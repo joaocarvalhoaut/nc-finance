@@ -1,0 +1,354 @@
+/**
+ * process-dispatch-jobs — worker que processa a fila de jobs de disparo.
+ *
+ * Chamada pelo pg_cron a cada 5 minutos.
+ * Protegida por AUTOMATION_CRON_SECRET.
+ *
+ * Por job:
+ *  1. Claim atômico (UPDATE status='processing' WHERE status IN ('queued','retrying'))
+ *  2. Valida assinatura/plano/limite
+ *  3. Verifica janela de envio da regra (Premium)
+ *  4. Busca devedor
+ *  5. Valida telefone
+ *  6. Verifica idempotência (5 min)
+ *  7. Monta mensagem (com PDF link se disponível)
+ *  8. Envia via Z-API global
+ *  9. Registra log em user_logs_cobranca
+ * 10. Incrementa charges_sent em sucesso
+ * 11. Atualiza job (success | failed | retrying | skipped | blocked_*)
+ *
+ * Retry backoff: 5 min → 15 min → 60 min → failed
+ *
+ * Secrets: AUTOMATION_CRON_SECRET, ZAPI_INSTANCE_ID, ZAPI_TOKEN, ZAPI_CLIENT_TOKEN,
+ *          SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ */
+
+import { createClient }                          from "npm:@supabase/supabase-js@2.49.8";
+import { corsHeaders }                           from "../_shared/cors.ts";
+import { normalizePhone, validatePhone, sendTextMessage } from "../_shared/zapi.ts";
+import { checkSubscription }                     from "../_shared/subscriptionGuard.ts";
+import { getUsageSnapshot, incrementChargesSent, getPlanLimit } from "../_shared/usageGuard.ts";
+import { insertBillingLog }                      from "../_shared/billingLog.ts";
+import { buildMessage }                          from "../_shared/messageBuilder.ts";
+
+// ─── Env ──────────────────────────────────────────────────────────────────────
+
+const SUPABASE_URL       = Deno.env.get("SUPABASE_URL")             || "";
+const SERVICE_ROLE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const CRON_SECRET        = Deno.env.get("AUTOMATION_CRON_SECRET")    || "";
+const ZAPI_INSTANCE_ID   = Deno.env.get("ZAPI_INSTANCE_ID")         || "";
+const ZAPI_TOKEN         = Deno.env.get("ZAPI_TOKEN")                || "";
+const ZAPI_CLIENT_TOKEN  = Deno.env.get("ZAPI_CLIENT_TOKEN")         || "";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const JOBS_PER_TICK        = 50;          // jobs processados por invocação
+const RETRY_DELAYS_MIN     = [5, 15, 60]; // backoff em minutos por tentativa
+const AUTOMATION_PLANS     = ["pro", "premium"];
+const PROVIDER             = "zapi";
+
+// ─── Admin client (service role) ──────────────────────────────────────────────
+
+const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+// ─── SHA-256 helper ───────────────────────────────────────────────────────────
+
+const hashKey = async (raw: string): Promise<string> => {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+};
+
+// ─── Process one job ──────────────────────────────────────────────────────────
+
+const processJob = async (job: Record<string, unknown>): Promise<void> => {
+  const jobId    = String(job.id);
+  const userId   = String(job.user_id);
+  const debtorId = String(job.debtor_id);
+  const ruleId   = (job.automation_rule_id as string | null) ?? null;
+  const attempts = Number(job.attempts ?? 0);
+  const maxAttempts = Number(job.max_attempts ?? 3);
+  const meta     = (job.metadata as Record<string, unknown>) ?? {};
+  const tone     = String(meta.tone ?? "neutro");
+
+  // ── Claim atômico ────────────────────────────────────────────────────────
+  const { data: claimed } = await admin
+    .from("user_dispatch_jobs")
+    .update({ status: "processing", updated_at: new Date().toISOString() })
+    .eq("id", jobId)
+    .in("status", ["queued", "retrying"])
+    .select("id")
+    .maybeSingle();
+
+  if (!claimed) return; // Outro worker já processou
+
+  const markJob = async (
+    status: string,
+    extras: Record<string, unknown> = {},
+  ) => {
+    await admin
+      .from("user_dispatch_jobs")
+      .update({ status, updated_at: new Date().toISOString(), ...extras })
+      .eq("id", jobId);
+  };
+
+  try {
+    // ── 1. Valida credenciais Z-API ────────────────────────────────────────
+    if (!ZAPI_INSTANCE_ID || !ZAPI_TOKEN || !ZAPI_CLIENT_TOKEN) {
+      await markJob("failed", { last_error: "Z-API nao configurada." });
+      return;
+    }
+
+    // ── 2. Valida assinatura ──────────────────────────────────────────────
+    const subResult = await checkSubscription(admin, userId);
+    if (!subResult.ok) {
+      await markJob("blocked_subscription", { last_error: subResult.guard.error });
+      return;
+    }
+    const { subscription } = subResult;
+
+    // ── 3. Verifica plano ─────────────────────────────────────────────────
+    if (!AUTOMATION_PLANS.includes(subscription.plan)) {
+      await markJob("skipped", { last_error: "Plano nao autoriza automacao." });
+      return;
+    }
+
+    // ── 4. Verifica janela de envio (se regra tiver configuração) ─────────
+    if (ruleId) {
+      const { data: rule } = await admin
+        .from("user_automation_rules")
+        .select("send_window_start, send_window_end, enabled")
+        .eq("id", ruleId)
+        .maybeSingle();
+
+      const r = rule as Record<string, unknown> | null;
+      if (r && r.enabled === false) {
+        await markJob("skipped", { last_error: "Regra desativada." });
+        return;
+      }
+
+      if (r?.send_window_start && r?.send_window_end) {
+        const now = new Date();
+        const hhmm = `${String(now.getUTCHours()).padStart(2, "0")}:${String(now.getUTCMinutes()).padStart(2, "0")}`;
+        const start = String(r.send_window_start).slice(0, 5);
+        const end   = String(r.send_window_end).slice(0, 5);
+        if (hhmm < start || hhmm > end) {
+          // Fora da janela: recoloca em queued com próximo scheduled_for no início da janela
+          const [sh, sm] = start.split(":").map(Number);
+          const nextWindow = new Date();
+          nextWindow.setUTCHours(sh, sm ?? 0, 0, 0);
+          if (nextWindow <= new Date()) nextWindow.setUTCDate(nextWindow.getUTCDate() + 1);
+          await admin
+            .from("user_dispatch_jobs")
+            .update({ status: "queued", scheduled_for: nextWindow.toISOString(), updated_at: new Date().toISOString() })
+            .eq("id", jobId);
+          return;
+        }
+      }
+    }
+
+    // ── 5. Valida limite mensal ────────────────────────────────────────────
+    const usage = await getUsageSnapshot(admin, userId, subscription.plan);
+    if (usage.remaining <= 0) {
+      await markJob("blocked_limit", {
+        last_error: `Limite mensal atingido (${usage.chargesUsed}/${usage.planLimit}).`,
+      });
+      return;
+    }
+
+    // ── 6. Busca devedor ──────────────────────────────────────────────────
+    const { data: debtorRow } = await admin
+      .from("user_registros_financeiros")
+      .select("id, client_name, document_number, due_date, amount, updated_value, phone, drive_file_url, drive_file_name")
+      .eq("id", debtorId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (!debtorRow) {
+      await markJob("skipped", { last_error: "Devedor nao encontrado." });
+      return;
+    }
+
+    const dr = debtorRow as Record<string, unknown>;
+    const clientName    = String(dr.client_name    ?? "");
+    const documentNumber= String(dr.document_number?? "");
+    const rawPhone      = String(dr.phone          ?? "");
+    const dueDate       = String(dr.due_date       ?? "");
+    const amount        = Number(dr.updated_value  ?? dr.amount ?? 0);
+    const driveFileUrl  = (dr.drive_file_url  as string | null) ?? null;
+    const driveFileName = (dr.drive_file_name as string | null) ?? null;
+    const customMsg     = (meta.custom_message as string | null) ?? null;
+
+    // ── 7. Valida telefone ────────────────────────────────────────────────
+    const normalizedPhone = normalizePhone(rawPhone);
+    if (!validatePhone(normalizedPhone)) {
+      const logId = await insertBillingLog(admin, {
+        userId, clientName, documentNumber,
+        phone: rawPhone || "sem_telefone",
+        amount, tone, message: "N/A",
+        status: "telefone_invalido", type: "lote", provider: PROVIDER,
+        errorMessage: `Tel invalido: "${rawPhone}"`, debtorId,
+      });
+      await markJob("failed", {
+        last_error: `Telefone invalido: ${rawPhone}`,
+        provider_message_id: logId,
+        attempts: attempts + 1,
+      });
+      return;
+    }
+
+    // ── 8. Monta mensagem ─────────────────────────────────────────────────
+    const message = buildMessage(
+      { clientName, documentNumber, dueDate, amount, driveFileUrl, driveFileName },
+      tone,
+      customMsg,
+    );
+
+    // ── 9. Idempotência (5 min) ───────────────────────────────────────────
+    const today = new Date().toISOString().slice(0, 10);
+    const idemRaw  = `${userId}::${normalizedPhone}::${message.slice(0, 100)}::${today}`;
+    const idemHash = await hashKey(idemRaw);
+    const fiveMin  = new Date(Date.now() - 5 * 60 * 1_000).toISOString();
+
+    const { data: dupLog } = await admin
+      .from("user_logs_cobranca")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("idempotency_key", idemHash)
+      .eq("status", "sucesso")
+      .gte("created_at", fiveMin)
+      .maybeSingle();
+
+    if (dupLog) {
+      await markJob("duplicated", { last_error: "Envio duplicado em 5min.", attempts: attempts + 1 });
+      return;
+    }
+
+    // ── 10. Envia via Z-API ───────────────────────────────────────────────
+    const zapiResult = await sendTextMessage({
+      instanceId:  ZAPI_INSTANCE_ID,
+      token:       ZAPI_TOKEN,
+      clientToken: ZAPI_CLIENT_TOKEN,
+      phone:       normalizedPhone,
+      message,
+    });
+
+    const logStatus = zapiResult.success ? "sucesso" : "erro";
+
+    // ── 11. Registra log ──────────────────────────────────────────────────
+    await insertBillingLog(admin, {
+      userId, clientName, documentNumber,
+      phone: normalizedPhone, amount, tone, message,
+      status: logStatus, type: "lote", provider: PROVIDER,
+      providerMessageId: zapiResult.messageId,
+      errorMessage: zapiResult.error,
+      idempotencyKey: idemHash,
+      debtorId,
+    });
+
+    // ── 12. Incrementa usage em sucesso ───────────────────────────────────
+    if (zapiResult.success) {
+      await incrementChargesSent(admin, userId, usage, 1);
+      await markJob("success", {
+        provider_message_id: zapiResult.messageId,
+        attempts: attempts + 1,
+      });
+    } else {
+      // ── 13. Retry ou falha definitiva ─────────────────────────────────
+      const newAttempts = attempts + 1;
+      if (newAttempts >= maxAttempts) {
+        await markJob("failed", {
+          last_error: zapiResult.error ?? "Max tentativas atingido.",
+          attempts:   newAttempts,
+        });
+      } else {
+        const delayMin = RETRY_DELAYS_MIN[newAttempts - 1] ?? 60;
+        const nextScheduled = new Date(Date.now() + delayMin * 60 * 1_000).toISOString();
+        await admin
+          .from("user_dispatch_jobs")
+          .update({
+            status:        "retrying",
+            attempts:      newAttempts,
+            last_error:    zapiResult.error,
+            scheduled_for: nextScheduled,
+            updated_at:    new Date().toISOString(),
+          })
+          .eq("id", jobId);
+      }
+    }
+  } catch (err) {
+    console.error(`[worker] job ${jobId} unhandled:`, err);
+    const newAttempts = attempts + 1;
+    if (newAttempts >= maxAttempts) {
+      await markJob("failed", {
+        last_error: err instanceof Error ? err.message.slice(0, 500) : "Erro desconhecido.",
+        attempts:   newAttempts,
+      });
+    } else {
+      const delayMin = RETRY_DELAYS_MIN[newAttempts - 1] ?? 60;
+      await admin
+        .from("user_dispatch_jobs")
+        .update({
+          status:        "retrying",
+          attempts:      newAttempts,
+          last_error:    err instanceof Error ? err.message.slice(0, 500) : "Erro desconhecido.",
+          scheduled_for: new Date(Date.now() + delayMin * 60 * 1_000).toISOString(),
+          updated_at:    new Date().toISOString(),
+        })
+        .eq("id", jobId);
+    }
+  }
+};
+
+// ─── Handler ──────────────────────────────────────────────────────────────────
+
+Deno.serve(async (request: Request) => {
+  if (request.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  // ── Segurança ─────────────────────────────────────────────────────────────
+  const auth = request.headers.get("Authorization") ?? "";
+  if (!CRON_SECRET || auth.replace("Bearer ", "").trim() !== CRON_SECRET) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  try {
+    const now = new Date().toISOString();
+
+    // Busca jobs elegíveis (queued ou retrying com scheduled_for vencido)
+    const { data: jobs, error } = await admin
+      .from("user_dispatch_jobs")
+      .select("*")
+      .in("status", ["queued", "retrying"])
+      .lte("scheduled_for", now)
+      .order("scheduled_for", { ascending: true })
+      .limit(JOBS_PER_TICK);
+
+    if (error) throw error;
+
+    const jobList = (jobs ?? []) as Array<Record<string, unknown>>;
+    let processed = 0;
+
+    for (const job of jobList) {
+      await processJob(job);
+      processed++;
+    }
+
+    // Atualiza sent/failed em user_automation_runs para runs em andamento
+    // (simplificado: runs ficam com sent/failed=0; os logs reais estão em user_logs_cobranca)
+
+    return new Response(
+      JSON.stringify({ success: true, jobsProcessed: processed, timestamp: now }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  } catch (err) {
+    console.error("[process-dispatch-jobs] unhandled:", err);
+    return new Response(
+      JSON.stringify({ error: "Erro interno no worker." }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+});

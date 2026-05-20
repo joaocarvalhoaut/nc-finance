@@ -1,0 +1,6 @@
+{
+  "name": "NC Finance",
+  "description": "Sistema moderno de gestão de faturamento, cobranças automáticas via WhatsApp e extração de dados financeiros com Inteligência Artificial.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
