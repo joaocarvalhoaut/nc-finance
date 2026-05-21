@@ -80,6 +80,7 @@ const mapRowToUserConfig = (row: UserConfigRow): UserConfig => ({
   whatsappStatus: row.whatsapp_status || "not_configured",
   integrationProvider: row.integration_provider,
   lastConnectionCheck: row.last_connection_check,
+  metadata: row.metadata || {},
   createdAt: row.created_at,
   updatedAt: row.updated_at
 });
@@ -98,7 +99,7 @@ const mapUserConfigToRow = (config: UserConfig) => ({
   whatsapp_status: config.whatsappStatus,
   integration_provider: config.integrationProvider || null,
   last_connection_check: config.lastConnectionCheck,
-  metadata: null
+  metadata: config.metadata || { created_by: "system" }
 });
 
 const mapTemplateRowToRecord = (row: MessageTemplateRow): MessageTemplateRecord => ({

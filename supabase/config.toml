@@ -68,7 +68,6 @@ enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
 secure_password_change = false
-mailer_autoconfirm = false
 max_frequency = "1s"
 otp_length = 6
 otp_expiry = 3600

@@ -100,6 +100,7 @@ export interface UserConfig {
   whatsappStatus: string;
   integrationProvider: string | null;
   lastConnectionCheck: string | null;
+  metadata?: Record<string, unknown>;
   createdAt?: string;
   updatedAt?: string;
 }

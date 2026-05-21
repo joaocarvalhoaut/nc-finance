@@ -292,6 +292,8 @@ export default function App() {
     plan,
     remainingCharges,
     refreshSubscription,
+    isSyncing: isSubscriptionSyncing,
+    startCheckoutPolling,
   } = useSubscription(userId);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isSubscriptionActionLoading, setIsSubscriptionActionLoading] = useState(false);
@@ -419,6 +421,27 @@ export default function App() {
     await signOut();
     setCurrentTab("inicio");
   };
+
+  // ── Detecção de retorno do Stripe Checkout ────────────────────────────────────
+  // Stripe redireciona para ?checkout=success após pagamento confirmado.
+  // O webhook pode chegar com 1-10 s de atraso — iniciamos polling para aguardar.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkoutResult = params.get("checkout");
+    if (!checkoutResult) return;
+
+    // Limpa o parâmetro da URL imediatamente (evita re-trigger em F5)
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete("checkout");
+    window.history.replaceState({}, "", cleanUrl.toString());
+
+    if (checkoutResult === "success" && userId) {
+      // Inicia polling aguardando o webhook do Stripe atualizar o status
+      startCheckoutPolling();
+    }
+    // canceled: apenas limpa URL, não faz nada (usuário volta para SubscriptionGate)
+  }, [userId]);
+  // ─────────────────────────────────────────────────────────────────────────────
 
   const handleStartCheckout = async (planId: PlanId) => {
     setIsSubscriptionActionLoading(true);
@@ -1175,18 +1198,18 @@ export default function App() {
           isAuthLoading={isAuthenticating}
           authConfigError={authConfigError}
         />
-      ) : isSubscriptionLoading ? (
+      ) : (isSubscriptionLoading && !isSubscriptionSyncing) ? (
         <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
           <div className="text-center space-y-3">
             <div className="w-10 h-10 mx-auto rounded-full border-2 border-emerald-500/30 border-t-emerald-400 animate-spin" />
-            <p className="text-sm font-semibold text-white">Verificando assinatura...</p>
+            <p className="text-sm font-semibold text-white">Verificando assinatura…</p>
             <p className="text-xs text-zinc-500">Preparando acesso seguro ao painel NC Finance.</p>
           </div>
         </div>
       ) : !canUseApp ? (
         <SubscriptionGate
           email={account?.email || user?.email || ""}
-          loading={isSubscriptionActionLoading}
+          loading={isSubscriptionActionLoading || isSubscriptionLoading}
           error={subscriptionGateError || subscriptionError}
           selectedPlanId={selectedPlanId}
           onSelectPlan={(planId) => {
@@ -1195,8 +1218,14 @@ export default function App() {
           }}
           onManageSubscription={() => void handleOpenBillingPortal()}
           onRefresh={() => void refreshSubscription()}
+          onBack={() => {
+            setSubscriptionGateError("");
+            setCurrentTab("inicio");
+          }}
+          onLogout={() => void handleSignOut()}
           subscription={subscription}
           usage={usage}
+          isSyncing={isSubscriptionSyncing}
         />
       ) : (
         <>
