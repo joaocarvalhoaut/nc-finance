@@ -283,6 +283,44 @@ interface ExtractedDebtorCandidate {
   telefone?: string;
 }
 
+type GeminiExtractApiResponse =
+  | {
+      ok: true;
+      debtors?: ExtractedDebtorCandidate[];
+      warnings?: string[];
+    }
+  | {
+      ok: false;
+      error?: string;
+    };
+
+const parseGeminiExtractResponse = async (
+  response: Response,
+): Promise<GeminiExtractApiResponse> => {
+  const contentType = response.headers.get("content-type") || "";
+  const isJson = contentType.toLowerCase().includes("application/json");
+
+  if (isJson) {
+    return (await response.json()) as GeminiExtractApiResponse;
+  }
+
+  const rawText = await response.text();
+  const safeText = rawText.trim();
+
+  console.warn("[gemini.extract.non_json_response]", {
+    status: response.status,
+    contentType,
+    preview: safeText.slice(0, 300),
+  });
+
+  return {
+    ok: false,
+    error:
+      safeText ||
+      "A API de extração retornou uma resposta inválida. Tente novamente em alguns instantes.",
+  };
+};
+
 export default function App() {
   const {
     account,
@@ -912,11 +950,15 @@ export default function App() {
         })
       });
 
-      const data = await response.json();
+      const data = await parseGeminiExtractResponse(response);
       if (!response.ok) {
-        throw new Error(typeof data?.error === "string" ? data.error : "Falha ao processar extracao IA.");
+        const message =
+          "error" in data && typeof data.error === "string"
+            ? data.error
+            : "Falha ao processar extracao IA.";
+        throw new Error(message);
       }
-      if (data.debtors && Array.isArray(data.debtors)) {
+      if (data.ok && data.debtors && Array.isArray(data.debtors)) {
         const parsedList = data.debtors
           .map((item: ExtractedDebtorCandidate, index: number) => ({
             id: `ext-${Date.now()}-${index}`,
@@ -933,6 +975,7 @@ export default function App() {
 
         setExtractedDebtors(parsedList);
         if (Array.isArray(data.warnings) && data.warnings.length > 0) {
+          console.warn("[gemini.extract.warnings]", data.warnings);
           setExtractionAlert(data.warnings.join(" "));
         } else if (parsedList.length === 0) {
           setExtractionAlert("Nenhum registro financeiro valido foi retornado pela IA para o conteudo enviado.");
