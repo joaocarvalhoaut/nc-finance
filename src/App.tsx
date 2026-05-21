@@ -870,6 +870,9 @@ export default function App() {
       });
 
       const data = await response.json();
+      if (!response.ok) {
+        throw new Error(typeof data?.error === "string" ? data.error : "Falha ao processar extração IA.");
+      }
       if (data.debtors && Array.isArray(data.debtors)) {
         const parsedList = data.debtors.map((item: ExtractedDebtorCandidate, index: number) => ({
           id: `ext-${Date.now()}-${index}`,
