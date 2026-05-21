@@ -66,6 +66,23 @@ const MESSAGE_TEMPLATE_FIELDS = `
   updated_at
 `;
 
+const sanitizeUserConfigPayload = (config: UserConfig) => ({
+  user_id: config.userId,
+  global_fine_pct: config.globalFinePct,
+  global_interest_day_pct: config.globalInterestDayPct,
+  selected_tone: config.selectedTone,
+  sheet_url_input: config.sheetUrlInput || null,
+  drive_linked_folder: config.driveLinkedFolder || null,
+  subscription_status: config.subscriptionStatus || "trialing",
+  stripe_customer_id: config.stripeCustomerId || null,
+  plan: config.plan || "starter",
+  usage_counters: config.usageCounters ?? {},
+  whatsapp_status: config.whatsappStatus || "not_configured",
+  integration_provider: config.integrationProvider || null,
+  last_connection_check: config.lastConnectionCheck,
+  metadata: config.metadata ?? {},
+});
+
 const mapRowToUserConfig = (row: UserConfigRow): UserConfig => ({
   userId: row.user_id,
   globalFinePct: Number(row.global_fine_pct || 0),
@@ -85,22 +102,7 @@ const mapRowToUserConfig = (row: UserConfigRow): UserConfig => ({
   updatedAt: row.updated_at
 });
 
-const mapUserConfigToRow = (config: UserConfig) => ({
-  user_id: config.userId,
-  global_fine_pct: config.globalFinePct,
-  global_interest_day_pct: config.globalInterestDayPct,
-  selected_tone: config.selectedTone,
-  sheet_url_input: config.sheetUrlInput || null,
-  drive_linked_folder: config.driveLinkedFolder || null,
-  subscription_status: config.subscriptionStatus,
-  stripe_customer_id: config.stripeCustomerId || null,
-  plan: config.plan,
-  usage_counters: config.usageCounters,
-  whatsapp_status: config.whatsappStatus,
-  integration_provider: config.integrationProvider || null,
-  last_connection_check: config.lastConnectionCheck,
-  metadata: config.metadata || { created_by: "system" }
-});
+const mapUserConfigToRow = (config: UserConfig) => sanitizeUserConfigPayload(config);
 
 const mapTemplateRowToRecord = (row: MessageTemplateRow): MessageTemplateRecord => ({
   id: row.id,
@@ -142,6 +144,7 @@ export const userConfigService = {
   async upsertConfig(config: UserConfig) {
     const supabase = getSupabaseClient();
     const payload = mapUserConfigToRow(config);
+    console.log("[user_configuracoes.write]", payload);
 
     const { data, error } = await supabase
       .from(USER_CONFIG_TABLE)
