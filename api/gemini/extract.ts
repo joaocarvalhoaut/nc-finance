@@ -1,4 +1,4 @@
-import { extractDebtorsWithGemini } from "../../src/server/geminiExtraction";
+ï»¿import { extractDebtorsWithGemini } from "../../src/server/geminiExtraction.js";
 
 type RequestBody = {
   textContent?: string;
@@ -55,7 +55,7 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   );
 
   if (!textContent || typeof textContent !== "string") {
-    return res.status(400).json({ error: "O texto para extração é obrigatório." });
+    return res.status(400).json({ error: "O texto para extraÃ§Ã£o Ã© obrigatÃ³rio." });
   }
 
   try {
@@ -76,6 +76,6 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
         stack: error instanceof Error ? error.stack : undefined,
       }),
     );
-    return res.status(500).json({ error: "Falha ao processar a extração com Gemini." });
+    return res.status(500).json({ error: "Falha ao processar a extraÃ§Ã£o com Gemini." });
   }
 }
