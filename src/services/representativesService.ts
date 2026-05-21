@@ -14,6 +14,9 @@ interface RepresentativeRow {
 
 const TABLE_NAME = "user_representantes";
 const SELECT_FIELDS = "id, user_id, name, phone, role, color, created_at, updated_at";
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isValidUUID = (value: string | null | undefined) => Boolean(value && UUID_REGEX.test(value));
 
 const mapRowToRepresentative = (row: RepresentativeRow): Representative => ({
   id: row.id,
@@ -27,7 +30,7 @@ const mapRowToRepresentative = (row: RepresentativeRow): Representative => ({
 });
 
 const mapRepresentativeToRow = (userId: string, representative: Representative) => ({
-  id: representative.id || undefined,
+  id: isValidUUID(representative.id) ? representative.id : undefined,
   user_id: userId,
   name: representative.name,
   phone: representative.phone,
@@ -54,7 +57,9 @@ export const representativesService = {
   async create(userId: string, representative: Representative) {
     const supabase = getSupabaseClient();
     const payload = mapRepresentativeToRow(userId, representative);
-    delete payload.id;
+    if (representative.id && !payload.id) {
+      console.warn("[representatives.write] representative.id invalido ignorado", representative.id);
+    }
 
     const { data, error } = await supabase
       .from(TABLE_NAME)
@@ -75,7 +80,9 @@ export const representativesService = {
     const supabase = getSupabaseClient();
     const payload = representatives.map((representative) => {
       const row = mapRepresentativeToRow(userId, representative);
-      delete row.id;
+      if (representative.id && !row.id) {
+        console.warn("[representatives.write] representative.id invalido ignorado", representative.id);
+      }
       return row;
     });
 

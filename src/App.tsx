@@ -140,6 +140,12 @@ Atenciosamente, departamento administrativo NC Finance.`
   }
 ];
 
+const INITIAL_REPRESENTATIVE_IDS = {
+  amanda: "11111111-1111-4111-8111-111111111111",
+  bruno: "22222222-2222-4222-8222-222222222222",
+  clara: "33333333-3333-4333-8333-333333333333"
+} as const;
+
 // Seed initial devedores matching the Portuguese financial context
 const INITIAL_DEBTORS: Debtor[] = [
   {
@@ -154,7 +160,7 @@ const INITIAL_DEBTORS: Debtor[] = [
     interestApplied: 2,
     fineApplied: 1,
     notes: "Aguardando retorno do e-mail do financeiro",
-    representativeId: "r1",
+    representativeId: INITIAL_REPRESENTATIVE_IDS.amanda,
     status: "pending"
   },
   {
@@ -169,7 +175,7 @@ const INITIAL_DEBTORS: Debtor[] = [
     interestApplied: 0,
     fineApplied: 0,
     notes: "Cliente solicitou envio preventivo amigável",
-    representativeId: "r2",
+    representativeId: INITIAL_REPRESENTATIVE_IDS.bruno,
     status: "pending"
   },
   {
@@ -184,7 +190,7 @@ const INITIAL_DEBTORS: Debtor[] = [
     interestApplied: 2,
     fineApplied: 1,
     notes: "Acordo de parcelamento em andamento",
-    representativeId: "r1",
+    representativeId: INITIAL_REPRESENTATIVE_IDS.amanda,
     status: "pending"
   },
   {
@@ -199,16 +205,16 @@ const INITIAL_DEBTORS: Debtor[] = [
     interestApplied: 0,
     fineApplied: 0,
     notes: "Pago via PIX com comprovante anexado",
-    representativeId: "r3",
+    representativeId: INITIAL_REPRESENTATIVE_IDS.clara,
     status: "sent"
   }
 ];
 
 // Seed initial representatives for devedores matching the scenario
 const INITIAL_REPRESENTATIVES: Representative[] = [
-  { id: "r1", name: "Amanda Azevedo", phone: "5577999881111", role: "Coordenador de Cobrança", color: "text-emerald-400 bg-emerald-500/10" },
-  { id: "r2", name: "Bruno Pinheiro", phone: "5511988772233", role: "Gestor Contas Sul", color: "text-sky-400 bg-sky-500/10" },
-  { id: "r3", name: "Clara Vasconcelos", phone: "5521977663344", role: "Jurídico NC Finance", color: "text-amber-400 bg-amber-500/10" }
+  { id: INITIAL_REPRESENTATIVE_IDS.amanda, name: "Amanda Azevedo", phone: "5577999881111", role: "Coordenador de Cobrança", color: "text-emerald-400 bg-emerald-500/10" },
+  { id: INITIAL_REPRESENTATIVE_IDS.bruno, name: "Bruno Pinheiro", phone: "5511988772233", role: "Gestor Contas Sul", color: "text-sky-400 bg-sky-500/10" },
+  { id: INITIAL_REPRESENTATIVE_IDS.clara, name: "Clara Vasconcelos", phone: "5521977663344", role: "Jurídico NC Finance", color: "text-amber-400 bg-amber-500/10" }
 ];
 
 const INITIAL_BILLING_LOGS: BillingLog[] = [
@@ -3410,6 +3416,7 @@ Devedor: Julio César de Mello, boleto 2104-E emitido por NC Empreendimentos par
     </div>
   );
 }
+
 
 
 

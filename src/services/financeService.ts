@@ -32,6 +32,7 @@ interface FinancialRecordRow {
 }
 
 const TABLE_NAME = "user_registros_financeiros";
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SELECT_FIELDS = `
   id,
   user_id,
@@ -58,6 +59,8 @@ const SELECT_FIELDS = `
   created_at,
   updated_at
 `;
+
+const isValidUUID = (value: string | null | undefined) => Boolean(value && UUID_REGEX.test(value));
 
 const normalizeDateToStorage = (value: string) => {
   if (!value) return new Date().toISOString().slice(0, 10);
@@ -124,7 +127,7 @@ const mapDebtorToRow = (userId: string, debtor: Debtor) => ({
   fine_applied: debtor.fineApplied ?? 0,
   updated_value: debtor.updatedValue ?? debtor.value,
   notes: debtor.notes || null,
-  representative_id: debtor.representativeId || null,
+  representative_id: isValidUUID(debtor.representativeId) ? debtor.representativeId : null,
   status: debtor.status,
   last_sent_message: debtor.lastSentMessage || null,
   last_sent_date: debtor.lastSentDate || null
@@ -149,6 +152,9 @@ export const financeService = {
   async create(userId: string, debtor: Debtor) {
     const supabase = getSupabaseClient();
     const payload = mapDebtorToRow(userId, debtor);
+    if (debtor.representativeId && !payload.representative_id) {
+      console.warn("[finance.write] representativeId invalido ignorado", debtor.representativeId);
+    }
     delete payload.id;
 
     const { data, error } = await supabase
@@ -170,6 +176,9 @@ export const financeService = {
     const supabase = getSupabaseClient();
     const payload = debtors.map((debtor) => {
       const row = mapDebtorToRow(userId, debtor);
+      if (debtor.representativeId && !row.representative_id) {
+        console.warn("[finance.write] representativeId invalido ignorado", debtor.representativeId);
+      }
       delete row.id;
       return row;
     });
@@ -189,6 +198,9 @@ export const financeService = {
   async update(userId: string, debtor: Debtor) {
     const supabase = getSupabaseClient();
     const payload = mapDebtorToRow(userId, debtor);
+    if (debtor.representativeId && !payload.representative_id) {
+      console.warn("[finance.write] representativeId invalido ignorado", debtor.representativeId);
+    }
     delete payload.id;
 
     const { data, error } = await supabase
