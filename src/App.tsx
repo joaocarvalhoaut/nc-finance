@@ -371,6 +371,8 @@ export default function App() {
   const [extractedDebtors, setExtractedDebtors] = useState<Debtor[]>([]);
   const [extractionAlert, setExtractionAlert] = useState<string>("");
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
+  // Gemini rate-limit countdown: > 0 means "waiting N seconds before auto-retry"
+  const [geminiCountdown, setGeminiCountdown] = useState<number>(0);
   const [importFileName, setImportFileName] = useState<string>("");
 
   // Representative management form values
@@ -494,6 +496,26 @@ export default function App() {
     }
     // canceled: apenas limpa URL, não faz nada (usuário volta para SubscriptionGate)
   }, [userId]);
+
+  // Gemini rate-limit countdown — ticks every second, auto-retries when it reaches 0
+  useEffect(() => {
+    if (geminiCountdown <= 0) return;
+    const timer = setTimeout(() => {
+      setGeminiCountdown((prev) => {
+        const next = prev - 1;
+        if (next <= 0) {
+          // Auto-retry: clear alert and trigger extraction again
+          setExtractionAlert("");
+          // defer so state flush completes before handleAIExtract runs
+          setTimeout(() => void handleAIExtract(), 0);
+        }
+        return next;
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geminiCountdown]);
+
   // Carregamento inicial de dados da conta autenticada
 
   const handleStartCheckout = async (planId: PlanId) => {
@@ -940,6 +962,7 @@ export default function App() {
 
     setIsExtracting(true);
     setExtractionAlert("");
+    setGeminiCountdown(0);
     try {
       const response = await fetch("/api/gemini/extract", {
         method: "POST",
@@ -951,6 +974,20 @@ export default function App() {
       });
 
       const data = await parseGeminiExtractResponse(response);
+
+      // Rate-limit: show countdown and auto-retry
+      if (response.status === 429) {
+        const raw = data as unknown as Record<string, unknown>;
+        const retryAfter = typeof raw.retryAfterSeconds === "number" ? raw.retryAfterSeconds : 65;
+        const msg =
+          typeof raw.error === "string"
+            ? raw.error
+            : `Limite de requisições atingido. Aguardando ${retryAfter}s para tentar novamente…`;
+        setExtractionAlert(msg);
+        setGeminiCountdown(retryAfter);
+        return;
+      }
+
       if (!response.ok) {
         const message =
           "error" in data && typeof data.error === "string"
@@ -1856,20 +1893,43 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                       </div>
 
                       {extractionAlert && (
-                        <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-xl flex items-center gap-2">
-                          <AlertTriangle className="w-4.5 h-4.5 flex-shrink-0" />
-                          <span>{extractionAlert}</span>
+                        <div className={`p-3 border text-xs rounded-xl flex items-start gap-2 ${
+                          geminiCountdown > 0
+                            ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                            : "bg-amber-500/10 border-amber-500/20 text-amber-400"
+                        }`}>
+                          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1 space-y-1">
+                            <span>{extractionAlert}</span>
+                            {geminiCountdown > 0 && (
+                              <div className="flex items-center gap-2 mt-1">
+                                <div className="h-1 flex-1 rounded-full bg-amber-900/40 overflow-hidden">
+                                  <div
+                                    className="h-full bg-amber-400 transition-all duration-1000"
+                                    style={{ width: `${Math.max(0, (geminiCountdown / 65) * 100)}%` }}
+                                  />
+                                </div>
+                                <span className="text-amber-200 font-mono font-bold tabular-nums">
+                                  {geminiCountdown}s
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
 
                       <button
                         onClick={handleAIExtract}
-                        disabled={isExtracting}
-                        className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all text-sm cursor-pointer"
+                        disabled={isExtracting || geminiCountdown > 0}
+                        className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all text-sm cursor-pointer disabled:cursor-not-allowed"
                       >
                         {isExtracting ? (
                           <>
                             <RefreshCw className="w-4 h-4 animate-spin" /> Extraindo Informações via IA Gemini...
+                          </>
+                        ) : geminiCountdown > 0 ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" /> Aguardando cota Gemini… {geminiCountdown}s
                           </>
                         ) : (
                           <>

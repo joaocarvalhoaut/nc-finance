@@ -1,4 +1,4 @@
-﻿import { extractDebtorsWithGemini } from "../../src/server/geminiExtraction.js";
+﻿import { extractDebtorsWithGemini, GeminiRateLimitError } from "../../src/server/geminiExtraction.js";
 
 type RequestBody = {
   textContent?: string;
@@ -82,6 +82,23 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
     );
     return sendJson(res, 200, result);
   } catch (error) {
+    // Rate-limit from Gemini — return 429 so the frontend can countdown + retry
+    if (error instanceof GeminiRateLimitError) {
+      console.warn(
+        JSON.stringify({
+          source: "vercel.gemini.extract.rate_limit",
+          retry_after_sec: error.retryAfterSeconds,
+          message: error.message,
+        }),
+      );
+      res.setHeader("Retry-After", String(error.retryAfterSeconds));
+      return sendJson(res, 429, {
+        ok: false,
+        error: error.message,
+        retryAfterSeconds: error.retryAfterSeconds,
+      });
+    }
+
     console.error(
       JSON.stringify({
         source: "vercel.gemini.extract.error",
