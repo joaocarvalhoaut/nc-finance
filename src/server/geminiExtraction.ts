@@ -36,6 +36,76 @@ export interface ExtractResponsePayload {
   warnings?: string[];
 }
 
+// ── Gemini error helpers ──────────────────────────────────────────────────────
+
+/** Extract the numeric HTTP status from a Gemini SDK error */
+const getGeminiHttpStatus = (error: unknown): number | null => {
+  if (!error || typeof error !== "object") return null;
+  const e = error as Record<string, unknown>;
+  // SDK wraps errors as { status, message, errorDetails }
+  if (typeof e.status === "number") return e.status;
+  // Or the raw response body may be embedded in the message string
+  const msg = typeof e.message === "string" ? e.message : "";
+  const match = msg.match(/"code"\s*:\s*(\d{3})/);
+  return match ? parseInt(match[1], 10) : null;
+};
+
+/** Parse the `retryDelay` seconds embedded in a Gemini 429 response */
+const parseRetryDelaySeconds = (error: unknown): number => {
+  try {
+    const msg =
+      error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : JSON.stringify(error);
+    const match = msg.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/);
+    return match ? Math.ceil(parseFloat(match[1])) : 0;
+  } catch {
+    return 0;
+  }
+};
+
+/**
+ * Map a Gemini API error to a short, user-friendly Portuguese message.
+ * Never leaks the raw JSON stack to the end-user.
+ */
+const toFriendlyGeminiError = (error: unknown): string => {
+  const status = getGeminiHttpStatus(error);
+  const msg =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+
+  if (status === 429 || msg.includes("RESOURCE_EXHAUSTED")) {
+    const delaySec = parseRetryDelaySeconds(error);
+    const tryAgain = delaySec > 0 ? ` Tente novamente em ${delaySec} segundos.` : "";
+    return `Limite de requisições da API Gemini atingido (cota gratuita esgotada).${tryAgain} Se o problema persistir, ative o faturamento em console.cloud.google.com.`;
+  }
+  if (status === 503 || msg.includes("UNAVAILABLE")) {
+    return "O serviço Gemini está temporariamente indisponível. Tente novamente em alguns instantes.";
+  }
+  if (status === 400 || msg.includes("INVALID_ARGUMENT")) {
+    return "Texto inválido ou muito curto para extração. Verifique o conteúdo e tente novamente.";
+  }
+  if (status === 401 || status === 403 || msg.includes("API_KEY") || msg.includes("permission")) {
+    return "Chave de API Gemini inválida ou sem permissão. Verifique a variável GEMINI_API_KEY no painel Vercel.";
+  }
+  if (msg.includes("DEADLINE_EXCEEDED") || msg.includes("504")) {
+    return "Extração demorou demais (timeout). Reduza o tamanho do texto e tente novamente.";
+  }
+  // Fallback — return only the first line to avoid dumping JSON
+  const firstLine = msg.split("\n")[0].slice(0, 200);
+  return firstLine || "Erro desconhecido ao chamar a API Gemini.";
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Max retry delay we're willing to wait before giving up (ms)
+const MAX_RETRY_WAIT_MS = 65_000;
+
 let ai: GoogleGenAI | null = null;
 
 const getGeminiClient = () => {
@@ -217,9 +287,8 @@ export const extractDebtorsWithGemini = async (
   }
 
   const client = getGeminiClient();
-  console.log(JSON.stringify({ source: "gemini.extract.call", model: "gemini-2.0-flash" }));
 
-  const response = await client.models.generateContent({
+  const geminiConfig = {
     model: "gemini-2.0-flash",
     contents: buildPrompt(textContent, category),
     config: {
@@ -255,53 +324,90 @@ export const extractDebtorsWithGemini = async (
         required: ["records"],
       },
     },
-  });
-
-  const resultText = response.text;
-  console.log(
-    JSON.stringify({
-      source: "gemini.extract.raw_response",
-      has_text: Boolean(resultText),
-      preview: resultText ? resultText.slice(0, 400) : null,
-    }),
-  );
-
-  if (!resultText) {
-    throw new Error("Sem resposta textual do Gemini.");
-  }
-
-  let parsed: { records?: GeminiReceivableRecord[] };
-  try {
-    parsed = JSON.parse(resultText.trim()) as { records?: GeminiReceivableRecord[] };
-  } catch (error) {
-    throw new Error(
-      `Resposta do Gemini não é JSON válido: ${
-        error instanceof Error ? error.message : "falha desconhecida"
-      }`,
-    );
-  }
-
-  const rawRecords = Array.isArray(parsed.records) ? parsed.records : [];
-  const normalizedRecords = rawRecords
-    .map((record) => toExtractedDebtor(record))
-    .filter((record): record is ExtractedDebtorRecord => Boolean(record));
-  const validatedRecords = validateAgainstSource(normalizedRecords, textContent);
-
-  const warnings: string[] = [];
-  const expectedByState = (textContent.match(/\bAberto\b/gi) || []).length;
-  if (expectedByState > 0 && validatedRecords.length < expectedByState) {
-    const warning = `Gemini retornou ${validatedRecords.length} registros válidos para um texto que sugere ${expectedByState} linhas em aberto.`;
-    warnings.push(warning);
-    console.warn(JSON.stringify({ source: "gemini.extract.warning", warning }));
-  }
-
-  if (!validatedRecords.length) {
-    throw new Error("Nenhum registro financeiro válido foi extraído do texto enviado.");
-  }
-
-  return {
-    ok: true,
-    debtors: validatedRecords,
-    warnings,
   };
+
+  // Retry loop — up to 3 attempts; retries on 429 / 503 with backoff
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      console.log(
+        JSON.stringify({ source: "gemini.extract.call", model: "gemini-2.0-flash", attempt }),
+      );
+
+      const response = await client.models.generateContent(geminiConfig);
+      const resultText = response.text;
+
+      console.log(
+        JSON.stringify({
+          source: "gemini.extract.raw_response",
+          has_text: Boolean(resultText),
+          preview: resultText ? resultText.slice(0, 400) : null,
+        }),
+      );
+
+      if (!resultText) {
+        throw new Error("Sem resposta textual do Gemini.");
+      }
+
+      let parsed: { records?: GeminiReceivableRecord[] };
+      try {
+        parsed = JSON.parse(resultText.trim()) as { records?: GeminiReceivableRecord[] };
+      } catch (parseError) {
+        throw new Error(
+          `Resposta do Gemini não é JSON válido: ${
+            parseError instanceof Error ? parseError.message : "falha desconhecida"
+          }`,
+        );
+      }
+
+      const rawRecords = Array.isArray(parsed.records) ? parsed.records : [];
+      const normalizedRecords = rawRecords
+        .map((record) => toExtractedDebtor(record))
+        .filter((record): record is ExtractedDebtorRecord => Boolean(record));
+      const validatedRecords = validateAgainstSource(normalizedRecords, textContent);
+
+      const warnings: string[] = [];
+      const expectedByState = (textContent.match(/\bAberto\b/gi) || []).length;
+      if (expectedByState > 0 && validatedRecords.length < expectedByState) {
+        const warning = `Gemini retornou ${validatedRecords.length} registros válidos para um texto que sugere ${expectedByState} linhas em aberto.`;
+        warnings.push(warning);
+        console.warn(JSON.stringify({ source: "gemini.extract.warning", warning }));
+      }
+
+      if (!validatedRecords.length) {
+        throw new Error("Nenhum registro financeiro válido foi extraído do texto enviado.");
+      }
+
+      return { ok: true, debtors: validatedRecords, warnings };
+
+    } catch (error) {
+      lastError = error;
+      const status = getGeminiHttpStatus(error);
+      const isRetryable = status === 429 || status === 503;
+
+      if (!isRetryable || attempt >= 3) break;
+
+      const delaySec = parseRetryDelaySeconds(error);
+      // Respect the API-suggested delay but cap at MAX_RETRY_WAIT_MS
+      const waitMs = Math.min(
+        delaySec > 0 ? delaySec * 1000 : attempt * 8_000,
+        MAX_RETRY_WAIT_MS,
+      );
+
+      console.warn(
+        JSON.stringify({
+          source: "gemini.extract.retry",
+          attempt,
+          status,
+          wait_ms: waitMs,
+          retry_delay_sec: delaySec,
+        }),
+      );
+
+      await sleep(waitMs);
+    }
+  }
+
+  // All attempts exhausted — throw a clean Portuguese error
+  throw new Error(toFriendlyGeminiError(lastError));
 };
