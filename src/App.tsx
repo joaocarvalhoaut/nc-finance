@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Sidebar from "./components/Sidebar";
 import LandingPage from "./components/LandingPage";
 import SubscriptionGate from "./components/SubscriptionGate";
@@ -70,9 +70,9 @@ import {
 const DEFAULT_PATTERNS: PatternMessage[] = [
   {
     id: "amigavel",
-    name: "AmigÃ¡vel (Preventivo)",
+    name: "Amigável (Preventivo)",
     description: "Abordagem leve para alertar antes do vencimento.",
-    template: `OlÃ¡ {nome_cliente}, tudo bem? ðŸ˜Š
+    template: `Olá {nome_cliente}, tudo bem? 😊
 Passando para lembrar de forma tranquila sobre o boleto abaixo, que segue em nosso acompanhamento.
 
 Documento: {documento}
@@ -80,62 +80,62 @@ Boleto: {documento_boleto}
 Vencimento: {vencimento}
 Valor: R$ {valor_atualizado}
 
-Quis me adiantar para facilitar sua organizaÃ§Ã£o e evitar qualquer correria perto do vencimento.
-Se precisar, posso reenviar os dados do boleto ou te ajudar a localizar as informaÃ§Ãµes mais rapidamente.
+Quis me adiantar para facilitar sua organização e evitar qualquer correria perto do vencimento.
+Se precisar, posso reenviar os dados do boleto ou te ajudar a localizar as informações mais rapidamente.
 
-Fico Ã  disposiÃ§Ã£o. Equipe NC Finance.`
+Fico à disposição. Equipe NC Finance.`
   },
   {
     id: "neutro",
     name: "Neutro (Institucional)",
-    description: "Mensagem direta focada na validaÃ§Ã£o do pagamento.",
-    template: `OlÃ¡ {nome_cliente},
-Segue o acompanhamento do tÃ­tulo abaixo para sua verificaÃ§Ã£o.
+    description: "Mensagem direta focada na validação do pagamento.",
+    template: `Olá {nome_cliente},
+Segue o acompanhamento do título abaixo para sua verificação.
 
 Documento: {documento}
 Boleto: {documento_boleto}
 Vencimento: {vencimento}
 Valor: R$ {valor_atualizado}
 
-O tÃ­tulo estÃ¡ no prazo informado e permanece em acompanhamento preventivo.
-Solicitamos a confirmaÃ§Ã£o do pagamento ou o envio do comprovante para atualizaÃ§Ã£o do status.
+O título está no prazo informado e permanece em acompanhamento preventivo.
+Solicitamos a confirmação do pagamento ou o envio do comprovante para atualização do status.
 
 Atenciosamente, equipe financeira NC Finance.`
   },
   {
     id: "firme",
-    name: "Firme (CobranÃ§a Ativa)",
-    description: "Foco em urgÃªncia com aviso de escalonamento.",
-    template: `OlÃ¡ {nome_cliente},
-Precisamos tratar com prioridade a pendÃªncia financeira abaixo.
+    name: "Firme (Cobrança Ativa)",
+    description: "Foco em urgência com aviso de escalonamento.",
+    template: `Olá {nome_cliente},
+Precisamos tratar com prioridade a pendência financeira abaixo.
 
 Documento: {documento}
 Boleto: {documento_boleto}
 Vencimento: {vencimento}
 Valor: R$ {valor_atualizado}
 
-O tÃ­tulo acumula {dias_atraso} dia(s) de atraso e exige uma definiÃ§Ã£o imediata.
-Pedimos regularizaÃ§Ã£o ainda hoje ou retorno objetivo com a previsÃ£o de pagamento.
+O título acumula {dias_atraso} dia(s) de atraso e exige uma definição imediata.
+Pedimos regularização ainda hoje ou retorno objetivo com a previsão de pagamento.
 
-Sem um posicionamento, o caso segue em escalonamento interno para acompanhamento diÃ¡rio.
-Equipe de cobranÃ§a NC Finance.`
+Sem um posicionamento, o caso segue em escalonamento interno para acompanhamento diário.
+Equipe de cobrança NC Finance.`
   },
   {
     id: "juridico",
-    name: "JurÃ­dico (Formal administrativo)",
-    description: "NotificaÃ§Ã£o mais formal e extrajudicial preventiva.",
+    name: "Jurídico (Formal administrativo)",
+    description: "Notificação mais formal e extrajudicial preventiva.",
     template: `Prezado(a) {nome_cliente},
-Comunicamos, para fins de registro administrativo, a permanÃªncia da pendÃªncia descrita abaixo.
+Comunicamos, para fins de registro administrativo, a permanência da pendência descrita abaixo.
 
 Documento: {documento}
 Boleto: {documento_boleto}
 Vencimento: {vencimento}
 Valor: R$ {valor_atualizado}
 
-Consta em sistema atraso de {dias_atraso} dia(s), sem regularizaÃ§Ã£o identificada atÃ© o momento.
-Solicitamos manifestaÃ§Ã£o formal e a respectiva regularizaÃ§Ã£o financeira com a maior brevidade possÃ­vel.
+Consta em sistema atraso de {dias_atraso} dia(s), sem regularização identificada até o momento.
+Solicitamos manifestação formal e a respectiva regularização financeira com a maior brevidade possível.
 
-Na ausÃªncia de retorno, o caso permanece sujeito ao fluxo interno de cobranÃ§a administrativa da empresa.
+Na ausência de retorno, o caso permanece sujeito ao fluxo interno de cobrança administrativa da empresa.
 
 Atenciosamente, departamento administrativo NC Finance.`
   }
@@ -175,13 +175,13 @@ const INITIAL_DEBTORS: Debtor[] = [
     category: "a_vencer",
     interestApplied: 0,
     fineApplied: 0,
-    notes: "Cliente solicitou envio preventivo amigÃ¡vel",
+    notes: "Cliente solicitou envio preventivo amigável",
     representativeId: INITIAL_REPRESENTATIVE_IDS.bruno,
     status: "pending"
   },
   {
     id: "d3",
-    client: "Julio CÃ©sar de Mello",
+    client: "Julio César de Mello",
     supplier: "NC Empreendimentos",
     document: "2104-E",
     dueDate: "10/05/2026",
@@ -213,22 +213,22 @@ const INITIAL_DEBTORS: Debtor[] = [
 
 // Seed initial representatives for devedores matching the scenario
 const INITIAL_REPRESENTATIVES: Representative[] = [
-  { id: INITIAL_REPRESENTATIVE_IDS.amanda, name: "Amanda Azevedo", phone: "5577999881111", role: "Coordenador de CobranÃ§a", color: "text-emerald-400 bg-emerald-500/10" },
+  { id: INITIAL_REPRESENTATIVE_IDS.amanda, name: "Amanda Azevedo", phone: "5577999881111", role: "Coordenador de Cobrança", color: "text-emerald-400 bg-emerald-500/10" },
   { id: INITIAL_REPRESENTATIVE_IDS.bruno, name: "Bruno Pinheiro", phone: "5511988772233", role: "Gestor Contas Sul", color: "text-sky-400 bg-sky-500/10" },
-  { id: INITIAL_REPRESENTATIVE_IDS.clara, name: "Clara Vasconcelos", phone: "5521977663344", role: "JurÃ­dico NC Finance", color: "text-amber-400 bg-amber-500/10" }
+  { id: INITIAL_REPRESENTATIVE_IDS.clara, name: "Clara Vasconcelos", phone: "5521977663344", role: "Jurídico NC Finance", color: "text-amber-400 bg-amber-500/10" }
 ];
 
 const INITIAL_BILLING_LOGS: BillingLog[] = [
   {
     id: "log-1",
-    client: "ConstruÃ§Ãµes Alvorada LTDA",
+    client: "Construções Alvorada LTDA",
     document: "12.345.678/0001-90",
     phone: "5577999881122",
     value: 14200.0,
     dateSent: "20/05/2026, 09:00",
     tone: "neutro",
     message:
-      "Prezado gestor da ConstruÃ§Ãµes Alvorada LTDA, identificamos em nosso sistema um faturamento em aberto no valor de R$ 14.200,00 com vencimento em 08/05/2026. Solicitamos a regularizaÃ§Ã£o conforme boleto em anexo.\n\nCÃ³digo de barras: 00190.00009 02748.294017 38491.104928 1 972600001420000",
+      "Prezado gestor da Construções Alvorada LTDA, identificamos em nosso sistema um faturamento em aberto no valor de R$ 14.200,00 com vencimento em 08/05/2026. Solicitamos a regularização conforme boleto em anexo.\n\nCódigo de barras: 00190.00009 02748.294017 38491.104928 1 972600001420000",
     status: "sent",
     type: "auto"
   },
@@ -241,20 +241,20 @@ const INITIAL_BILLING_LOGS: BillingLog[] = [
     dateSent: "19/05/2026, 09:02",
     tone: "amigavel",
     message:
-      "OlÃ¡ equipe do Supermercado Santos, tudo bem? ðŸ˜Š Passando para lembrar que a sua fatura de R$ 6.800,00 vence amanhÃ£, 20/05/2026. O boleto correspondente foi localizado via integraÃ§Ã£o de pastas NC no Google Drive e estÃ¡ disponÃ­vel no link para download. Obrigado!",
+      "Olá equipe do Supermercado Santos, tudo bem? 😊 Passando para lembrar que a sua fatura de R$ 6.800,00 vence amanhã, 20/05/2026. O boleto correspondente foi localizado via integração de pastas NC no Google Drive e está disponível no link para download. Obrigado!",
     status: "sent",
     type: "auto"
   },
   {
     id: "log-3",
-    client: "ConsultÃ³rio Dr. Marcos Toledo",
+    client: "Consultório Dr. Marcos Toledo",
     document: "94.814.731/0001-08",
     phone: "5577991122334",
     value: 2350.0,
     dateSent: "18/05/2026, 14:35",
     tone: "amigavel",
     message:
-      "OlÃ¡ Dr. Marcos, segue em anexo o arquivo referente Ã  mensalidade de suporte financeiro NC no valor de R$ 2.350,00 com vencimento para o dia 25/05/2026. Tenha um excelente dia!",
+      "Olá Dr. Marcos, segue em anexo o arquivo referente à mensalidade de suporte financeiro NC no valor de R$ 2.350,00 com vencimento para o dia 25/05/2026. Tenha um excelente dia!",
     status: "sent",
     type: "manual"
   }
@@ -437,15 +437,15 @@ export default function App() {
     setCurrentTab("inicio");
   };
 
-  // â”€â”€ DetecÃ§Ã£o de retorno do Stripe Checkout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Stripe redireciona para ?checkout=success apÃ³s pagamento confirmado.
-  // O webhook pode chegar com 1-10 s de atraso â€” iniciamos polling para aguardar.
+  // Detec??o de retorno do Stripe Checkout
+  // Stripe redireciona para ?checkout=success após pagamento confirmado.
+  // O webhook pode chegar com 1-10 s de atraso ? iniciamos polling para aguardar.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const checkoutResult = params.get("checkout");
     if (!checkoutResult) return;
 
-    // Limpa o parÃ¢metro da URL imediatamente (evita re-trigger em F5)
+    // Limpa o parâmetro da URL imediatamente (evita re-trigger em F5)
     const cleanUrl = new URL(window.location.href);
     cleanUrl.searchParams.delete("checkout");
     window.history.replaceState({}, "", cleanUrl.toString());
@@ -454,9 +454,9 @@ export default function App() {
       // Inicia polling aguardando o webhook do Stripe atualizar o status
       startCheckoutPolling();
     }
-    // canceled: apenas limpa URL, nÃ£o faz nada (usuÃ¡rio volta para SubscriptionGate)
+    // canceled: apenas limpa URL, não faz nada (usuário volta para SubscriptionGate)
   }, [userId]);
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Carregamento inicial de dados da conta autenticada
 
   const handleStartCheckout = async (planId: PlanId) => {
     setIsSubscriptionActionLoading(true);
@@ -707,7 +707,7 @@ export default function App() {
     }
   };
 
-  // â”€â”€â”€ Envio em lote de cobranÃ§as â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Envio em lote de cobran?as
   const handleBatchSend = async () => {
     if (selectedDebtorIds.size === 0 || isBatchSending) return;
     setIsBatchSending(true);
@@ -735,13 +735,13 @@ export default function App() {
           );
         }
       }
-      setSelectedDebtorIds(new Set()); // limpa seleÃ§Ã£o apÃ³s envio
+      setSelectedDebtorIds(new Set()); // limpa seleção após envio
     } finally {
       setIsBatchSending(false);
     }
   };
 
-  // â”€â”€â”€ AutomaÃ§Ãµes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Automa??es
   const loadAutomationData = async () => {
     setIsLoadingAutomation(true);
     setAutomationError("");
@@ -753,7 +753,7 @@ export default function App() {
       setAutomationRules(rules);
       setAutomationRuns(runs);
     } catch (e) {
-      setAutomationError(e instanceof Error ? e.message : "Falha ao carregar automaÃ§Ãµes.");
+      setAutomationError(e instanceof Error ? e.message : "Falha ao carregar automações.");
     } finally {
       setIsLoadingAutomation(false);
     }
@@ -803,7 +803,7 @@ export default function App() {
   };
 
   const handleDeleteRule = async (id: string) => {
-    if (!window.confirm("Excluir esta regra de automaÃ§Ã£o? Ela nÃ£o poderÃ¡ ser recuperada.")) return;
+    if (!window.confirm("Excluir esta regra de automação? Ela não poderá ser recuperada.")) return;
     setAutomationRules((prev) => prev.filter((r) => r.id !== id));
     try {
       await automationService.deleteRule(id);
@@ -813,7 +813,7 @@ export default function App() {
     }
   };
 
-  // â”€â”€â”€ MÃ©tricas operacionais â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // M?tricas operacionais
   const loadOperationalMetrics = async () => {
     if (!isLoggedIn) return;
     setIsLoadingMetrics(true);
@@ -822,7 +822,7 @@ export default function App() {
       const metrics = await metricsService.load(limit);
       setOperationalMetrics(metrics);
     } catch {
-      // silently ignore â€” metrics are non-critical
+      // silently ignore ? metrics are non-critical
     } finally {
       setIsLoadingMetrics(false);
     }
@@ -876,7 +876,7 @@ export default function App() {
       const parsedText = await parseImportFile(file);
 
       if (!parsedText.trim()) {
-        throw new Error("O arquivo foi lido, mas nÃ£o contÃ©m texto extraÃ­vel para a IA.");
+        throw new Error("O arquivo foi lido, mas não contém texto extraível para a IA.");
       }
 
       setImportText(parsedText);
@@ -886,7 +886,7 @@ export default function App() {
       setExtractionAlert(
         error instanceof Error
           ? error.message
-          : "NÃ£o foi possÃ­vel ler o arquivo enviado. Use PDF, TXT, CSV ou Excel com texto acessÃ­vel.",
+          : "Não foi possível ler o arquivo enviado. Use PDF, TXT, CSV ou Excel com texto acessível.",
       );
     } finally {
       setIsParsingImportFile(false);
@@ -1044,7 +1044,7 @@ export default function App() {
     }
   };
 
-  // ImportaÃ§Ã£o real do Google Sheets via Edge Function
+  // Importação real do Google Sheets via Edge Function
   const handleImportSheets = async () => {
     if (!sheetUrlInput.trim()) return;
     setIsSheetsSynching(true);
@@ -1106,7 +1106,7 @@ export default function App() {
 
   // Clear visual matrix debtors
   const clearOverviewVision = async () => {
-    if (window.confirm("VocÃª tem certeza de que deseja apagar absolutamente todos os devedores da visÃ£o geral?")) {
+    if (window.confirm("Você tem certeza de que deseja apagar absolutamente todos os devedores da visão geral?")) {
       if (!currentOwnerUserId) return;
       const currentIds = debtors.map((debtor) => debtor.id);
       setDebtors([]);
@@ -1124,7 +1124,7 @@ export default function App() {
   const handleSendMessage = async () => {
     if (!selectedDebtorForMessage) return;
 
-    // PrÃ©-checagem visual (backend re-valida tudo â€” isso sÃ³ evita round-trip desnecessÃ¡rio)
+    // Pr?-checagem visual (backend re-valida tudo ? isso s? evita round-trip desnecess?rio)
     if (!canSendCharge) {
       setMessageFeedback({
         success: false,
@@ -1153,7 +1153,7 @@ export default function App() {
         void updateGeneralDebtorField(selectedDebtorForMessage.id, "lastSentDate", new Date().toLocaleString());
         void updateGeneralDebtorField(selectedDebtorForMessage.id, "lastSentMessage", customMessageDraft);
 
-        // Adiciona log na UI (o log real jÃ¡ foi criado no backend pelo Edge Function)
+        // Adiciona log na UI (o log real já foi criado no backend pelo Edge Function)
         const localLogEntry: BillingLog = {
           id: result.logId ?? `local-log-${Date.now()}`,
           userId: currentOwnerUserId || undefined,
@@ -1171,27 +1171,27 @@ export default function App() {
         };
         setBillingLogs((prev) => [localLogEntry, ...prev]);
 
-        // Atualiza contadores de uso na UI (backend jÃ¡ incrementou no DB)
+        // Atualiza contadores de uso na UI (backend já incrementou no DB)
         void refreshSubscription();
 
         setMessageFeedback({
           success: true,
-          text: `Mensagem enviada com sucesso! ID: ${result.messageId ?? "â€”"}. ${
+          text: `Mensagem enviada com sucesso! ID: ${result.messageId ?? "?"}. ${
             result.chargesUsed != null && result.chargesLimit != null
-              ? `Uso do mÃªs: ${result.chargesUsed}/${result.chargesLimit}`
+              ? `Uso do mês: ${result.chargesUsed}/${result.chargesLimit}`
               : ""
           }`,
         });
       } else {
-        // Mapeia status para mensagem legÃ­vel ao usuÃ¡rio
+        // Mapeia status para mensagem legível ao usuário
         const friendlyText =
           SEND_STATUS_LABELS[result.status as SendChargeStatus] ??
           result.error ??
-          "Falha ao enviar cobranÃ§a.";
+          "Falha ao enviar cobrança.";
 
         setMessageFeedback({ success: false, text: friendlyText });
 
-        // Se limite atingido, tambÃ©m atualiza contadores para refletir UI corretamente
+        // Se limite atingido, também atualiza contadores para refletir UI corretamente
         if (result.status === "bloqueado_limite") {
           void refreshSubscription();
         }
@@ -1233,7 +1233,7 @@ export default function App() {
   // Hot template text quick inserts
   const insertTemplatePresetText = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert("Copiado com sucesso! Agora vocÃª pode colar diretamente nos campos de texto.");
+    alert("Copiado com sucesso! Agora você pode colar diretamente nos campos de texto.");
   };
 
   if (isSessionLoading) {
@@ -1261,7 +1261,7 @@ export default function App() {
         <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
           <div className="text-center space-y-3">
             <div className="w-10 h-10 mx-auto rounded-full border-2 border-emerald-500/30 border-t-emerald-400 animate-spin" />
-            <p className="text-sm font-semibold text-white">Verificando assinaturaâ€¦</p>
+            <p className="text-sm font-semibold text-white">Verificando assinaturaâ¬¦</p>
             <p className="text-xs text-zinc-500">Preparando acesso seguro ao painel NC Finance.</p>
           </div>
         </div>
@@ -1300,23 +1300,20 @@ export default function App() {
             userEmail={account?.email || user?.email || ""}
           />
 
-          {/* Main workspace area wrapped based on collapsible sidebar margins */}
           <main className="transition-all duration-300 pl-14 md:pl-16 min-h-screen flex flex-col justify-between">
             
-            {/* Upper Workspace Navigation */}
             <div className="border-b border-zinc-800/60 bg-zinc-950 p-4 sticky top-0 z-20 flex flex-wrap gap-4 items-center justify-between">
               <div className="flex items-center gap-3">
                 <h2 className="text-lg font-bold text-white capitalize">
-                  {currentTab === "dashboard" && "Dashboard & MÃ©tricas"}
-                  {currentTab === "importar" && "ImportaÃ§Ã£o Inteligente com IA"}
+                  {currentTab === "dashboard" && "Dashboard & Métricas"}
+                  {currentTab === "importar" && "Importação Inteligente com IA"}
                   {currentTab === "visao_geral" && "Painel Geral de Devedores"}
-                  {currentTab === "cobranca" && "AutomaÃ§Ã£o e ComunicaÃ§Ã£o"}
-                  {currentTab === "historico" && "HistÃ³rico de CobranÃ§a"}
-                  {currentTab === "automacoes" && "AutomaÃ§Ãµes de CobranÃ§a"}
+                  {currentTab === "cobranca" && "Automação e Comunicação"}
+                  {currentTab === "historico" && "Histórico de Cobrança"}
+                  {currentTab === "automacoes" && "Automações de Cobrança"}
                 </h2>
               </div>
 
-              {/* Top info and fast switch targets */}
               <div className="flex items-center gap-4">
 
                 <div className="flex gap-1.5 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
@@ -1330,25 +1327,25 @@ export default function App() {
                     onClick={() => setCurrentTab("visao_geral")} 
                     className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "visao_geral" ? "bg-emerald-500 text-black" : "text-zinc-400 hover:text-white"}`}
                   >
-                    VisÃ£o Geral
+                    Visão Geral
                   </button>
                   <button 
                     onClick={() => setCurrentTab("cobranca")} 
                     className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "cobranca" ? "bg-emerald-500 text-black" : "text-zinc-400 hover:text-white"}`}
                   >
-                    CobranÃ§a
+                    Cobrança
                   </button>
                   <button
                     onClick={() => setCurrentTab("historico")}
                     className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "historico" ? "bg-emerald-500 text-black" : "text-zinc-400 hover:text-white"}`}
                   >
-                    HistÃ³rico
+                    Histórico
                   </button>
                   <button
                     onClick={() => setCurrentTab("automacoes")}
                     className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "automacoes" ? "bg-emerald-500 text-black" : "text-zinc-400 hover:text-white"}`}
                   >
-                    AutomaÃ§Ãµes
+                    Automações
                   </button>
                 </div>
               </div>
@@ -1376,10 +1373,8 @@ export default function App() {
               </div>
             )}
 
-            {/* Dynamic Content Views */}
             <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-8">
               
-              {/* BRAND GREETING INFO FOR ALL PAGES */}
               <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-950 border border-emerald-500/10 p-4 sm:p-5 rounded-3xl relative overflow-hidden shadow-xl">
                 <div className="absolute top-0 right-0 w-[200px] h-full bg-[radial-gradient(circle_at_right_top,rgba(16,185,129,0.06),transparent)]" />
                 <div className="flex flex-col gap-4">
@@ -1388,18 +1383,14 @@ export default function App() {
                       <Zap className="w-5 h-5 text-emerald-400 animate-pulse" /> Sistema Moderno NC Finance
                     </h3>
                     <p className="text-xs sm:text-sm text-zinc-400 font-light mt-1">
-                      Gerencie faturamentos, extraia devedores via inteligÃªncia artificial com Gemini 3.5 Flash e envie notificaÃ§Ãµes automÃ¡ticas com Z-API acopladas ao Google Drive.
+                      Gerencie faturamentos, extraia devedores via inteligência artificial com Gemini 3.5 Flash e envie notificações automáticas com Z-API acopladas ao Google Drive.
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-              {/* TAB: DASHBOARD (Resumo de valores, totais) */}
-              {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {currentTab === "dashboard" && (
                 <div className="space-y-8">
-                  {/* SUBSCRIPTION STATUS CARD */}
                   <SubscriptionStatusCard
                     subscription={subscription}
                     usage={usage}
@@ -1408,10 +1399,8 @@ export default function App() {
                     onManageSubscription={() => void handleOpenBillingPortal()}
                   />
 
-                  {/* METRICS ROW */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     
-                    {/* Stat CARD 1: Total Base */}
                     <div className="bg-zinc-900/60 border border-zinc-900 p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[120px] shadow">
                       <div className="flex items-center justify-between text-zinc-500 text-xs uppercase tracking-wider font-mono">
                         <span>Faturamento Base Inicial</span>
@@ -1425,7 +1414,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Stat CARD 2: Total Updated (com Multa/Juros) */}
                     <div className="bg-zinc-900/60 border border-emerald-500/10 p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[120px] shadow">
                       <div className="absolute -top-1 -right-1 w-6 h-6 bg-emerald-500/15 rounded-bl-xl text-[9px] font-bold text-emerald-400 flex items-center justify-center font-mono">+12%</div>
                       <div className="flex items-center justify-between text-emerald-400 text-xs uppercase tracking-wider font-mono">
@@ -1436,25 +1424,23 @@ export default function App() {
                         <span className="text-2xl sm:text-3xl font-extrabold text-emerald-300 font-mono">{formatBRL(totalUpdatedVolumeStatus)}</span>
                       </div>
                       <div className="text-[10px] text-emerald-400/60 mt-2">
-                        Somado {globalFinePct}% de multa + {globalInterestDayPct}% de juros diÃ¡rios.
+                        Somado {globalFinePct}% de multa + {globalInterestDayPct}% de juros diários.
                       </div>
                     </div>
 
-                    {/* Stat CARD 3: Vencido vs A Vencer */}
                     <div className="bg-zinc-900/60 border border-zinc-900 p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[120px] shadow">
                       <div className="flex items-center justify-between text-rose-400 text-xs uppercase tracking-wider font-mono">
-                        <span>PendÃªncia CrÃ­tica</span>
+                        <span>Pendência Crítica</span>
                         <AlertTriangle className="w-4 h-4 text-rose-400" />
                       </div>
                       <div className="mt-2 flex items-baseline justify-between">
                         <span className="text-2xl sm:text-3xl font-extrabold text-rose-400 font-mono">{formatBRL(vencidosValue)}</span>
                       </div>
                       <div className="text-[10px] text-zinc-500 mt-2">
-                        Boletos vencidos hÃ¡ cerca de 12 dias.
+                        Boletos vencidos há cerca de 12 dias.
                       </div>
                     </div>
 
-                    {/* Stat CARD 4: Liquidado/Recuperado */}
                     <div className="bg-zinc-900/60 border border-zinc-900 p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[120px] shadow">
                       <div className="flex items-center justify-between text-emerald-400 text-xs uppercase tracking-wider font-mono">
                         <span>Total Liquidado</span>
@@ -1470,15 +1456,13 @@ export default function App() {
 
                   </div>
 
-                  {/* CUSTOM CORNER SVG FINANCIAL PERFORMANCE CHART & EXPLAINER GRID */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     
-                    {/* SVG Interactive Area Bar Chart */}
                     <div className="lg:col-span-8 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl">
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div>
-                          <h4 className="text-sm font-bold text-white">Fluxo Projetado de RecuperaÃ§Ã£o</h4>
-                          <p className="text-xs text-zinc-500">RepresentaÃ§Ã£o visual do volume devedor por categoria contÃ¡bil</p>
+                          <h4 className="text-sm font-bold text-white">Fluxo Projetado de Recuperação</h4>
+                          <p className="text-xs text-zinc-500">Representação visual do volume devedor por categoria contábil</p>
                         </div>
                         <div className="flex items-center gap-4 text-xs font-mono">
                           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-rose-500 inline-block"/> Vencidos</span>
@@ -1487,7 +1471,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Clean Emerald Custom responsive SVG Chart representation */}
                       <div className="relative w-full h-[240px] border-b border-l border-zinc-800 pt-4 px-2">
                         <svg className="w-full h-full" viewBox="0 0 600 200" preserveAspectRatio="none">
                           <defs>
@@ -1497,21 +1480,15 @@ export default function App() {
                             </linearGradient>
                           </defs>
 
-                          {/* Horizontal Grid lines */}
                           <line x1="0" y1="50" x2="600" y2="50" stroke="#27272a" strokeDasharray="4 4" strokeWidth="1" />
                           <line x1="0" y1="100" x2="600" y2="100" stroke="#27272a" strokeDasharray="4 4" strokeWidth="1" />
                           <line x1="0" y1="150" x2="600" y2="150" stroke="#27272a" strokeDasharray="4 4" strokeWidth="1" />
 
-                          {/* Dynamic colored barsrepresenting proportions */}
-                          {/* Atrasados - Rose Area */}
                           <rect x="50" y={200 - Math.min(180, (vencidosValue / (totalUpdatedVolumeStatus || 1)) * 180)} width="65" height={Math.min(180, (vencidosValue / (totalUpdatedVolumeStatus || 1)) * 180)} rx="8" fill="#f43f5e" opacity="0.85" />
-                          {/* A Vencer - Amber Area */}
                           <rect x="250" y={200 - Math.min(180, (aVencerValue / (totalUpdatedVolumeStatus || 1)) * 180)} width="65" height={Math.min(180, (aVencerValue / (totalUpdatedVolumeStatus || 1)) * 180)} rx="8" fill="#f59e0b" opacity="0.85" />
-                          {/* Liquidado - Emerald Area */}
                           <rect x="450" y={200 - Math.min(180, (liquidadoValue / (totalUpdatedVolumeStatus || 1)) * 180)} width="65" height={Math.min(180, (liquidadoValue / (totalUpdatedVolumeStatus || 1)) * 180)} rx="8" fill="#10b981" opacity="0.95" />
                         </svg>
 
-                        {/* Chart Foot Axis Labels */}
                         <div className="absolute left-0 right-0 -bottom-6 flex justify-around text-[10px] text-zinc-500 font-mono">
                           <span className="text-rose-400 font-bold">Vencidos ({formatBRL(vencidosValue)})</span>
                           <span className="text-amber-400 font-bold">A Vencer ({formatBRL(aVencerValue)})</span>
@@ -1521,15 +1498,14 @@ export default function App() {
 
                       <div className="pt-4 flex flex-col sm:flex-row justify-between text-xs text-zinc-400 gap-2">
                         <span>Total Geral em Monitoria: <span className="text-white font-mono font-bold">{debtors.length} clientes</span></span>
-                        <span>MÃ©dia por Boleto: <span className="text-emerald-400 font-mono font-bold">{formatBRL(debtors.length > 0 ? totalUpdatedVolumeStatus / debtors.length : 0)}</span></span>
+                        <span>Média por Boleto: <span className="text-emerald-400 font-mono font-bold">{formatBRL(debtors.length > 0 ? totalUpdatedVolumeStatus / debtors.length : 0)}</span></span>
                       </div>
                     </div>
 
-                    {/* Quick Representatives Dashboard assignment overview */}
                     <div className="lg:col-span-4 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 flex flex-col justify-between shadow-xl">
                       <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-white">ResponsÃ¡veis Ativos</h4>
-                        <p className="text-xs text-zinc-500">Membros de cobranÃ§a cadastrados</p>
+                        <h4 className="text-sm font-bold text-white">Responsáveis Ativos</h4>
+                        <p className="text-xs text-zinc-500">Membros de cobrança cadastrados</p>
                       </div>
 
                       <div className="space-y-3 max-h-[170px] overflow-y-auto pr-1">
@@ -1558,30 +1534,29 @@ export default function App() {
                         onClick={() => setCurrentTab("visao_geral")}
                         className="w-full mt-2 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold text-center transition-all cursor-pointer flex items-center justify-center gap-1.5"
                       >
-                        <UserPlus className="w-3.5 h-3.5" /> Gerenciar ResponsÃ¡veis e Devedores
+                        <UserPlus className="w-3.5 h-3.5" /> Gerenciar Responsáveis e Devedores
                       </button>
                     </div>
 
                   </div>
 
-                  {/* HOW IT WORKS DIAGRAM WITH SIMULATED FLOW */}
                   <div className="p-6 rounded-3xl bg-zinc-900/60 border border-zinc-900">
-                    <h4 className="text-sm font-bold text-white mb-4">Fluxo Operacional de CobranÃ§as da NC Finance</h4>
+                    <h4 className="text-sm font-bold text-white mb-4">Fluxo Operacional de Cobranças da NC Finance</h4>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
                       <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-850 flex flex-col gap-2">
                         <span className="font-mono text-emerald-400 font-bold">Passo 1</span>
-                        <h5 className="font-bold text-white">ImportaÃ§Ã£o e ExtraÃ§Ã£o</h5>
-                        <p className="text-zinc-500 font-light">Cole o relatÃ³rio bruto ou insira as parcelas para que a IA do Gemini estruture os vencimentos.</p>
+                        <h5 className="font-bold text-white">Importação e Extração</h5>
+                        <p className="text-zinc-500 font-light">Cole o relatório bruto ou insira as parcelas para que a IA do Gemini estruture os vencimentos.</p>
                       </div>
                       <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-850 flex flex-col gap-2">
                         <span className="font-mono text-emerald-400 font-bold">Passo 2</span>
-                        <h5 className="font-bold text-white">CorreÃ§Ã£o de Valores</h5>
-                        <p className="text-zinc-500 font-light">Defina os juros diÃ¡rios e a multa de atraso. O sistema atualiza os valores finais imediatamente.</p>
+                        <h5 className="font-bold text-white">Correção de Valores</h5>
+                        <p className="text-zinc-500 font-light">Defina os juros diários e a multa de atraso. O sistema atualiza os valores finais imediatamente.</p>
                       </div>
                       <div className="p-4 rounded-xl bg-zinc-300/5 border border-zinc-850 flex flex-col gap-2">
                         <span className="font-mono text-emerald-400 font-bold">Passo 3</span>
-                        <h5 className="font-mono text-zinc-400">SeleÃ§Ã£o do Tom</h5>
-                        <p className="text-zinc-500 font-light">Escolha entre AmigÃ¡vel, Neutro, Firme ou de NotificaÃ§Ã£o JurÃ­dica de acordo com o atraso.</p>
+                        <h5 className="font-mono text-zinc-400">Seleção do Tom</h5>
+                        <p className="text-zinc-500 font-light">Escolha entre Amigável, Neutro, Firme ou de Notificação Jurídica de acordo com o atraso.</p>
                       </div>
                       <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 flex flex-col gap-2">
                         <span className="font-mono text-emerald-400 font-bold">Passo 4</span>
@@ -1591,7 +1566,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* â”€â”€ MÃ‰TRICAS OPERACIONAIS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -1607,36 +1581,34 @@ export default function App() {
                       </button>
                     </div>
 
-                    {/* Uso do Plano + Taxa de Sucesso */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-1">
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Envios este mÃªs</p>
+                        <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Envios este mês</p>
                         <p className="text-xl font-extrabold text-white font-mono">
                           {operationalMetrics?.usageThisMonth?.chargesUsed ?? (usage?.chargesUsed ?? 0)}
-                          <span className="text-xs font-normal text-zinc-500">/{operationalMetrics?.usageThisMonth?.planLimit ?? (usage?.planLimit ?? "â€”")}</span>
+                          <span className="text-xs font-normal text-zinc-500">/{operationalMetrics?.usageThisMonth?.planLimit ?? (usage?.planLimit ?? "?")}</span>
                         </p>
                       </div>
                       <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-1">
                         <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Limite restante</p>
                         <p className={`text-xl font-extrabold font-mono ${(operationalMetrics?.usageThisMonth?.remaining ?? remainingCharges ?? 0) > 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                          {operationalMetrics?.usageThisMonth?.remaining ?? remainingCharges ?? "â€”"}
+                          {operationalMetrics?.usageThisMonth?.remaining ?? remainingCharges ?? "?"}
                         </p>
                       </div>
                       <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-1">
                         <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Taxa de sucesso</p>
                         <p className={`text-xl font-extrabold font-mono ${(operationalMetrics?.successRateThisMonth ?? 100) >= 80 ? "text-emerald-400" : "text-amber-400"}`}>
-                          {isLoadingMetrics ? "â€”" : `${operationalMetrics?.successRateThisMonth ?? 100}%`}
+                          {isLoadingMetrics ? "?" : `${operationalMetrics?.successRateThisMonth ?? 100}%`}
                         </p>
                       </div>
                       <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-1">
                         <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Jobs na fila</p>
                         <p className={`text-xl font-extrabold font-mono ${(operationalMetrics?.activeJobsInQueue ?? 0) > 0 ? "text-amber-400" : "text-zinc-400"}`}>
-                          {isLoadingMetrics ? "â€”" : (operationalMetrics?.activeJobsInQueue ?? 0)}
+                          {isLoadingMetrics ? "?" : (operationalMetrics?.activeJobsInQueue ?? 0)}
                         </p>
                       </div>
                     </div>
 
-                    {/* Devedores por categoria */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {[
                         { label: "Vencidos", count: debtors.filter(d => d.category === "vencidos").length, color: "text-rose-400 border-rose-500/20 bg-rose-500/5" },
@@ -1650,17 +1622,15 @@ export default function App() {
                       ))}
                     </div>
 
-                    {/* Ãšltimas atividades â€” 3 colunas */}
                     {operationalMetrics && (
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-                        {/* ImportaÃ§Ãµes recentes */}
                         <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4 space-y-3">
                           <h5 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                            <CloudLightning className="w-3.5 h-3.5 text-sky-400" /> ImportaÃ§Ãµes Sheets
+                            <CloudLightning className="w-3.5 h-3.5 text-sky-400" /> Importações Sheets
                           </h5>
                           {operationalMetrics.recentImports.length === 0 ? (
-                            <p className="text-[11px] text-zinc-600">Nenhuma importaÃ§Ã£o ainda.</p>
+                            <p className="text-[11px] text-zinc-600">Nenhuma importação ainda.</p>
                           ) : operationalMetrics.recentImports.slice(0, 4).map((imp) => (
                             <div key={imp.id} className="flex items-center justify-between gap-2">
                               <div className="min-w-0">
@@ -1678,7 +1648,6 @@ export default function App() {
                           ))}
                         </div>
 
-                        {/* Drive matches recentes */}
                         <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4 space-y-3">
                           <h5 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
                             <FolderOpen className="w-3.5 h-3.5 text-amber-400" /> Matches Drive
@@ -1689,7 +1658,7 @@ export default function App() {
                             <div key={dm.id} className="flex items-center justify-between gap-2">
                               <div className="min-w-0">
                                 <p className="text-[11px] text-zinc-300 font-mono">
-                                  {dm.debtorsMatched}/{dm.debtorsTotal} devedores Â· {dm.filesFound} PDFs
+                                  {dm.debtorsMatched}/{dm.debtorsTotal} devedores · {dm.filesFound} PDFs
                                 </p>
                                 <p className="text-[10px] text-zinc-600">
                                   {new Date(dm.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
@@ -1702,10 +1671,9 @@ export default function App() {
                           ))}
                         </div>
 
-                        {/* AutomaÃ§Ãµes recentes + erros */}
                         <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4 space-y-3">
                           <h5 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                            <Bot className="w-3.5 h-3.5 text-emerald-400" /> AutomaÃ§Ãµes / Erros
+                            <Bot className="w-3.5 h-3.5 text-emerald-400" /> Automações / Erros
                           </h5>
                           {operationalMetrics.recentAutomationRuns.length === 0 && operationalMetrics.recentErrors.length === 0 ? (
                             <p className="text-[11px] text-zinc-600">Sem atividade recente.</p>
@@ -1715,7 +1683,7 @@ export default function App() {
                                 <div key={run.id} className="flex items-center justify-between gap-2">
                                   <div className="min-w-0">
                                     <p className="text-[11px] text-zinc-300 font-mono">
-                                      {run.jobsCreated} jobs criados Â· {run.sent} enviados
+                                      {run.jobsCreated} jobs criados · {run.sent} enviados
                                     </p>
                                     <p className="text-[10px] text-zinc-600">
                                       {new Date(run.startedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
@@ -1728,10 +1696,10 @@ export default function App() {
                               ))}
                               {operationalMetrics.recentErrors.length > 0 && (
                                 <div className="pt-1 border-t border-zinc-800/60">
-                                  <p className="text-[10px] text-rose-400 font-semibold mb-1">Ãšltimos erros:</p>
+                                  <p className="text-[10px] text-rose-400 font-semibold mb-1">?ltimos erros:</p>
                                   {operationalMetrics.recentErrors.slice(0, 2).map((err) => (
                                     <p key={err.id} className="text-[10px] text-zinc-500 truncate">
-                                      {err.clientName} â€” <span className="text-rose-500">{err.status}</span>
+                                      {err.clientName} ? <span className="text-rose-500">{err.status}</span>
                                     </p>
                                   ))}
                                 </div>
@@ -1743,7 +1711,6 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* Loading skeleton */}
                     {isLoadingMetrics && !operationalMetrics && (
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {[0, 1, 2].map((i) => (
@@ -1756,25 +1723,20 @@ export default function App() {
                 </div>
               )}
 
-              {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-              {/* TAB: IMPORTAR & EXTRAIR */}
-              {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {currentTab === "importar" && (
                 <div className="space-y-8">
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     
-                    {/* Raw Text Import Input Box */}
                     <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl">
                       <div className="space-y-1">
                         <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
-                          <Download className="w-4 h-4 text-emerald-400" /> Upload ou Texto de CobranÃ§a
+                          <Download className="w-4 h-4 text-emerald-400" /> Upload ou Texto de Cobrança
                         </h4>
                         <p className="text-xs text-zinc-500 font-light">
-                          Cole faturas, relatÃ³rios de ERP, e-mails brutos ou selecione presets abaixo para que a inteligÃªncia artificial do Gemini extraia tudo estruturadamente.
+                          Cole faturas, relatórios de ERP, e-mails brutos ou selecione presets abaixo para que a inteligência artificial do Gemini extraia tudo estruturadamente.
                         </p>
                       </div>
 
-                      {/* Drop File Upload */}
                       <div className="p-4 rounded-2xl bg-zinc-950 border-2 border-dashed border-zinc-800 hover:border-emerald-500/30 transition-all text-center space-y-2 relative group">
                         <div className="w-10 h-10 rounded-full bg-zinc-900/50 flex items-center justify-center text-zinc-400 mx-auto group-hover:bg-emerald-500/10 group-hover:text-emerald-400 transition-colors">
                           <FileCheck2 className="w-5 h-5" />
@@ -1796,9 +1758,8 @@ export default function App() {
                           className="absolute inset-0 opacity-0 cursor-pointer"
                         />
                       </div>
-                      {/* Import fields selectors */}
                       <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-zinc-500">Fluxo ContÃ¡bil de Entrada:</label>
+                        <label className="text-xs font-bold uppercase tracking-widest text-zinc-500">Fluxo Contábil de Entrada:</label>
                         <div className="grid grid-cols-3 gap-2">
                           {(["vencidos", "a_vencer", "liquidado"] as const).map((cat) => (
                             <button
@@ -1808,19 +1769,18 @@ export default function App() {
                             >
                               {cat === "vencidos" && "Vencidos"}
                               {cat === "a_vencer" && "A vencer"}
-                              {cat === "liquidado" && "LiquidaÃ§Ã£o"}
+                              {cat === "liquidado" && "Liquidação"}
                             </button>
                           ))}
                         </div>
                       </div>
 
-                      {/* Preset raw examples for fast testing */}
                       <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-zinc-500">Inserir Presets de SimulaÃ§Ã£o RÃ¡pida:</label>
+                        <label className="text-xs font-bold uppercase tracking-widest text-zinc-500">Inserir Presets de Simulação Rápida:</label>
                         <div className="flex flex-col gap-1.5">
                           <button
                             type="button"
-                            onClick={() => setImportText(`Extrato de DÃ©bitos NC Ltda
+                            onClick={() => setImportText(`Extrato de Débitos NC Ltda
 1. IDERLANDIO JESUS DE OLIVEIRA - Titulo 4254-2 - Vencimento 10/05/2026 - Valor R$ 715,66 - tel 33988245204
 2. MENEZES E BATISTA LTDA ME - Titulo 4240-2 - Vencimento 09/05/2026 - Valor R$ 760,20 - tel `)}
                             className="w-full text-left p-2.5 rounded-lg bg-zinc-950 hover:bg-zinc-900 border border-zinc-900 text-[11px] text-zinc-400 block truncate"
@@ -1841,9 +1801,8 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                           </button>
                         </div>
                       </div>
-                      {/* Textarea editor */}
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block">Dados textuais para OCR / ExtraÃ§Ã£o:</label>
+                        <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block">Dados textuais para OCR / Extração:</label>
                         <textarea
                           rows={6}
                           value={importText}
@@ -1867,37 +1826,35 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                       >
                         {isExtracting ? (
                           <>
-                            <RefreshCw className="w-4 h-4 animate-spin" /> Extraindo InformaÃ§Ãµes via IA Gemini...
+                            <RefreshCw className="w-4 h-4 animate-spin" /> Extraindo Informações via IA Gemini...
                           </>
                         ) : (
                           <>
-                            <Zap className="w-4 h-4" /> Extrair com InteligÃªncia Artificial
+                            <Zap className="w-4 h-4" /> Extrair com Inteligência Artificial
                           </>
                         )}
                       </button>
 
                     </div>
 
-                    {/* Extracted Data table for visual revision */}
                     <div className="lg:col-span-7 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl flex flex-col justify-between">
                       <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-white">Dados Financeiros ExtraÃ­dos RevisÃ¡veis</h4>
+                        <h4 className="text-sm font-bold text-white">Dados Financeiros Extraídos Revisáveis</h4>
                         <p className="text-xs text-zinc-500 font-light">
-                          Os dados abaixo foram interpretados e estruturados pela IA do Gemini. VocÃª pode editar os campos e optar por enviÃ¡-los de forma consolidada para a VisÃ£o Geral.
+                          Os dados abaixo foram interpretados e estruturados pela IA do Gemini. Você pode editar os campos e optar por enviá-los de forma consolidada para a Visão Geral.
                         </p>
                       </div>
 
-                      {/* Structured Result Display */}
                       <div className="flex-1 min-h-[300px] overflow-y-auto max-h-[420px] pr-1 space-y-4">
                         {extractedDebtors.length === 0 ? (
                           <div className="h-full flex flex-col items-center justify-center text-center p-8 border border-zinc-850 border-dashed rounded-2xl text-zinc-500">
                             <SlidersHorizontal className="w-10 h-10 text-zinc-700 animate-pulse mb-2" />
-                            <p className="text-xs font-semibold">Nenhuma informaÃ§Ã£o estruturada pendente</p>
-                            <p className="text-[10px] text-zinc-600 max-w-sm mt-1">Cole as faturas e clique no botÃ£o verde para ver os campos extraÃ­dos estruturados em tabela editÃ¡vel.</p>
+                            <p className="text-xs font-semibold">Nenhuma informação estruturada pendente</p>
+                            <p className="text-[10px] text-zinc-600 max-w-sm mt-1">Cole as faturas e clique no botão verde para ver os campos extraídos estruturados em tabela editável.</p>
                           </div>
                         ) : (
                           <div className="space-y-3">
-                            <span className="text-xs font-mono font-bold text-emerald-400 block">âœ“ {extractedDebtors.length} Registros Prontos para RevisÃ£o:</span>
+                            <span className="text-xs font-mono font-bold text-emerald-400 block">? {extractedDebtors.length} Registros Prontos para Revis?o:</span>
                             
                             {extractedDebtors.map((item, index) => (
                               <div key={item.id} className="p-3 bg-zinc-950 border border-zinc-850 rounded-xl space-y-2 relative group">
@@ -1975,13 +1932,13 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                       </div>
 
                       <div className="pt-4 border-t border-zinc-900 flex items-center justify-between gap-4 flex-wrap">
-                        <span className="text-zinc-500 text-xs">Aguardando consolidaÃ§Ã£o do operador.</span>
+                        <span className="text-zinc-500 text-xs">Aguardando consolidação do operador.</span>
                         <button
                           onClick={sendExtractedToOverview}
                           disabled={extractedDebtors.length === 0}
                           className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold flex items-center gap-2 shadow disabled:opacity-50 transition-all text-xs cursor-pointer"
                         >
-                          <CheckCircle className="w-4 h-4" /> Enviar para a VisÃ£o Geral
+                          <CheckCircle className="w-4 h-4" /> Enviar para a Visão Geral
                         </button>
                       </div>
                     </div>
@@ -1990,22 +1947,17 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                 </div>
               )}
 
-              {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-              {/* TAB: VISÃƒO GERAL */}
-              {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {currentTab === "visao_geral" && (
                 <div className="space-y-8">
                   
-                  {/* GLOBAL ADJUSTMENT MULTIPLIERS & REPS CREATION CARDS COLLAPSE */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     
-                    {/* Multa / Juros global parameters controller */}
                     <div className="lg:col-span-4 bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-md">
                       <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                        <Percent className="w-4 h-4 text-emerald-400" /> ParÃ¢metros de Encargos Globais
+                        <Percent className="w-4 h-4 text-emerald-400" /> Parâmetros de Encargos Globais
                       </h4>
                       <p className="text-xs text-zinc-500 font-light leading-relaxed">
-                        Defina a multa padrÃ£o imediata e a taxa de juros aplicada por dia de atraso para todos os devedores classificados como Vencidos na visÃ£o geral.
+                        Defina a multa padrão imediata e a taxa de juros aplicada por dia de atraso para todos os devedores classificados como Vencidos na visão geral.
                       </p>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -2038,17 +1990,16 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                       </div>
                       
                       <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-[10px] text-zinc-500 font-light">
-                        * O cÃ¡lculo Ã© feito com base em 12 dias de atraso presumidos sobre a data histÃ³rica base dos boletos em atraso.
+                        * O cálculo é feito com base em 12 dias de atraso presumidos sobre a data histórica base dos boletos em atraso.
                       </div>
                     </div>
 
-                    {/* Cadastrar representantes form */}
                     <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-md">
                       <h4 className="text-sm font-bold text-white flex items-center gap-2">
                         <UserPlus className="w-4 h-4 text-emerald-400" /> Cadastro de Representantes
                       </h4>
                       <p className="text-xs text-zinc-500 font-light leading-none">
-                        Adicione assessores ou assessoria jurÃ­dica externa para cobranÃ§a dedicada.
+                        Adicione assessores ou assessoria jurídica externa para cobrança dedicada.
                       </p>
 
                       <form onSubmit={handleAddRep} className="space-y-3">
@@ -2082,7 +2033,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                               type="text"
                               value={newRepRole}
                               onChange={(e) => setNewRepRole(e.target.value)}
-                              placeholder="ResponsÃ¡vel Financeiro"
+                              placeholder="Responsável Financeiro"
                               className="w-full bg-zinc-950 border border-zinc-805 rounded-xl px-2.5 py-1.5 text-xs text-white"
                             />
                           </div>
@@ -2090,13 +2041,12 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                             type="submit"
                             className="bg-emerald-500 hover:bg-emerald-400 text-black py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow flex items-center justify-center gap-1.5"
                           >
-                            <PlusCircle className="w-4 h-4" /> Cadastrar ResponsÃ¡vel
+                            <PlusCircle className="w-4 h-4" /> Cadastrar Responsável
                           </button>
                         </div>
                       </form>
                     </div>
 
-                    {/* Google Sheets â€” importaÃ§Ã£o real */}
                     <div className="lg:col-span-3 bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-md flex flex-col justify-between">
                       <div className="space-y-1.5">
                         <h4 className="text-sm font-bold text-white flex items-center gap-2 font-sans">
@@ -2104,7 +2054,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                         </h4>
                         <p className="text-[11px] text-zinc-400 font-light leading-relaxed">
                           Compartilhe a planilha com o e-mail da service account da plataforma e cole o link abaixo.
-                          A planilha deve ter colunas: <span className="text-zinc-300 font-mono">nome, valor, vencimento</span> (mÃ­nimo).
+                          A planilha deve ter colunas: <span className="text-zinc-300 font-mono">nome, valor, vencimento</span> (mínimo).
                         </p>
                       </div>
 
@@ -2120,7 +2070,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                           type="text"
                           value={sheetNameInput}
                           onChange={(e) => setSheetNameInput(e.target.value)}
-                          placeholder="Nome da aba (opcional â€” padrÃ£o: primeira aba)"
+                          placeholder="Nome da aba (opcional ? padr?o: primeira aba)"
                           className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-400 focus:outline-none focus:border-emerald-500 font-mono"
                         />
                       </div>
@@ -2143,7 +2093,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                         )}
                       </button>
 
-                      {/* Resultado da importaÃ§Ã£o */}
                       {sheetsImportResult && (
                         <div className={`rounded-2xl border px-4 py-3 text-xs space-y-1 ${
                           sheetsImportResult.success
@@ -2152,7 +2101,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                         }`}>
                           {sheetsImportResult.success ? (
                             <>
-                              <div className="font-bold text-emerald-300">âœ“ ImportaÃ§Ã£o concluÃ­da</div>
+                              <div className="font-bold text-emerald-300">? Importa??o conclu?da</div>
                               <div>Linhas lidas: <span className="font-semibold text-white">{sheetsImportResult.rowsTotal}</span></div>
                               <div>Importadas: <span className="font-semibold text-emerald-300">{sheetsImportResult.rowsImported}</span></div>
                               {sheetsImportResult.rowsSkipped > 0 && (
@@ -2161,7 +2110,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                             </>
                           ) : (
                             <>
-                              <div className="font-bold text-rose-300">âœ• Falha na importaÃ§Ã£o</div>
+                              <div className="font-bold text-rose-300">? Falha na importa??o</div>
                               <div className="text-rose-200/80">{sheetsImportResult.error ?? "Erro desconhecido."}</div>
                             </>
                           )}
@@ -2171,7 +2120,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
 
                   </div>
 
-                  {/* FILTER BAR AND CONTROLS */}
                   <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-900 flex flex-wrap gap-4 items-center justify-between">
                     <div className="flex items-center gap-2 bg-zinc-950 p-2 rounded-xl border border-zinc-805 flex-1 min-w-[200px] max-w-sm">
                       <Search className="w-4 h-4 text-zinc-500" />
@@ -2201,7 +2149,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                       </div>
 
                       <div className="flex items-center gap-1.5">
-                        <span className="text-zinc-500">ResponsÃ¡vel:</span>
+                        <span className="text-zinc-500">Responsável:</span>
                         <select
                           value={repFilter}
                           onChange={(e) => setRepFilter(e.target.value)}
@@ -2226,14 +2174,13 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                           onClick={clearOverviewVision}
                           className="px-4.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/10 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs text-center"
                         >
-                          <Trash2 className="w-3.5 h-3.5" /> Limpar VisÃ£o Geral
+                          <Trash2 className="w-3.5 h-3.5" /> Limpar Visão Geral
                         </button>
                       </div>
 
                     </div>
                   </div>
 
-                  {/* â”€â”€â”€ BARRA DE AÃ‡ÃƒO EM LOTE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                   {selectedDebtorIds.size > 0 && (
                     <div className="p-4 rounded-2xl bg-emerald-500/8 border border-emerald-500/20 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
@@ -2245,13 +2192,13 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                           onClick={() => setSelectedDebtorIds(new Set())}
                           className="text-[10px] text-zinc-500 hover:text-zinc-300 underline"
                         >
-                          Limpar seleÃ§Ã£o
+                          Limpar seleção
                         </button>
                       </div>
                       <div className="flex items-center gap-3">
                         {plan === "basic" && (
                           <span className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded font-mono">
-                            Plano Basic â€” upgrade para Pro/Premium
+                            Plano Basic ? upgrade para Pro/Premium
                           </span>
                         )}
                         {remainingCharges === 0 && plan !== "basic" && (
@@ -2278,7 +2225,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                           ) : (
                             <>
                               <SendHorizonal className="w-3.5 h-3.5" />
-                              Enviar cobranÃ§as ({selectedDebtorIds.size})
+                              Enviar cobranças ({selectedDebtorIds.size})
                             </>
                           )}
                         </button>
@@ -2286,7 +2233,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                     </div>
                   )}
 
-                  {/* â”€â”€â”€ RESULTADO DO LOTE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                   {batchSendResult && (
                     <div className={`p-4 rounded-2xl border space-y-3 ${
                       batchSendResult.success && batchSendResult.sent > 0
@@ -2305,26 +2251,26 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                 : "text-rose-300"
                           }`}>
                             {batchSendResult.success
-                              ? `âœ“ ${batchSendResult.dryRun ? "[SimulaÃ§Ã£o] " : ""}Lote processado â€” ${batchSendResult.sent} enviados`
-                              : `âœ• ${BATCH_TOP_STATUS_LABELS[batchSendResult.status as BatchTopStatus] ?? batchSendResult.error}`
+                              ? `? ${batchSendResult.dryRun ? "[Simula??o] " : ""}Lote processado ? ${batchSendResult.sent} enviados`
+                              : `? ${BATCH_TOP_STATUS_LABELS[batchSendResult.status as BatchTopStatus] ?? batchSendResult.error}`
                             }
                           </div>
                           {batchSendResult.success && (
                             <div className="flex flex-wrap gap-3 text-[10px] font-mono">
                               {batchSendResult.sent > 0 && (
-                                <span className="text-emerald-400">âœ“ {batchSendResult.sent} enviados</span>
+                                <span className="text-emerald-400">? {batchSendResult.sent} enviados</span>
                               )}
                               {batchSendResult.failed > 0 && (
-                                <span className="text-rose-400">âœ• {batchSendResult.failed} falhas</span>
+                                <span className="text-rose-400">? {batchSendResult.failed} falhas</span>
                               )}
                               {batchSendResult.duplicated > 0 && (
-                                <span className="text-zinc-400">âŠ˜ {batchSendResult.duplicated} duplicados</span>
+                                <span className="text-zinc-400">? {batchSendResult.duplicated} duplicados</span>
                               )}
                               {batchSendResult.invalidPhone > 0 && (
-                                <span className="text-amber-400">âš  {batchSendResult.invalidPhone} tel. invÃ¡lidos</span>
+                                <span className="text-amber-400">? {batchSendResult.invalidPhone} tel. inv?lidos</span>
                               )}
                               {batchSendResult.blockedLimit > 0 && (
-                                <span className="text-zinc-500">âŠ˜ {batchSendResult.blockedLimit} bloqueados (limite)</span>
+                                <span className="text-zinc-500">? {batchSendResult.blockedLimit} bloqueados (limite)</span>
                               )}
                               <span className="text-zinc-600">
                                 Uso: {batchSendResult.usageAfter}/{batchSendResult.usageLimit}
@@ -2336,10 +2282,9 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                           type="button"
                           onClick={() => setBatchSendResult(null)}
                           className="text-zinc-500 hover:text-zinc-300 text-xs"
-                        >âœ•</button>
+                        >?</button>
                       </div>
 
-                      {/* Detalhes por devedor */}
                       {batchSendResult.results.length > 0 && (
                         <div className="max-h-[160px] overflow-y-auto space-y-1 border-t border-zinc-800 pt-2">
                           {batchSendResult.results.map((r) => (
@@ -2352,12 +2297,12 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                 r.status === "bloqueado_limite"    ? "text-zinc-600"    :
                                 "text-rose-400"
                               }`}>
-                                {r.status === "sucesso"             ? "âœ“ enviado"         :
-                                 r.status === "duplicado"           ? "âŠ˜ duplicado"       :
-                                 r.status === "telefone_invalido"   ? "âš  tel. invÃ¡lido"  :
-                                 r.status === "bloqueado_limite"    ? "âŠ˜ limite"          :
-                                 r.status === "devedor_nao_encontrado" ? "âŠ˜ nÃ£o encontrado" :
-                                 "âœ• erro"}
+                                {r.status === "sucesso"             ? "? enviado"         :
+                                 r.status === "duplicado"           ? "? duplicado"       :
+                                 r.status === "telefone_invalido"   ? "? tel. inv?lido"  :
+                                 r.status === "bloqueado_limite"    ? "? limite"          :
+                                 r.status === "devedor_nao_encontrado" ? "? n?o encontrado" :
+                                 "? erro"}
                               </span>
                             </div>
                           ))}
@@ -2366,13 +2311,11 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                     </div>
                   )}
 
-                  {/* MASTER TABELA DE DEVEDORES */}
                   <div className="bg-zinc-900/40 border border-zinc-900 rounded-3xl overflow-hidden shadow-xl">
                     <div className="overflow-x-auto">
                       <table id="tbl-devedores" className="w-full text-xs text-left text-zinc-300">
                         <thead className="text-[10px] uppercase font-mono tracking-wider bg-zinc-900/80 border-b border-zinc-800 text-zinc-400">
                           <tr>
-                            {/* Coluna de seleÃ§Ã£o em lote */}
                             <th className="px-3 py-4 w-8">
                               <button
                                 type="button"
@@ -2402,18 +2345,18 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                             <th className="px-4 py-4 text-right">Valor Base (R$)</th>
                             <th className="px-4 py-4 text-right bg-emerald-500/5 text-emerald-400">Total + Multa + Juros (R$)</th>
                             <th className="px-4 py-4 text-center">Tipo / Status</th>
-                            <th className="px-4 py-4">ResponsÃ¡vel AtribuÃ­do</th>
-                            <th className="px-4 py-4">ObservaÃ§Ãµes</th>
+                            <th className="px-4 py-4">Responsável Atribuído</th>
+                            <th className="px-4 py-4">Observações</th>
                             <th className="px-4 py-4 text-center text-emerald-400/60">PDF</th>
-                            <th className="px-5 py-4 text-right">AÃ§Ã£o</th>
+                            <th className="px-5 py-4 text-right">Ação</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-800">
                           {filteredDebtors.length === 0 ? (
                             <tr>
                               <td colSpan={13} className="px-6 py-12 text-center text-zinc-500">
-                                Nenhum devedor encontrado nos parÃ¢metros de filtros ativos.
-                                VÃ¡ para o assistente de extraÃ§Ã£o para importar novas faturas ou clique em "Exportar planilha" para ver amostras.
+                                Nenhum devedor encontrado nos parâmetros de filtros ativos.
+                                Vá para o assistente de extração para importar novas faturas ou clique em "Exportar planilha" para ver amostras.
                               </td>
                             </tr>
                           ) : (
@@ -2422,7 +2365,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                               
                               return (
                                 <tr key={d.id} className={`hover:bg-zinc-900/30 transition-colors ${selectedDebtorIds.has(d.id) ? "bg-emerald-500/5" : ""}`}>
-                                  {/* Checkbox seleÃ§Ã£o em lote */}
                                   <td className="px-3 py-4">
                                     <button
                                       type="button"
@@ -2442,7 +2384,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                       }
                                     </button>
                                   </td>
-                                  {/* Client editing name inline */}
                                   <td className="px-5 py-4 font-bold text-white min-w-[150px]">
                                     <input
                                       type="text"
@@ -2451,7 +2392,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                       className="w-full bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded p-1 font-bold text-white"
                                     />
                                   </td>
-                                  {/* Vendor / Supplier */}
                                   <td className="px-4 py-4 font-light text-zinc-400">
                                     <input
                                       type="text"
@@ -2460,7 +2400,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                       className="w-full bg-transparent focus:bg-zinc-950 rounded p-1"
                                     />
                                   </td>
-                                  {/* Doc */}
                                   <td className="px-4 py-4 text-center font-mono text-zinc-400">
                                     <input
                                       type="text"
@@ -2469,7 +2408,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                       className="w-20 text-center bg-transparent focus:bg-zinc-950 rounded p-1 font-mono"
                                     />
                                   </td>
-                                  {/* Due date */}
                                   <td className="px-4 py-4 text-center font-mono">
                                     <input
                                       type="text"
@@ -2478,7 +2416,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                       className="w-22 text-center bg-transparent focus:bg-zinc-950 rounded p-1 font-mono text-xs"
                                     />
                                   </td>
-                                  {/* Phone / Whatsapp */}
                                   <td className="px-4 py-4 text-center font-mono">
                                     <input
                                       type="text"
@@ -2488,7 +2425,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                       className="w-32 text-center bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded p-1 font-mono text-xs text-zinc-300 focus:outline-none"
                                     />
                                   </td>
-                                  {/* Raw base value */}
                                   <td className="px-4 py-4 text-right font-mono">
                                     <input
                                       type="number"
@@ -2497,11 +2433,9 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                       className="w-24 text-right bg-transparent focus:bg-zinc-950 rounded p-1 font-mono text-xs"
                                     />
                                   </td>
-                                  {/* Updated value based on category details */}
                                   <td className="px-4 py-4 text-right font-mono text-emerald-300 font-bold bg-emerald-500/5">
                                     {formatBRL(d.updatedValue || d.value)}
                                   </td>
-                                  {/* Type / Category label tag */}
                                   <td className="px-4 py-4 text-center">
                                     <span 
                                       onClick={() => {
@@ -2521,20 +2455,18 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                       {d.category === "liquidado" && "Liquidado"}
                                     </span>
                                   </td>
-                                  {/* Representative Selector dropdown inline */}
                                   <td className="px-4 py-4">
                                     <select
                                       value={d.representativeId || ""}
                                       onChange={(e) => updateGeneralDebtorField(d.id, "representativeId", e.target.value || undefined)}
                                       className="bg-zinc-950 border border-zinc-805 text-[11px] text-zinc-300 rounded px-2 py-1 max-w-[140px] truncate focus:outline-none"
                                     >
-                                      <option value="">NÃ£o AtribuÃ­do</option>
+                                      <option value="">Não Atribuído</option>
                                       {representatives.map(r => (
                                         <option key={r.id} value={r.id}>{r.name}</option>
                                       ))}
                                     </select>
                                   </td>
-                                  {/* Notes columns description */}
                                   <td className="px-4 py-4 min-w-[120px]">
                                     <input
                                       type="text"
@@ -2544,7 +2476,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                       className="w-full bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded px-1.5 py-1"
                                     />
                                   </td>
-                                  {/* PDF Drive link */}
                                   <td className="px-4 py-4 text-center">
                                     {d.driveFileId ? (
                                       <a
@@ -2557,10 +2488,9 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                         <ExternalLink className="w-3 h-3" />
                                       </a>
                                     ) : (
-                                      <span className="text-zinc-700 text-[10px]">â€”</span>
+                                      <span className="text-zinc-700 text-[10px]">?</span>
                                     )}
                                   </td>
-                                  {/* Fast communicate & delete dispatch options */}
                                   <td className="px-5 py-4 text-right">
                                     <div className="flex items-center justify-end gap-2 text-zinc-400">
                                       <button
@@ -2594,26 +2524,21 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                 </div>
               )}
 
-              {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-              {/* TAB: STATUS & COBRANÃ‡A (WP, Z-API, Drive pairing) */}
-              {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {currentTab === "cobranca" && (
                 <div className="space-y-8">
                   
-                  {/* UPPER CONFIGURATION REGION FOR TIMERS AND DRIVE */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     
-                    {/* ROBOT SCHEDULE CONFIG FOR ALL USERS */}
                     <div className="lg:col-span-6 bg-zinc-900/40 border border-zinc-950 p-5 rounded-3xl space-y-4 shadow-xl flex flex-col justify-between">
                       <div className="space-y-1.5">
                         <div className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded text-[10px] font-bold font-mono uppercase tracking-wide">
                           Agendamento Global (Z-API)
                         </div>
                         <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-emerald-400" /> CobranÃ§a Automatizada
+                          <Clock className="w-4 h-4 text-emerald-400" /> Cobrança Automatizada
                         </h4>
                         <p className="text-xs text-zinc-500 font-light leading-relaxed">
-                          Ative o robÃ´ para realizar varreduras automÃ¡ticas de faturamento de acordo com a hora programada de sua preferÃªncia.
+                          Ative o robô para realizar varreduras automáticas de faturamento de acordo com a hora programada de sua preferência.
                         </p>
                       </div>
 
@@ -2629,7 +2554,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <label className="text-xs text-zinc-300 font-medium">HorÃ¡rio PadrÃ£o de Envio:</label>
+                          <label className="text-xs text-zinc-300 font-medium">Horário Padrão de Envio:</label>
                           <input 
                             type="time"
                             value={zapiConfig.scheduledTime}
@@ -2640,20 +2565,19 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                       </div>
 
                       <div className="p-3 bg-emerald-500/5 rounded-xl border border-emerald-500/10 text-[10px] text-zinc-500 font-light">
-                        O sistema dispararÃ¡ faturas para os telefones no formato amigÃ¡vel ou de atraso na hora estipulada via integraÃ§Ã£o Z-API centralizada.
+                        O sistema disparará faturas para os telefones no formato amigável ou de atraso na hora estipulada via integração Z-API centralizada.
                       </div>
                     </div>
 
-                    {/* GOOGLE DRIVE REAL â€” PDF matching */}
                     <div className="lg:col-span-6 bg-zinc-900/40 border border-zinc-950 p-5 rounded-3xl space-y-4 shadow-xl flex flex-col justify-between">
                       <div className="space-y-3">
                         <div className="space-y-1">
                           <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                            <FolderOpen className="w-4 h-4 text-emerald-400" /> Google Drive â€” Localizar PDFs
+                            <FolderOpen className="w-4 h-4 text-emerald-400" /> Google Drive ? Localizar PDFs
                           </h4>
                           <p className="text-[11px] text-zinc-500 font-light leading-normal">
                             Localiza boletos PDF na pasta central da plataforma e associa automaticamente a cada devedor por CPF/CNPJ ou nome.
-                            DisponÃ­vel nos planos <span className="text-emerald-400 font-medium">Pro</span> e <span className="text-emerald-400 font-medium">Premium</span>.
+                            Disponível nos planos <span className="text-emerald-400 font-medium">Pro</span> e <span className="text-emerald-400 font-medium">Premium</span>.
                           </p>
                         </div>
 
@@ -2675,7 +2599,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                           )}
                         </button>
 
-                        {/* Resultado do match */}
                         {driveMatchResult && (
                           <div className={`rounded-2xl border px-4 py-3 text-xs space-y-1 ${
                             driveMatchResult.success
@@ -2684,13 +2607,13 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                           }`}>
                             {driveMatchResult.success ? (
                               <>
-                                <div className="font-bold text-emerald-300">âœ“ PDFs localizados</div>
+                                <div className="font-bold text-emerald-300">? PDFs localizados</div>
                                 <div>Arquivos encontrados: <span className="font-semibold text-white">{driveMatchResult.filesFound}</span></div>
                                 <div>Devedores associados: <span className="font-semibold text-emerald-300">{driveMatchResult.debtorsMatched}</span> / {driveMatchResult.debtorsTotal}</div>
                               </>
                             ) : (
                               <>
-                                <div className="font-bold text-rose-300">âœ• Falha ao localizar PDFs</div>
+                                <div className="font-bold text-rose-300">? Falha ao localizar PDFs</div>
                                 <div className="text-rose-200/80">
                                   {DRIVE_STATUS_LABELS[driveMatchResult.status as DriveMatchStatus] ?? driveMatchResult.error ?? "Erro desconhecido."}
                                 </div>
@@ -2699,7 +2622,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                           </div>
                         )}
 
-                        {/* Lista de devedores com PDF associado */}
                         {driveMatchResult?.success && driveMatchResult.debtorsMatched > 0 && (
                           <div className="space-y-1.5">
                             <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">PDFs associados:</label>
@@ -2707,7 +2629,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                               {debtors.filter((d) => d.driveFileId).map((d) => (
                                 <div key={d.id} className="flex items-center justify-between hover:text-zinc-200 py-0.5 gap-2">
                                   <span className="truncate flex items-center gap-1">
-                                    ðŸ“„ {d.driveFileName ?? "â€”"}
+                                    PDF: {d.driveFileName ?? "?"}
                                   </span>
                                   <span className={`flex-shrink-0 font-bold ${
                                     (d.driveMatchScore ?? 0) >= 0.9 ? "text-emerald-400" :
@@ -2723,25 +2645,22 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                       </div>
 
                       <div className="p-2.5 rounded-lg bg-emerald-500/10 text-[10px] text-emerald-400 text-center font-bold mt-2">
-                        ðŸ”— Canal de envio WhatsApp Z-API centralizado: Conectado
+                        Canal de envio WhatsApp Z-API centralizado: Conectado
                       </div>
                     </div>
 
                   </div>
 
-                  {/* ACTIVE WORKSPACE GRID FOR SENDING INDIVIDUAL WP */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     
-                    {/* Left debtors selection list */}
                     <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl">
                       <div className="space-y-1">
                         <h4 className="text-sm font-bold text-white">Selecione o Devedor Alvo</h4>
                         <p className="text-xs text-zinc-500 font-light">
-                          Escolha quem receberÃ¡ a notificaÃ§Ã£o para carregar dados e modelos nos tons adequados.
+                          Escolha quem receberá a notificação para carregar dados e modelos nos tons adequados.
                         </p>
                       </div>
 
-                      {/* Search box search target inside WP Billing panel */}
                       <div className="space-y-3">
                         <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
                           {debtors.map((d) => {
@@ -2761,7 +2680,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                 <div className="space-y-1 select-none">
                                   <div className="text-xs font-pro font-black text-white">{d.client}</div>
                                   <div className="text-[10px] text-zinc-400 font-light font-mono flex items-center gap-1">
-                                    <span>Doc: {d.document}</span> â€¢ <span>{d.dueDate}</span>
+                                    <span>Doc: {d.document}</span> ? <span>{d.dueDate}</span>
                                   </div>
                                   <div className="text-[11px] font-mono text-emerald-400 font-extrabold">{formatBRL(d.updatedValue || d.value)}</div>
                                 </div>
@@ -2779,7 +2698,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                   
                                   {d.status === "sent" ? (
                                     <span className="text-[9px] text-emerald-400 flex items-center gap-1">
-                                      âœ“ Enviado
+                                      ? Enviado
                                     </span>
                                   ) : (
                                     <span className="text-[9px] text-zinc-500 font-light">Pendente</span>
@@ -2792,7 +2711,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                       </div>
                     </div>
 
-                    {/* Middle template selector, Custom Draft edit & dispatch trigger */}
                     <div className="lg:col-span-7 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-5 shadow-xl flex flex-col justify-between">
                       {selectedDebtorForMessage ? (
                         <>
@@ -2800,14 +2718,13 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                             <div className="flex items-center justify-between flex-wrap gap-2">
                               <div>
                                 <h4 className="text-sm font-bold text-white">Editar Abordagem para: <span className="text-emerald-400">{selectedDebtorForMessage.client}</span></h4>
-                                <p className="text-xs text-zinc-500">Documento: {selectedDebtorForMessage.document} | Destino WhatsApp: {selectedDebtorForMessage.phone || "(NÃ£o informado)"}</p>
+                                <p className="text-xs text-zinc-500">Documento: {selectedDebtorForMessage.document} | Destino WhatsApp: {selectedDebtorForMessage.phone || "(Não informado)"}</p>
                               </div>
                             </div>
                           </div>
 
-                          {/* Tone toggle buttons */}
                           <div className="space-y-2">
-                            <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Escolher PadrÃ£o de Abordagem para o Cliente:</label>
+                            <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Escolher Padrão de Abordagem para o Cliente:</label>
                             <div className="grid grid-cols-4 gap-2">
                               {(["amigavel", "neutro", "firme", "juridico"] as const).map((tone) => {
                                 const isToneSelected = selectedTone === tone;
@@ -2822,19 +2739,18 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                       }
                                     `}
                                   >
-                                    {tone === "amigavel" && "AmigÃ¡vel"}
+                                    {tone === "amigavel" && "Amigável"}
                                     {tone === "neutro" && "Neutro"}
                                     {tone === "firme" && "Firme"}
-                                    {tone === "juridico" && "JurÃ­dico"}
+                                    {tone === "juridico" && "Jurídico"}
                                   </button>
                                 );
                               })}
                             </div>
                           </div>
 
-                          {/* Drive match display â€” real data from debtor */}
                           <div className="p-3.5 rounded-2xl bg-zinc-950 border border-zinc-850 space-y-1.5 text-xs text-zinc-400">
-                            <span className="text-[10px] text-zinc-500 font-mono block">Boleto PDF â€” Google Drive:</span>
+                            <span className="text-[10px] text-zinc-500 font-mono block">Boleto PDF ? Google Drive:</span>
                             {selectedDebtorForMessage?.driveFileId ? (
                               <a
                                 href={selectedDebtorForMessage.driveFileUrl ?? "#"}
@@ -2848,15 +2764,14 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                               </a>
                             ) : (
                               <span className="text-zinc-500 text-xs italic">
-                                Nenhum PDF pareado â€” clique em "Localizar PDFs no Drive" na aba de CobranÃ§a.
+                                Nenhum PDF pareado ? clique em "Localizar PDFs no Drive" na aba de Cobran?a.
                               </span>
                             )}
                             <span className="text-[8px] text-zinc-600 block leading-none">A NC Finance cruza CPF/CNPJ e nome do cliente para localizar o boleto correto na pasta da plataforma.</span>
                           </div>
 
-                          {/* Text editors */}
                           <div className="space-y-1.5 flex-1 flex flex-col">
-                            <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block">EsboÃ§o Final da Mensagem (EditÃ¡vel):</label>
+                            <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block">Esboço Final da Mensagem (Editável):</label>
                             <textarea
                               rows={10}
                               value={customMessageDraft}
@@ -2871,7 +2786,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                             </div>
                           )}
 
-                          {/* CTA options */}
                           <div className="pt-4 border-t border-zinc-900 flex justify-end gap-3">
                             <button
                               onClick={handleSendMessage}
@@ -2882,7 +2796,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                 "Disparando via Z-API..."
                               ) : (
                                 <>
-                                  <Send className="w-4 h-4" /> Enviar CobranÃ§a WhatsApp
+                                  <Send className="w-4 h-4" /> Enviar Cobrança WhatsApp
                                 </>
                               )}
                             </button>
@@ -2892,7 +2806,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                         <div className="h-full flex flex-col items-center justify-center text-center p-8 text-zinc-500">
                           <SlidersHorizontal className="w-12 h-12 text-zinc-700 animate-pulse mb-3" />
                           <p className="font-semibold text-white">Nenhum devedor ativado do painel</p>
-                          <p className="text-xs text-zinc-600 mt-1 max-w-sm">Selecione uma fatura ativa ou inadimplente na lista ao lado para desenhar e projetar a rÃ©gua de cobranÃ§a perfeita.</p>
+                          <p className="text-xs text-zinc-600 mt-1 max-w-sm">Selecione uma fatura ativa ou inadimplente na lista ao lado para desenhar e projetar a régua de cobrança perfeita.</p>
                         </div>
                       )}
                     </div>
@@ -2901,12 +2815,8 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                 </div>
               )}
 
-              {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-              {/* TAB: HISTÃ“RICO DE COBRANÃ‡AS (Z-API logs tracking) */}
-              {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {currentTab === "historico" && (
                 <div className="space-y-6">
-                  {/* METRIC ACCENTS FOR HISTORY */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     <div className="bg-zinc-900/40 border border-zinc-900/80 p-5 rounded-2xl shadow-lg flex items-center gap-4">
                       <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl">
@@ -2925,7 +2835,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                       <div>
                         <span className="text-[10px] uppercase tracking-wider text-zinc-500 block">Clientes Contatados</span>
                         <span className="text-xl font-bold text-white font-mono">
-                          {Array.from(new Set(billingLogs.map(log => log.document))).length} Ãºnicos
+                          {Array.from(new Set(billingLogs.map(log => log.document))).length} únicos
                         </span>
                       </div>
                     </div>
@@ -2943,22 +2853,20 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                     </div>
                   </div>
 
-                  {/* LOGS CONTROL AND GRID */}
                   <div className="bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-6 shadow-xl">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div>
                         <h3 className="text-base font-bold text-white flex items-center gap-2">
-                          <History className="w-5 h-5 text-emerald-400" /> HistÃ³rico de Disparos WhatsApp
+                          <History className="w-5 h-5 text-emerald-400" /> Histórico de Disparos WhatsApp
                         </h3>
                         <p className="text-xs text-zinc-500 font-light mt-0.5">
-                          Lista completa com o status das notificaÃ§Ãµes geradas manualmente ou pelo robÃ´ programado.
+                          Lista completa com o status das notificações geradas manualmente ou pelo robô programado.
                         </p>
                       </div>
 
-                      {/* Clear logs button */}
                       <button
                         onClick={async () => {
-                          if (window.confirm("VocÃª tem certeza de que deseja esvaziar o histÃ³rico de cobranÃ§a?")) {
+                          if (window.confirm("Você tem certeza de que deseja esvaziar o histórico de cobrança?")) {
                             if (!currentOwnerUserId) return;
                             const currentLogIds = billingLogs.map((log) => log.id);
                             setBillingLogs([]);
@@ -2969,7 +2877,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                         }}
                         className="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500 hover:text-black border border-rose-500/20 text-rose-400 text-xs rounded-xl font-medium transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-center"
                       >
-                        Limpar HistÃ³rico
+                        Limpar Histórico
                       </button>
                     </div>
 
@@ -2977,8 +2885,8 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                       {billingLogs.length === 0 ? (
                         <div className="p-12 text-center text-zinc-500 space-y-2">
                           <History className="w-10 h-10 text-zinc-800 mx-auto animate-spin" />
-                          <p className="font-semibold text-white text-sm">O histÃ³rico estÃ¡ vazio</p>
-                          <p className="text-xs text-zinc-600 max-w-xs mx-auto">Nenhum faturamento foi notificado recentemente. Quando disparar cobranÃ§as na aba de CobranÃ§a, elas serÃ£o listadas em tempo real aqui.</p>
+                          <p className="font-semibold text-white text-sm">O histórico está vazio</p>
+                          <p className="text-xs text-zinc-600 max-w-xs mx-auto">Nenhum faturamento foi notificado recentemente. Quando disparar cobranças na aba de Cobrança, elas serão listadas em tempo real aqui.</p>
                         </div>
                       ) : (
                         <div className="overflow-x-auto">
@@ -2990,7 +2898,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                 <th className="px-5 py-4 font-center">Canal / Tipo</th>
                                 <th className="px-5 py-4 text-right">Valor Notificado</th>
                                 <th className="px-5 py-4 text-center">Status</th>
-                                <th className="px-5 py-4 text-right">AÃ§Ãµes</th>
+                                <th className="px-5 py-4 text-right">Ações</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-900 text-xs text-zinc-300">
@@ -3000,7 +2908,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                     <td className="px-5 py-4 font-mono text-zinc-500 text-[11px]">{log.dateSent}</td>
                                     <td className="px-5 py-4">
                                       <div className="font-bold text-white text-xs">{log.client}</div>
-                                      <div className="text-[10px] text-zinc-500 font-mono">D: {log.document} â€¢ TÃ©l: {log.phone}</div>
+                                      <div className="text-[10px] text-zinc-500 font-mono">D: {log.document} ? T?l: {log.phone}</div>
                                     </td>
                                     <td className="px-5 py-4">
                                       <div className="flex items-center gap-2">
@@ -3010,7 +2918,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                         <span className={`text-[9px] uppercase font-bold font-mono px-1.5 py-0.5 rounded
                                           ${log.type === "auto" ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400"}
                                         `}>
-                                          {log.type === "auto" ? "RobÃ´" : "Manual"}
+                                          {log.type === "auto" ? "Robô" : "Manual"}
                                         </span>
                                       </div>
                                     </td>
@@ -3018,7 +2926,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                     <td className="px-5 py-4 text-center">
                                       {(log.status === "sucesso" || log.status === "sent") ? (
                                         <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded font-mono font-semibold">
-                                          âœ“ Sucesso
+                                          ? Sucesso
                                         </span>
                                       ) : log.status === "bloqueado_limite" ? (
                                         <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded font-mono font-semibold">
@@ -3034,11 +2942,11 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                         </span>
                                       ) : log.status === "telefone_invalido" ? (
                                         <span className="inline-flex items-center gap-1 text-[10px] text-rose-400 bg-rose-400/10 px-2 py-0.5 rounded font-mono font-semibold">
-                                          Tel. invÃ¡lido
+                                          Tel. inválido
                                         </span>
                                       ) : (
                                         <span className="inline-flex items-center gap-1 text-[10px] text-rose-400 bg-rose-400/10 px-2 py-0.5 rounded font-mono font-semibold">
-                                          âœ• Erro
+                                          ? Erro
                                         </span>
                                       )}
                                     </td>
@@ -3068,17 +2976,16 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                       </div>
                                     </td>
                                   </tr>
-                                  {/* EXPANDED MESSAGE DETAIL IN-LINE FOR GREAT EXPERIENCE */}
                                   {selectedLogDetail?.id === log.id && (
                                     <tr className="bg-zinc-950/50">
                                       <td colSpan={6} className="px-6 py-4 border-t border-zinc-900">
                                         <div className="space-y-2 text-left">
                                           <div className="flex items-center justify-between text-[11px]">
-                                            <span className="font-bold text-zinc-400">ConteÃºdo do Disparo (Tom: <span className="text-emerald-400 capitalize font-mono font-bold">{log.tone}</span>)</span>
+                                            <span className="font-bold text-zinc-400">Conteúdo do Disparo (Tom: <span className="text-emerald-400 capitalize font-mono font-bold">{log.tone}</span>)</span>
                                             <button 
                                               onClick={() => {
                                                 navigator.clipboard.writeText(log.message);
-                                                alert("Mensagem copiada para a Ã¡rea de transferÃªncia!");
+                                                alert("Mensagem copiada para a área de transferência!");
                                               }}
                                               className="text-emerald-400 hover:underline cursor-pointer text-[10px]"
                                             >
@@ -3103,22 +3010,18 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                 </div>
               )}
 
-              {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-              {/* TAB: AUTOMAÃ‡Ã•ES (scheduler + dispatch worker) */}
-              {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {currentTab === "automacoes" && (
                 <div className="space-y-6">
 
-                  {/* Plan gate: Basic */}
                   {plan === "basic" && (
                     <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-6 flex items-start gap-4">
                       <Bot className="w-8 h-8 text-amber-400 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-bold text-amber-300 text-sm">AutomaÃ§Ã£o indisponÃ­vel no plano Basic</p>
+                        <p className="font-bold text-amber-300 text-sm">Automação indisponível no plano Basic</p>
                         <p className="text-xs text-zinc-400 mt-1">
-                          FaÃ§a upgrade para o plano <span className="text-emerald-400 font-semibold">Pro</span> ou{" "}
+                          Faça upgrade para o plano <span className="text-emerald-400 font-semibold">Pro</span> ou{" "}
                           <span className="text-purple-400 font-semibold">Premium</span> para criar regras de disparo
-                          automÃ¡tico. Pro permite regras simples; Premium desbloqueia janela de envio, limite diÃ¡rio e
+                          automático. Pro permite regras simples; Premium desbloqueia janela de envio, limite diário e
                           prioridade na fila.
                         </p>
                         <button
@@ -3131,22 +3034,20 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                     </div>
                   )}
 
-                  {/* Error banner */}
                   {automationError && (
                     <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-3 text-sm text-rose-200 flex items-center justify-between gap-3">
                       <span>{automationError}</span>
-                      <button onClick={() => setAutomationError("")} className="text-rose-400 hover:text-rose-200 text-xs cursor-pointer">âœ•</button>
+                      <button onClick={() => setAutomationError("")} className="text-rose-400 hover:text-rose-200 text-xs cursor-pointer">?</button>
                     </div>
                   )}
 
-                  {/* Header row */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <h3 className="text-base font-bold text-white flex items-center gap-2">
-                        <Bot className="w-5 h-5 text-emerald-400" /> Regras de AutomaÃ§Ã£o
+                        <Bot className="w-5 h-5 text-emerald-400" /> Regras de Automação
                       </h3>
                       <p className="text-xs text-zinc-500 mt-0.5">
-                        O scheduler roda diariamente Ã s 08h UTC e cria jobs na fila. O worker processa a cada 5 min.
+                        O scheduler roda diariamente às 08h UTC e cria jobs na fila. O worker processa a cada 5 min.
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -3170,17 +3071,15 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                     </div>
                   </div>
 
-                  {/* Create rule form */}
                   {showCreateRuleForm && plan !== "basic" && (
                     <form
                       onSubmit={(e) => void handleCreateRule(e)}
                       className="bg-zinc-900/60 border border-emerald-500/20 rounded-2xl p-5 space-y-4 shadow-xl"
                     >
                       <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                        <CalendarClock className="w-4 h-4 text-emerald-400" /> Nova Regra de AutomaÃ§Ã£o
+                        <CalendarClock className="w-4 h-4 text-emerald-400" /> Nova Regra de Automação
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {/* Name */}
                         <div className="sm:col-span-2">
                           <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">Nome da Regra *</label>
                           <input
@@ -3193,7 +3092,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                           />
                         </div>
 
-                        {/* Rule type */}
                         <div>
                           <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">Tipo de Regra *</label>
                           <select
@@ -3207,7 +3105,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                           </select>
                         </div>
 
-                        {/* Days before (only if due_in_days) */}
                         {newRuleForm.ruleType === "due_in_days" && (
                           <div>
                             <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">Dias antes do vencimento</label>
@@ -3222,7 +3119,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                           </div>
                         )}
 
-                        {/* Tone */}
                         <div>
                           <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">Tom da Mensagem</label>
                           <select
@@ -3230,19 +3126,18 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                             onChange={(e) => setNewRuleForm((p) => ({ ...p, messageTone: e.target.value as AutomationRuleCreate["messageTone"] }))}
                             className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
                           >
-                            <option value="amigavel">AmigÃ¡vel</option>
+                            <option value="amigavel">Amigável</option>
                             <option value="neutro">Neutro</option>
                             <option value="firme">Firme</option>
-                            <option value="juridico">JurÃ­dico</option>
+                            <option value="juridico">Jurídico</option>
                           </select>
                         </div>
 
-                        {/* Window start/end â€” Premium only */}
                         {plan === "premium" && (
                           <>
                             <div>
                               <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
-                                Janela de Envio â€” InÃ­cio <span className="text-purple-400">(Premium)</span>
+                                Janela de Envio ? In?cio <span className="text-purple-400">(Premium)</span>
                               </label>
                               <input
                                 type="time"
@@ -3253,7 +3148,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                             </div>
                             <div>
                               <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
-                                Janela de Envio â€” Fim <span className="text-purple-400">(Premium)</span>
+                                Janela de Envio ? Fim <span className="text-purple-400">(Premium)</span>
                               </label>
                               <input
                                 type="time"
@@ -3264,7 +3159,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                             </div>
                             <div>
                               <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
-                                MÃ¡x. envios/dia <span className="text-purple-400">(Premium)</span>
+                                Máx. envios/dia <span className="text-purple-400">(Premium)</span>
                               </label>
                               <input
                                 type="number"
@@ -3279,16 +3174,15 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                           </>
                         )}
 
-                        {/* Custom message */}
                         <div className="sm:col-span-2">
                           <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
-                            Mensagem Personalizada <span className="text-zinc-600">(opcional â€” usa template do tom se vazio)</span>
+                            Mensagem Personalizada <span className="text-zinc-600">(opcional ? usa template do tom se vazio)</span>
                           </label>
                           <textarea
                             rows={3}
                             value={newRuleForm.customMessage ?? ""}
                             onChange={(e) => setNewRuleForm((p) => ({ ...p, customMessage: e.target.value || null }))}
-                            placeholder="OlÃ¡ {nome_cliente}, ..."
+                            placeholder="Olá {nome_cliente}, ..."
                             className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 resize-none"
                           />
                         </div>
@@ -3312,7 +3206,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                     </form>
                   )}
 
-                  {/* Rules list */}
                   {isLoadingAutomation ? (
                     <div className="py-10 text-center text-zinc-500 flex items-center justify-center gap-2">
                       <RefreshCw className="w-4 h-4 animate-spin" /> Carregando regras...
@@ -3322,7 +3215,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                       <Bot className="w-10 h-10 text-zinc-700 mx-auto" />
                       <p className="text-sm font-semibold text-white">Nenhuma regra configurada</p>
                       <p className="text-xs text-zinc-600 max-w-sm mx-auto">
-                        Crie uma regra para que o sistema dispare cobranÃ§as automaticamente todos os dias.
+                        Crie uma regra para que o sistema dispare cobranças automaticamente todos os dias.
                         Requer plano Pro ou Premium.
                       </p>
                     </div>
@@ -3335,7 +3228,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                             rule.enabled ? "border-emerald-500/20" : "border-zinc-800"
                           }`}
                         >
-                          {/* Toggle */}
                           <button
                             onClick={() => void handleToggleRule(rule.id, !rule.enabled)}
                             title={rule.enabled ? "Desativar regra" : "Ativar regra"}
@@ -3346,7 +3238,6 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                               : <ToggleLeft className="w-7 h-7 text-zinc-600" />}
                           </button>
 
-                          {/* Info */}
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="font-semibold text-white text-sm truncate">{rule.name}</span>
@@ -3367,21 +3258,20 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                             </div>
                             <div className="flex flex-wrap gap-x-4 mt-1.5 text-[11px] text-zinc-500 font-mono">
                               {rule.sendWindowStart && rule.sendWindowEnd && (
-                                <span>ðŸ• {rule.sendWindowStart}â€“{rule.sendWindowEnd}</span>
+                                <span>Janela: {rule.sendWindowStart}?{rule.sendWindowEnd}</span>
                               )}
                               {rule.maxDailySends != null && (
-                                <span>ðŸ“¨ mÃ¡x {rule.maxDailySends}/dia</span>
+                                <span>Limite: m?x {rule.maxDailySends}/dia</span>
                               )}
                               {rule.lastRunAt && (
-                                <span>Ãšltimo run: {new Date(rule.lastRunAt).toLocaleString("pt-BR")}</span>
+                                <span>?ltimo run: {new Date(rule.lastRunAt).toLocaleString("pt-BR")}</span>
                               )}
                               {rule.nextRunAt && (
-                                <span>PrÃ³ximo: {new Date(rule.nextRunAt).toLocaleString("pt-BR")}</span>
+                                <span>Próximo: {new Date(rule.nextRunAt).toLocaleString("pt-BR")}</span>
                               )}
                             </div>
                           </div>
 
-                          {/* Delete */}
                           <button
                             onClick={() => void handleDeleteRule(rule.id)}
                             title="Excluir regra"
@@ -3394,11 +3284,10 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                     </div>
                   )}
 
-                  {/* Recent runs */}
                   {automationRuns.length > 0 && (
                     <div className="bg-zinc-900/40 border border-zinc-900 rounded-3xl p-6 space-y-4 shadow-xl">
                       <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <History className="w-4 h-4 text-emerald-400" /> Ãšltimas execuÃ§Ãµes do Scheduler
+                        <History className="w-4 h-4 text-emerald-400" /> ?ltimas execu??es do Scheduler
                       </h3>
                       <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-xs">
@@ -3443,15 +3332,14 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                     </div>
                   )}
 
-                  {/* Setup guide */}
                   <div className="bg-zinc-900/30 border border-zinc-800/60 rounded-2xl p-5 space-y-3">
                     <h4 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-                      <Info className="w-4 h-4 text-zinc-500" /> ConfiguraÃ§Ã£o do pg_cron (feita uma Ãºnica vez)
+                      <Info className="w-4 h-4 text-zinc-500" /> Configuração do pg_cron (feita uma única vez)
                     </h4>
                     <ol className="text-xs text-zinc-500 space-y-1.5 list-decimal list-inside">
-                      <li>Habilite <span className="text-zinc-300 font-mono">pg_cron</span> e <span className="text-zinc-300 font-mono">pg_net</span> no Supabase Dashboard â†’ Database â†’ Extensions.</li>
+                      <li>Habilite <span className="text-zinc-300 font-mono">pg_cron</span> e <span className="text-zinc-300 font-mono">pg_net</span> no Supabase Dashboard ? Database ? Extensions.</li>
                       <li>Configure o secret: <span className="text-zinc-300 font-mono">npx supabase secrets set AUTOMATION_CRON_SECRET=&lt;segredo&gt; --project-ref &lt;ref&gt;</span></li>
-                      <li>FaÃ§a deploy das Edge Functions: <span className="text-zinc-300 font-mono">npx supabase functions deploy run-automation-scheduler process-dispatch-jobs</span></li>
+                      <li>Faça deploy das Edge Functions: <span className="text-zinc-300 font-mono">npx supabase functions deploy run-automation-scheduler process-dispatch-jobs</span></li>
                       <li>Rode os comandos <span className="text-zinc-300 font-mono">SELECT cron.schedule(...)</span> documentados na migration <span className="text-zinc-300 font-mono">20260521020000_automation.sql</span>.</li>
                     </ol>
                   </div>
@@ -3461,9 +3349,8 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
 
             </div>
 
-            {/* General Admin Footer */}
             <footer className="border-t border-zinc-900 bg-zinc-950 py-6 text-zinc-600 text-[10px] text-center">
-              <span>NC Finance Admin Desk v1.1.0 â€¢ ConexÃ£o com Google Cloud Run & Gemini API ativa e criptografada â€¢ {new Date().getFullYear()} NC Finance.</span>
+              <span>NC Finance Admin Desk v1.1.0 • Conexão com Google Cloud Run & Gemini API ativa e criptografada • {new Date().getFullYear()} NC Finance.</span>
             </footer>
 
           </main>
@@ -3472,6 +3359,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
     </div>
   );
 }
+
 
 
 
