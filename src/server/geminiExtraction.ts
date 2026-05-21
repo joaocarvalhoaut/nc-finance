@@ -51,7 +51,7 @@ const getGeminiClient = () => {
         headers: {
           "User-Agent": "nc-finance-vercel",
         },
-        timeout: 45000,
+        timeout: 55000,
       },
     });
   }
@@ -179,13 +179,28 @@ const validateAgainstSource = (records: ExtractedDebtorRecord[], textContent: st
   });
 };
 
+// ~20 000 chars ≈ 5 000 tokens — safe ceiling for gemini-2.0-flash at 60 s
+const MAX_TEXT_CHARS = 20_000;
+
 export const extractDebtorsWithGemini = async (
   payload: ExtractRequestPayload,
 ): Promise<ExtractResponsePayload> => {
-  const { textContent, category } = payload;
+  const { category } = payload;
+  let { textContent } = payload;
 
   if (!textContent.trim()) {
     throw new Error("Payload vazio. Envie o texto real do relatório para extração.");
+  }
+
+  if (textContent.length > MAX_TEXT_CHARS) {
+    console.warn(
+      JSON.stringify({
+        source: "gemini.extract.truncated",
+        original_length: textContent.length,
+        truncated_to: MAX_TEXT_CHARS,
+      }),
+    );
+    textContent = textContent.slice(0, MAX_TEXT_CHARS);
   }
 
   console.log(
@@ -202,10 +217,10 @@ export const extractDebtorsWithGemini = async (
   }
 
   const client = getGeminiClient();
-  console.log(JSON.stringify({ source: "gemini.extract.call", model: "gemini-3.5-flash" }));
+  console.log(JSON.stringify({ source: "gemini.extract.call", model: "gemini-2.0-flash" }));
 
   const response = await client.models.generateContent({
-    model: "gemini-3.5-flash",
+    model: "gemini-2.0-flash",
     contents: buildPrompt(textContent, category),
     config: {
       systemInstruction:
