@@ -5,7 +5,23 @@ export interface ExtractRequestPayload {
   category?: string;
 }
 
-export interface ExtractedDebtorRecord {
+export interface GeminiReceivableRecord {
+  cliente: string;
+  fornecedor: string;
+  cnpj_empresa: string;
+  telefone: string;
+  tipo: string;
+  numero_titulo: string;
+  vencimento: string;
+  dias: string;
+  valor: number;
+  estado: string;
+  emissao_nfe: string;
+  pagamento: string;
+  valor_pago: number | null;
+}
+
+export interface ExtractedDebtorRecord extends GeminiReceivableRecord {
   client: string;
   supplier: string;
   document: string;
@@ -15,8 +31,9 @@ export interface ExtractedDebtorRecord {
 }
 
 export interface ExtractResponsePayload {
+  ok: true;
   debtors: ExtractedDebtorRecord[];
-  warning?: string;
+  warnings?: string[];
 }
 
 let ai: GoogleGenAI | null = null;
@@ -25,15 +42,16 @@ const getGeminiClient = () => {
   if (!ai) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.warn("[gemini.extract] GEMINI_API_KEY ausente, usando fallback local");
+      throw new Error("GEMINI_API_KEY não configurada.");
     }
 
     ai = new GoogleGenAI({
-      apiKey: apiKey || "MOCK_API_KEY",
+      apiKey,
       httpOptions: {
         headers: {
           "User-Agent": "nc-finance-vercel",
         },
+        timeout: 45000,
       },
     });
   }
@@ -41,147 +59,234 @@ const getGeminiClient = () => {
   return ai;
 };
 
-export const simulateExtraction = (text: string, category = "Vencidos"): ExtractedDebtorRecord[] => {
-  const cleaned = text.toLowerCase();
-  const names = [
-    "Carlos Eduardo Neves",
-    "Mariana Silva Bastos",
-    "Julio César de Mello",
-    "Fernanda Oliveira Ramos",
-    "Lucas Pereira de Jesus",
-    "Beatriz Costa de Almeida",
-  ];
-  const suppliers = ["NC Finance Nordeste", "NC Telecom S/A", "Parceiro Logística Ltda"];
+const normalizeDigits = (value: string | null | undefined) => (value || "").replace(/\D+/g, "");
 
-  const debtorsList: ExtractedDebtorRecord[] = [];
-  const loopCount = Math.max(2, Math.min(5, Math.ceil(text.length / 100)));
-
-  for (let i = 0; i < loopCount; i += 1) {
-    const randIdx = (i + cleaned.length) % names.length;
-    const randSuppIdx = (i + cleaned.length) % suppliers.length;
-    const documentNo = `424${1 + i}-${randIdx}`;
-
-    let dueDateString = "11/03/2026";
-    if (category === "Vencidos") {
-      dueDateString = "10/05/2026";
-    } else if (category === "A vencer") {
-      dueDateString = "25/08/2026";
-    } else {
-      dueDateString = "18/05/2026";
-    }
-
-    const baseVal = 400 + (cleaned.length * 17) % 3500;
-    const simulatedVal = Math.round(baseVal * 1.5 * 100) / 100;
-    const phone = `557799988${7720 + i}`;
-
-    debtorsList.push({
-      client: names[randIdx],
-      supplier: suppliers[randSuppIdx],
-      document: documentNo,
-      dueDate: dueDateString,
-      value: simulatedVal,
-      phone,
-    });
-  }
-
-  return debtorsList;
+const normalizeDate = (value: string | null | undefined) => {
+  const raw = (value || "").trim();
+  const match = raw.match(/\b\d{2}\/\d{2}\/\d{4}\b/);
+  return match ? match[0] : "";
 };
 
-const buildPrompt = (textContent: string, category?: string) => `Analise o seguinte extrato, relatório ou dados brutos de faturamento em português correspondente à categoria "${category || "geral"}".
-Extraia cada devedor/lançamento de cobrança detalhado com os seguintes campos:
-- client (Nome do cliente/pagador)
-- supplier (Nome do fornecedor/emissor, se identificável. Caso não conste, preencher com "NC Finance" ou empresa principal)
-- document (Número do boleto, número da fatura, número da cobrança ou CPF/CNPJ se for o único número livre)
-- dueDate (Data de vencimento, formatada rigorosamente como DD/MM/YYYY)
-- value (Valor da cobrança numérico, ex: 1500.50. Remova caracteres de moeda)
-- phone (Telefone ou número de contato se houver. Exemplo: 5577999881122 ou similar. Caso não exista, preencha com vazio "")
+const normalizeMoney = (value: string | number | null | undefined) => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? Number(value.toFixed(2)) : NaN;
+  }
 
-Texto de dados brutos:
+  if (!value) return NaN;
+
+  const cleaned = value
+    .replace(/[R$\s]/g, "")
+    .replace(/\.(?=\d{3}(?:\D|$))/g, "")
+    .replace(",", ".");
+
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : NaN;
+};
+
+const normalizeForMatch = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "")
+    .toUpperCase();
+
+const buildPrompt = (textContent: string, category?: string) => `Você vai extrair registros financeiros tabulares de uma lista de recebíveis/cobranças.
+
+Regras obrigatórias:
+- Extraia somente registros presentes no texto fornecido.
+- Nunca invente nomes, telefones, valores, títulos, datas ou empresas.
+- Preserve cada linha da tabela como um registro financeiro.
+- Não use exemplos do prompt como dados extraídos.
+- Se um campo não existir no texto, use string vazia ou null.
+- Retorne JSON puro, sem markdown, comentários ou explicações.
+- Datas devem permanecer em formato DD/MM/YYYY.
+- Telefones devem conter apenas dígitos.
+- Valores monetários devem ser normalizados para decimal com ponto, por exemplo 715.66.
+
+Campos por registro:
+- cliente
+- fornecedor
+- cnpj_empresa
+- telefone
+- tipo
+- numero_titulo
+- vencimento
+- dias
+- valor
+- estado
+- emissao_nfe
+- pagamento
+- valor_pago
+
+Categoria contábil selecionada: ${category || "geral"}
+
+Texto real enviado pelo usuário:
 """
 ${textContent}
-"""
-`;
+"""`;
+
+const toExtractedDebtor = (record: GeminiReceivableRecord): ExtractedDebtorRecord | null => {
+  const client = (record.cliente || "").trim();
+  const document = (record.numero_titulo || "").trim();
+  const dueDate = normalizeDate(record.vencimento);
+  const value = normalizeMoney(record.valor);
+  const phone = normalizeDigits(record.telefone);
+
+  if (!client || !document || !dueDate || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return {
+    ...record,
+    cliente: client,
+    fornecedor: (record.fornecedor || "").trim(),
+    cnpj_empresa: (record.cnpj_empresa || "").trim(),
+    telefone: phone,
+    tipo: (record.tipo || "").trim(),
+    numero_titulo: document,
+    vencimento: dueDate,
+    dias: (record.dias || "").toString().trim(),
+    valor: value,
+    estado: (record.estado || "").trim(),
+    emissao_nfe: normalizeDate(record.emissao_nfe),
+    pagamento: normalizeDate(record.pagamento),
+    valor_pago:
+      record.valor_pago === null || record.valor_pago === undefined
+        ? null
+        : normalizeMoney(record.valor_pago),
+    client,
+    supplier: (record.fornecedor || "").trim(),
+    document,
+    dueDate,
+    value,
+    phone,
+  };
+};
+
+const validateAgainstSource = (records: ExtractedDebtorRecord[], textContent: string) => {
+  const normalizedSource = normalizeForMatch(textContent);
+
+  return records.filter((record) => {
+    const normalizedClient = normalizeForMatch(record.client);
+    const normalizedDocument = normalizeForMatch(record.document);
+    const normalizedDate = normalizeForMatch(record.dueDate);
+
+    return (
+      normalizedSource.includes(normalizedClient) &&
+      normalizedSource.includes(normalizedDocument) &&
+      normalizedSource.includes(normalizedDate)
+    );
+  });
+};
 
 export const extractDebtorsWithGemini = async (
   payload: ExtractRequestPayload,
 ): Promise<ExtractResponsePayload> => {
   const { textContent, category } = payload;
-  const key = process.env.GEMINI_API_KEY;
+
+  if (!textContent.trim()) {
+    throw new Error("Payload vazio. Envie o texto real do relatório para extração.");
+  }
 
   console.log(
     JSON.stringify({
       source: "gemini.extract.request",
       category: category || "geral",
       text_length: textContent.length,
-      has_api_key: Boolean(key),
+      has_api_key: Boolean(process.env.GEMINI_API_KEY),
     }),
   );
 
-  if (!key) {
-    return {
-      debtors: simulateExtraction(textContent, category),
-      warning: "Usado extrator inteligente simulado local devido à ausência da chave Gemini.",
-    };
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY não configurada no ambiente.");
   }
 
-  try {
-    const client = getGeminiClient();
-    const response = await client.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: buildPrompt(textContent, category),
-      config: {
-        systemInstruction:
-          "Você é um extrator de inteligência de dados especializado em documentos financeiros, contas a receber e boletos de faturamento.",
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            debtors: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  client: { type: Type.STRING },
-                  supplier: { type: Type.STRING },
-                  document: { type: Type.STRING },
-                  dueDate: { type: Type.STRING },
-                  value: { type: Type.NUMBER },
-                  phone: { type: Type.STRING },
-                },
-                required: ["client", "dueDate", "value"],
+  const client = getGeminiClient();
+  console.log(JSON.stringify({ source: "gemini.extract.call", model: "gemini-3.5-flash" }));
+
+  const response = await client.models.generateContent({
+    model: "gemini-3.5-flash",
+    contents: buildPrompt(textContent, category),
+    config: {
+      systemInstruction:
+        "Você é um extrator rigoroso de recebíveis. Extraia somente dados presentes no texto. Nunca invente registros.",
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          records: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                cliente: { type: Type.STRING },
+                fornecedor: { type: Type.STRING },
+                cnpj_empresa: { type: Type.STRING },
+                telefone: { type: Type.STRING },
+                tipo: { type: Type.STRING },
+                numero_titulo: { type: Type.STRING },
+                vencimento: { type: Type.STRING },
+                dias: { type: Type.STRING },
+                valor: { type: Type.NUMBER },
+                estado: { type: Type.STRING },
+                emissao_nfe: { type: Type.STRING },
+                pagamento: { type: Type.STRING },
+                valor_pago: { type: Type.NUMBER },
               },
+              required: ["cliente", "numero_titulo", "vencimento", "valor"],
             },
           },
         },
+        required: ["records"],
       },
-    });
+    },
+  });
 
-    const resultText = response.text;
-    if (!resultText) {
-      throw new Error("Sem resposta textual do modelo Gemini.");
-    }
+  const resultText = response.text;
+  console.log(
+    JSON.stringify({
+      source: "gemini.extract.raw_response",
+      has_text: Boolean(resultText),
+      preview: resultText ? resultText.slice(0, 400) : null,
+    }),
+  );
 
-    const parsed = JSON.parse(resultText.trim()) as ExtractResponsePayload;
-    console.log(
-      JSON.stringify({
-        source: "gemini.extract.response",
-        debtors_count: Array.isArray(parsed.debtors) ? parsed.debtors.length : 0,
-      }),
-    );
-
-    return parsed;
-  } catch (error) {
-    console.error(
-      JSON.stringify({
-        source: "gemini.extract.error",
-        message: error instanceof Error ? error.message : "Falha desconhecida",
-        stack: error instanceof Error ? error.stack : undefined,
-      }),
-    );
-
-    return {
-      debtors: simulateExtraction(textContent, category),
-      warning: "Usado extrator inteligente simulado local devido à instabilidade do serviço.",
-    };
+  if (!resultText) {
+    throw new Error("Sem resposta textual do Gemini.");
   }
+
+  let parsed: { records?: GeminiReceivableRecord[] };
+  try {
+    parsed = JSON.parse(resultText.trim()) as { records?: GeminiReceivableRecord[] };
+  } catch (error) {
+    throw new Error(
+      `Resposta do Gemini não é JSON válido: ${
+        error instanceof Error ? error.message : "falha desconhecida"
+      }`,
+    );
+  }
+
+  const rawRecords = Array.isArray(parsed.records) ? parsed.records : [];
+  const normalizedRecords = rawRecords
+    .map((record) => toExtractedDebtor(record))
+    .filter((record): record is ExtractedDebtorRecord => Boolean(record));
+  const validatedRecords = validateAgainstSource(normalizedRecords, textContent);
+
+  const warnings: string[] = [];
+  const expectedByState = (textContent.match(/\bAberto\b/gi) || []).length;
+  if (expectedByState > 0 && validatedRecords.length < expectedByState) {
+    const warning = `Gemini retornou ${validatedRecords.length} registros válidos para um texto que sugere ${expectedByState} linhas em aberto.`;
+    warnings.push(warning);
+    console.warn(JSON.stringify({ source: "gemini.extract.warning", warning }));
+  }
+
+  if (!validatedRecords.length) {
+    throw new Error("Nenhum registro financeiro válido foi extraído do texto enviado.");
+  }
+
+  return {
+    ok: true,
+    debtors: validatedRecords,
+    warnings,
+  };
 };

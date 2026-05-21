@@ -39,7 +39,7 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
 
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
-    return res.status(405).json({ error: "Method Not Allowed" });
+    return res.status(405).json({ ok: false, error: "Method Not Allowed" });
   }
 
   const payload = parseBody(req.body);
@@ -55,7 +55,7 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   );
 
   if (!textContent || typeof textContent !== "string") {
-    return res.status(400).json({ error: "O texto para extração é obrigatório." });
+    return res.status(400).json({ ok: false, error: "O texto para extração é obrigatório." });
   }
 
   try {
@@ -64,7 +64,7 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
       JSON.stringify({
         source: "vercel.gemini.extract.success",
         debtors_count: result.debtors.length,
-        warning: result.warning || null,
+        warnings: result.warnings || [],
       }),
     );
     return res.status(200).json(result);
@@ -76,6 +76,9 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
         stack: error instanceof Error ? error.stack : undefined,
       }),
     );
-    return res.status(500).json({ error: "Falha ao processar a extração com Gemini." });
+    return res.status(502).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "Falha ao processar a extração com Gemini.",
+    });
   }
 }
