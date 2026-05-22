@@ -8,7 +8,13 @@
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "diagnose:whatsapp-zapi": "node scripts/diagnose-whatsapp-zapi.js",
+    "e2e:whatsapp": "node scripts/e2e-whatsapp-zapi.js",
+    "e2e:whatsapp:report": "node scripts/e2e-whatsapp-zapi.js --report",
+    "e2e:whatsapp:live": "LIVE_MODE=true node scripts/e2e-whatsapp-zapi.js --report",
+    "test:parser": "npx tsx src/services/localDocumentExtraction/__tests__/normalizeText.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/tableParser.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/regexExtractors.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/heuristics.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/validation.test.ts",
+    "test:hardening": "node scripts/hardening.js --report"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

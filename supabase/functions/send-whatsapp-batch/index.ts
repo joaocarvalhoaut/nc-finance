@@ -18,7 +18,8 @@
  *  8.  Incrementa charges_sent com o total de sucessos
  *  9.  Retorna resumo sanitizado
  *
- * Segredos (nunca no frontend): ZAPI_INSTANCE_ID, ZAPI_TOKEN, ZAPI_CLIENT_TOKEN
+ * Segredos: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, AUTOMATION_CRON_SECRET
+ * Z-API credentials lidas de platform_integrations via loadZApiCredentials() — não hardcoded
  *
  * Planos:
  *  - Basic   → bloqueado (403 plano_sem_recurso)
@@ -32,20 +33,22 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
-import { normalizePhone, validatePhone, sendTextMessage } from "../_shared/zapi.ts";
+import { normalizePhone, validatePhone, sendTextMessage, sendDocumentMessage } from "../_shared/zapi.ts";
+import { downloadDriveFile, getDriveAccessToken } from "../_shared/driveFolderIndex.ts";
 import { checkSubscription }               from "../_shared/subscriptionGuard.ts";
 import { getUsageSnapshot, incrementChargesSent } from "../_shared/usageGuard.ts";
 import { insertBillingLog }                from "../_shared/billingLog.ts";
 import { buildMessage }                    from "../_shared/messageBuilder.ts";
+import { loadZApiCredentials }             from "../_shared/platformIntegrations.ts";
+import { sanitizeError }                   from "../_shared/sanitize.ts";
+import { checkPilotGuard, incrementPilotDailyCount } from "../_shared/pilotGuard.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
 const SUPABASE_URL      = Deno.env.get("SUPABASE_URL")            || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")       || "";
 const SERVICE_ROLE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const ZAPI_INSTANCE_ID  = Deno.env.get("ZAPI_INSTANCE_ID")        || "";
-const ZAPI_TOKEN        = Deno.env.get("ZAPI_TOKEN")               || "";
-const ZAPI_CLIENT_TOKEN = Deno.env.get("ZAPI_CLIENT_TOKEN")        || "";
+// Z-API credentials loaded dynamically via loadZApiCredentials() — not hardcoded
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -145,13 +148,28 @@ Deno.serve(async (request: Request) => {
     const customMessage  = typeof body.customMessage === "string" ? body.customMessage : null;
     const dryRun         = body.dryRun === true;
 
-    // ── 3. Valida credenciais Z-API ────────────────────────────────────────────
-    if (!ZAPI_INSTANCE_ID || !ZAPI_TOKEN || !ZAPI_CLIENT_TOKEN) {
+    // ── 3. Valida credenciais Z-API (platform_integrations → env vars) ──────────
+    // P4: usa SOMENTE platform_integrations — NUNCA company_integrations
+    const zapiCreds = await loadZApiCredentials(admin);
+    if (!zapiCreds) {
       return errResponse(503, {
-        error: "Z-API nao configurada na plataforma. Contate o suporte.",
+        error: "Z-API nao configurada na plataforma. Configure as credenciais no painel de integrações.",
         status: "zapi_nao_configurada",
       });
     }
+
+    // ── 3b. Pilot-mode guard ──────────────────────────────────────────────────
+    // Only runs if this tenant has a pilot_config row (non-pilot tenants pass through).
+    const pilotResult = await checkPilotGuard(admin, userId);
+    if (!pilotResult.ok && pilotResult.reason !== "config_ausente") {
+      return errResponse(pilotResult.statusCode, {
+        error:  pilotResult.message,
+        status: pilotResult.reason,
+      });
+    }
+
+    // Clamp rawIds to pilot remaining capacity (on top of plan limit)
+    const pilotRemaining = pilotResult.ok ? pilotResult.remaining : Number.MAX_SAFE_INTEGER;
 
     // ── 4. Valida assinatura Stripe ────────────────────────────────────────────
     const subResult = await checkSubscription(admin, userId);
@@ -176,9 +194,12 @@ Deno.serve(async (request: Request) => {
     const usage = await getUsageSnapshot(admin, userId, subscription.plan);
     const { remaining } = usage;
 
+    // Apply the stricter of plan limit vs pilot daily limit
+    const effectiveLimit = Math.min(remaining, pilotRemaining);
+
     // Devedores que PODEM ser processados vs. que ficam bloqueados por limite
-    const idsToProcess  = rawIds.slice(0, remaining);
-    const idsOverLimit  = rawIds.slice(remaining);
+    const idsToProcess  = rawIds.slice(0, effectiveLimit);
+    const idsOverLimit  = rawIds.slice(effectiveLimit);
 
     // ── 7. Busca devedores (apenas os que pertencem ao userId) ────────────────
     // Se idsToProcess estiver vazio por limite zerado, pularemos o loop abaixo
@@ -204,6 +225,10 @@ Deno.serve(async (request: Request) => {
     let invalidPhone  = 0;
     const today = new Date().toISOString().slice(0, 10);
 
+    // ── Pre-fetch Drive access token once (for PDF attachment in loop) ────────
+    // Non-blocking: if token unavailable, batch continues without attachments
+    const driveAccessToken = await getDriveAccessToken().catch(() => null);
+
     // ── 7. Loop de envio ──────────────────────────────────────────────────────
     for (const debtorId of idsToProcess) {
       // a. Busca devedor — filtrado pelo userId (user_id = auth.uid() derivado)
@@ -211,7 +236,7 @@ Deno.serve(async (request: Request) => {
         .from("user_registros_financeiros")
         .select(
           "id, client_name, document_number, due_date, amount, phone, " +
-          "updated_value, category, drive_file_url, drive_file_name",
+          "updated_value, category, drive_file_id, drive_file_url, drive_file_name",
         )
         .eq("id", debtorId)
         .eq("user_id", userId) // garante que o devedor pertence ao usuário
@@ -236,7 +261,8 @@ Deno.serve(async (request: Request) => {
       const rawPhone      = String(dr.phone          ?? "");
       const dueDate       = String(dr.due_date       ?? "");
       const amount        = Number(dr.updated_value ?? dr.amount ?? 0);
-      const driveFileUrl  = (dr.drive_file_url as string | null) ?? null;
+      const driveFileId   = (dr.drive_file_id   as string | null) ?? null;
+      const driveFileUrl  = (dr.drive_file_url  as string | null) ?? null;
       const driveFileName = (dr.drive_file_name as string | null) ?? null;
 
       // b. Normaliza e valida telefone
@@ -251,7 +277,8 @@ Deno.serve(async (request: Request) => {
           status: "telefone_invalido",
           type: "lote",
           provider: PROVIDER,
-          errorMessage: `Telefone invalido: "${rawPhone}" → "${normalizedPhone}"`,
+          // P2: do not log raw phone number in error message
+          errorMessage: `Telefone invalido: tamanho=${rawPhone.replace(/\D/g, "").length}d`,
           debtorId,
         });
 
@@ -299,24 +326,49 @@ Deno.serve(async (request: Request) => {
       }
 
       // e. Envia (ou simula em dryRun)
+      // If a Drive PDF was matched, try to send as document first; fall back to text.
       let zapiResult = { success: false, messageId: null as string | null, zaapId: null as string | null, error: "dryRun" };
+      let sentWithPdf = false;
 
       if (!dryRun) {
-        zapiResult = await sendTextMessage({
-          instanceId:  ZAPI_INSTANCE_ID,
-          token:       ZAPI_TOKEN,
-          clientToken: ZAPI_CLIENT_TOKEN,
-          phone:       normalizedPhone,
-          message,
-        });
+        // ── Attempt PDF attachment if Drive file is matched ────────────────────
+        if (driveFileId && driveAccessToken) {
+          const pdfBytes = await downloadDriveFile(driveFileId, driveAccessToken).catch(() => null);
+          if (pdfBytes && pdfBytes.length > 0) {
+            zapiResult = await sendDocumentMessage({
+              instanceId:  zapiCreds.instanceId,
+              token:       zapiCreds.token,
+              clientToken: zapiCreds.clientToken,
+              phone:       normalizedPhone,
+              fileName:    driveFileName ?? "boleto.pdf",
+              documentBytes: pdfBytes,
+              caption:     message,
+            });
+            if (zapiResult.success) sentWithPdf = true;
+          }
+        }
+
+        // ── Fallback to text-only (no PDF or PDF send failed) ──────────────────
+        if (!zapiResult.success) {
+          zapiResult = await sendTextMessage({
+            instanceId:  zapiCreds.instanceId,
+            token:       zapiCreds.token,
+            clientToken: zapiCreds.clientToken,
+            phone:       normalizedPhone,
+            message,
+          });
+        }
       } else {
         // dryRun: simula sucesso sem enviar
-        zapiResult = { success: true, messageId: `dry-${debtorId.slice(0, 8)}`, zaapId: null, error: null };
+        zapiResult  = { success: true, messageId: `dry-${debtorId.slice(0, 8)}`, zaapId: null, error: null };
+        sentWithPdf = !!driveFileId;
       }
 
       const logStatus: string = zapiResult.success ? "sucesso" : "erro";
+      void sentWithPdf; // used in future for per-item reporting
 
       // f. Registra log individual
+      // dryRun: NÃO grava idempotencyKey — evita bloquear envio real posterior.
       const logId = await insertBillingLog(admin, {
         userId, clientName, documentNumber,
         phone:            normalizedPhone,
@@ -328,7 +380,7 @@ Deno.serve(async (request: Request) => {
         provider:         PROVIDER,
         providerMessageId: zapiResult.messageId,
         errorMessage:     zapiResult.error,
-        idempotencyKey:   idempotencyHash,
+        idempotencyKey:   dryRun ? null : idempotencyHash,
         debtorId,
       });
 
@@ -347,9 +399,14 @@ Deno.serve(async (request: Request) => {
       }
     }
 
-    // ── 8. Incrementa charges_sent com total de sucessos reais ────────────────
+    // ── 8. Incrementa charges_sent e pilot counter com total de sucessos reais ──
     if (successCount > 0 && !dryRun) {
       await incrementChargesSent(admin, userId, usage, successCount);
+      if (pilotResult.ok) {
+        incrementPilotDailyCount(admin, userId, successCount).catch((e: unknown) => {
+          console.error("[send-whatsapp-batch] pilot counter increment failed:", e instanceof Error ? e.message : String(e));
+        });
+      }
     }
 
     // ── 9. Retorna resumo sanitizado ──────────────────────────────────────────
@@ -375,7 +432,8 @@ Deno.serve(async (request: Request) => {
     });
 
   } catch (err) {
-    console.error("[send-whatsapp-batch] unhandled:", err);
+    // P2: sanitize error — no PII in unhandled error logs
+    console.error("[send-whatsapp-batch] unhandled:", sanitizeError(err instanceof Error ? err.message : String(err)));
     return errResponse(500, {
       error: "Erro interno. Tente novamente ou contate o suporte.",
       status: "erro_interno",

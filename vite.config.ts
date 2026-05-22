@@ -22,6 +22,12 @@ export default defineConfig(() => {
       // Raise warning threshold slightly; vendor splitting handles the main chunk
       chunkSizeWarningLimit: 600,
       rollupOptions: {
+        // tesseract.js is an optional OCR dependency.  It is NOT installed by
+        // default — users who need scanned-PDF support can add it manually:
+        //   npm install tesseract.js
+        // Marking it external prevents Rollup from erroring on the dynamic
+        // import; the try/catch in ocrFallback.ts handles runtime absence.
+        external: ["tesseract.js"],
         output: {
           manualChunks: {
             // Vendor: React runtime — stable, infrequently changes

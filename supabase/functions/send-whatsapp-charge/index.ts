@@ -20,16 +20,18 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
-import { normalizePhone, validatePhone, sendTextMessage } from "../_shared/zapi.ts";
+import { normalizePhone, validatePhone, sendTextMessage, sendDocumentMessage } from "../_shared/zapi.ts";
+import { downloadDriveFile, getDriveAccessToken } from "../_shared/driveFolderIndex.ts";
+import { loadZApiCredentials } from "../_shared/platformIntegrations.ts";
+import { maskPhone, messagePreview, sanitizeError } from "../_shared/sanitize.ts";
+import { checkPilotGuard, incrementPilotDailyCount } from "../_shared/pilotGuard.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
 const SUPABASE_URL       = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_ANON_KEY  = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const SERVICE_ROLE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const ZAPI_INSTANCE_ID   = Deno.env.get("ZAPI_INSTANCE_ID") || "";
-const ZAPI_TOKEN         = Deno.env.get("ZAPI_TOKEN") || "";
-const ZAPI_CLIENT_TOKEN  = Deno.env.get("ZAPI_CLIENT_TOKEN") || "";
+// Note: ZAPI_* env vars are read via loadZApiCredentials() — not hardcoded here
 
 // ─── Plan limits (espelha src/config/plans.ts) ────────────────────────────────
 
@@ -115,10 +117,12 @@ Deno.serve(async (request: Request) => {
       return errResponse(400, { error: "Campos obrigatorios: phone, message.", status: "telefone_invalido" });
     }
 
-    // ── 3. Valida credenciais Z-API ────────────────────────────────────────────
-    if (!ZAPI_INSTANCE_ID || !ZAPI_TOKEN || !ZAPI_CLIENT_TOKEN) {
+    // ── 3. Carrega credenciais Z-API (platform_integrations → env vars) ──────────
+    // P4: usa SOMENTE platform_integrations ou env vars — NUNCA company_integrations
+    const zapiCreds = await loadZApiCredentials(admin);
+    if (!zapiCreds) {
       return errResponse(503, {
-        error: "Z-API nao configurada na plataforma. Contate o suporte.",
+        error: "Z-API nao configurada na plataforma. Configure as credenciais no painel de integrações.",
         status: "zapi_nao_configurada",
       });
     }
@@ -132,14 +136,15 @@ Deno.serve(async (request: Request) => {
 
     const ALLOWED_STATUSES = ["trialing", "active"];
     if (!subscription || !ALLOWED_STATUSES.includes(subscription.status)) {
+      // P2: persist masked phone + message preview — never raw data
       await admin.from("user_logs_cobranca").insert({
         user_id: userId,
         client_name: (body.clientName || "Desconhecido").slice(0, 255),
         document_number: (body.documentNumber || "").slice(0, 100),
-        phone: body.phone,
+        phone: maskPhone(body.phone),
         amount: Number(body.amount || 0),
         tone: body.tone || "neutro",
-        message: body.message.slice(0, 500),
+        message: messagePreview(body.message, 100),
         status: "bloqueado_assinatura",
         type: "manual",
         provider: "zapi",
@@ -150,6 +155,17 @@ Deno.serve(async (request: Request) => {
       return errResponse(403, {
         error: "Assinatura necessaria (trialing ou active). Verifique seu plano.",
         status: "bloqueado_assinatura",
+      });
+    }
+
+    // ── 4b. Pilot-mode guard ──────────────────────────────────────────────────
+    // If a pilot_config row exists for this user, all pilot rules must pass.
+    // Users without a pilot_config row are allowed through (non-pilot tenants).
+    const pilotResult = await checkPilotGuard(admin, userId);
+    if (!pilotResult.ok && pilotResult.reason !== "config_ausente") {
+      return errResponse(pilotResult.statusCode, {
+        error:  pilotResult.message,
+        status: pilotResult.reason,
       });
     }
 
@@ -170,10 +186,10 @@ Deno.serve(async (request: Request) => {
         user_id: userId,
         client_name: (body.clientName || "Desconhecido").slice(0, 255),
         document_number: (body.documentNumber || "").slice(0, 100),
-        phone: body.phone,
+        phone: maskPhone(body.phone),
         amount: Number(body.amount || 0),
         tone: body.tone || "neutro",
-        message: body.message.slice(0, 500),
+        message: messagePreview(body.message, 100),
         status: "bloqueado_limite",
         type: "manual",
         provider: "zapi",
@@ -196,14 +212,16 @@ Deno.serve(async (request: Request) => {
         user_id: userId,
         client_name: (body.clientName || "Desconhecido").slice(0, 255),
         document_number: (body.documentNumber || "").slice(0, 100),
-        phone: body.phone,
+        // P2: masked phone — raw phone never persisted
+        phone: maskPhone(body.phone),
         amount: Number(body.amount || 0),
         tone: body.tone || "neutro",
-        message: body.message.slice(0, 500),
+        message: messagePreview(body.message, 100),
         status: "telefone_invalido",
         type: "manual",
         provider: "zapi",
-        error_message: `Telefone invalido: "${body.phone}" → normalizado: "${normalizedPhone}"`,
+        // P2: sanitize error — no raw phone in error_message
+        error_message: `Telefone invalido: tamanho=${(body.phone ?? "").replace(/\D/g,"").length}d`,
         debtor_id: body.debtorId || null,
       });
 
@@ -236,41 +254,96 @@ Deno.serve(async (request: Request) => {
       });
     }
 
-    // ── 8. Envia via Z-API global ──────────────────────────────────────────────
-    const zapiResult = await sendTextMessage({
-      instanceId: ZAPI_INSTANCE_ID,
-      token: ZAPI_TOKEN,
-      clientToken: ZAPI_CLIENT_TOKEN,
-      phone: normalizedPhone,
-      message: body.message,
-    });
+    // ── 8. Envia via Z-API (com PDF se houver match Drive; fallback texto) ──────
+    let zapiResult: { success: boolean; messageId: string | null; zaapId: string | null; error: string | null };
+
+    // Check if this debtor has a pre-matched Drive PDF
+    let debtorDriveFileId: string | null = null;
+    let debtorDriveFileName: string | null = null;
+    if (body.debtorId) {
+      const { data: dr } = await admin
+        .from("user_registros_financeiros")
+        .select("drive_file_id, drive_file_name")
+        .eq("id", body.debtorId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (dr) {
+        debtorDriveFileId   = (dr as Record<string, unknown>).drive_file_id   as string | null ?? null;
+        debtorDriveFileName = (dr as Record<string, unknown>).drive_file_name as string | null ?? null;
+      }
+    }
+
+    // Attempt PDF attachment if available
+    let sentWithPdf = false;
+    if (debtorDriveFileId) {
+      const driveToken = await getDriveAccessToken().catch(() => null);
+      if (driveToken) {
+        const pdfBytes = await downloadDriveFile(debtorDriveFileId, driveToken).catch(() => null);
+        if (pdfBytes && pdfBytes.length > 0) {
+          zapiResult = await sendDocumentMessage({
+            instanceId:  zapiCreds.instanceId,
+            token:       zapiCreds.token,
+            clientToken: zapiCreds.clientToken,
+            phone:       normalizedPhone,
+            fileName:    debtorDriveFileName ?? "boleto.pdf",
+            documentBytes: pdfBytes,
+            caption:     body.message,
+          });
+          if (zapiResult.success) sentWithPdf = true;
+        }
+      }
+    }
+
+    // Fallback to text-only
+    if (!sentWithPdf) {
+      zapiResult = await sendTextMessage({
+        instanceId:  zapiCreds.instanceId,
+        token:       zapiCreds.token,
+        clientToken: zapiCreds.clientToken,
+        phone:       normalizedPhone,
+        message:     body.message,
+      });
+    }
 
     const logStatus = zapiResult.success ? "sucesso" : "erro";
+    void sentWithPdf;
 
-    // ── 9. Persiste log (service role — nunca expõe credenciais) ───────────────
+    // ── 9. Persiste log sanitizado (P2) ────────────────────────────────────────
     const { data: insertedLog } = await admin
       .from("user_logs_cobranca")
       .insert({
-        user_id: userId,
-        client_name: (body.clientName || "Desconhecido").slice(0, 255),
-        document_number: (body.documentNumber || "").slice(0, 100),
-        phone: normalizedPhone,
-        amount: Number(body.amount || 0),
-        tone: body.tone || "neutro",
-        message: body.message.slice(0, 2_000),
-        status: logStatus,
-        type: "manual",
-        provider: "zapi",
+        user_id:             userId,
+        client_name:         (body.clientName || "Desconhecido").slice(0, 255),
+        document_number:     (body.documentNumber || "").slice(0, 100),
+        // P2: masked phone — raw number never stored
+        phone:               maskPhone(normalizedPhone),
+        amount:              Number(body.amount || 0),
+        tone:                body.tone || "neutro",
+        // P2: message preview — full message text never stored
+        message:             messagePreview(body.message, 100),
+        status:              logStatus,
+        type:                "manual",
+        provider:            "zapi",
         provider_message_id: zapiResult.messageId,
-        error_message: zapiResult.error,
-        idempotency_key: idempotencyHash,
-        debtor_id: body.debtorId || null,
+        // P2: sanitize error — strip any PII that might appear in provider errors
+        error_message:       zapiResult.error
+                               ? sanitizeError(zapiResult.error).slice(0, 300)
+                               : null,
+        idempotency_key:     idempotencyHash,
+        debtor_id:           body.debtorId || null,
       })
       .select("id, created_at")
       .single();
 
-    // ── 10. Incrementa usage counter (apenas em caso de sucesso) ───────────────
+    // ── 10. Incrementa usage counter e pilot counter (apenas em caso de sucesso)
     if (zapiResult.success) {
+      // Pilot daily counter (fire-and-forget — non-blocking)
+      if (pilotResult.ok) {
+        incrementPilotDailyCount(admin, userId, 1).catch((e: unknown) => {
+          console.error("[send-whatsapp-charge] pilot counter increment failed:", e instanceof Error ? e.message : String(e));
+        });
+      }
+
       await admin.from("user_usage_counters").upsert(
         {
           user_id: userId,

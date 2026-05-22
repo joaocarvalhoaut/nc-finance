@@ -1,32 +1,49 @@
 /**
- * billingLog.ts — inserção de logs em user_logs_cobranca.
- * Usado por Edge Functions de envio individual e em lote.
+ * billingLog.ts — inserção segura de logs em user_logs_cobranca.
+ *
+ * Regras de segurança (obrigatórias):
+ *   - NUNCA grava telefone completo — usa maskPhone() antes de persistir.
+ *   - NUNCA grava mensagem completa — usa messagePreview() (máx 100 chars).
+ *   - NUNCA grava token, client_token, headers brutos ou payload bruto.
+ *   - error_message é sanitizado via sanitizeError() antes de gravar.
+ *
+ * Colunas gravadas em user_logs_cobranca:
+ *   phone            → telefone mascarado ("5511*****321")
+ *   message          → preview da mensagem (max 100 chars)
+ *   error_message    → mensagem sanitizada sem PII
+ *   provider_message_id → ID retornado pelo provider (seguro)
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
+import { maskPhone, messagePreview, sanitizeError } from "./sanitize.ts";
 
 type AdminClient = ReturnType<typeof createClient>;
 
 export interface BillingLogPayload {
-  userId: string;
-  clientName: string;
-  documentNumber: string;
-  phone: string;
-  amount: number;
-  tone: string;
-  message: string;
-  status: string;
-  type: "manual" | "lote";
-  provider: string;
+  userId:             string;
+  clientName:         string;
+  documentNumber:     string;
+  /** Raw phone — will be masked before persisting */
+  phone:              string;
+  amount:             number;
+  tone:               string;
+  /** Full message — will be truncated to preview before persisting */
+  message:            string;
+  status:             string;
+  type:               "manual" | "lote";
+  provider:           string;
   providerMessageId?: string | null;
-  errorMessage?: string | null;
-  idempotencyKey?: string | null;
-  debtorId?: string | null;
+  /** Raw error — will be sanitized before persisting */
+  errorMessage?:      string | null;
+  idempotencyKey?:    string | null;
+  debtorId?:          string | null;
 }
 
 /**
- * Insere um log de cobrança e retorna o ID gerado, ou null em caso de erro.
- * Nunca lança exceção — falha silenciosa para não derrubar o fluxo principal.
+ * Insere um log de cobrança com dados sanitizados.
+ * Retorna o ID gerado, ou null em caso de erro silencioso.
+ *
+ * NUNCA persiste: telefone completo, mensagem completa, tokens ou headers brutos.
  */
 export const insertBillingLog = async (
   admin: AdminClient,
@@ -39,15 +56,20 @@ export const insertBillingLog = async (
         user_id:             payload.userId,
         client_name:         payload.clientName.slice(0, 255),
         document_number:     payload.documentNumber.slice(0, 100),
-        phone:               payload.phone,
+        // ── MASKED: never store raw phone ──────────────────────────────
+        phone:               maskPhone(payload.phone),
         amount:              payload.amount,
         tone:                payload.tone,
-        message:             payload.message.slice(0, 2_000),
+        // ── PREVIEW: never store full message ─────────────────────────
+        message:             messagePreview(payload.message, 100),
         status:              payload.status,
         type:                payload.type,
         provider:            payload.provider,
         provider_message_id: payload.providerMessageId ?? null,
-        error_message:       payload.errorMessage ?? null,
+        // ── SANITIZED: strip credentials/PII from error text ──────────
+        error_message:       payload.errorMessage
+                               ? sanitizeError(payload.errorMessage).slice(0, 300)
+                               : null,
         idempotency_key:     payload.idempotencyKey ?? null,
         debtor_id:           payload.debtorId ?? null,
       })

@@ -1,59 +1,104 @@
+/**
+ * File-to-text converter for the import screen.
+ *
+ * PDF parsing now groups text items by their Y-coordinate so that each
+ * visual row in the PDF becomes one line in the output.  This gives the
+ * local extraction heuristics much better signal than a flat space-joined
+ * string.
+ */
+
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist/legacy/build/pdf.mjs";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import * as XLSX from "xlsx";
 
 GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
-const normalizeWhitespace = (value: string) => value.replace(/\s+/g, " ").trim();
+/** Y-coordinate tolerance for grouping items on the same visual row (PDF units ≈ pt). */
+const Y_TOLERANCE = 4;
 
-const parsePdfFile = async (file: File) => {
+// ── PDF ───────────────────────────────────────────────────────────────────────
+
+const parsePdfFile = async (file: File): Promise<string> => {
   const buffer = await file.arrayBuffer();
   const pdf = await getDocument({ data: new Uint8Array(buffer) }).promise;
-  const chunks: string[] = [];
+  const pageLines: string[] = [];
 
-  for (let pageIndex = 1; pageIndex <= pdf.numPages; pageIndex += 1) {
-    const page = await pdf.getPage(pageIndex);
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
     const content = await page.getTextContent();
-    const pageText = content.items
-      .map((item) => ("str" in item ? item.str : ""))
-      .join(" ");
 
-    chunks.push(normalizeWhitespace(pageText));
+    // Collect items with their positions
+    type RawItem = { str: string; transform: number[] };
+    const items = (content.items as unknown[])
+      .filter(
+        (item): item is RawItem =>
+          typeof (item as RawItem).str === "string" &&
+          (item as RawItem).str.trim().length > 0 &&
+          Array.isArray((item as RawItem).transform) &&
+          (item as RawItem).transform.length >= 6,
+      );
+
+    if (items.length === 0) continue;
+
+    // Group by quantised Y coordinate (same visual row)
+    const rowMap = new Map<number, Array<{ str: string; x: number }>>();
+    for (const item of items) {
+      const y = item.transform[5];
+      const bucket = Math.round(y / Y_TOLERANCE) * Y_TOLERANCE;
+      const row = rowMap.get(bucket) ?? [];
+      row.push({ str: item.str, x: item.transform[4] });
+      rowMap.set(bucket, row);
+    }
+
+    // Sort rows top-to-bottom, items left-to-right
+    const sortedRows = [...rowMap.entries()]
+      .sort(([a], [b]) => b - a) // descending Y = top first
+      .map(([, row]) =>
+        row
+          .sort((a, b) => a.x - b.x)
+          .map((it) => it.str.replace(/\s+/g, " "))
+          .join(" ")
+          .trim(),
+      )
+      .filter((row) => row.length > 0);
+
+    pageLines.push(...sortedRows);
   }
 
-  return normalizeWhitespace(chunks.join("\n"));
+  // Join rows with newline, collapse 3+ consecutive blank lines
+  return pageLines
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 };
 
-const parseTextFile = async (file: File) => {
+// ── Plain text / CSV ──────────────────────────────────────────────────────────
+
+const parseTextFile = async (file: File): Promise<string> => {
   const text = await file.text();
-  return normalizeWhitespace(text);
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
 };
 
-const parseSpreadsheetFile = async (file: File) => {
+// ── Spreadsheet ───────────────────────────────────────────────────────────────
+
+const parseSpreadsheetFile = async (file: File): Promise<string> => {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
   const sheets = workbook.SheetNames.map((sheetName) => {
     const sheet = workbook.Sheets[sheetName];
     return XLSX.utils.sheet_to_csv(sheet, { FS: ";", blankrows: false });
   });
-
-  return normalizeWhitespace(sheets.join("\n"));
+  return sheets.join("\n").trim();
 };
 
-export const parseImportFile = async (file: File) => {
-  const lowerName = file.name.toLowerCase();
+// ── Public API ────────────────────────────────────────────────────────────────
 
-  if (lowerName.endsWith(".pdf")) {
-    return parsePdfFile(file);
-  }
+export const parseImportFile = async (file: File): Promise<string> => {
+  const name = file.name.toLowerCase();
 
-  if (lowerName.endsWith(".txt") || lowerName.endsWith(".csv")) {
-    return parseTextFile(file);
-  }
+  if (name.endsWith(".pdf")) return parsePdfFile(file);
+  if (name.endsWith(".txt") || name.endsWith(".csv")) return parseTextFile(file);
+  if (name.endsWith(".xlsx") || name.endsWith(".xls")) return parseSpreadsheetFile(file);
 
-  if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
-    return parseSpreadsheetFile(file);
-  }
-
-  throw new Error("Formato de arquivo não suportado. Use PDF, TXT, CSV ou Excel.");
+  throw new Error("Formato de arquivo não suportado. Use PDF, TXT, CSV ou Excel (.xlsx/.xls).");
 };

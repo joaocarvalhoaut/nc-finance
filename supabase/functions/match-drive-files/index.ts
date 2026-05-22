@@ -28,6 +28,7 @@ import {
   matchDebtorsToFiles,
   type DebtorMatchInput,
 } from "../_shared/googleDrive.ts";
+import { batchMatchDebtors, getDriveAccessToken } from "../_shared/driveFolderIndex.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,7 @@ const SUPABASE_ANON_KEY  = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const SERVICE_ROLE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const GOOGLE_EMAIL       = Deno.env.get("GOOGLE_CLIENT_EMAIL") || "";
 const GOOGLE_PRIVATE_KEY = Deno.env.get("GOOGLE_PRIVATE_KEY") || "";
+// Legacy platform-level folder (fallback when user has no per-user folder configured)
 const DRIVE_FOLDER_ID    = Deno.env.get("GOOGLE_DRIVE_FOLDER_ID") || "";
 
 // ─── Plan gate ────────────────────────────────────────────────────────────────
@@ -102,21 +104,80 @@ Deno.serve(async (request: Request) => {
       });
     }
 
-    // ── 4. Valida credenciais ─────────────────────────────────────────────────
+    // ── 4. Resolve folder ID (per-user → fallback to platform env var) ───────────
+    let resolvedFolderId = DRIVE_FOLDER_ID;
+
+    // Check per-user folder first (from drive-index-folder setup)
+    const { data: userFolder } = await admin
+      .from("user_drive_folders")
+      .select("folder_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (userFolder) {
+      resolvedFolderId = (userFolder as { folder_id: string }).folder_id;
+    }
+
     if (!GOOGLE_EMAIL || !GOOGLE_PRIVATE_KEY) {
       return errResponse(503, {
         error: "Integração Google não configurada na plataforma. Contate o suporte.",
         status: "google_nao_configurado",
       });
     }
-    if (!DRIVE_FOLDER_ID) {
+    if (!resolvedFolderId) {
       return errResponse(503, {
-        error: "Pasta do Google Drive não configurada na plataforma. Contate o suporte.",
+        error: "Nenhuma pasta do Google Drive configurada. Cole a URL da pasta na seção de cobranças.",
         status: "drive_folder_nao_configurada",
       });
     }
 
     // ── 5. Obtém access token Google ──────────────────────────────────────────
+
+    // ── Fast path: if user has a drive index, use it (no need to re-list Drive) ─
+    // batchMatchDebtors reads user_drive_index (pre-indexed) which is much faster.
+    const { data: indexCount } = await admin
+      .from("user_drive_index")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId);
+
+    if ((indexCount as unknown as number ?? 0) > 0) {
+      // Use the cached index for fast matching
+      const matchResult = await batchMatchDebtors(admin, userId, { onlyUnmatched: false });
+      const now2 = new Date().toISOString();
+
+      // Count debtors with drive_file_id after matching
+      const { data: matchedRows } = await admin
+        .from("user_registros_financeiros")
+        .select("id, drive_file_id, drive_file_name, drive_file_url, drive_match_score")
+        .eq("user_id", userId)
+        .not("drive_file_id", "is", null);
+
+      const matchedCount2 = matchedRows?.length ?? 0;
+      const totalDebtors  = matchResult.total;
+
+      // Log this match run
+      await admin.from("user_drive_match_logs").insert({
+        user_id: userId, folder_id: resolvedFolderId,
+        files_found: (indexCount as unknown as number ?? 0),
+        debtors_matched: matchedCount2,
+        debtors_total: totalDebtors,
+        status: "success", metadata: { source: "index_cache", plan: subscription.plan },
+      });
+
+      return okResponse({
+        success: true, status: "success",
+        filesFound: (indexCount as unknown as number ?? 0),
+        debtorsTotal: totalDebtors,
+        debtorsMatched: matchedCount2,
+        error: null, logId: null, matchedAt: now2,
+        matches: (matchedRows ?? []).map((r: Record<string, unknown>) => ({
+          debtorId: r.id, fileId: r.drive_file_id, fileName: r.drive_file_name,
+          fileUrl: r.drive_file_url, score: r.drive_match_score,
+        })),
+      });
+    }
+
+    // ── Slow path: no index — fall back to legacy filename-only matching ──────
     let accessToken: string;
     try {
       accessToken = await getGoogleAccessToken(
@@ -134,12 +195,12 @@ Deno.serve(async (request: Request) => {
     // ── 6. Lista PDFs na pasta ─────────────────────────────────────────────────
     let driveFiles: Awaited<ReturnType<typeof listFilesInFolder>>;
     try {
-      driveFiles = await listFilesInFolder(DRIVE_FOLDER_ID, accessToken);
+      driveFiles = await listFilesInFolder(resolvedFolderId, accessToken);
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : "Erro ao listar arquivos do Drive.";
       await admin.from("user_drive_match_logs").insert({
         user_id: userId,
-        folder_id: DRIVE_FOLDER_ID,
+        folder_id: resolvedFolderId,
         files_found: 0,
         debtors_matched: 0,
         debtors_total: 0,
@@ -207,7 +268,7 @@ Deno.serve(async (request: Request) => {
       .from("user_drive_match_logs")
       .insert({
         user_id: userId,
-        folder_id: DRIVE_FOLDER_ID,
+        folder_id: resolvedFolderId,
         files_found: driveFiles.length,
         debtors_matched: matchedCount,
         debtors_total: debtors.length,

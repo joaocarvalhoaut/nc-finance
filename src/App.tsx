@@ -3,6 +3,7 @@ import Sidebar from "./components/Sidebar";
 import LandingPage from "./components/LandingPage";
 import SubscriptionGate from "./components/SubscriptionGate";
 import SubscriptionStatusCard from "./components/SubscriptionStatusCard";
+import ClientDashboard from "./components/ClientDashboard";
 import { PLAN_LIST } from "./config/plans";
 import { useAccount } from "./hooks/useAccount";
 import { useSubscription } from "./hooks/useSubscription";
@@ -18,6 +19,7 @@ import { whatsappBatchService, BATCH_TOP_STATUS_LABELS, type BatchChargeResult, 
 import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type AutomationRule, type AutomationRun, type AutomationRuleCreate } from "./services/automationService";
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
 import { parseImportFile } from "./utils/importFileParser";
+import { extractDocumentLocally, type LocalExtractionResult } from "./services/localDocumentExtraction";
 import { 
   Debtor, 
   Representative, 
@@ -268,58 +270,7 @@ const DEFAULT_USER_CONFIG = {
     "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKv196_0TBQI8Z-x7y8jGs8dRA5nFM/edit",
 };
 
-interface ExtractedDebtorCandidate {
-  client?: string;
-  supplier?: string;
-  cliente?: string;
-  fornecedor?: string;
-  document?: string;
-  numero_titulo?: string;
-  dueDate?: string;
-  vencimento?: string;
-  value?: number | string;
-  valor?: number | string;
-  phone?: string;
-  telefone?: string;
-}
-
-type GeminiExtractApiResponse =
-  | {
-      ok: true;
-      debtors?: ExtractedDebtorCandidate[];
-      warnings?: string[];
-    }
-  | {
-      ok: false;
-      error?: string;
-    };
-
-const parseGeminiExtractResponse = async (
-  response: Response,
-): Promise<GeminiExtractApiResponse> => {
-  const contentType = response.headers.get("content-type") || "";
-  const isJson = contentType.toLowerCase().includes("application/json");
-
-  if (isJson) {
-    return (await response.json()) as GeminiExtractApiResponse;
-  }
-
-  const rawText = await response.text();
-  const safeText = rawText.trim();
-
-  console.warn("[gemini.extract.non_json_response]", {
-    status: response.status,
-    contentType,
-    preview: safeText.slice(0, 300),
-  });
-
-  return {
-    ok: false,
-    error:
-      safeText ||
-      "A API de extração retornou uma resposta inválida. Tente novamente em alguns instantes.",
-  };
-};
+// (Gemini extraction API types removed — pipeline is now fully local)
 
 export default function App() {
   const {
@@ -371,8 +322,10 @@ export default function App() {
   const [extractedDebtors, setExtractedDebtors] = useState<Debtor[]>([]);
   const [extractionAlert, setExtractionAlert] = useState<string>("");
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
-  // Gemini rate-limit countdown: > 0 means "waiting N seconds before auto-retry"
-  const [geminiCountdown, setGeminiCountdown] = useState<number>(0);
+  // Original File object — needed for OCR fallback on scanned PDFs
+  const [importFile, setImportFile] = useState<File | null>(null);
+  // Last extraction result — used for post-import summary UI
+  const [lastExtractionResult, setLastExtractionResult] = useState<LocalExtractionResult | null>(null);
   const [importFileName, setImportFileName] = useState<string>("");
 
   // Representative management form values
@@ -437,7 +390,7 @@ export default function App() {
 
   useEffect(() => {
     if (isLoggedIn && currentTab === "inicio") {
-      setCurrentTab("dashboard");
+      setCurrentTab("cobrar");
     }
   }, [currentTab, isLoggedIn]);
 
@@ -445,7 +398,7 @@ export default function App() {
     setIsAuthenticating(true);
     try {
       await signIn({ email, password });
-      setCurrentTab("dashboard");
+      setCurrentTab("cobrar");
     } finally {
       setIsAuthenticating(false);
     }
@@ -458,7 +411,7 @@ export default function App() {
       const needsEmailConfirmation = !authResult.session;
 
       if (!needsEmailConfirmation) {
-        setCurrentTab("dashboard");
+        setCurrentTab("cobrar");
       }
 
       return {
@@ -496,25 +449,6 @@ export default function App() {
     }
     // canceled: apenas limpa URL, não faz nada (usuário volta para SubscriptionGate)
   }, [userId]);
-
-  // Gemini rate-limit countdown — ticks every second, auto-retries when it reaches 0
-  useEffect(() => {
-    if (geminiCountdown <= 0) return;
-    const timer = setTimeout(() => {
-      setGeminiCountdown((prev) => {
-        const next = prev - 1;
-        if (next <= 0) {
-          // Auto-retry: clear alert and trigger extraction again
-          setExtractionAlert("");
-          // defer so state flush completes before handleAIExtract runs
-          setTimeout(() => void handleAIExtract(), 0);
-        }
-        return next;
-      });
-    }, 1000);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geminiCountdown]);
 
   // Carregamento inicial de dados da conta autenticada
 
@@ -931,6 +865,7 @@ export default function App() {
     setExtractionAlert("");
     setExtractedDebtors([]);
     setImportFileName(file.name);
+    setImportFile(file); // store for OCR fallback
 
     try {
       const parsedText = await parseImportFile(file);
@@ -953,77 +888,83 @@ export default function App() {
     }
   };
 
-  // Call Gemini extraction backend pipeline
+  // ── Local extraction pipeline (free, no API key required) ────────────────
   const handleAIExtract = async () => {
     if (!importText.trim()) {
-      setExtractionAlert("Escreva, cole ou carregue um arquivo com informacoes reais de cobranca antes de prosseguir.");
+      setExtractionAlert(
+        "Escreva, cole ou carregue um arquivo com informações reais de cobrança antes de prosseguir.",
+      );
       return;
     }
 
     setIsExtracting(true);
     setExtractionAlert("");
-    setGeminiCountdown(0);
+    setLastExtractionResult(null);
+
     try {
-      const response = await fetch("/api/gemini/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          textContent: importText,
-          category: importCategory === "vencidos" ? "Vencidos" : importCategory === "a_vencer" ? "A vencer" : "Liquidacao"
-        })
-      });
+      // ── Primary path: local deterministic extraction ──────────────────────
+      const result = await extractDocumentLocally(
+        importText,
+        importCategory,
+        importFile ?? undefined,
+      );
 
-      const data = await parseGeminiExtractResponse(response);
+      setLastExtractionResult(result);
 
-      // Rate-limit: show countdown and auto-retry
-      if (response.status === 429) {
-        const raw = data as unknown as Record<string, unknown>;
-        const retryAfter = typeof raw.retryAfterSeconds === "number" ? raw.retryAfterSeconds : 65;
-        const msg =
-          typeof raw.error === "string"
-            ? raw.error
-            : `Limite de requisições atingido. Aguardando ${retryAfter}s para tentar novamente…`;
-        setExtractionAlert(msg);
-        setGeminiCountdown(retryAfter);
+      if (result.records.length > 0) {
+        const parsedList = result.records.map((item, index) => ({
+          id: `ext-${Date.now()}-${index}`,
+          client: item.client,
+          supplier: item.supplier,
+          document: item.document,
+          dueDate: item.dueDate,
+          value: item.value,
+          phone: item.phone,
+          category: importCategory,
+          status: "pending" as const,
+        }));
+
+        setExtractedDebtors(parsedList);
+
+        if (result.warnings.length > 0) {
+          setExtractionAlert(result.warnings.join(" "));
+        }
+
+        console.log(
+          JSON.stringify({
+            source: "local.extract.success",
+            records: parsedList.length,
+            method: result.method,
+            low_confidence: result.lowConfidenceCount,
+          }),
+        );
         return;
       }
 
-      if (!response.ok) {
-        const message =
-          "error" in data && typeof data.error === "string"
-            ? data.error
-            : "Falha ao processar extracao IA.";
-        throw new Error(message);
-      }
-      if (data.ok && data.debtors && Array.isArray(data.debtors)) {
-        const parsedList = data.debtors
-          .map((item: ExtractedDebtorCandidate, index: number) => ({
-            id: `ext-${Date.now()}-${index}`,
-            client: item.client || item.cliente || "",
-            supplier: item.supplier || item.fornecedor || "",
-            document: item.document || item.numero_titulo || "",
-            dueDate: item.dueDate || item.vencimento || "",
-            value: Number(item.value ?? item.valor ?? 0),
-            phone: item.phone || item.telefone || "",
-            category: importCategory,
-            status: "pending" as const
-          }))
-          .filter((item: Debtor) => item.client && item.document && item.dueDate && Number.isFinite(item.value) && item.value > 0);
+      // ── Nothing found locally ─────────────────────────────────────────────
+      const warningMsg =
+        result.warnings.length > 0
+          ? result.warnings.join(" ")
+          : "Nenhum registro financeiro válido foi encontrado no texto. " +
+            "Verifique se o arquivo contém campos de cliente, vencimento e valor. " +
+            `(Método: ${result.method}, candidatos: ${result.totalCandidates})`;
 
-        setExtractedDebtors(parsedList);
-        if (Array.isArray(data.warnings) && data.warnings.length > 0) {
-          console.warn("[gemini.extract.warnings]", data.warnings);
-          setExtractionAlert(data.warnings.join(" "));
-        } else if (parsedList.length === 0) {
-          setExtractionAlert("Nenhum registro financeiro valido foi retornado pela IA para o conteudo enviado.");
-        }
-      } else {
-        setExtractedDebtors([]);
-        setExtractionAlert("Nenhum dado financeiro pode ser extraido de forma estruturada. Verifique o conteudo do arquivo ou texto informado.");
-      }
-    } catch (err) {
       setExtractedDebtors([]);
-      setExtractionAlert(err instanceof Error ? err.message : "Falha ao processar a extracao com Gemini.");
+      setExtractionAlert(warningMsg);
+
+    } catch (err) {
+      console.error(
+        JSON.stringify({
+          source: "local.extract.error",
+          message: err instanceof Error ? err.message : "desconhecido",
+        }),
+      );
+      setExtractedDebtors([]);
+      setExtractionAlert(
+        err instanceof Error
+          ? err.message
+          : "Falha ao processar a extração local. Verifique o formato do arquivo.",
+      );
     } finally {
       setIsExtracting(false);
     }
@@ -1454,7 +1395,28 @@ export default function App() {
             )}
 
             <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-8">
-              
+
+              {/* ── Tab: Cobrar (novo fluxo simplificado) ──────────────────── */}
+              {currentTab === "cobrar" && userId && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Enviar cobranças</h2>
+                    <p className="text-sm text-zinc-400 mt-1">
+                      Importe sua planilha, revise os devedores e envie as mensagens em segundos.
+                    </p>
+                  </div>
+                  <ClientDashboard
+                    userId={userId}
+                    globalFinePct={globalFinePct}
+                    globalInterestDayPct={globalInterestDayPct}
+                    onBatchSent={(result) => {
+                      setBatchSendResult(result);
+                    }}
+                  />
+                </div>
+              )}
+
+              {currentTab !== "cobrar" && (
               <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-950 border border-emerald-500/10 p-4 sm:p-5 rounded-3xl relative overflow-hidden shadow-xl">
                 <div className="absolute top-0 right-0 w-[200px] h-full bg-[radial-gradient(circle_at_right_top,rgba(16,185,129,0.06),transparent)]" />
                 <div className="flex flex-col gap-4">
@@ -1463,11 +1425,12 @@ export default function App() {
                       <Zap className="w-5 h-5 text-emerald-400 animate-pulse" /> Sistema Moderno NC Finance
                     </h3>
                     <p className="text-xs sm:text-sm text-zinc-400 font-light mt-1">
-                      Gerencie faturamentos, extraia devedores via inteligência artificial com Gemini 3.5 Flash e envie notificações automáticas com Z-API acopladas ao Google Drive.
+                      Gerencie faturamentos, extraia devedores com o pipeline local de análise de documentos e envie notificações automáticas de cobrança.
                     </p>
                   </div>
                 </div>
               </div>
+              )}
 
               {currentTab === "dashboard" && (
                 <div className="space-y-8">
@@ -1626,7 +1589,7 @@ export default function App() {
                       <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-850 flex flex-col gap-2">
                         <span className="font-mono text-emerald-400 font-bold">Passo 1</span>
                         <h5 className="font-bold text-white">Importação e Extração</h5>
-                        <p className="text-zinc-500 font-light">Cole o relatório bruto ou insira as parcelas para que a IA do Gemini estruture os vencimentos.</p>
+                        <p className="text-zinc-500 font-light">Cole o relatório bruto ou insira as parcelas para que o extrator local estruture os vencimentos.</p>
                       </div>
                       <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-850 flex flex-col gap-2">
                         <span className="font-mono text-emerald-400 font-bold">Passo 2</span>
@@ -1813,7 +1776,7 @@ export default function App() {
                           <Download className="w-4 h-4 text-emerald-400" /> Upload ou Texto de Cobrança
                         </h4>
                         <p className="text-xs text-zinc-500 font-light">
-                          Cole faturas, relatórios de ERP, e-mails brutos ou selecione presets abaixo para que a inteligência artificial do Gemini extraia tudo estruturadamente.
+                          Cole faturas, relatórios de ERP ou selecione presets abaixo. O extrator local identifica clientes, vencimentos, valores e documentos automaticamente.
                         </p>
                       </div>
 
@@ -1825,7 +1788,7 @@ export default function App() {
                           <p className="text-xs font-semibold text-zinc-300">Arraste seus relatorios PDF, TXT ou EXCEL aqui</p>
                           <p className="text-[10px] text-zinc-600">
                             {isParsingImportFile
-                              ? "Lendo conteudo real do arquivo para enviar ao Gemini..."
+                              ? "Lendo arquivo..."
                               : importFileName
                                 ? `Arquivo carregado: ${importFileName}`
                                 : "O conteudo real do arquivo tera prioridade sobre presets e textos de exemplo."}
@@ -1893,47 +1856,24 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                       </div>
 
                       {extractionAlert && (
-                        <div className={`p-3 border text-xs rounded-xl flex items-start gap-2 ${
-                          geminiCountdown > 0
-                            ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
-                            : "bg-amber-500/10 border-amber-500/20 text-amber-400"
-                        }`}>
+                        <div className="p-3 border text-xs rounded-xl flex items-start gap-2 bg-amber-500/10 border-amber-500/20 text-amber-400">
                           <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                          <div className="flex-1 space-y-1">
-                            <span>{extractionAlert}</span>
-                            {geminiCountdown > 0 && (
-                              <div className="flex items-center gap-2 mt-1">
-                                <div className="h-1 flex-1 rounded-full bg-amber-900/40 overflow-hidden">
-                                  <div
-                                    className="h-full bg-amber-400 transition-all duration-1000"
-                                    style={{ width: `${Math.max(0, (geminiCountdown / 65) * 100)}%` }}
-                                  />
-                                </div>
-                                <span className="text-amber-200 font-mono font-bold tabular-nums">
-                                  {geminiCountdown}s
-                                </span>
-                              </div>
-                            )}
-                          </div>
+                          <span className="flex-1">{extractionAlert}</span>
                         </div>
                       )}
 
                       <button
                         onClick={handleAIExtract}
-                        disabled={isExtracting || geminiCountdown > 0}
+                        disabled={isExtracting}
                         className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all text-sm cursor-pointer disabled:cursor-not-allowed"
                       >
                         {isExtracting ? (
                           <>
-                            <RefreshCw className="w-4 h-4 animate-spin" /> Extraindo Informações via IA Gemini...
-                          </>
-                        ) : geminiCountdown > 0 ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 animate-spin" /> Aguardando cota Gemini… {geminiCountdown}s
+                            <RefreshCw className="w-4 h-4 animate-spin" /> Extraindo dados do documento…
                           </>
                         ) : (
                           <>
-                            <Zap className="w-4 h-4" /> Extrair com Inteligência Artificial
+                            <Zap className="w-4 h-4" /> Extrair Dados do Documento
                           </>
                         )}
                       </button>
@@ -1944,9 +1884,38 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                       <div className="space-y-1">
                         <h4 className="text-sm font-bold text-white">Dados Financeiros Extraídos Revisáveis</h4>
                         <p className="text-xs text-zinc-500 font-light">
-                          Os dados abaixo foram interpretados e estruturados pela IA do Gemini. Você pode editar os campos e optar por enviá-los de forma consolidada para a Visão Geral.
+                          Os dados abaixo foram extraídos pelo pipeline local. Você pode editar os campos e optar por enviá-los de forma consolidada para a Visão Geral.
                         </p>
                       </div>
+
+                      {/* ── Post-import summary chips ──────────────────────── */}
+                      {lastExtractionResult && (
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <CheckCircle className="w-3 h-3" />
+                            {lastExtractionResult.records.length} registro{lastExtractionResult.records.length !== 1 ? "s" : ""}
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">
+                            método: {lastExtractionResult.method}
+                          </span>
+                          {lastExtractionResult.lowConfidenceCount > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              <AlertTriangle className="w-3 h-3" />
+                              {lastExtractionResult.lowConfidenceCount} baixa confiança
+                            </span>
+                          )}
+                          {lastExtractionResult.missingDocCount > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-500 border border-zinc-700">
+                              {lastExtractionResult.missingDocCount} doc gerado
+                            </span>
+                          )}
+                          {lastExtractionResult.totalCandidates > lastExtractionResult.records.length && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-500 border border-zinc-700">
+                              {lastExtractionResult.totalCandidates - lastExtractionResult.records.length} descartado{lastExtractionResult.totalCandidates - lastExtractionResult.records.length !== 1 ? "s" : ""}
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       <div className="flex-1 min-h-[300px] overflow-y-auto max-h-[420px] pr-1 space-y-4">
                         {extractedDebtors.length === 0 ? (
@@ -3453,7 +3422,7 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
             </div>
 
             <footer className="border-t border-zinc-900 bg-zinc-950 py-6 text-zinc-600 text-[10px] text-center">
-              <span>NC Finance Admin Desk v1.1.0 • Conexão com Google Cloud Run & Gemini API ativa e criptografada • {new Date().getFullYear()} NC Finance.</span>
+              <span>NC Finance v1.3.0 • {new Date().getFullYear()} NC Finance.</span>
             </footer>
 
           </main>

@@ -1,21 +1,12 @@
 import React, { useState } from "react";
 import {
-  PiggyBank,
-  ArrowLeftRight,
-  DownloadCloud,
-  ShieldAlert,
-  SendHorizontal,
-  UserSquare2,
   LogOut,
   LogIn,
-  Sliders,
   Info,
-  ChevronRight,
-  Menu,
   Pin,
   PinOff,
   History,
-  Bot
+  SendHorizontal,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -82,12 +73,8 @@ export default function Sidebar({
   };
 
   const menuItems = isLoggedIn ? [
-    { id: "dashboard", label: "Dashboard", icon: Sliders },
-    { id: "importar", label: "Importação e Extração", icon: DownloadCloud },
-    { id: "visao_geral", label: "Visão Geral Devedores", icon: ArrowLeftRight },
-    { id: "cobranca", label: "Cobrança", icon: SendHorizontal },
+    { id: "cobrar",   label: "Cobrar",    icon: SendHorizontal },
     { id: "historico", label: "Histórico", icon: History },
-    { id: "automacoes", label: "Automações", icon: Bot }
   ] : [
     { id: "inicio", label: "Apresentação", icon: Info }
   ];

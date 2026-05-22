@@ -1,0 +1,302 @@
+{
+  "timestamp": "2026-05-21T19:08:30.983Z",
+  "mode": "dry_run",
+  "supabaseUrl": "https://hiabmnyyxbedtkigcjdx.supabase.co",
+  "results": [
+    {
+      "section": 1,
+      "check": "SUPABASE_URL",
+      "status": "PASS",
+      "detail": "https://hiabmnyyxbedtkigcjdx.supabase.co"
+    },
+    {
+      "section": 1,
+      "check": "SUPABASE_ANON_KEY",
+      "status": "PASS",
+      "detail": "eyJh...OQE"
+    },
+    {
+      "section": 1,
+      "check": "SUPABASE_SERVICE_ROLE_KEY",
+      "status": "PASS",
+      "detail": "eyJh...Euw"
+    },
+    {
+      "section": 1,
+      "check": "TEST_USER_EMAIL",
+      "status": "PASS",
+      "detail": "e2e-test@nc-finance.test"
+    },
+    {
+      "section": 1,
+      "check": "TEST_USER_PASSWORD",
+      "status": "PASS",
+      "detail": "definida"
+    },
+    {
+      "section": 1,
+      "check": "GATEWAY_ADMIN_SECRET",
+      "status": "PASS",
+      "detail": "5a0b...530"
+    },
+    {
+      "section": 2,
+      "check": "signIn",
+      "status": "PASS",
+      "detail": "userId=b9c2f102…"
+    },
+    {
+      "section": 2,
+      "check": "JWT obtido",
+      "status": "PASS",
+      "detail": "eyJh...B7A"
+    },
+    {
+      "section": 3,
+      "check": "Rejeita save sem X-Admin-Token",
+      "status": "PASS",
+      "detail": "HTTP 403"
+    },
+    {
+      "section": 3,
+      "check": "Bootstrap gateway/init — credenciais lidas de Supabase Secrets",
+      "status": "PASS",
+      "detail": "Credenciais inicializadas a partir das variáveis de ambiente. Use action=validate para testar a conexão."
+    },
+    {
+      "section": 3,
+      "check": "Resposta de init não contém credenciais (server-side only)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 4,
+      "check": "GET gateway/status retorna 200",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 4,
+      "check": "Resposta de status não contém credenciais",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 4,
+      "check": "Campos seguros presentes",
+      "status": "PASS",
+      "detail": "status, connected, connected_pending_phone"
+    },
+    {
+      "section": 4,
+      "check": "phone_number_masked está devidamente mascarado",
+      "status": "PASS",
+      "detail": "5577*****938"
+    },
+    {
+      "section": 4,
+      "check": "POST gateway/validate",
+      "status": "SKIP",
+      "detail": "credenciais Z-API não disponíveis nesta execução"
+    },
+    {
+      "section": 5,
+      "check": "GET gateway/qr",
+      "status": "SKIP",
+      "detail": "credenciais Z-API não disponíveis — instância não configurada"
+    },
+    {
+      "section": 6,
+      "check": "Assinatura de teste criada (trialing/pro) para o usuário de teste",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 6,
+      "check": "3 devedores de teste inseridos",
+      "status": "PASS",
+      "detail": "b8ab0627, 76ac3852, a8d84a5c…"
+    },
+    {
+      "section": 7,
+      "check": "Envio individual sucesso",
+      "status": "PASS",
+      "detail": "messageId=3EB0230F26FCCA2531FA46 logId=d4426043-f4db-4055-bb02-89de4d5ded86"
+    },
+    {
+      "section": 7,
+      "check": "Não retornou credenciais Z-API",
+      "status": "PASS",
+      "detail": "ok=true sem token/client_token"
+    },
+    {
+      "section": 8,
+      "check": "Lote concluído",
+      "status": "PASS",
+      "detail": "enviados=2 falhos=0 dup=0 tel_inv=1"
+    },
+    {
+      "section": 8,
+      "check": "dryRun=true — nenhuma mensagem real enviada",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 8,
+      "check": "Telefone inválido detectado no lote",
+      "status": "PASS",
+      "detail": "1 registro(s)"
+    },
+    {
+      "section": 8,
+      "check": "Resposta do lote não contém credenciais",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 9,
+      "check": "4 log(s) encontrado(s) em user_logs_cobranca",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 9,
+      "check": "Todos os 4 logs verificados — sem PII detectado",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 9,
+      "check": "Telefones mascarados encontrados nos logs",
+      "status": "PASS",
+      "detail": "***, 5511******002"
+    },
+    {
+      "section": 9,
+      "check": "Mensagens nos logs respeitam limite de tamanho (≤ 110 chars)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 9,
+      "check": "Chaves de idempotência são SHA-256 (64 chars hex)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 10,
+      "check": "Segunda requisição bloqueada como duplicata",
+      "status": "PASS",
+      "detail": "HTTP 409 — duplicateLogId=d4426043-f4db-4055-bb02-89de4d5ded86"
+    },
+    {
+      "section": 10,
+      "check": "Terceira requisição também bloqueada como duplicata",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 11,
+      "check": "Webhook rejeita Client-Token inválido",
+      "status": "PASS",
+      "detail": "HTTP 401"
+    },
+    {
+      "section": 11,
+      "check": "Webhook rejeita requisição sem Client-Token",
+      "status": "PASS",
+      "detail": "HTTP 401"
+    },
+    {
+      "section": 11,
+      "check": "Status atualizado via webhook",
+      "status": "PASS",
+      "detail": "messageId=dry-76ac3852 → delivered"
+    },
+    {
+      "section": 11,
+      "check": "updatedRows=1",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 11,
+      "check": "DB confirma status=entregue após webhook",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 12,
+      "check": "Tabela pilot_config acessível",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 12,
+      "check": "Usuário sem pilot_config não é bloqueado pelo guard",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 12,
+      "check": "pilot_enabled=false bloqueia envio",
+      "status": "PASS",
+      "detail": "HTTP 403 pilot_desabilitado"
+    },
+    {
+      "section": 12,
+      "check": "pilot_enabled=true permite envio dentro do horário",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 12,
+      "check": "Limite diário atingido retorna 429 limite_diario",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 12,
+      "check": "pilot_daily_sends zerado antes do envio",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 12,
+      "check": "pilot_daily_sends incrementado após envio",
+      "status": "PASS",
+      "detail": "sent_count=1"
+    },
+    {
+      "section": 12,
+      "check": "Dados de piloto de teste removidos",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 13,
+      "check": "Logs de teste removidos de user_logs_cobranca",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 13,
+      "check": "3 devedores de teste removidos de user_registros_financeiros",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "section": 13,
+      "check": "Assinatura de teste removida",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "summary": {
+    "pass": 46,
+    "fail": 0,
+    "warn": 0,
+    "skip": 2
+  },
+  "verdict": "APPROVED"
+}

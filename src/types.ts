@@ -117,6 +117,63 @@ export interface MessageTemplateRecord {
   updatedAt?: string;
 }
 
+// ── Pilot mode ────────────────────────────────────────────────────────────────
+
+export interface PilotConfig {
+  id:                   string;
+  userId:               string;
+  pilotEnabled:         boolean;
+  dailySendLimit:       number;
+  allowedSendStart:     string;   // "HH:MM" UTC
+  allowedSendEnd:       string;   // "HH:MM" UTC
+  allowedWeekdays:      number[]; // 1=Mon … 7=Sun
+  whatsappNumberLabel:  string | null;
+  responsibleName:      string | null;
+  supportChannel:       string | null;
+  notes:                string | null;
+  createdAt?:           string;
+  updatedAt?:           string;
+}
+
+export interface PilotDailySends {
+  userId:     string;
+  sendDate:   string;
+  sentCount:  number;
+}
+
+export interface PilotFallbackNote {
+  id:             string;
+  userId:         string;
+  logId:          string | null;
+  clientName:     string;
+  documentNumber: string | null;
+  phoneMasked:    string | null;
+  resolution:     "resolvido_manualmente" | "reenviado" | "ignorado" | "contato_direto";
+  observation:    string | null;
+  resolvedAt:     string;
+  createdAt:      string;
+}
+
+export interface PilotMetrics {
+  totalSentToday:       number;
+  dailyLimit:           number;
+  remainingToday:       number;
+  totalDeliveredToday:  number;
+  totalFailedToday:     number;
+  totalDuplicateBlocked: number;
+  totalInvalidPhone:    number;
+  avgDeliveryMinutes:   number | null;
+  lastErrors:           PilotLastError[];
+  loadedAt:             string;
+}
+
+export interface PilotLastError {
+  id:         string;
+  clientName: string;
+  status:     string;
+  createdAt:  string;
+}
+
 export type MessageTone = "amigavel" | "neutro" | "firme" | "juridico";
 export type PlanId = "basic" | "pro" | "premium";
 export type SubscriptionStatus =

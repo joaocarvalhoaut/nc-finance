@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
-import { 
-  CheckCircle2, 
-  Sparkles, 
-  MessageSquare, 
-  ShieldCheck, 
-  Clock, 
-  ArrowRight, 
-  FileSpreadsheet, 
-  HardDrive, 
+import {
+  CheckCircle2,
+  Sparkles,
+  MessageSquare,
+  ShieldCheck,
+  Clock,
+  ArrowRight,
+  FileSpreadsheet,
+  HardDrive,
   Terminal,
   FileCheck,
   Smartphone,
@@ -17,6 +17,8 @@ import {
   Zap
 } from "lucide-react";
 import type { AuthCredentials, SignUpPayload } from "../types";
+// Static import — Vite resolves this at build time and outputs a hashed URL.
+// DO NOT use /src/... URL paths for assets (breaks in production/Vercel).
 
 interface LandingPageProps {
   onLogin: (credentials: AuthCredentials) => Promise<void>;
@@ -276,14 +278,90 @@ export default function LandingPage({
                       <span>5G 📶</span>
                     </div>
 
-                    {/* Image showcase */}
+                    {/* Image showcase — static import ensures correct hashed URL in production */}
                     <div className="w-full overflow-hidden rounded-lg border border-zinc-900 bg-zinc-950 mt-1 relative flex justify-center">
-                      <img
-                        src="/src/assets/images/whatsapp_billing_mockup_1779296528244.png"
-                        alt="WhatsApp Billing Mockup"
-                        className="w-full object-cover rounded-lg aspect-square"
-                        referrerPolicy="no-referrer"
-                      />
+                      <div
+                        aria-label="WhatsApp Billing Mockup"
+                        className="w-full aspect-square rounded-lg bg-gradient-to-b from-[#0f1c17] via-[#101413] to-[#090b0a] p-3 sm:p-4"
+                      >
+                        <div className="flex h-full flex-col overflow-hidden rounded-[20px] border border-emerald-500/10 bg-[#0b1411] shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
+                          <div className="flex items-center justify-between border-b border-white/5 bg-[#12241d] px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
+                                <FileCheck className="h-5 w-5" />
+                              </div>
+                              <div>
+                                <div className="text-sm font-semibold text-white">NC Finance</div>
+                                <div className="text-[11px] text-emerald-300">Cobrança automatizada</div>
+                              </div>
+                            </div>
+                            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.18em] text-emerald-300">
+                              Live
+                            </span>
+                          </div>
+
+                          <div className="flex-1 space-y-3 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),_transparent_38%),linear-gradient(180deg,#0d1512_0%,#08100d_100%)] px-4 py-4">
+                            <div className="ml-auto max-w-[78%] rounded-2xl rounded-tr-md border border-white/5 bg-white/[0.04] px-3 py-2 text-left shadow-sm">
+                              <div className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Cliente</div>
+                              <p className="mt-1 text-sm leading-relaxed text-zinc-100">
+                                Bom dia! Preciso do boleto atualizado para pagamento ainda hoje.
+                              </p>
+                            </div>
+
+                            <div className="max-w-[88%] rounded-2xl rounded-tl-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-3 text-left shadow-[0_14px_30px_rgba(16,185,129,0.08)]">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="text-[11px] uppercase tracking-[0.18em] text-emerald-300/80">
+                                    ORTHOMAX INDUSTRIA E COMERCIO
+                                  </div>
+                                  <div className="mt-1 text-sm font-semibold text-white">
+                                    Título 4254-2 • Vencimento 10/05/2026
+                                  </div>
+                                </div>
+                                <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[11px] font-semibold text-emerald-200">
+                                  R$ 715,66
+                                </span>
+                              </div>
+
+                              <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div>
+                                    <div className="text-[11px] uppercase tracking-[0.16em] text-zinc-400">Sacado</div>
+                                    <div className="mt-1 text-sm font-medium text-zinc-100">
+                                      IDERLANDIO JESUS DE OLIVEIRA
+                                    </div>
+                                  </div>
+                                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-zinc-300">
+                                    PDF anexado
+                                  </span>
+                                </div>
+                                <div className="mt-3 flex items-center gap-3 rounded-xl border border-emerald-400/15 bg-emerald-400/5 px-3 py-2">
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300">
+                                    <Check className="h-5 w-5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="truncate text-sm font-medium text-white">
+                                      Boleto_4254-2_IDERLANDIO.pdf
+                                    </div>
+                                    <div className="text-[11px] text-zinc-400">
+                                      Linha digitável e instruções de pagamento enviadas
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="mt-3 flex items-center justify-between text-[11px] text-zinc-400">
+                                <span>Telefone 55 77 9 8137-6867</span>
+                                <span>14:02</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-3 py-2 text-center text-[11px] text-zinc-400">
+                              Mensagem enviada com boleto, valor e rastreabilidade do envio
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                       <div className="absolute bottom-4 left-4 right-4 bg-zinc-950/90 border border-emerald-500/30 backdrop-blur-md p-3 rounded-xl shadow-xl flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />

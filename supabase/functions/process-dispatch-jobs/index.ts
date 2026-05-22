@@ -30,15 +30,15 @@ import { checkSubscription }                     from "../_shared/subscriptionGu
 import { getUsageSnapshot, incrementChargesSent, getPlanLimit } from "../_shared/usageGuard.ts";
 import { insertBillingLog }                      from "../_shared/billingLog.ts";
 import { buildMessage }                          from "../_shared/messageBuilder.ts";
+import { loadZApiCredentials }                   from "../_shared/platformIntegrations.ts";
+import { sanitizeError }                         from "../_shared/sanitize.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
 const SUPABASE_URL       = Deno.env.get("SUPABASE_URL")             || "";
 const SERVICE_ROLE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const CRON_SECRET        = Deno.env.get("AUTOMATION_CRON_SECRET")    || "";
-const ZAPI_INSTANCE_ID   = Deno.env.get("ZAPI_INSTANCE_ID")         || "";
-const ZAPI_TOKEN         = Deno.env.get("ZAPI_TOKEN")                || "";
-const ZAPI_CLIENT_TOKEN  = Deno.env.get("ZAPI_CLIENT_TOKEN")         || "";
+// Z-API credentials loaded dynamically via loadZApiCredentials() — not hardcoded
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -92,9 +92,11 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
   };
 
   try {
-    // ── 1. Valida credenciais Z-API ────────────────────────────────────────
-    if (!ZAPI_INSTANCE_ID || !ZAPI_TOKEN || !ZAPI_CLIENT_TOKEN) {
-      await markJob("failed", { last_error: "Z-API nao configurada." });
+    // ── 1. Carrega credenciais Z-API (platform_integrations → env vars) ──────
+    // P4: usa SOMENTE platform_integrations — NUNCA company_integrations
+    const zapiCreds = await loadZApiCredentials(admin);
+    if (!zapiCreds) {
+      await markJob("failed", { last_error: "Z-API nao configurada (platform_integrations ausente)." });
       return;
     }
 
@@ -223,11 +225,11 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
       return;
     }
 
-    // ── 10. Envia via Z-API ───────────────────────────────────────────────
+    // ── 10. Envia via Z-API (credenciais de platform_integrations) ───────────
     const zapiResult = await sendTextMessage({
-      instanceId:  ZAPI_INSTANCE_ID,
-      token:       ZAPI_TOKEN,
-      clientToken: ZAPI_CLIENT_TOKEN,
+      instanceId:  zapiCreds.instanceId,
+      token:       zapiCreds.token,
+      clientToken: zapiCreds.clientToken,
       phone:       normalizedPhone,
       message,
     });
@@ -276,7 +278,8 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
       }
     }
   } catch (err) {
-    console.error(`[worker] job ${jobId} unhandled:`, err);
+    // P2: sanitize error before logging — no PII in logs
+    console.error(`[worker] job ${jobId} unhandled: ${sanitizeError(err instanceof Error ? err.message : String(err))}`);
     const newAttempts = attempts + 1;
     if (newAttempts >= maxAttempts) {
       await markJob("failed", {

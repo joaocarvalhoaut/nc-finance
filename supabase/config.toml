@@ -105,6 +105,10 @@ verify_jwt = false
 [functions.process-dispatch-jobs]
 verify_jwt = false
 
+# Z-API sends webhooks without Supabase JWT — auth is via Client-Token header
+[functions.sync-whatsapp-status]
+verify_jwt = false
+
 [analytics]
 enabled = false
 port = 54327

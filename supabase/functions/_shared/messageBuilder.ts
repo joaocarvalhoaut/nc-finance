@@ -20,6 +20,8 @@ export interface DebtorForMessage {
   amount: number;
   driveFileUrl?: string | null;
   driveFileName?: string | null;
+  /** Dias de atraso (para templates que usam {dias_atraso}) */
+  daysOverdue?: number | null;
 }
 
 // ─── Default templates (por tom) ──────────────────────────────────────────────
@@ -112,12 +114,15 @@ export const buildMessage = (
   const dueFormatted = normalizeDate(debtor.dueDate);
   const amountFormatted = formatBRL(debtor.amount);
 
+  const daysOverdueStr = String(debtor.daysOverdue ?? 0);
+
   let msg = template
     .replace(/{nome_cliente}/g,    debtor.clientName   || "Cliente")
     .replace(/{documento}/g,       debtor.documentNumber || "—")
     .replace(/{documento_boleto}/g, debtor.documentNumber || "—")
     .replace(/{vencimento}/g,      dueFormatted)
-    .replace(/{valor_atualizado}/g, amountFormatted);
+    .replace(/{valor_atualizado}/g, amountFormatted)
+    .replace(/{dias_atraso}/g,     daysOverdueStr);
 
   // Appenda link do PDF do Drive, se disponível
   if (debtor.driveFileUrl) {
