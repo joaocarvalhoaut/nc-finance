@@ -24,7 +24,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
 import {
   getGoogleAccessToken,
-  listFilesInFolder,
+  listFilesInFolderDeep,
   matchDebtorsToFiles,
   type DebtorMatchInput,
 } from "../_shared/googleDrive.ts";
@@ -192,10 +192,10 @@ Deno.serve(async (request: Request) => {
       });
     }
 
-    // ── 6. Lista PDFs na pasta ─────────────────────────────────────────────────
-    let driveFiles: Awaited<ReturnType<typeof listFilesInFolder>>;
+    // ── 6. Lista PDFs na pasta (inclui subpastas nomeadas por cliente) ────────
+    let driveFiles: Awaited<ReturnType<typeof listFilesInFolderDeep>>;
     try {
-      driveFiles = await listFilesInFolder(resolvedFolderId, accessToken);
+      driveFiles = await listFilesInFolderDeep(resolvedFolderId, accessToken);
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : "Erro ao listar arquivos do Drive.";
       await admin.from("user_drive_match_logs").insert({

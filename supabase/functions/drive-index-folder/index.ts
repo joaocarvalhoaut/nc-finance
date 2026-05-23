@@ -23,7 +23,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
 import { checkSubscription } from "../_shared/subscriptionGuard.ts";
-import { getGoogleAccessToken, listFilesInFolder } from "../_shared/googleDrive.ts";
+import { getGoogleAccessToken, listFilesInFolderDeep } from "../_shared/googleDrive.ts";
 import {
   saveFolderConfig,
   indexFolderForUser,
@@ -225,7 +225,7 @@ Deno.serve(async (request: Request) => {
 
       try {
         folderName = await resolveFolderName(folderId, accessToken);
-        const files = await listFilesInFolder(folderId, accessToken);
+        const files = await listFilesInFolderDeep(folderId, accessToken);
         isAccessible = true;
         fileCount = files.length;
       } catch (e) {

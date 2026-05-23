@@ -229,5 +229,64 @@ export const financeService = {
     if (error) {
       throw new Error(error.message || "Falha ao excluir registro financeiro.");
     }
-  }
+  },
+
+  /**
+   * reconcileLiquidations — marca como liquidado devedores existentes que
+   * correspondem aos registros do arquivo de liquidação (por número de documento).
+   *
+   * Regra: apenas altera registros em category "vencidos" ou "a_vencer".
+   * Nunca cria cobranças para registros de liquidação.
+   *
+   * @returns quantidade de registros reconciliados no DB.
+   */
+  async reconcileLiquidations(
+    userId: string,
+    documentNumbers: string[],
+  ): Promise<number> {
+    if (!documentNumbers.length) return 0;
+
+    const supabase = getSupabaseClient();
+
+    // Normaliza: remove caracteres não-alfanuméricos para comparação
+    const normalized = documentNumbers
+      .map(d => d.replace(/[^a-z0-9]/gi, "").toUpperCase())
+      .filter(Boolean);
+
+    if (!normalized.length) return 0;
+
+    // Busca registros vencidos / a_vencer que possam ser reconciliados
+    const { data: existing, error: fetchErr } = await supabase
+      .from(TABLE_NAME)
+      .select("id, document_number")
+      .eq("user_id", userId)
+      .in("category", ["vencidos", "a_vencer"]);
+
+    if (fetchErr) return 0; // non-critical — não bloqueia o fluxo
+
+    const matchIds = (existing ?? [])
+      .filter((row: { id: string; document_number: string }) => {
+        const norm = (row.document_number ?? "").replace(/[^a-z0-9]/gi, "").toUpperCase();
+        return normalized.includes(norm);
+      })
+      .map((row: { id: string }) => row.id);
+
+    if (!matchIds.length) return 0;
+
+    const now = new Date().toISOString();
+    const { error: updErr } = await supabase
+      .from(TABLE_NAME)
+      .update({
+        category: "liquidado",
+        status: "sent",
+        notes: `Reconciliado por arquivo de liquidação em ${now.slice(0, 10)}`,
+        updated_at: now,
+      })
+      .in("id", matchIds)
+      .eq("user_id", userId);
+
+    if (updErr) return 0;
+
+    return matchIds.length;
+  },
 };

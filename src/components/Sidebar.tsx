@@ -7,6 +7,11 @@ import {
   PinOff,
   History,
   SendHorizontal,
+  LayoutDashboard,
+  Upload,
+  Eye,
+  MessageSquare,
+  Zap,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -30,7 +35,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const [isPinned, setIsPinned] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(256); // Dynamic width starts at 256px, ranges from 180px to 500px
+  const [sidebarWidth, setSidebarWidth] = useState(256);
   const [isDragging, setIsDragging] = useState(false);
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -43,13 +48,12 @@ export default function Sidebar({
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
       const deltaX = moveEvent.clientX - startX;
-      // Constraint limit from 180px minimum up to 500px maximum
       const newWidth = Math.max(180, Math.min(500, startWidth + deltaX));
-      
+
       if (Math.abs(deltaX) > 6) {
         hasDragged = true;
         setSidebarWidth(newWidth);
-        setIsPinned(true); // Automatically lock/pin the sidebar when dragging to custom width
+        setIsPinned(true);
       }
     };
 
@@ -72,24 +76,33 @@ export default function Sidebar({
     document.addEventListener("pointerup", handlePointerUp);
   };
 
+  // ── Menu definition ────────────────────────────────────────────────────────
+  // "cobrar" = fluxo simplificado para o cliente (Upload → Prévia → Envio)
+  // Demais tabs = pipeline operacional interno completo
   const menuItems = isLoggedIn ? [
-    { id: "cobrar",   label: "Cobrar",    icon: SendHorizontal },
-    { id: "historico", label: "Histórico", icon: History },
+    { id: "cobrar",      label: "Cobrar",       icon: SendHorizontal, section: "client" },
+    { id: "separator1",  label: "",             icon: null,            section: "divider" },
+    { id: "dashboard",   label: "Dashboard",    icon: LayoutDashboard, section: "internal" },
+    { id: "importar",    label: "Importar",     icon: Upload,          section: "internal" },
+    { id: "visao_geral", label: "Visão Geral",  icon: Eye,             section: "internal" },
+    { id: "cobranca",    label: "Cobrança",     icon: MessageSquare,   section: "internal" },
+    { id: "historico",   label: "Histórico",    icon: History,         section: "internal" },
+    { id: "automacoes",  label: "Automações",   icon: Zap,             section: "internal" },
   ] : [
-    { id: "inicio", label: "Apresentação", icon: Info }
+    { id: "inicio", label: "Apresentação", icon: Info, section: "public" }
   ];
 
   const handleItemClick = (id: string) => {
+    if (id.startsWith("separator")) return;
     onTabChange(id);
   };
 
-  // Determine actual rendered width based on pinned state and hover triggers
   const isExpanded = isPinned || isHovered;
 
   return (
     <>
-      {/* Sleek edge trigger strip to wake up sidebar on hover */}
-      <div 
+      {/* Edge hover trigger */}
+      <div
         className="fixed top-0 left-0 h-full w-3 z-50 bg-gradient-to-r from-emerald-500/20 to-transparent cursor-pointer transition-opacity duration-300 md:block hidden"
         onMouseEnter={() => setIsHovered(true)}
       />
@@ -98,16 +111,16 @@ export default function Sidebar({
       <aside
         id="sidebar"
         className={`fixed top-0 left-0 h-full z-40 bg-zinc-950 border-r border-emerald-500/20 text-white flex flex-col justify-between shadow-[4px_0_24px_rgba(0,0,0,0.8)]
-          ${isDragging ? "transition-none" : "transition-all duration-300"} 
+          ${isDragging ? "transition-none" : "transition-all duration-300"}
           ${isPinned ? "translate-x-0" : ""}
         `}
         style={{ width: isExpanded ? `${sidebarWidth}px` : "56px" }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Upper Brand / Logo Segment */}
-        <div className="flex flex-col">
-          <div className={`flex items-center border-b border-zinc-800/60 overflow-hidden h-[65px] transition-all duration-300
+        {/* Brand */}
+        <div className="flex flex-col min-h-0 overflow-y-auto">
+          <div className={`flex items-center border-b border-zinc-800/60 overflow-hidden h-[65px] transition-all duration-300 flex-shrink-0
             ${isExpanded ? "justify-between p-4" : "justify-center p-0"}
           `}>
             <div className={`flex items-center ${isExpanded ? "pl-1" : "justify-center w-full"}`}>
@@ -116,47 +129,57 @@ export default function Sidebar({
               </span>
             </div>
 
-            {/* Pin Toggle visible only when expanded */}
             {isExpanded && (
               <button
                 onPointerDown={handlePointerDown}
                 className="p-1.5 rounded-md text-zinc-400 hover:text-emerald-400 hover:bg-zinc-900 transition-all cursor-grab active:cursor-grabbing border border-transparent hover:border-emerald-500/10"
-                title={isPinned ? "Clique para desafixar ou segure e arraste para redimensionar" : "Clique para fixar ou segure e arraste para redimensionar"}
+                title={isPinned ? "Clique para desafixar ou arraste para redimensionar" : "Clique para fixar ou arraste para redimensionar"}
               >
                 {isPinned ? <Pin className="w-4 h-4 text-emerald-400" /> : <PinOff className="w-4 h-4" />}
               </button>
             )}
           </div>
 
-          {/* Navigation Items */}
-          <nav className="p-2.5 space-y-1.5 flex-1">
+          {/* Navigation */}
+          <nav className="p-2.5 space-y-1 flex-1">
             {menuItems.map((item) => {
-              const IconComponent = item.icon;
+              // Divider
+              if (item.section === "divider") {
+                return (
+                  <div key={item.id} className={`transition-all duration-200 ${isExpanded ? "mx-1 my-2 border-t border-zinc-800/60" : "mx-2 my-2 border-t border-zinc-800/60"}`} />
+                );
+              }
+
+              const IconComponent = item.icon!;
               const isActive = currentTab === item.id;
-              
+              const isClient = item.section === "client";
+
               return (
                 <button
                   key={item.id}
                   onClick={() => handleItemClick(item.id)}
                   className={`w-full flex items-center rounded-xl transition-all duration-250 cursor-pointer group relative
                     ${isExpanded ? "justify-start gap-3.5 p-3" : "justify-center px-2 py-3"}
-                    ${isActive 
-                      ? "bg-emerald-500 text-black font-semibold shadow-[0_3px_15px_rgba(16,185,129,0.25)]" 
-                      : "text-zinc-400 hover:text-white hover:bg-zinc-900/80"
+                    ${isActive
+                      ? isClient
+                        ? "bg-emerald-500 text-black font-semibold shadow-[0_3px_15px_rgba(16,185,129,0.25)]"
+                        : "bg-zinc-800 text-white font-semibold"
+                      : isClient
+                        ? "text-emerald-400 hover:text-black hover:bg-emerald-500/80"
+                        : "text-zinc-400 hover:text-white hover:bg-zinc-900/80"
                     }
                   `}
                 >
                   <div className="flex items-center justify-center w-5 h-5 flex-shrink-0">
                     <IconComponent className={`w-5 h-5 flex-shrink-0 transition-transform ${!isActive && "group-hover:scale-110"}`} />
                   </div>
-                  
+
                   {isExpanded && (
                     <span className="text-sm transition-all duration-200 truncate opacity-100">
                       {item.label}
                     </span>
                   )}
 
-                  {/* Icon indicator for collapsed state hover */}
                   {!isExpanded && (
                     <div className="absolute left-full ml-3 px-2 py-1 bg-black border border-emerald-500/30 text-emerald-400 text-xs rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap shadow-xl">
                       {item.label}
@@ -165,20 +188,27 @@ export default function Sidebar({
                 </button>
               );
             })}
+
+            {/* Internal section label */}
+            {isLoggedIn && isExpanded && (
+              <p className="text-[9px] uppercase tracking-widest text-zinc-600 px-3 pt-1 font-mono select-none">
+                Pipeline operacional
+              </p>
+            )}
           </nav>
         </div>
 
-        {/* Lower Account Area */}
-        <div className={`border-t border-zinc-800/60 flex flex-col gap-1 bg-zinc-950/90 h-[110px] transition-all duration-300
+        {/* Account area */}
+        <div className={`border-t border-zinc-800/60 flex flex-col gap-1 bg-zinc-950/90 flex-shrink-0 transition-all duration-300
           ${isExpanded ? "p-3" : "p-2.5 py-3"}
         `}>
           {isLoggedIn ? (
             <div className="flex flex-col gap-1.5 overflow-hidden">
               {isExpanded && (
                 <div className="px-2.5 py-1 text-xs text-zinc-500 max-w-full truncate">
-                   Conta autenticada:
-                   <span className="text-zinc-200 block truncate font-semibold">{userLabel}</span>
-                   {userEmail ? <span className="text-zinc-400 font-mono block truncate">{userEmail}</span> : null}
+                  Conta autenticada:
+                  <span className="text-zinc-200 block truncate font-semibold">{userLabel}</span>
+                  {userEmail ? <span className="text-zinc-400 font-mono block truncate">{userEmail}</span> : null}
                 </div>
               )}
               <button
@@ -213,9 +243,9 @@ export default function Sidebar({
         </div>
       </aside>
 
-      {/* Background Overlay for mobile devices if menu expanded */}
+      {/* Mobile overlay */}
       {isExpanded && !isPinned && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-30 transition-opacity md:hidden"
           onClick={() => setIsHovered(false)}
         />

@@ -15,7 +15,7 @@
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
-import { getGoogleAccessToken, listFilesInFolder, type DriveFile } from "./googleDrive.ts";
+import { getGoogleAccessToken, listFilesInFolderDeep, type DriveFile } from "./googleDrive.ts";
 
 type AdminClient = ReturnType<typeof createClient>;
 
@@ -372,19 +372,23 @@ function tokenSet(text: string): Set<string> {
 /**
  * Score a single index row against debtor data.
  *
- * Scoring hierarchy (highest wins):
- *   1.00 — linha digitável exact match
- *   0.98 — document number in linha/nosso_numero
- *   0.95 — document number exact in filename
- *   0.90 — CPF/CNPJ exact match
- *   0.80 — nosso_numero in filename
- *   0.75–1.00 — name token Jaccard ≥ 0.6
- *   0.50–0.74 — name token Jaccard ≥ 0.3
- *   0.30–0.49 — valor + vencimento match
+ * Scoring duplo: nome do cliente + número do documento, avaliados em paralelo.
+ *
+ * Scores individuais:
+ *   docScore  — 1.0 se número encontrado na linha digitável / nosso número / filename / CPF-CNPJ
+ *   nameScore — Jaccard (0–1) dos tokens do nome do cliente vs filename / client_name_extracted
+ *
+ * Score final combinado:
+ *   docScore + nameScore ambos positivos  → 1.00 (certeza)
+ *   só docScore (linha/nosso/CPF)         → 0.95–1.00
+ *   só docScore (filename)                → 0.85
+ *   só nameScore ≥ 0.6                    → 0.80–1.00
+ *   só nameScore ≥ 0.3                    → 0.50–0.79
+ *   valor + vencimento                    → 0.30–0.45
  */
 export function scoreRow(
   debtor: {
-    documentNumber: string; // stripped digits
+    documentNumber: string;
     clientName:     string;
     amount?:        number | null;
     dueDate?:       string | null; // YYYY-MM-DD or DD/MM/YYYY
@@ -392,66 +396,119 @@ export function scoreRow(
   row: IndexRow,
 ): { score: number; reason: string } {
   const docDigits = digits(debtor.documentNumber);
+  // Normaliza o número do documento preservando alfanuméricos (ex: "NF-2024-001" → "nf2024001")
+  const docAlpha  = normalizeText(debtor.documentNumber).replace(/\s/g, "");
 
-  // ── 1. Linha digitável contains document number ─────────────────────────
-  if (row.linha_digitavel && docDigits.length >= 8) {
+  // ── Sinal 1: número do documento ──────────────────────────────────────────
+
+  let docScore  = 0;
+  let docReason = "";
+
+  // 1a. Linha digitável (boleto)
+  if (row.linha_digitavel && docDigits.length >= 6) {
     if (row.linha_digitavel.includes(docDigits)) {
-      return { score: 0.98, reason: "document_in_linha" };
+      docScore = 1.0; docReason = "document_in_linha";
     }
   }
 
-  // ── 2. Nosso número exact ────────────────────────────────────────────────
-  if (row.nosso_numero && docDigits.length >= 6) {
+  // 1b. Nosso Número
+  if (!docScore && row.nosso_numero && docDigits.length >= 4) {
     const nosso = digits(row.nosso_numero);
     if (nosso === docDigits || nosso.includes(docDigits) || docDigits.includes(nosso)) {
-      return { score: 0.95, reason: "nosso_numero_match" };
+      docScore = 0.98; docReason = "nosso_numero_match";
     }
   }
 
-  // ── 3. Document number in filename ──────────────────────────────────────
-  if (docDigits.length >= 8 && row.file_name_normalized) {
-    const fileDigits = digits(row.file_name_normalized);
-    if (fileDigits.includes(docDigits) || row.file_name_normalized.includes(docDigits)) {
-      return { score: 0.95, reason: "document_exact_filename" };
-    }
-  }
-
-  // ── 4. CPF/CNPJ exact match ──────────────────────────────────────────────
-  if (row.cpf_cnpj && docDigits.length >= 11) {
+  // 1c. CPF / CNPJ exato
+  if (!docScore && row.cpf_cnpj && docDigits.length >= 11) {
     if (row.cpf_cnpj === docDigits) {
-      return { score: 0.90, reason: "cpf_cnpj_exact" };
+      docScore = 0.95; docReason = "cpf_cnpj_exact";
     }
   }
-
-  // ── 5. Phone number in filename (stripped, no DDI) ──────────────────────
-  // (not used here — phone not stored in index, filename only)
-
-  // ── 6. Name token similarity (filename + extracted name) ─────────────────
-  const debtorTokens = tokenSet(debtor.clientName);
-
-  let bestNameScore = 0;
-  let bestNameReason = "name_tokens_filename";
 
   if (row.file_name_normalized) {
-    const fnTokens = tokenSet(row.file_name_normalized);
-    const fnJ = jaccard(debtorTokens, fnTokens);
-    if (fnJ > bestNameScore) { bestNameScore = fnJ; bestNameReason = "name_tokens_filename"; }
+    const fn = row.file_name_normalized.trim();
+    const fileDigits = digits(fn);
+    const fileAlpha  = fn.replace(/\s/g, "");
+
+    // 1d. Número curto (2–3 chars): requer igualdade exata com o filename
+    if (!docScore && docDigits.length >= 2 && docDigits.length <= 3) {
+      if (fn === docDigits || fn === docAlpha) {
+        docScore = 0.88; docReason = "document_exact_filename_short";
+      }
+    }
+
+    // 1e. Número longo (≥ 4 dígitos): substring no filename
+    if (!docScore && docDigits.length >= 4 && fileDigits.includes(docDigits)) {
+      docScore = 0.85; docReason = "document_digits_filename";
+    }
+
+    // 1f. Alfanumérico (ex: "NF2024001") no filename
+    if (!docScore && docAlpha.length >= 4 && fileAlpha.includes(docAlpha)) {
+      docScore = 0.85; docReason = "document_alpha_filename";
+    }
   }
 
+  // ── Sinal 2: nome do cliente ──────────────────────────────────────────────
+
+  const debtorTokens = tokenSet(debtor.clientName);
+  let nameScore  = 0;
+  let nameReason = "name_tokens_filename";
+
+  // 2a. Jaccard completo (favorece nomes que batem bem no todo)
+  if (row.file_name_normalized) {
+    const fnJ = jaccard(debtorTokens, tokenSet(row.file_name_normalized));
+    if (fnJ > nameScore) { nameScore = fnJ; nameReason = "name_tokens_filename"; }
+  }
   if (row.client_name_extracted) {
+    const extJ = jaccard(debtorTokens, tokenSet(row.client_name_extracted));
+    if (extJ > nameScore) { nameScore = extJ; nameReason = "name_tokens_extracted"; }
+  }
+
+  // 2b. Token único significativo (≥ 5 chars): um token distintivo do devedor
+  //     aparece no arquivo → sinal moderado mesmo com Jaccard baixo
+  //     (captura "MOBILAR" em "MOBILAR NOTA.pdf", "JOICE" em "CARTA...JOICE.pdf")
+  if (nameScore < 0.60 && row.file_name_normalized) {
+    const fnTokens = tokenSet(row.file_name_normalized);
+    for (const t of debtorTokens) {
+      if (t.length >= 5 && fnTokens.has(t)) {
+        // Pontuação baseada no comprimento do token (mais longo = mais específico)
+        const hit = Math.min(0.65, 0.45 + t.length * 0.025);
+        if (hit > nameScore) { nameScore = hit; nameReason = "name_token_hit"; }
+      }
+    }
+  }
+  if (nameScore < 0.60 && row.client_name_extracted) {
     const extTokens = tokenSet(row.client_name_extracted);
-    const extJ = jaccard(debtorTokens, extTokens);
-    if (extJ > bestNameScore) { bestNameScore = extJ; bestNameReason = "name_tokens_extracted"; }
+    for (const t of debtorTokens) {
+      if (t.length >= 5 && extTokens.has(t)) {
+        const hit = Math.min(0.65, 0.45 + t.length * 0.025);
+        if (hit > nameScore) { nameScore = hit; nameReason = "name_token_hit_extracted"; }
+      }
+    }
   }
 
-  if (bestNameScore >= 0.60) {
-    return { score: 0.50 + bestNameScore * 0.50, reason: bestNameReason };
-  }
-  if (bestNameScore >= 0.30) {
-    return { score: 0.30 + bestNameScore * 0.67, reason: bestNameReason };
+  // ── Score combinado ───────────────────────────────────────────────────────
+
+  // Ambos os sinais positivos → máxima certeza
+  if (docScore > 0 && nameScore >= 0.35) {
+    return { score: 1.0, reason: `${docReason}+${nameReason}` };
   }
 
-  // ── 7. Valor + vencimento fallback ───────────────────────────────────────
+  // Apenas documento
+  if (docScore > 0) {
+    return { score: docScore, reason: docReason };
+  }
+
+  // Apenas nome
+  if (nameScore >= 0.60) {
+    return { score: 0.50 + nameScore * 0.50, reason: nameReason };
+  }
+  if (nameScore >= 0.30) {
+    return { score: 0.30 + nameScore * 0.67, reason: nameReason };
+  }
+
+  // ── Fallback: valor + vencimento ─────────────────────────────────────────
   let valorOk = false;
   let vencOk  = false;
 
@@ -459,7 +516,6 @@ export function scoreRow(
     valorOk = Math.abs(debtor.amount - row.valor) < 0.02;
   }
   if (debtor.dueDate && row.vencimento) {
-    // Normalize dueDate to YYYY-MM-DD
     let due = debtor.dueDate;
     const ddmm = due.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if (ddmm) due = `${ddmm[3]}-${ddmm[2]}-${ddmm[1]}`;
@@ -521,10 +577,10 @@ export async function indexFolderForUser(
   let filesSkipped = 0;
   let filesError   = 0;
 
-  // List all PDFs in the folder
+  // List all PDFs in the folder (including subfolders named after clients)
   let driveFiles: DriveFile[] = [];
   try {
-    driveFiles = await listFilesInFolder(folderId, accessToken);
+    driveFiles = await listFilesInFolderDeep(folderId, accessToken);
   } catch (e) {
     throw new Error(`Drive list error: ${e instanceof Error ? e.message : String(e)}`);
   }
@@ -559,7 +615,10 @@ export async function indexFolderForUser(
         continue;
       }
 
-      // Build base record
+      // Build base record.
+      // Sempre usa o nome real do arquivo como file_name_normalized (para matching por filename).
+      // O nome da subpasta pai (quando disponível) vai para client_name_extracted como
+      // sinal adicional de cliente — o scoreRow já usa client_name_extracted em paralelo.
       const baseRecord = {
         user_id:              userId,
         folder_id:            folderId,
@@ -575,19 +634,32 @@ export async function indexFolderForUser(
       };
 
       // Attempt metadata extraction (best-effort)
+      // Seed client_name_extracted from parent folder name when available —
+      // this is the most reliable signal when the Drive is organized as
+      // one subfolder per client (pattern: "NOME DO CLIENTE/boleto.pdf").
       let meta: BoletoMetadata = {
         linhaDigitavel: null, nossoNumero: null, cpfCnpj: null,
-        clientName: null, valor: null, vencimento: null,
+        clientName: file.parentFolderName ?? null,
+        valor: null, vencimento: null,
       };
-      let metaExtracted = false;
+      let metaExtracted = Boolean(file.parentFolderName);
 
-      // Only attempt if file is small enough
+      // Only attempt PDF content extraction if file is small enough
       if (fileSize <= MAX_PDF_BYTES_FOR_EXTRACTION && fileSize > 0) {
         const pdfBytes = await downloadDriveFile(file.id, accessToken);
         if (pdfBytes && pdfBytes.length > 0) {
           const text = await extractPdfText(pdfBytes);
           if (text.trim().length > 20) {
-            meta = extractBoletoMetadata(text);
+            const extracted = extractBoletoMetadata(text);
+            // Merge: prefer extracted values, but keep folder-name client as fallback
+            meta = {
+              linhaDigitavel: extracted.linhaDigitavel,
+              nossoNumero:    extracted.nossoNumero,
+              cpfCnpj:        extracted.cpfCnpj,
+              clientName:     extracted.clientName ?? meta.clientName,
+              valor:          extracted.valor,
+              vencimento:     extracted.vencimento,
+            };
             metaExtracted = true;
           }
         }
@@ -752,7 +824,8 @@ export async function batchMatchDebtors(
 
   for (const d of debtors as Array<Record<string, unknown>>) {
     const debtor = {
-      documentNumber: String(d.document_number ?? "").replace(/\D/g, ""),
+      // Passa o número original (alfanumérico) — scoreRow faz a normalização internamente
+      documentNumber: String(d.document_number ?? ""),
       clientName:     String(d.client_name     ?? ""),
       amount:         Number(d.updated_value ?? d.amount ?? 0) || null,
       dueDate:        (d.due_date as string | null) ?? null,
