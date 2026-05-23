@@ -143,12 +143,6 @@ Atenciosamente, departamento administrativo NC Finance.`
   }
 ];
 
-const INITIAL_REPRESENTATIVE_IDS = {
-  amanda: "11111111-1111-4111-8111-111111111111",
-  bruno: "22222222-2222-4222-8222-222222222222",
-  clara: "33333333-3333-4333-8333-333333333333"
-} as const;
-
 // Seed initial devedores matching the Portuguese financial context
 const INITIAL_DEBTORS: Debtor[] = [
   {
@@ -163,7 +157,6 @@ const INITIAL_DEBTORS: Debtor[] = [
     interestApplied: 2,
     fineApplied: 1,
     notes: "Aguardando retorno do e-mail do financeiro",
-    representativeId: INITIAL_REPRESENTATIVE_IDS.amanda,
     status: "pending"
   },
   {
@@ -178,7 +171,6 @@ const INITIAL_DEBTORS: Debtor[] = [
     interestApplied: 0,
     fineApplied: 0,
     notes: "Cliente solicitou envio preventivo amigável",
-    representativeId: INITIAL_REPRESENTATIVE_IDS.bruno,
     status: "pending"
   },
   {
@@ -193,7 +185,6 @@ const INITIAL_DEBTORS: Debtor[] = [
     interestApplied: 2,
     fineApplied: 1,
     notes: "Acordo de parcelamento em andamento",
-    representativeId: INITIAL_REPRESENTATIVE_IDS.amanda,
     status: "pending"
   },
   {
@@ -208,16 +199,15 @@ const INITIAL_DEBTORS: Debtor[] = [
     interestApplied: 0,
     fineApplied: 0,
     notes: "Pago via PIX com comprovante anexado",
-    representativeId: INITIAL_REPRESENTATIVE_IDS.clara,
     status: "sent"
   }
 ];
 
-// Seed initial representatives for devedores matching the scenario
+// Seed initial representatives — no hardcoded IDs so each user gets fresh UUIDs
 const INITIAL_REPRESENTATIVES: Representative[] = [
-  { id: INITIAL_REPRESENTATIVE_IDS.amanda, name: "Amanda Azevedo", phone: "5577999881111", role: "Coordenador de Cobrança", color: "text-emerald-400 bg-emerald-500/10" },
-  { id: INITIAL_REPRESENTATIVE_IDS.bruno, name: "Bruno Pinheiro", phone: "5511988772233", role: "Gestor Contas Sul", color: "text-sky-400 bg-sky-500/10" },
-  { id: INITIAL_REPRESENTATIVE_IDS.clara, name: "Clara Vasconcelos", phone: "5521977663344", role: "Jurídico NC Finance", color: "text-amber-400 bg-amber-500/10" }
+  { id: "", name: "Amanda Azevedo", phone: "5577999881111", role: "Coordenador de Cobrança", color: "text-emerald-400 bg-emerald-500/10" },
+  { id: "", name: "Bruno Pinheiro", phone: "5511988772233", role: "Gestor Contas Sul", color: "text-sky-400 bg-sky-500/10" },
+  { id: "", name: "Clara Vasconcelos", phone: "5521977663344", role: "Jurídico NC Finance", color: "text-amber-400 bg-amber-500/10" }
 ];
 
 const INITIAL_BILLING_LOGS: BillingLog[] = [
@@ -701,14 +691,27 @@ export default function App() {
     }
   };
 
-  // Envio em lote de cobran?as
+  // Envio em lote de cobranças — liquidados são bloqueados
   const handleBatchSend = async () => {
     if (selectedDebtorIds.size === 0 || isBatchSending) return;
+
+    // Nunca envia cobranças para títulos liquidados
+    const cobráveis: string[] = Array.from(selectedDebtorIds).filter((id): id is string => {
+      const d = debtors.find(x => x.id === id);
+      return Boolean(d && d.category !== "liquidado");
+    });
+
+    if (cobráveis.length === 0) {
+      // Todos selecionados são liquidados — avisa e cancela
+      setWorkspaceError("Os registros selecionados estão marcados como liquidados. Cobranças não foram enviadas.");
+      return;
+    }
+
     setIsBatchSending(true);
     setBatchSendResult(null);
     try {
       const result = await whatsappBatchService.sendBatchCharges({
-        debtorIds: Array.from(selectedDebtorIds),
+        debtorIds: cobráveis,
         tone: selectedTone,
         customMessage: undefined,
       });
@@ -1145,7 +1148,16 @@ export default function App() {
   const handleSendMessage = async () => {
     if (!selectedDebtorForMessage) return;
 
-    // Pr?-checagem visual (backend re-valida tudo ? isso s? evita round-trip desnecess?rio)
+    // Liquidados nunca devem receber cobrança
+    if (selectedDebtorForMessage.category === "liquidado") {
+      setMessageFeedback({
+        success: false,
+        text: "Este título está marcado como liquidado. Cobranças não são enviadas para títulos pagos.",
+      });
+      return;
+    }
+
+    // Pré-checagem visual (backend re-valida tudo — isso evita round-trip desnecessário)
     if (!canSendCharge) {
       setMessageFeedback({
         success: false,
@@ -1171,7 +1183,7 @@ export default function App() {
       if (result.success) {
         // Atualiza registro local do devedor
         void updateGeneralDebtorField(selectedDebtorForMessage.id, "status", "sent");
-        void updateGeneralDebtorField(selectedDebtorForMessage.id, "lastSentDate", new Date().toLocaleString());
+        void updateGeneralDebtorField(selectedDebtorForMessage.id, "lastSentDate", new Date().toISOString());
         void updateGeneralDebtorField(selectedDebtorForMessage.id, "lastSentMessage", customMessageDraft);
 
         // Adiciona log na UI (o log real já foi criado no backend pelo Edge Function)
@@ -1182,7 +1194,7 @@ export default function App() {
           document: selectedDebtorForMessage.document,
           phone: selectedDebtorForMessage.phone,
           value: selectedDebtorForMessage.updatedValue ?? selectedDebtorForMessage.value,
-          dateSent: new Date().toLocaleString("pt-BR"),
+          dateSent: new Date().toISOString(),
           tone: selectedTone,
           message: customMessageDraft,
           status: "sucesso",
@@ -1326,45 +1338,64 @@ export default function App() {
             <div className="border-b border-zinc-800/60 bg-zinc-950 p-4 sticky top-0 z-20 flex flex-wrap gap-4 items-center justify-between">
               <div className="flex items-center gap-3">
                 <h2 className="text-lg font-bold text-white capitalize">
-                  {currentTab === "dashboard" && "Dashboard & Métricas"}
-                  {currentTab === "importar" && "Importação Inteligente com IA"}
-                  {currentTab === "visao_geral" && "Painel Geral de Devedores"}
-                  {currentTab === "cobranca" && "Automação e Comunicação"}
-                  {currentTab === "historico" && "Histórico de Cobrança"}
+                  {currentTab === "cobrar"     && "Enviar Cobranças"}
+                  {currentTab === "dashboard"  && "Dashboard & Métricas"}
+                  {currentTab === "importar"   && "Importação — Vencidos · A Vencer · Liquidação"}
+                  {currentTab === "visao_geral"&& "Visão Geral — Base Consolidada"}
+                  {currentTab === "cobranca"   && "Cobrança — Z-API / WhatsApp"}
+                  {currentTab === "historico"  && "Histórico de Cobrança"}
                   {currentTab === "automacoes" && "Automações de Cobrança"}
                 </h2>
               </div>
 
               <div className="flex items-center gap-4">
 
-                <div className="flex gap-1.5 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
-                  <button 
-                    onClick={() => setCurrentTab("dashboard")} 
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "dashboard" ? "bg-emerald-500 text-black" : "text-zinc-400 hover:text-white"}`}
+                <div className="flex flex-wrap gap-1.5 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
+                  {/* Fluxo simplificado do cliente */}
+                  <button
+                    onClick={() => setCurrentTab("cobrar")}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "cobrar" ? "bg-emerald-500 text-black" : "text-zinc-400 hover:text-white"}`}
+                  >
+                    Cobrar
+                  </button>
+
+                  {/* Separador visual */}
+                  <span className="w-px bg-zinc-700 self-stretch mx-0.5" />
+
+                  {/* Pipeline interno */}
+                  <button
+                    onClick={() => setCurrentTab("dashboard")}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "dashboard" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
                   >
                     Dashboard
                   </button>
-                  <button 
-                    onClick={() => setCurrentTab("visao_geral")} 
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "visao_geral" ? "bg-emerald-500 text-black" : "text-zinc-400 hover:text-white"}`}
+                  <button
+                    onClick={() => setCurrentTab("importar")}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "importar" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
+                  >
+                    Importar
+                  </button>
+                  <button
+                    onClick={() => setCurrentTab("visao_geral")}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "visao_geral" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
                   >
                     Visão Geral
                   </button>
-                  <button 
-                    onClick={() => setCurrentTab("cobranca")} 
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "cobranca" ? "bg-emerald-500 text-black" : "text-zinc-400 hover:text-white"}`}
+                  <button
+                    onClick={() => setCurrentTab("cobranca")}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "cobranca" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
                   >
                     Cobrança
                   </button>
                   <button
                     onClick={() => setCurrentTab("historico")}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "historico" ? "bg-emerald-500 text-black" : "text-zinc-400 hover:text-white"}`}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "historico" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
                   >
                     Histórico
                   </button>
                   <button
                     onClick={() => setCurrentTab("automacoes")}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "automacoes" ? "bg-emerald-500 text-black" : "text-zinc-400 hover:text-white"}`}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "automacoes" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
                   >
                     Automações
                   </button>
@@ -1411,6 +1442,22 @@ export default function App() {
                     globalInterestDayPct={globalInterestDayPct}
                     onBatchSent={(result) => {
                       setBatchSendResult(result);
+                      // Re-fetch billing logs so Histórico reflects the new batch entries
+                      if (currentOwnerUserId) {
+                        void billingLogsService.listByUser(currentOwnerUserId)
+                          .then(setBillingLogs)
+                          .catch(() => {/* non-critical */});
+                      }
+                    }}
+                    onDebtorsImported={async () => {
+                      // Recarrega a Visão Geral do DB após qualquer importação ou reconciliação
+                      if (!currentOwnerUserId) return;
+                      try {
+                        const updated = await financeService.listByUser(currentOwnerUserId);
+                        setDebtors(updated);
+                      } catch {
+                        // non-critical — Visão Geral será atualizada no próximo acesso
+                      }
                     }}
                   />
                 </div>
@@ -2988,9 +3035,9 @@ GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valo
                                           WhatsApp Z-API
                                         </span>
                                         <span className={`text-[9px] uppercase font-bold font-mono px-1.5 py-0.5 rounded
-                                          ${log.type === "auto" ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400"}
+                                          ${log.type === "auto" ? "bg-purple-500/10 text-purple-400" : log.type === "lote" ? "bg-emerald-500/10 text-emerald-400" : "bg-blue-500/10 text-blue-400"}
                                         `}>
-                                          {log.type === "auto" ? "Robô" : "Manual"}
+                                          {log.type === "auto" ? "Robô" : log.type === "lote" ? "Lote" : "Manual"}
                                         </span>
                                       </div>
                                     </td>

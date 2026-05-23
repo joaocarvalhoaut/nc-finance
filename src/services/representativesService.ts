@@ -29,14 +29,20 @@ const mapRowToRepresentative = (row: RepresentativeRow): Representative => ({
   updatedAt: row.updated_at
 });
 
-const mapRepresentativeToRow = (userId: string, representative: Representative) => ({
-  id: isValidUUID(representative.id) ? representative.id : undefined,
-  user_id: userId,
-  name: representative.name,
-  phone: representative.phone,
-  role: representative.role,
-  color: representative.color
-});
+const mapRepresentativeToRow = (userId: string, representative: Representative) => {
+  const row: Record<string, unknown> = {
+    user_id: userId,
+    name: representative.name,
+    phone: representative.phone,
+    role: representative.role,
+    color: representative.color
+  };
+  // Only include id when it's a valid UUID — omitting it lets Postgres auto-generate one
+  if (isValidUUID(representative.id)) {
+    row.id = representative.id;
+  }
+  return row;
+};
 
 export const representativesService = {
   async listByUser(userId: string) {

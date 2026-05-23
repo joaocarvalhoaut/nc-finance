@@ -73,7 +73,7 @@ export interface BillingLog {
    *   "bloqueado_assinatura" | "duplicado" | "telefone_invalido"
    */
   status: "sent" | "failed" | "sucesso" | "erro" | "bloqueado_limite" | "bloqueado_assinatura" | "duplicado" | "telefone_invalido";
-  type: "auto" | "manual";
+  type: "auto" | "manual" | "lote";
   providerMessageId?: string | null;
   payload?: Record<string, unknown> | null;
   createdAt?: string;

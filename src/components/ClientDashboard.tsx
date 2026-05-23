@@ -3,14 +3,16 @@
  *
  * Fluxo: Upload → Prévia → Envio
  *
- * Intencionalmente OCULTA toda a complexidade técnica de WhatsApp/Z-API.
- * O cliente vê apenas:
- *   - Indicador simples "WhatsApp ativo" (ponto verde) ou "Desconectado"
- *   - Upload de arquivo (drag-and-drop ou clique)
- *   - Tabela de prévia dos devedores extraídos
- *   - Seletor de tom de mensagem
- *   - Botão "Enviar cobranças" com modal de confirmação
- *   - Resumo do resultado
+ * Categorias de importação:
+ *  - vencidos   → cobráveis com juros/multa, seguem para WhatsApp
+ *  - a_vencer   → acompanhamento preventivo, seguem para WhatsApp com tom amigável
+ *  - liquidação → APENAS reconciliação (marcar como pago); NÃO geram cobrança
+ *
+ * Internamente usa o mesmo pipeline de:
+ *  financeService.createMany → salva na base consolidada (Visão Geral)
+ *  financeService.reconcileLiquidations → reconcilia liquidações
+ *  whatsappBatchService.sendBatchCharges → envia via Z-API (apenas vencidos/a_vencer)
+ *  driveFolderService.syncFolder → matching Drive automático antes do envio
  *
  * Sem: QR Code, instância Z-API, tokens, webhooks, status técnicos.
  */
@@ -34,6 +36,9 @@ import {
   WifiOff,
   FolderOpen,
   Paperclip,
+  CheckCircle,
+  Clock,
+  HandCoins,
 } from "lucide-react";
 import { whatsappGatewayService } from "../services/whatsappGatewayService";
 import { whatsappBatchService, type BatchChargeResult } from "../services/whatsappBatchService";
@@ -56,19 +61,58 @@ const TONE_OPTIONS: { value: MessageTone; label: string; description: string }[]
   { value: "juridico",  label: "Jurídico",     description: "Notificação formal para casos mais críticos" },
 ];
 
+// ─── Import category ──────────────────────────────────────────────────────────
+
+type ImportCategory = "vencidos" | "a_vencer" | "liquidado";
+
+const CATEGORY_OPTIONS: {
+  value: ImportCategory;
+  label: string;
+  description: string;
+  color: string;
+  activeColor: string;
+}[] = [
+  {
+    value: "vencidos",
+    label: "Vencidos",
+    description: "Títulos já vencidos — cobráveis com juros e multa",
+    color: "border-zinc-700 text-zinc-400 hover:border-rose-500/50 hover:text-rose-300",
+    activeColor: "border-rose-500 bg-rose-500/10 text-rose-300 font-semibold",
+  },
+  {
+    value: "a_vencer",
+    label: "A vencer",
+    description: "Títulos a vencer — aviso preventivo amigável",
+    color: "border-zinc-700 text-zinc-400 hover:border-amber-500/50 hover:text-amber-300",
+    activeColor: "border-amber-500 bg-amber-500/10 text-amber-300 font-semibold",
+  },
+  {
+    value: "liquidado",
+    label: "Liquidação",
+    description: "Títulos pagos — reconciliação, SEM cobrança",
+    color: "border-zinc-700 text-zinc-400 hover:border-emerald-500/50 hover:text-emerald-300",
+    activeColor: "border-emerald-500 bg-emerald-500/10 text-emerald-300 font-semibold",
+  },
+];
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface ClientDashboardProps {
-  userId:            string;
-  globalFinePct:     number;
+  userId:               string;
+  globalFinePct:        number;
   globalInterestDayPct: number;
-  /** Called after a successful batch send so App.tsx can refresh billing logs */
+  /** Chamado após envio de lote (sucesso ou falha) — atualiza logs no pai */
   onBatchSent?: (result: BatchChargeResult) => void;
+  /**
+   * Chamado após salvar devedores na base consolidada (import + liquidação).
+   * O pai deve recarregar os devedores do DB ao receber esta chamada.
+   */
+  onDebtorsImported?: () => void;
 }
 
 // ─── Step type ────────────────────────────────────────────────────────────────
 
-type Step = "upload" | "preview" | "sending" | "done";
+type Step = "upload" | "preview" | "sending" | "done" | "reconciling" | "reconciled";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -77,17 +121,20 @@ export default function ClientDashboard({
   globalFinePct,
   globalInterestDayPct,
   onBatchSent,
+  onDebtorsImported,
 }: ClientDashboardProps) {
   // ── WhatsApp status ──────────────────────────────────────────────────────────
   const [waConnected, setWaConnected]   = useState<boolean | null>(null);
   const [waChecking,  setWaChecking]    = useState(false);
 
-  // ── Pilot mode remaining sends ───────────────────────────────────────────────
-  // null = not in pilot (no limit shown), 0+ = in pilot mode
+  // ── Pilot mode ───────────────────────────────────────────────────────────────
   const [pilotRemaining, setPilotRemaining] = useState<number | null>(null);
 
   // ── Today's sent count ───────────────────────────────────────────────────────
   const [sentToday, setSentToday] = useState<number>(0);
+
+  // ── Import category ──────────────────────────────────────────────────────────
+  const [importCategory, setImportCategory] = useState<ImportCategory>("vencidos");
 
   // ── Flow state ───────────────────────────────────────────────────────────────
   const [step,            setStep]           = useState<Step>("upload");
@@ -102,20 +149,28 @@ export default function ClientDashboard({
   const [isSending,       setIsSending]      = useState(false);
   const [sendResult,      setSendResult]     = useState<BatchChargeResult | null>(null);
 
+  // ── Liquidação reconciliation state ─────────────────────────────────────────
+  const [isReconciling,      setIsReconciling]      = useState(false);
+  const [reconciledCount,    setReconciledCount]    = useState(0);
+  const [reconcileError,     setReconcileError]     = useState("");
+
   // ── Drive folder state ───────────────────────────────────────────────────────
-  const [driveFolderUrl,   setDriveFolderUrl]   = useState("");
-  const [driveSaving,      setDriveSaving]       = useState(false);
-  const [driveSaveMsg,     setDriveSaveMsg]       = useState("");
-  const [driveSaveError,   setDriveSaveError]     = useState("");
-  const [driveStatus,      setDriveStatus]        = useState<DriveFolderStatus | null>(null);
+  const [driveFolderUrl,  setDriveFolderUrl]  = useState("");
+  const [driveSaving,     setDriveSaving]     = useState(false);
+  const [driveSaveMsg,    setDriveSaveMsg]    = useState("");
+  const [driveSaveError,  setDriveSaveError]  = useState("");
+  const [driveStatus,     setDriveStatus]     = useState<DriveFolderStatus | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Init: check WhatsApp + today's count ────────────────────────────────────
+  // ── Init ─────────────────────────────────────────────────────────────────────
   const refreshWaStatus = useCallback(async () => {
     setWaChecking(true);
     try {
-      const s = await whatsappGatewayService.getStatus();
+      // Use validateConnection (live Z-API check) so the status is always
+      // current — getStatus() reads a potentially-stale cached DB value and
+      // would show "Canal indisponível" even when the channel is active.
+      const s = await whatsappGatewayService.validateConnection();
       setWaConnected(s.connected);
     } catch {
       setWaConnected(false);
@@ -149,11 +204,10 @@ export default function ClientDashboard({
         setPilotRemaining(null);
       }
     } catch {
-      // non-critical — pilot status is best-effort
+      // non-critical
     }
   }, []);
 
-  // ── Drive folder status refresh ──────────────────────────────────────────────
   const refreshDriveStatus = useCallback(async () => {
     try {
       const status = await driveFolderService.getStatus();
@@ -170,7 +224,7 @@ export default function ClientDashboard({
     void refreshDriveStatus();
   }, [refreshWaStatus, refreshTodayCount, refreshPilotStatus, refreshDriveStatus]);
 
-  // ── Drive folder save handler ─────────────────────────────────────────────────
+  // ── Drive folder save ─────────────────────────────────────────────────────────
   const handleDriveSave = useCallback(async () => {
     const url = driveFolderUrl.trim();
     if (!url) return;
@@ -202,7 +256,7 @@ export default function ClientDashboard({
     }
   }, [driveFolderUrl, refreshDriveStatus]);
 
-  // ── File handling ────────────────────────────────────────────────────────────
+  // ── File handling ─────────────────────────────────────────────────────────────
 
   const processFile = useCallback(async (file: File) => {
     if (!file) return;
@@ -211,7 +265,6 @@ export default function ClientDashboard({
     setProcessingMsg("Lendo arquivo…");
 
     try {
-      // 1. Parse file → raw text
       setProcessingMsg("Extraindo dados do arquivo…");
       let rawText: string;
       try {
@@ -226,9 +279,8 @@ export default function ClientDashboard({
         return;
       }
 
-      // 2. Extract debtors locally
-      setProcessingMsg("Identificando devedores…");
-      const extraction = await extractDocumentLocally(rawText, undefined, file);
+      setProcessingMsg("Identificando registros…");
+      const extraction = await extractDocumentLocally(rawText, importCategory, file);
 
       const extracted: Debtor[] = extraction.records.map((d) => ({
         id: crypto.randomUUID(),
@@ -238,38 +290,40 @@ export default function ClientDashboard({
         dueDate: d.dueDate,
         value: d.value,
         phone: d.phone,
-        category: "vencidos",
+        // ── Usa a categoria selecionada pelo usuário ──────────────────────────
+        category: importCategory,
         status: "pending",
-        interestApplied: globalInterestDayPct,
-        fineApplied: globalFinePct,
-        updatedValue: Math.round(d.value * (1 + globalFinePct / 100) * 100) / 100,
+        interestApplied: importCategory === "liquidado" ? 0 : globalInterestDayPct,
+        fineApplied:     importCategory === "liquidado" ? 0 : globalFinePct,
+        updatedValue:
+          importCategory === "liquidado"
+            ? d.value
+            : Math.round(d.value * (1 + globalFinePct / 100) * 100) / 100,
       }));
 
       if (extracted.length === 0) {
-        // Surface the most specific warning from the extraction pipeline
         const detail = extraction.warnings.length > 0
           ? extraction.warnings[0]
           : "Verifique se o arquivo contém dados de cobrança legíveis.";
-        setExtractError(`Nenhum devedor identificado. ${detail}`);
+        setExtractError(`Nenhum registro identificado. ${detail}`);
         setIsProcessing(false);
         return;
       }
 
-      // Pre-select all by default
       setDebtors(extracted);
       setSelectedIds(new Set(extracted.map(d => d.id)));
+
+      // Liquidação → preview com botão de reconciliação (sem envio WhatsApp)
       setStep("preview");
     } catch (err) {
       setExtractError(
-        err instanceof Error
-          ? err.message
-          : "Falha ao processar o arquivo. Tente novamente."
+        err instanceof Error ? err.message : "Falha ao processar o arquivo. Tente novamente."
       );
     } finally {
       setIsProcessing(false);
       setProcessingMsg("");
     }
-  }, [globalFinePct, globalInterestDayPct]);
+  }, [globalFinePct, globalInterestDayPct, importCategory]);
 
   const handleFileDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -281,11 +335,10 @@ export default function ClientDashboard({
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) void processFile(file);
-    // reset input so same file can be re-selected
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [processFile]);
 
-  // ── Selection helpers ────────────────────────────────────────────────────────
+  // ── Selection helpers ─────────────────────────────────────────────────────────
 
   const toggleAll = () => {
     if (selectedIds.size === debtors.length) {
@@ -304,16 +357,57 @@ export default function ClientDashboard({
     });
   };
 
-  // ── Send flow ────────────────────────────────────────────────────────────────
+  // ── Liquidação: reconciliar pagamentos ────────────────────────────────────────
+
+  const handleReconcile = async () => {
+    const selected = debtors.filter(d => selectedIds.has(d.id));
+    if (!selected.length) return;
+
+    setIsReconciling(true);
+    setReconcileError("");
+    setStep("reconciling");
+
+    try {
+      // 1. Salva na base consolidada como "liquidado"
+      await financeService.createMany(userId, selected);
+
+      // 2. Marca devedores existentes com mesmo documento como liquidados
+      const docs = selected.map(d => d.document).filter(Boolean);
+      const count = await financeService.reconcileLiquidations(userId, docs);
+      setReconciledCount(count);
+
+      // 3. Notifica o pai para recarregar Visão Geral
+      onDebtorsImported?.();
+
+      setStep("reconciled");
+    } catch (err) {
+      setReconcileError(
+        err instanceof Error ? err.message : "Falha na reconciliação. Tente novamente."
+      );
+      setStep("preview");
+    } finally {
+      setIsReconciling(false);
+    }
+  };
+
+  // ── Send flow ─────────────────────────────────────────────────────────────────
 
   const handleSendClick = () => {
     if (selectedIds.size === 0) return;
 
+    // Liquidações NÃO devem ir para cobrança
     const selected = debtors.filter(d => selectedIds.has(d.id));
+    const liquidados = selected.filter(d => d.category === "liquidado");
+    if (liquidados.length > 0) {
+      // Redireciona automaticamente para o fluxo de reconciliação
+      void handleReconcile();
+      return;
+    }
+
     const validPhone  = selected.filter(d => d.phone && d.phone.replace(/\D/g, "").length >= 10).length;
     const invalidPhone = selected.length - validPhone;
 
-    const preview = `Olá {nome_cliente}, identificamos uma pendência financeira em seu CPF/CNPJ. Por favor, entre em contato para regularização.`;
+    const preview = `Olá {nome_cliente}, identificamos uma pendência financeira. Por favor, entre em contato para regularização.`;
 
     setConfirmData({
       debtorCount:       selected.length,
@@ -321,7 +415,7 @@ export default function ClientDashboard({
       invalidPhoneCount: invalidPhone,
       messagePreview:    preview.slice(0, 200),
       tone:              TONE_OPTIONS.find(t => t.value === selectedTone)?.label ?? selectedTone,
-      pilotRemaining,   // null = not in pilot (no cap shown); 0+ = pilot limit
+      pilotRemaining,
       whatsappConnected: waConnected ?? false,
     });
   };
@@ -333,12 +427,14 @@ export default function ClientDashboard({
     setStep("sending");
 
     try {
-      // Persist extracted debtors to DB so IDs are valid for the batch edge function.
-      // If persistence fails entirely, abort with a clear message (do not send with invalid IDs).
       const selectedDebtors = debtors.filter(d => selectedIds.has(d.id));
-      let persisted: typeof selectedDebtors;
+
+      // Garante que nenhum liquidado entre no envio
+      const cobráveis = selectedDebtors.filter(d => d.category !== "liquidado");
+
+      let persisted: typeof cobráveis;
       try {
-        persisted = await financeService.createMany(userId, selectedDebtors);
+        persisted = await financeService.createMany(userId, cobráveis);
       } catch (persistErr) {
         throw new Error(
           "Falha ao salvar devedores antes do envio: " +
@@ -346,19 +442,21 @@ export default function ClientDashboard({
           ". Verifique sua conexão e tente novamente."
         );
       }
+
+      // Notifica Visão Geral para recarregar
+      onDebtorsImported?.();
+
       const validIds = persisted.map(d => d.id).filter(Boolean) as string[];
 
-      // Trigger Drive matching automatically (fire-and-forget — does not block send)
-      // Matches each persisted debtor against the user's Drive index before sending.
-      // If Drive folder is configured, this attaches the correct PDF to each debtor record.
+      // Drive matching automático antes do envio (fire-and-forget)
       if (driveStatus?.configured) {
         void driveFolderService.syncFolder().catch(() => {/* non-critical */});
       }
 
       const result = await whatsappBatchService.sendBatchCharges({
-        debtorIds:    validIds,
-        tone:         selectedTone,
-        dryRun:       false,
+        debtorIds: validIds,
+        tone:      selectedTone,
+        dryRun:    false,
       });
 
       setSendResult(result);
@@ -395,19 +493,22 @@ export default function ClientDashboard({
     setSelectedIds(new Set());
     setSendResult(null);
     setExtractError("");
+    setReconcileError("");
+    setReconciledCount(0);
   };
 
-  // ─── Render ────────────────────────────────────────────────────────────────
-
+  // ─── Render helpers ───────────────────────────────────────────────────────────
   const formatBRL = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  const isLiquidacao = importCategory === "liquidado";
+  const catOption    = CATEGORY_OPTIONS.find(c => c.value === importCategory)!;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
 
       {/* ── Top status bar ─────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        {/* WhatsApp status indicator */}
         <div className="flex items-center gap-3">
           {waChecking ? (
             <span className="flex items-center gap-1.5 text-sm text-zinc-400">
@@ -436,7 +537,6 @@ export default function ClientDashboard({
           </button>
         </div>
 
-        {/* Quick stats */}
         <div className="flex items-center gap-4 text-sm text-zinc-400">
           {debtors.length > 0 && step === "preview" && (
             <span className="flex items-center gap-1.5">
@@ -451,12 +551,12 @@ export default function ClientDashboard({
         </div>
       </div>
 
-      {/* ── Drive folder section (always visible on upload step) ──────────── */}
-      {step === "upload" && (
+      {/* ── Drive folder section ────────────────────────────────────────────── */}
+      {step === "upload" && !isLiquidacao && (
         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <FolderOpen className="w-4 h-4 text-zinc-400" />
-            <span className="text-sm font-medium text-zinc-300">Pasta dos boletos</span>
+            <span className="text-sm font-medium text-zinc-300">Pasta dos boletos (Google Drive)</span>
             {driveStatus?.configured && (
               <span className="flex items-center gap-1 text-xs text-emerald-400 ml-auto">
                 <Paperclip className="w-3 h-3" />
@@ -514,7 +614,7 @@ export default function ClientDashboard({
                 <p className="text-xs text-emerald-400">{driveSaveMsg}</p>
               )}
               <p className="text-xs text-zinc-600">
-                Cole o link da pasta do Google Drive com os PDFs dos boletos. O sistema vincula automaticamente.
+                Cole o link da pasta do Google Drive com os PDFs dos boletos.
               </p>
             </div>
           )}
@@ -524,6 +624,40 @@ export default function ClientDashboard({
       {/* ── Step: Upload ───────────────────────────────────────────────────── */}
       {step === "upload" && (
         <div className="space-y-4">
+
+          {/* Category selector */}
+          <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4">
+            <p className="text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-zinc-400" />
+              Tipo de arquivo
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {CATEGORY_OPTIONS.map(cat => (
+                <button
+                  key={cat.value}
+                  onClick={() => setImportCategory(cat.value)}
+                  className={`px-3 py-3 rounded-xl border text-sm transition-all text-left
+                    ${importCategory === cat.value ? cat.activeColor : cat.color}
+                  `}
+                >
+                  <div className="font-semibold text-sm">{cat.label}</div>
+                  <div className="text-[10px] opacity-70 mt-0.5 leading-tight">{cat.description}</div>
+                </button>
+              ))}
+            </div>
+
+            {/* Liquidação warning */}
+            {isLiquidacao && (
+              <div className="mt-3 flex items-start gap-2 text-xs text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3">
+                <HandCoins className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>
+                  Arquivo de <strong>liquidação</strong>: os registros identificados serão marcados como
+                  pagos na base consolidada. <strong>Nenhuma cobrança será enviada.</strong>
+                </span>
+              </div>
+            )}
+          </div>
+
           {/* Drop zone */}
           <div
             onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
@@ -556,15 +690,26 @@ export default function ClientDashboard({
               </>
             ) : (
               <>
-                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                  <Upload className="w-8 h-8 text-emerald-400" />
+                <div className={`w-16 h-16 rounded-2xl border flex items-center justify-center
+                  ${isLiquidacao
+                    ? "bg-emerald-500/10 border-emerald-500/20"
+                    : "bg-zinc-800/60 border-zinc-700"
+                  }`}
+                >
+                  <Upload className={`w-8 h-8 ${isLiquidacao ? "text-emerald-400" : "text-zinc-400"}`} />
                 </div>
                 <div className="text-center space-y-1">
                   <p className="text-lg font-semibold text-white">
-                    Arraste o arquivo aqui ou clique para selecionar
+                    {isLiquidacao
+                      ? "Arquivo de liquidação (pagamentos realizados)"
+                      : "Arraste o arquivo aqui ou clique para selecionar"
+                    }
                   </p>
                   <p className="text-sm text-zinc-400">
-                    Planilha Excel, CSV, PDF ou TXT com os dados dos devedores
+                    {isLiquidacao
+                      ? "Planilha ou PDF com títulos liquidados — será reconciliado com a base"
+                      : "Planilha Excel, CSV, PDF ou TXT com os dados dos devedores"
+                    }
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono">
@@ -576,7 +721,6 @@ export default function ClientDashboard({
             )}
           </div>
 
-          {/* Extraction error */}
           {extractError && (
             <div className="flex items-start gap-3 bg-red-950/40 border border-red-500/30 rounded-2xl p-4 text-sm text-red-400">
               <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
@@ -589,33 +733,55 @@ export default function ClientDashboard({
       {/* ── Step: Preview ──────────────────────────────────────────────────── */}
       {step === "preview" && (
         <div className="space-y-5">
-          {/* Tone selector */}
-          <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4">
-            <p className="text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-emerald-400" />
-              Tom da mensagem
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {TONE_OPTIONS.map(t => (
-                <button
-                  key={t.value}
-                  onClick={() => setSelectedTone(t.value)}
-                  className={`
-                    text-left px-3 py-2.5 rounded-xl border text-sm transition-all
-                    ${selectedTone === t.value
-                      ? "border-emerald-500 bg-emerald-500/10 text-emerald-300 font-semibold"
-                      : "border-zinc-700 bg-zinc-900/50 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
-                    }
-                  `}
-                  title={t.description}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+
+          {/* Category badge */}
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm
+            ${catOption.activeColor}`}
+          >
+            {isLiquidacao
+              ? <CheckCircle className="w-4 h-4" />
+              : importCategory === "vencidos"
+              ? <AlertTriangle className="w-4 h-4" />
+              : <Clock className="w-4 h-4" />
+            }
+            <span className="font-semibold">{catOption.label}</span>
+            <span className="opacity-70 text-xs">— {catOption.description}</span>
+            {isLiquidacao && (
+              <span className="ml-auto text-xs font-bold text-emerald-400">
+                SEM envio de cobrança
+              </span>
+            )}
           </div>
 
-          {/* Debtors table */}
+          {/* Tone selector — apenas para cobráveis */}
+          {!isLiquidacao && (
+            <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4">
+              <p className="text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-emerald-400" />
+                Tom da mensagem
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {TONE_OPTIONS.map(t => (
+                  <button
+                    key={t.value}
+                    onClick={() => setSelectedTone(t.value)}
+                    className={`
+                      text-left px-3 py-2.5 rounded-xl border text-sm transition-all
+                      ${selectedTone === t.value
+                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-300 font-semibold"
+                        : "border-zinc-700 bg-zinc-900/50 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
+                      }
+                    `}
+                    title={t.description}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Records table */}
           <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
               <div className="flex items-center gap-3">
@@ -633,7 +799,7 @@ export default function ClientDashboard({
                   >
                     {selectedIds.size > 0 && <CheckCircle2 className="w-3 h-3 text-white" />}
                   </div>
-                  Todos ({debtors.length})
+                  {isLiquidacao ? `Liquidações (${debtors.length})` : `Todos (${debtors.length})`}
                 </button>
               </div>
               <span className="text-xs text-zinc-500">
@@ -655,14 +821,12 @@ export default function ClientDashboard({
                       ${isSelected ? "bg-emerald-500/5 hover:bg-emerald-500/10" : "hover:bg-zinc-800/40"}
                     `}
                   >
-                    {/* Checkbox */}
                     <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors
                       ${isSelected ? "bg-emerald-500 border-emerald-500" : "border-zinc-600"}`}
                     >
                       {isSelected && <CheckCircle2 className="w-3 h-3 text-white" />}
                     </div>
 
-                    {/* Info */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white truncate">{d.client}</p>
                       <p className="text-xs text-zinc-500 truncate">
@@ -670,15 +834,17 @@ export default function ClientDashboard({
                       </p>
                     </div>
 
-                    {/* Value */}
                     <div className="text-right flex-shrink-0">
                       <p className="text-sm font-semibold text-white font-mono">
                         {formatBRL(d.updatedValue ?? d.value)}
                       </p>
-                      {!hasPhone && (
+                      {!isLiquidacao && !hasPhone && (
                         <p className="text-[10px] text-amber-400 flex items-center gap-1 justify-end">
                           <AlertTriangle className="w-3 h-3" /> sem telefone
                         </p>
+                      )}
+                      {isLiquidacao && (
+                        <p className="text-[10px] text-emerald-400">liquidado</p>
                       )}
                     </div>
                   </div>
@@ -686,6 +852,14 @@ export default function ClientDashboard({
               })}
             </div>
           </div>
+
+          {/* Reconcile error */}
+          {reconcileError && (
+            <div className="flex items-start gap-3 bg-red-950/40 border border-red-500/30 rounded-2xl p-4 text-sm text-red-400">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <span>{reconcileError}</span>
+            </div>
+          )}
 
           {/* Action bar */}
           <div className="flex flex-col sm:flex-row gap-3">
@@ -697,23 +871,96 @@ export default function ClientDashboard({
               Importar outro arquivo
             </button>
 
-            <button
-              onClick={handleSendClick}
-              disabled={selectedIds.size === 0 || waConnected === false}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-base transition-colors shadow-lg shadow-emerald-900/40"
-            >
-              <Send className="w-5 h-5" />
-              Enviar cobranças
-              <ChevronRight className="w-4 h-4" />
-            </button>
+            {isLiquidacao ? (
+              /* Liquidação: botão de reconciliação (NÃO envia WhatsApp) */
+              <button
+                onClick={() => void handleReconcile()}
+                disabled={selectedIds.size === 0 || isReconciling}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-base transition-colors shadow-lg shadow-emerald-900/40"
+              >
+                {isReconciling
+                  ? <><Loader2 className="w-5 h-5 animate-spin" /> Reconciliando…</>
+                  : <><CheckCircle className="w-5 h-5" /> Marcar como liquidado<ChevronRight className="w-4 h-4" /></>
+                }
+              </button>
+            ) : (
+              /* Cobráveis: botão de envio */
+              <button
+                onClick={handleSendClick}
+                disabled={selectedIds.size === 0 || waConnected === false}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-base transition-colors shadow-lg shadow-emerald-900/40"
+              >
+                <Send className="w-5 h-5" />
+                Enviar cobranças
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
-          {waConnected === false && (
+          {!isLiquidacao && waConnected === false && (
             <p className="text-sm text-rose-400 flex items-center gap-2">
               <WifiOff className="w-4 h-4" />
               Canal de envio indisponível no momento. Contate o suporte para reativar.
             </p>
           )}
+        </div>
+      )}
+
+      {/* ── Step: Reconciling ─────────────────────────────────────────────────── */}
+      {step === "reconciling" && (
+        <div className="flex flex-col items-center justify-center gap-6 py-20">
+          <Loader2 className="w-16 h-16 text-emerald-400 animate-spin" />
+          <div className="text-center space-y-1">
+            <p className="text-lg font-semibold text-white">Reconciliando liquidações…</p>
+            <p className="text-sm text-zinc-400">
+              Atualizando status dos títulos na base consolidada.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step: Reconciled ──────────────────────────────────────────────────── */}
+      {step === "reconciled" && (
+        <div className="space-y-5">
+          <div className="rounded-2xl border bg-emerald-950/30 border-emerald-500/30 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <CheckCircle className="w-8 h-8 text-emerald-400" />
+              <div>
+                <h3 className="text-lg font-bold text-white">Liquidações reconciliadas!</h3>
+                <p className="text-sm text-zinc-400">
+                  {reconciledCount > 0
+                    ? `${reconciledCount} título${reconciledCount !== 1 ? "s" : ""} marcado${reconciledCount !== 1 ? "s" : ""} como liquidado na base consolidada.`
+                    : "Registros salvos. Nenhum título anterior correspondente encontrado para atualização automática."
+                  }
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="text-center bg-zinc-900/60 rounded-xl p-3">
+                <p className="text-2xl font-bold font-mono text-emerald-400">{debtors.filter(d => selectedIds.has(d.id)).length}</p>
+                <p className="text-xs text-zinc-500 mt-0.5">Registros importados</p>
+              </div>
+              <div className="text-center bg-zinc-900/60 rounded-xl p-3">
+                <p className="text-2xl font-bold font-mono text-emerald-300">{reconciledCount}</p>
+                <p className="text-xs text-zinc-500 mt-0.5">Títulos reconciliados</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-500 mt-4">
+              Nenhuma mensagem de cobrança foi enviada. Verifique a Visão Geral para confirmar as atualizações.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={handleReset}
+              className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              Nova importação
+            </button>
+          </div>
         </div>
       )}
 
@@ -733,7 +980,6 @@ export default function ClientDashboard({
       {/* ── Step: Done ─────────────────────────────────────────────────────── */}
       {step === "done" && sendResult && (
         <div className="space-y-5">
-          {/* Result card */}
           <div className={`rounded-2xl border p-6 ${
             sendResult.success
               ? "bg-emerald-950/30 border-emerald-500/30"
@@ -769,7 +1015,6 @@ export default function ClientDashboard({
             </div>
           </div>
 
-          {/* Failed items (client names only — no PII) */}
           {sendResult.results.filter(r => r.status !== "sucesso").length > 0 && (
             <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden">
               <div className="px-4 py-3 border-b border-zinc-800">
@@ -796,7 +1041,6 @@ export default function ClientDashboard({
             </div>
           )}
 
-          {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={handleReset}

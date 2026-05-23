@@ -6,7 +6,7 @@ type BillingLogStatus =
   | "sucesso" | "erro"            // Z-API real
   | "bloqueado_limite" | "bloqueado_assinatura"
   | "duplicado" | "telefone_invalido";
-type BillingLogType = "auto" | "manual";
+type BillingLogType = "auto" | "manual" | "lote";
 
 interface BillingLogRow {
   id: string;

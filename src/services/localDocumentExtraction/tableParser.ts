@@ -50,6 +50,9 @@ function deaccent(s: string): string {
 /** Return true if a line looks like a header row. */
 export function isHeaderLine(line: string): boolean {
   const norm = deaccent(line);
+  // A line with an actual date (DD/MM/YYYY) or currency amount (R$) is a data
+  // line even if it contains words like "titulo" or "vencimento".
+  if (/\d{2}\/\d{2}\/\d{4}/.test(norm) || /r\$/.test(norm)) return false;
   let hits = 0;
   for (const aliases of Object.values(HEADER_ALIASES)) {
     if (aliases.some((a) => norm.includes(a))) hits++;
