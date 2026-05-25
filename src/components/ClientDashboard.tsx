@@ -39,7 +39,6 @@ import {
   CheckCircle,
   Clock,
   HandCoins,
-  Zap,
 } from "lucide-react";
 import { whatsappGatewayService } from "../services/whatsappGatewayService";
 import { whatsappBatchService, type BatchChargeResult } from "../services/whatsappBatchService";
@@ -163,12 +162,6 @@ export default function ClientDashboard({
   const [driveStatus,     setDriveStatus]     = useState<DriveFolderStatus | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // ── Input mode (file upload vs manual text) ───────────────────────────────
-  const [inputMode,    setInputMode]    = useState<"file" | "text">("file");
-  const [manualText,   setManualText]   = useState("");
-  const [isSavingOnly, setIsSavingOnly] = useState(false);
-  const [saveOnlyDone, setSaveOnlyDone] = useState(false);
 
   // ── Init ─────────────────────────────────────────────────────────────────────
   const refreshWaStatus = useCallback(async () => {
@@ -325,55 +318,6 @@ export default function ClientDashboard({
     } catch (err) {
       setExtractError(
         err instanceof Error ? err.message : "Falha ao processar o arquivo. Tente novamente."
-      );
-    } finally {
-      setIsProcessing(false);
-      setProcessingMsg("");
-    }
-  }, [globalFinePct, globalInterestDayPct, importCategory]);
-
-  const processText = useCallback(async (text: string) => {
-    if (!text.trim()) return;
-    setExtractError("");
-    setIsProcessing(true);
-    setProcessingMsg("Identificando registros…");
-
-    try {
-      const extraction = await extractDocumentLocally(text, importCategory);
-
-      const extracted: Debtor[] = extraction.records.map((d) => ({
-        id: crypto.randomUUID(),
-        client:    d.client,
-        supplier:  d.supplier,
-        document:  d.document,
-        dueDate:   d.dueDate,
-        value:     d.value,
-        phone:     d.phone,
-        category:  importCategory,
-        status:    "pending",
-        interestApplied: importCategory === "liquidado" ? 0 : globalInterestDayPct,
-        fineApplied:     importCategory === "liquidado" ? 0 : globalFinePct,
-        updatedValue:
-          importCategory === "liquidado"
-            ? d.value
-            : Math.round(d.value * (1 + globalFinePct / 100) * 100) / 100,
-      }));
-
-      if (extracted.length === 0) {
-        const detail = extraction.warnings.length > 0
-          ? extraction.warnings[0]
-          : "Verifique se o texto contém dados de cobrança legíveis.";
-        setExtractError(`Nenhum registro identificado. ${detail}`);
-        setIsProcessing(false);
-        return;
-      }
-
-      setDebtors(extracted);
-      setSelectedIds(new Set(extracted.map(d => d.id)));
-      setStep("preview");
-    } catch (err) {
-      setExtractError(
-        err instanceof Error ? err.message : "Falha ao processar o texto. Tente novamente."
       );
     } finally {
       setIsProcessing(false);
@@ -551,24 +495,6 @@ export default function ClientDashboard({
     setExtractError("");
     setReconcileError("");
     setReconciledCount(0);
-    setInputMode("file");
-    setManualText("");
-    setSaveOnlyDone(false);
-  };
-
-  const handleSaveOnly = async () => {
-    const selected = debtors.filter(d => selectedIds.has(d.id));
-    if (!selected.length) return;
-    setIsSavingOnly(true);
-    try {
-      await financeService.createMany(userId, selected);
-      onDebtorsImported?.();
-      setSaveOnlyDone(true);
-    } catch (err) {
-      setExtractError(err instanceof Error ? err.message : "Falha ao salvar. Tente novamente.");
-    } finally {
-      setIsSavingOnly(false);
-    }
   };
 
   // ─── Render helpers ───────────────────────────────────────────────────────────
@@ -732,24 +658,7 @@ export default function ClientDashboard({
             )}
           </div>
 
-          {/* Input mode toggle */}
-          <div className="flex items-center gap-1 bg-zinc-900/60 p-1 rounded-xl border border-zinc-800 w-fit">
-            <button
-              onClick={() => setInputMode("file")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${inputMode === "file" ? "bg-zinc-700 text-white" : "text-zinc-500 hover:text-zinc-300"}`}
-            >
-              Arquivo
-            </button>
-            <button
-              onClick={() => setInputMode("text")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${inputMode === "text" ? "bg-zinc-700 text-white" : "text-zinc-500 hover:text-zinc-300"}`}
-            >
-              Texto manual
-            </button>
-          </div>
-
-          {/* Drop zone — modo arquivo */}
-          {inputMode === "file" && (
+          {/* Drop zone */}
           <div
             onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
             onDragLeave={() => setIsDragging(false)}
@@ -811,47 +720,6 @@ export default function ClientDashboard({
               </>
             )}
           </div>
-
-          )}
-
-          {/* Modo texto manual */}
-          {inputMode === "text" && (
-            <div className="space-y-3">
-              <div className="flex flex-col gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setManualText(`Extrato de Débitos Distribuidora Alfa Ltda\n1. CARLOS MENDES DA SILVA - Titulo 1082-3 - Vencimento 15/06/2026 - Valor R$ 715,66 - tel 11999990001\n2. COMERCIO BETA LTDA ME - Titulo 2031-1 - Vencimento 20/06/2026 - Valor R$ 1.240,00 - tel 11999990002`)}
-                  className="w-full text-left p-2.5 rounded-lg bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400 truncate"
-                >
-                  Preset 1: Exemplo (2 registros)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setManualText(`LISTA DE RECEBIVEIS\nCOMERCIO GAMMA LTDA - Titulo 3010/002 - Vencimento 10/06/2026 - Valor R$ 833,20\nINDUSTRIA DELTA SA - Titulo 4022/001 - Vencimento 12/06/2026 - Valor R$ 6.459,60\nMOVEIS SIGMA LTDA - Titulo 5041-2 - Vencimento 18/06/2026 - Valor R$ 2.248,00\nELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
-                  className="w-full text-left p-2.5 rounded-lg bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400 truncate"
-                >
-                  Preset 2: Exemplo (4 registros)
-                </button>
-              </div>
-              <textarea
-                rows={8}
-                value={manualText}
-                onChange={e => setManualText(e.target.value)}
-                placeholder="Cole as linhas financeiras cruas ou digite manualmente: Nome, Fatura, Telefone..."
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500 transition-all font-mono resize-none"
-              />
-              <button
-                onClick={() => void processText(manualText)}
-                disabled={!manualText.trim() || isProcessing}
-                className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-black font-extrabold flex items-center justify-center gap-2 text-sm transition-all"
-              >
-                {isProcessing
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Extraindo dados…</>
-                  : <><Zap className="w-4 h-4" /> Extrair Dados do Texto</>
-                }
-              </button>
-            </div>
-          )}
 
           {extractError && (
             <div className="flex items-start gap-3 bg-red-950/40 border border-red-500/30 rounded-2xl p-4 text-sm text-red-400">
@@ -993,17 +861,6 @@ export default function ClientDashboard({
             </div>
           )}
 
-          {/* Save-only confirmation */}
-          {saveOnlyDone && (
-            <div className="flex items-start gap-3 bg-emerald-950/30 border border-emerald-500/30 rounded-2xl p-4 text-sm text-emerald-400">
-              <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold">{selectedIds.size} registro{selectedIds.size !== 1 ? "s" : ""} salvos na Visão Geral.</p>
-                <p className="text-xs text-zinc-500 mt-0.5">Nenhuma cobrança foi enviada.</p>
-              </div>
-            </div>
-          )}
-
           {/* Action bar */}
           <div className="flex flex-col sm:flex-row gap-3">
             <button
@@ -1011,22 +868,8 @@ export default function ClientDashboard({
               className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 text-sm font-medium transition-colors"
             >
               <RotateCcw className="w-4 h-4" />
-              {saveOnlyDone ? "Nova importação" : "Importar outro arquivo"}
+              Importar outro arquivo
             </button>
-
-            {/* Botão salvar na base (sem WhatsApp) — apenas para cobráveis */}
-            {!isLiquidacao && !saveOnlyDone && (
-              <button
-                onClick={() => void handleSaveOnly()}
-                disabled={selectedIds.size === 0 || isSavingOnly}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-zinc-600 text-zinc-300 hover:text-white hover:border-zinc-400 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
-              >
-                {isSavingOnly
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando…</>
-                  : <><CheckCircle className="w-4 h-4" /> Salvar na base (sem envio)</>
-                }
-              </button>
-            )}
 
             {isLiquidacao ? (
               /* Liquidação: botão de reconciliação (NÃO envia WhatsApp) */
