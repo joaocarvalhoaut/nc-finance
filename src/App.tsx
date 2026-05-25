@@ -26,7 +26,7 @@ import {
   BillingLog,
   PlanId,
   UserConfig,
-  ZApiConfig, 
+
   MessageTone, 
   PatternMessage
 } from "./types";
@@ -296,10 +296,7 @@ export default function App() {
   // Temporary seed data is now persisted by user_id on first authenticated access.
   const [debtors, setDebtors] = useState<Debtor[]>([]);
   const [representatives, setRepresentatives] = useState<Representative[]>([]);
-  const [zapiConfig, setZapiConfig] = useState<ZApiConfig>({
-    autoBillingEnabled: true,
-    scheduledTime: "09:00"
-  });
+
   const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState("");
   const [isSavingConfig, setIsSavingConfig] = useState(false);
@@ -2646,49 +2643,9 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
               {currentTab === "cobranca" && (
                 <div className="space-y-8">
                   
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    
-                    <div className="lg:col-span-6 bg-zinc-900/40 border border-zinc-950 p-5 rounded-3xl space-y-4 shadow-xl flex flex-col justify-between">
-                      <div className="space-y-1.5">
-                        <div className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded text-[10px] font-bold font-mono uppercase tracking-wide">
-                          Agendamento Global (Z-API)
-                        </div>
-                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-emerald-400" /> Cobrança Automatizada
-                        </h4>
-                        <p className="text-xs text-zinc-500 font-light leading-relaxed">
-                          Ative o robô para realizar varreduras automáticas de faturamento de acordo com a hora programada de sua preferência.
-                        </p>
-                      </div>
+                  <div className="grid grid-cols-1 gap-8">
 
-                      <div className="space-y-3.5 pt-2">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs text-zinc-300 font-medium">Auto-disparos Habilitado:</label>
-                          <button
-                            onClick={() => setZapiConfig(prev => ({...prev, autoBillingEnabled: !prev.autoBillingEnabled}))}
-                            className={`w-12 h-6.5 rounded-full p-1 transition-all ${zapiConfig.autoBillingEnabled ? "bg-emerald-500 text-black" : "bg-zinc-800"}`}
-                          >
-                            <div className={`w-4.5 h-4.5 rounded-full bg-white transition-all transform ${zapiConfig.autoBillingEnabled ? "translate-x-5.5" : "translate-x-0"}`} />
-                          </button>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs text-zinc-300 font-medium">Horário Padrão de Envio:</label>
-                          <input 
-                            type="time"
-                            value={zapiConfig.scheduledTime}
-                            onChange={(e) => setZapiConfig(prev => ({...prev, scheduledTime: e.target.value}))}
-                            className="bg-zinc-950 border border-zinc-800 p-1.5 text-xs text-center rounded text-zinc-100 font-mono focus:outline-none focus:border-emerald-500"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-emerald-500/5 rounded-xl border border-emerald-500/10 text-[10px] text-zinc-500 font-light">
-                        O sistema disparará faturas para os telefones no formato amigável ou de atraso na hora estipulada via integração Z-API centralizada.
-                      </div>
-                    </div>
-
-                    <div className="lg:col-span-6 bg-zinc-900/40 border border-zinc-950 p-5 rounded-3xl space-y-4 shadow-xl flex flex-col justify-between">
+                    <div className="bg-zinc-900/40 border border-zinc-950 p-5 rounded-3xl space-y-4 shadow-xl flex flex-col justify-between">
                       <div className="space-y-3">
                         <div className="space-y-1">
                           <h4 className="text-sm font-bold text-white flex items-center gap-2">

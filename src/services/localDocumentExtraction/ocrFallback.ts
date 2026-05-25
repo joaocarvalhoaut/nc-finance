@@ -24,8 +24,8 @@ async function tryLoadTesseract(): Promise<
   }> } | null
 > {
   try {
-    // @ts-expect-error tesseract.js is an optional runtime dependency
-    const mod = await import("tesseract.js");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod = await import("tesseract.js" as any);
     return mod as { createWorker: (...args: unknown[]) => Promise<unknown> } as ReturnType<typeof tryLoadTesseract> extends Promise<infer T> ? T : never;
   } catch {
     return null;
