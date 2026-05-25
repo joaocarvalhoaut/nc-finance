@@ -15,6 +15,7 @@ import { userConfigService } from "./services/userConfigService";
 import { whatsappService, SEND_STATUS_LABELS, type SendChargeStatus } from "./services/whatsappService";
 import { googleSheetsService, type ImportResult as SheetsImportResult } from "./services/googleSheetsService";
 import { googleDriveService, DRIVE_STATUS_LABELS, type DriveMatchResult, type DriveMatchStatus } from "./services/googleDriveService";
+import { driveFolderService, type DriveFolderStatus } from "./services/driveMatching/driveFolderService";
 import { whatsappBatchService, BATCH_TOP_STATUS_LABELS, type BatchChargeResult, type BatchTopStatus } from "./services/whatsappBatchService";
 import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type AutomationRule, type AutomationRun, type AutomationRuleCreate } from "./services/automationService";
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
@@ -332,6 +333,10 @@ export default function App() {
   const [sheetsImportResult, setSheetsImportResult] = useState<SheetsImportResult | null>(null);
   const [isDriveMatching, setIsDriveMatching] = useState<boolean>(false);
   const [driveMatchResult, setDriveMatchResult] = useState<DriveMatchResult | null>(null);
+  const [driveFolderUrl, setDriveFolderUrl] = useState<string>("");
+  const [isDriveSaving, setIsDriveSaving] = useState<boolean>(false);
+  const [driveSaveMsg, setDriveSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [driveFolderStatus, setDriveFolderStatus] = useState<DriveFolderStatus | null>(null);
 
   // Batch WhatsApp send state
   const [selectedDebtorIds, setSelectedDebtorIds] = useState<Set<string>>(new Set());
@@ -689,6 +694,31 @@ export default function App() {
     }
   };
 
+  // Salvar pasta do Google Drive e carregar status
+  const handleSaveDriveFolder = async () => {
+    if (!driveFolderUrl.trim()) return;
+    setIsDriveSaving(true);
+    setDriveSaveMsg(null);
+    try {
+      const result = await driveFolderService.saveFolder(driveFolderUrl.trim());
+      if (result.success) {
+        setDriveSaveMsg({ ok: true, text: `Pasta "${result.folderName ?? "Drive"}" salva. ${result.fileCount} arquivo(s) indexado(s).` });
+        setDriveFolderUrl("");
+        const status = await driveFolderService.getStatus();
+        setDriveFolderStatus(status);
+      } else {
+        setDriveSaveMsg({ ok: false, text: result.message || result.error || "Falha ao salvar pasta." });
+      }
+    } finally {
+      setIsDriveSaving(false);
+    }
+  };
+
+  const loadDriveFolderStatus = async () => {
+    const status = await driveFolderService.getStatus();
+    setDriveFolderStatus(status);
+  };
+
   // Envio em lote de cobranças — liquidados são bloqueados
   const handleBatchSend = async () => {
     if (selectedDebtorIds.size === 0 || isBatchSending) return;
@@ -757,6 +787,12 @@ export default function App() {
   useEffect(() => {
     if (currentTab === "automacoes" && isLoggedIn && automationRules.length === 0 && !isLoadingAutomation) {
       void loadAutomationData();
+    }
+  }, [currentTab, isLoggedIn]);
+
+  useEffect(() => {
+    if (currentTab === "cobranca" && isLoggedIn && !driveFolderStatus) {
+      void loadDriveFolderStatus();
     }
   }, [currentTab, isLoggedIn]);
 
@@ -2650,18 +2686,57 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                       <div className="space-y-3">
                         <div className="space-y-1">
                           <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                            <FolderOpen className="w-4 h-4 text-emerald-400" /> Google Drive ? Localizar PDFs
+                            <FolderOpen className="w-4 h-4 text-emerald-400" /> Google Drive — Localizar PDFs
                           </h4>
                           <p className="text-[11px] text-zinc-500 font-light leading-normal">
-                            Localiza boletos PDF na pasta central da plataforma e associa automaticamente a cada devedor por CPF/CNPJ ou nome.
+                            Cole o link da pasta do Drive onde seus boletos PDF estão armazenados. O sistema associa automaticamente cada arquivo ao devedor por CPF/CNPJ ou nome.
                             Disponível nos planos <span className="text-emerald-400 font-medium">Pro</span> e <span className="text-emerald-400 font-medium">Premium</span>.
                           </p>
+                        </div>
+
+                        {/* Folder status */}
+                        {driveFolderStatus?.configured && (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/8 border border-emerald-500/15 text-[11px] text-emerald-300">
+                            <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate font-medium">{driveFolderStatus.folderName ?? "Pasta configurada"}</span>
+                            <span className="ml-auto shrink-0 text-zinc-500">{driveFolderStatus.fileCount} arquivo(s)</span>
+                          </div>
+                        )}
+
+                        {/* URL input */}
+                        <div className="space-y-2">
+                          <label className="text-[10px] uppercase font-mono font-bold text-zinc-500 tracking-wider">
+                            Link da pasta do Google Drive
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="url"
+                              value={driveFolderUrl}
+                              onChange={(e) => setDriveFolderUrl(e.target.value)}
+                              placeholder="https://drive.google.com/drive/folders/..."
+                              className="flex-1 min-w-0 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void handleSaveDriveFolder()}
+                              disabled={isDriveSaving || !driveFolderUrl.trim()}
+                              className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
+                            >
+                              {isDriveSaving ? <div className="w-3 h-3 rounded-full border border-black border-t-transparent animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                              Salvar
+                            </button>
+                          </div>
+                          {driveSaveMsg && (
+                            <p className={`text-[11px] ${driveSaveMsg.ok ? "text-emerald-400" : "text-rose-400"}`}>
+                              {driveSaveMsg.text}
+                            </p>
+                          )}
                         </div>
 
                         <button
                           type="button"
                           onClick={handleMatchDriveFiles}
-                          disabled={isDriveMatching}
+                          disabled={isDriveMatching || !driveFolderStatus?.configured}
                           className="w-full py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-900 text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:shadow-lg hover:shadow-emerald-500/5 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isDriveMatching ? (
@@ -2684,13 +2759,13 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                           }`}>
                             {driveMatchResult.success ? (
                               <>
-                                <div className="font-bold text-emerald-300">? PDFs localizados</div>
+                                <div className="font-bold text-emerald-300">✓ PDFs localizados</div>
                                 <div>Arquivos encontrados: <span className="font-semibold text-white">{driveMatchResult.filesFound}</span></div>
                                 <div>Devedores associados: <span className="font-semibold text-emerald-300">{driveMatchResult.debtorsMatched}</span> / {driveMatchResult.debtorsTotal}</div>
                               </>
                             ) : (
                               <>
-                                <div className="font-bold text-rose-300">? Falha ao localizar PDFs</div>
+                                <div className="font-bold text-rose-300">✗ Falha ao localizar PDFs</div>
                                 <div className="text-rose-200/80">
                                   {DRIVE_STATUS_LABELS[driveMatchResult.status as DriveMatchStatus] ?? driveMatchResult.error ?? "Erro desconhecido."}
                                 </div>
@@ -2841,7 +2916,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                               </a>
                             ) : (
                               <span className="text-zinc-500 text-xs italic">
-                                Nenhum PDF pareado ? clique em "Localizar PDFs no Drive" na aba de Cobran?a.
+                                Nenhum PDF vinculado — clique em "Localizar PDFs no Drive" na aba de Cobrança.
                               </span>
                             )}
                             <span className="text-[8px] text-zinc-600 block leading-none">A NC Finance cruza CPF/CNPJ e nome do cliente para localizar o boleto correto na pasta da plataforma.</span>
