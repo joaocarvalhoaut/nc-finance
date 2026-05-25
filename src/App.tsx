@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import Sidebar from "./components/Sidebar";
 import LandingPage from "./components/LandingPage";
 import SubscriptionGate from "./components/SubscriptionGate";
 import SubscriptionStatusCard from "./components/SubscriptionStatusCard";
@@ -1192,19 +1191,7 @@ export default function App() {
         />
       ) : (
         <>
-          <Sidebar
-            currentTab={currentTab === "inicio" ? "dashboard" : currentTab}
-            onTabChange={(tab) => setCurrentTab(tab)}
-            isLoggedIn={isLoggedIn}
-            onLogout={handleSignOut}
-            onLoginClick={() => {
-              setCurrentTab("dashboard");
-            }}
-            userLabel={account?.displayName || "Conta autenticada"}
-            userEmail={account?.email || user?.email || ""}
-          />
-
-          <main className="transition-all duration-300 pl-14 md:pl-16 min-h-screen flex flex-col justify-between">
+          <main className="min-h-screen flex flex-col justify-between">
             
             <div className="border-b border-zinc-800/60 bg-zinc-950 p-4 sticky top-0 z-20 flex flex-wrap gap-4 items-center justify-between">
               <div className="flex items-center gap-3">
@@ -1229,10 +1216,6 @@ export default function App() {
                     Cobrar
                   </button>
 
-                  {/* Separador visual */}
-                  <span className="w-px bg-zinc-700 self-stretch mx-0.5" />
-
-                  {/* Pipeline interno */}
                   <button
                     onClick={() => setCurrentTab("dashboard")}
                     className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "dashboard" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
