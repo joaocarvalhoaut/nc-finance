@@ -25,7 +25,7 @@ export const CURRENCY_RE = /R\$\s*([\d.,]+)/gi;
 
 /** Brazilian document types */
 export const DOC_TYPE_RE =
-  /\b(Duplicata\s+Mercantil|Nota\s+Promiss[oó]ria|Cheque|Boleto|NF[e]?|Recibo|Contrato|D\.M\.|DM)\b/gi;
+  /\b(Duplicata\s*Mercantil|Nota\s+Promiss[oó]ria|Cheque|Boleto|NF[e]?|Recibo|Contrato|D\.M\.|DM)\b/gi;
 
 /** Alphanumeric codes that look like title/boleto numbers: "4254-2", "CH01-3", "1243/002" */
 export const DOC_NUM_RE = /\b([A-Z]{0,4}\d[\w-]{0,15}(?:\/\d{1,6})?)\b/g;

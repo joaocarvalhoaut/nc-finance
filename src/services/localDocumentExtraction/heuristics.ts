@@ -161,10 +161,10 @@ export function parseErpFormat(text: string): RecordCandidate[] {
       docNumber = m ? m[1] : null;
     }
     if (!docNumber) {
-      // Fallback: scan for codes like "4254-2", "CH01-3", "1243/002"
+      // Fallback: scan for codes like "4254-2", "CH01-3", "1243/002", "2427/5"
       // Exclude matches that look like date fragments (DD/MM or similar short slash patterns)
       const docFallbackRe =
-        /\b([A-Z]{1,4}\d[\d-]{0,15}(?:\/\d{1,6})?|\d{3,}[-/]\d{2,}(?:[-/]\d{2,})?)\b/gi;
+        /\b([A-Z]{1,4}\d[\d-]{0,15}(?:\/\d{1,6})?|\d{3,}[-/]\d{1,}(?:[-/]\d{1,})?)\b/gi;
       for (const m of afterPhone.matchAll(docFallbackRe)) {
         const candidate = m[1];
         // Skip if it looks like DD/MM/YYYY or DD/MM
