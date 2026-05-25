@@ -3,12 +3,9 @@ import {
   LogOut,
   LogIn,
   Info,
-  Pin,
-  PinOff,
   History,
   SendHorizontal,
   LayoutDashboard,
-  Upload,
   Eye,
   MessageSquare,
   Zap,
@@ -35,46 +32,6 @@ export default function Sidebar({
 }: SidebarProps) {
   const [isPinned, setIsPinned] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(256);
-  const [isDragging, setIsDragging] = useState(false);
-
-  const handlePointerDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = sidebarWidth;
-    let hasDragged = false;
-
-    setIsDragging(true);
-
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const newWidth = Math.max(180, Math.min(500, startWidth + deltaX));
-
-      if (Math.abs(deltaX) > 6) {
-        hasDragged = true;
-        setSidebarWidth(newWidth);
-        setIsPinned(true);
-      }
-    };
-
-    const handlePointerUp = () => {
-      setIsDragging(false);
-      document.removeEventListener("pointermove", handlePointerMove);
-      document.removeEventListener("pointerup", handlePointerUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-
-      if (!hasDragged) {
-        setIsPinned(prev => !prev);
-      }
-    };
-
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    document.addEventListener("pointermove", handlePointerMove);
-    document.addEventListener("pointerup", handlePointerUp);
-  };
 
   // ── Menu definition ────────────────────────────────────────────────────────
   // "cobrar" = fluxo simplificado para o cliente (Upload → Prévia → Envio)
@@ -83,7 +40,6 @@ export default function Sidebar({
     { id: "cobrar",      label: "Cobrar",       icon: SendHorizontal, section: "client" },
     { id: "separator1",  label: "",             icon: null,            section: "divider" },
     { id: "dashboard",   label: "Dashboard",    icon: LayoutDashboard, section: "internal" },
-    { id: "importar",    label: "Importar",     icon: Upload,          section: "internal" },
     { id: "visao_geral", label: "Visão Geral",  icon: Eye,             section: "internal" },
     { id: "cobranca",    label: "Cobrança",     icon: MessageSquare,   section: "internal" },
     { id: "historico",   label: "Histórico",    icon: History,         section: "internal" },
@@ -110,11 +66,8 @@ export default function Sidebar({
       {/* Main Container */}
       <aside
         id="sidebar"
-        className={`fixed top-0 left-0 h-full z-40 bg-zinc-950 border-r border-emerald-500/20 text-white flex flex-col justify-between shadow-[4px_0_24px_rgba(0,0,0,0.8)]
-          ${isDragging ? "transition-none" : "transition-all duration-300"}
-          ${isPinned ? "translate-x-0" : ""}
-        `}
-        style={{ width: isExpanded ? `${sidebarWidth}px` : "56px" }}
+        className={`fixed top-0 left-0 h-full z-40 bg-zinc-950 border-r border-emerald-500/20 text-white flex flex-col justify-between shadow-[4px_0_24px_rgba(0,0,0,0.8)] transition-all duration-300`}
+        style={{ width: isExpanded ? "240px" : "56px" }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
@@ -131,11 +84,16 @@ export default function Sidebar({
 
             {isExpanded && (
               <button
-                onPointerDown={handlePointerDown}
-                className="p-1.5 rounded-md text-zinc-400 hover:text-emerald-400 hover:bg-zinc-900 transition-all cursor-grab active:cursor-grabbing border border-transparent hover:border-emerald-500/10"
-                title={isPinned ? "Clique para desafixar ou arraste para redimensionar" : "Clique para fixar ou arraste para redimensionar"}
+                onClick={() => setIsPinned(prev => !prev)}
+                className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-all"
+                title={isPinned ? "Desafixar sidebar" : "Fixar sidebar"}
               >
-                {isPinned ? <Pin className="w-4 h-4 text-emerald-400" /> : <PinOff className="w-4 h-4" />}
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {isPinned
+                    ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  }
+                </svg>
               </button>
             )}
           </div>
