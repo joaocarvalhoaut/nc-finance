@@ -68,7 +68,8 @@ import {
   ToggleLeft,
   ToggleRight,
   CalendarClock,
-  X
+  X,
+  Copy
 } from "lucide-react";
 
 // Default Pattern message templates following user specification
@@ -2260,9 +2261,25 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                           <FileSpreadsheet className="w-4 h-4 text-emerald-400" /> Google Sheets
                         </h4>
                         <p className="text-[11px] text-zinc-400 font-light leading-relaxed">
-                          Compartilhe a planilha com o e-mail da service account da plataforma e cole o link abaixo.
+                          Compartilhe a planilha com o e-mail abaixo e cole o link.
                           A planilha deve ter colunas: <span className="text-zinc-300 font-mono">nome, valor, vencimento</span> (mínimo).
                         </p>
+                        {/* Service account e-mail — copiável */}
+                        {(() => {
+                          const saEmail = import.meta.env.VITE_GOOGLE_SERVICE_ACCOUNT_EMAIL as string | undefined;
+                          if (!saEmail) return null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => navigator.clipboard.writeText(saEmail)}
+                              title="Clique para copiar"
+                              className="w-full flex items-center justify-between gap-2 bg-zinc-950 border border-emerald-500/20 rounded-xl px-3 py-2 text-left group hover:border-emerald-500/50 transition-colors"
+                            >
+                              <span className="text-[11px] font-mono text-emerald-300 truncate">{saEmail}</span>
+                              <Copy className="w-3.5 h-3.5 text-zinc-500 group-hover:text-emerald-400 flex-shrink-0 transition-colors" />
+                            </button>
+                          );
+                        })()}
                       </div>
 
                       <div className="space-y-2">
