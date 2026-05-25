@@ -83,8 +83,6 @@ export default function Sidebar({
                 {isExpanded ? "NC Finance" : "NC"}
               </span>
             </div>
-
-            )}
           </div>
 
           {/* Navigation */}
