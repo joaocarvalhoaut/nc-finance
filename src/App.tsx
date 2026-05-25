@@ -1382,7 +1382,7 @@ export default function App() {
         <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
           <div className="text-center space-y-3">
             <div className="w-10 h-10 mx-auto rounded-full border-2 border-emerald-500/30 border-t-emerald-400 animate-spin" />
-            <p className="text-sm font-semibold text-white">Verificando assinaturaâ¬¦</p>
+            <p className="text-sm font-semibold text-white">Verificando assinatura…</p>
             <p className="text-xs text-zinc-500">Preparando acesso seguro ao painel NC Finance.</p>
           </div>
         </div>
@@ -2278,7 +2278,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                           type="text"
                           value={sheetNameInput}
                           onChange={(e) => setSheetNameInput(e.target.value)}
-                          placeholder="Nome da aba (opcional ? padr?o: primeira aba)"
+                          placeholder="Nome da aba (opcional — padrão: primeira aba)"
                           className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-400 focus:outline-none focus:border-emerald-500 font-mono"
                         />
                       </div>
@@ -2309,7 +2309,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                         }`}>
                           {sheetsImportResult.success ? (
                             <>
-                              <div className="font-bold text-emerald-300">? Importa??o conclu?da</div>
+                              <div className="font-bold text-emerald-300">✓ Importação concluída</div>
                               <div>Linhas lidas: <span className="font-semibold text-white">{sheetsImportResult.rowsTotal}</span></div>
                               <div>Importadas: <span className="font-semibold text-emerald-300">{sheetsImportResult.rowsImported}</span></div>
                               {sheetsImportResult.rowsSkipped > 0 && (
@@ -2318,7 +2318,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                             </>
                           ) : (
                             <>
-                              <div className="font-bold text-rose-300">? Falha na importa??o</div>
+                              <div className="font-bold text-rose-300">✗ Falha na importação</div>
                               <div className="text-rose-200/80">{sheetsImportResult.error ?? "Erro desconhecido."}</div>
                             </>
                           )}
@@ -2553,7 +2553,6 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                               </button>
                             </th>
                             <th className="px-5 py-4">Cliente / Sacado</th>
-                            <th className="px-4 py-4">Fornecedor</th>
                             <th className="px-4 py-4 text-center">Documento Id</th>
                             <th className="px-4 py-4 text-center">Vencimento</th>
                             <th className="px-4 py-4 text-center">Telefone (WhatsApp)</th>
@@ -2605,14 +2604,6 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                                       value={d.client}
                                       onChange={(e) => updateGeneralDebtorField(d.id, "client", e.target.value)}
                                       className="w-full bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded p-1 font-bold text-white"
-                                    />
-                                  </td>
-                                  <td className="px-4 py-4 font-light text-zinc-400">
-                                    <input
-                                      type="text"
-                                      value={d.supplier}
-                                      onChange={(e) => updateGeneralDebtorField(d.id, "supplier", e.target.value)}
-                                      className="w-full bg-transparent focus:bg-zinc-950 rounded p-1"
                                     />
                                   </td>
                                   <td className="px-4 py-4 text-center font-mono text-zinc-400">
