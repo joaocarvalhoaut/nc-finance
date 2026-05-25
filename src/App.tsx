@@ -35,8 +35,9 @@ import {
   UserPlus, 
   FileCheck2, 
   Trash2, 
-  FileSpreadsheet, 
-  Download, 
+  FileSpreadsheet,
+  Download,
+  Upload,
   Percent, 
   CheckCircle, 
   Clock, 
@@ -3407,6 +3408,65 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                       </div>
                     </div>
                   )}
+
+                  {/* ── Como usar Automações ── */}
+                  <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-2xl p-6 space-y-5">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-emerald-400" /> Como usar as Automações
+                      </h4>
+                      <p className="text-xs text-zinc-500">
+                        Configure uma vez e o sistema cobra seus clientes automaticamente todos os dias.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {[
+                        {
+                          step: "1",
+                          icon: <Upload className="w-4 h-4 text-emerald-400" />,
+                          title: "Importe seus devedores",
+                          desc: "Vá em Importar e carregue seu PDF ou planilha. O sistema extrai cliente, título, vencimento e valor automaticamente.",
+                        },
+                        {
+                          step: "2",
+                          icon: <Bot className="w-4 h-4 text-emerald-400" />,
+                          title: "Crie uma regra",
+                          desc: 'Clique em "Nova Regra", escolha o tipo (Vencidos, A Vencer…), o tom da mensagem e salve.',
+                        },
+                        {
+                          step: "3",
+                          icon: <Clock className="w-4 h-4 text-emerald-400" />,
+                          title: "O robô age sozinho",
+                          desc: "Todos os dias às 08h o scheduler verifica suas regras e envia cobranças via WhatsApp para os clientes elegíveis.",
+                        },
+                        {
+                          step: "4",
+                          icon: <History className="w-4 h-4 text-emerald-400" />,
+                          title: "Acompanhe em Histórico",
+                          desc: "Cada mensagem enviada aparece na aba Histórico com status, tom e dados do cliente para auditoria completa.",
+                        },
+                      ].map(({ step, icon, title, desc }) => (
+                        <div key={step} className="bg-zinc-950/60 border border-zinc-800/60 rounded-xl p-4 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold shrink-0">
+                              {step}
+                            </span>
+                            {icon}
+                            <span className="text-xs font-semibold text-white">{title}</span>
+                          </div>
+                          <p className="text-[11px] text-zinc-500 leading-relaxed">{desc}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex items-start gap-2.5 bg-emerald-500/5 border border-emerald-500/15 rounded-xl px-4 py-3">
+                      <CheckCircle className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                      <p className="text-[11px] text-zinc-400 leading-relaxed">
+                        <span className="text-emerald-400 font-medium">Deduplicação automática:</span> o sistema nunca envia duas cobranças para o mesmo cliente dentro de 20 horas, evitando spam mesmo que a regra rode todos os dias.
+                      </p>
+                    </div>
+                  </div>
 
                 </div>
               )}
