@@ -138,9 +138,11 @@ export const automationService = {
 
   async createRule(payload: AutomationRuleCreate): Promise<AutomationRule> {
     const supabase = getSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from("user_automation_rules")
       .insert({
+        user_id:           user?.id,
         name:              payload.name,
         rule_type:         payload.ruleType,
         days_before_due:   payload.daysBefore    ?? null,
