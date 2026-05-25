@@ -1870,23 +1870,23 @@ export default function App() {
                         <div className="flex flex-col gap-1.5">
                           <button
                             type="button"
-                            onClick={() => setImportText(`Extrato de Débitos NC Ltda
-1. IDERLANDIO JESUS DE OLIVEIRA - Titulo 4254-2 - Vencimento 10/05/2026 - Valor R$ 715,66 - tel 33988245204
-2. MENEZES E BATISTA LTDA ME - Titulo 4240-2 - Vencimento 09/05/2026 - Valor R$ 760,20 - tel `)}
+                            onClick={() => setImportText(`Extrato de Débitos Distribuidora Alfa Ltda
+1. CARLOS MENDES DA SILVA - Titulo 1082-3 - Vencimento 15/06/2026 - Valor R$ 715,66 - tel 11999990001
+2. COMERCIO BETA LTDA ME - Titulo 2031-1 - Vencimento 20/06/2026 - Valor R$ 1.240,00 - tel 11999990002`)}
                             className="w-full text-left p-2.5 rounded-lg bg-zinc-950 hover:bg-zinc-900 border border-zinc-900 text-[11px] text-zinc-400 block truncate"
                           >
-                            Preset 1: Recebiveis reais (2 linhas)
+                            Preset 1: Exemplo (2 linhas)
                           </button>
                           <button
                             type="button"
-                            onClick={() => setImportText(`LISTA DE RECEBIVEIS REAIS
-COLCHOES E CIA DE BRASILANDIA LTDA - Titulo 1243/002 - Vencimento 11/05/2026 - Valor R$ 833,20
-RAMOS MOVEIS E ELETRO LTDA - Titulo 1244/002 - Vencimento 11/05/2026 - Valor R$ 6.459,60
-SUPER MOVEIS DA VOVO LTDA - Titulo 4241-2 - Vencimento 09/05/2026 - Valor R$ 2.248,00
-GIL MOVEIS E ELETRODOMESTICOS LTDA - Titulo F01-3 - Vencimento 14/05/2026 - Valor R$ 2.941,16`)}
+                            onClick={() => setImportText(`LISTA DE RECEBIVEIS
+COMERCIO GAMMA LTDA - Titulo 3010/002 - Vencimento 10/06/2026 - Valor R$ 833,20
+INDUSTRIA DELTA SA - Titulo 4022/001 - Vencimento 12/06/2026 - Valor R$ 6.459,60
+MOVEIS SIGMA LTDA - Titulo 5041-2 - Vencimento 18/06/2026 - Valor R$ 2.248,00
+ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                             className="w-full text-left p-2.5 rounded-lg bg-zinc-950 hover:bg-zinc-900 border border-zinc-900 text-[11px] text-zinc-400 block truncate"
                           >
-                            Preset 2: Recebiveis reais (4 linhas)
+                            Preset 2: Exemplo (4 linhas)
 
                           </button>
                         </div>
