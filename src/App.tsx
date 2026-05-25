@@ -19,8 +19,6 @@ import { driveFolderService, type DriveFolderStatus } from "./services/driveMatc
 import { whatsappBatchService, BATCH_TOP_STATUS_LABELS, type BatchChargeResult, type BatchTopStatus } from "./services/whatsappBatchService";
 import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type AutomationRule, type AutomationRun, type AutomationRuleCreate } from "./services/automationService";
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
-import { parseImportFile } from "./utils/importFileParser";
-import { extractDocumentLocally, type LocalExtractionResult } from "./services/localDocumentExtraction";
 import { 
   Debtor, 
   Representative, 
@@ -32,10 +30,9 @@ import {
   PatternMessage
 } from "./types";
 import { 
-  Users, 
-  UserPlus, 
-  FileCheck2, 
-  Trash2, 
+  Users,
+  UserPlus,
+  Trash2,
   FileSpreadsheet,
   Download,
   Upload,
@@ -303,19 +300,6 @@ export default function App() {
   const [workspaceError, setWorkspaceError] = useState("");
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [patternTemplates, setPatternTemplates] = useState<PatternMessage[]>(DEFAULT_PATTERNS);
-
-  // Extraction screen properties
-  const [importText, setImportText] = useState<string>("");
-  const [importCategory, setImportCategory] = useState<"vencidos" | "a_vencer" | "liquidado">("vencidos");
-  const [isExtracting, setIsExtracting] = useState<boolean>(false);
-  const [extractedDebtors, setExtractedDebtors] = useState<Debtor[]>([]);
-  const [extractionAlert, setExtractionAlert] = useState<string>("");
-  const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
-  // Original File object — needed for OCR fallback on scanned PDFs
-  const [importFile, setImportFile] = useState<File | null>(null);
-  // Last extraction result — used for post-import summary UI
-  const [lastExtractionResult, setLastExtractionResult] = useState<LocalExtractionResult | null>(null);
-  const [importFileName, setImportFileName] = useState<string>("");
 
   // Representative management form values
   const [newRepName, setNewRepName] = useState("");
@@ -890,148 +874,6 @@ export default function App() {
       .replace(/{dias_atraso}/g, daysAtraso);
   };
 
-  const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (!file) {
-      return;
-    }
-
-    setIsParsingImportFile(true);
-    setExtractionAlert("");
-    setExtractedDebtors([]);
-    setImportFileName(file.name);
-    setImportFile(file); // store for OCR fallback
-
-    try {
-      const parsedText = await parseImportFile(file);
-
-      if (!parsedText.trim()) {
-        throw new Error("O arquivo foi lido, mas não contém texto extraível para a IA.");
-      }
-
-      setImportText(parsedText);
-    } catch (error) {
-      setImportFileName("");
-      setImportText("");
-      setExtractionAlert(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível ler o arquivo enviado. Use PDF, TXT, CSV ou Excel com texto acessível.",
-      );
-    } finally {
-      setIsParsingImportFile(false);
-    }
-  };
-
-  // ── Local extraction pipeline (free, no API key required) ────────────────
-  const handleAIExtract = async () => {
-    if (!importText.trim()) {
-      setExtractionAlert(
-        "Escreva, cole ou carregue um arquivo com informações reais de cobrança antes de prosseguir.",
-      );
-      return;
-    }
-
-    setIsExtracting(true);
-    setExtractionAlert("");
-    setLastExtractionResult(null);
-
-    try {
-      // ── Primary path: local deterministic extraction ──────────────────────
-      const result = await extractDocumentLocally(
-        importText,
-        importCategory,
-        importFile ?? undefined,
-      );
-
-      setLastExtractionResult(result);
-
-      if (result.records.length > 0) {
-        const parsedList = result.records.map((item, index) => ({
-          id: `ext-${Date.now()}-${index}`,
-          client: item.client,
-          supplier: item.supplier,
-          document: item.document,
-          dueDate: item.dueDate,
-          value: item.value,
-          phone: item.phone,
-          category: importCategory,
-          status: "pending" as const,
-        }));
-
-        setExtractedDebtors(parsedList);
-
-        if (result.warnings.length > 0) {
-          setExtractionAlert(result.warnings.join(" "));
-        }
-
-        console.log(
-          JSON.stringify({
-            source: "local.extract.success",
-            records: parsedList.length,
-            method: result.method,
-            low_confidence: result.lowConfidenceCount,
-          }),
-        );
-        return;
-      }
-
-      // ── Nothing found locally ─────────────────────────────────────────────
-      const warningMsg =
-        result.warnings.length > 0
-          ? result.warnings.join(" ")
-          : "Nenhum registro financeiro válido foi encontrado no texto. " +
-            "Verifique se o arquivo contém campos de cliente, vencimento e valor. " +
-            `(Método: ${result.method}, candidatos: ${result.totalCandidates})`;
-
-      setExtractedDebtors([]);
-      setExtractionAlert(warningMsg);
-
-    } catch (err) {
-      console.error(
-        JSON.stringify({
-          source: "local.extract.error",
-          message: err instanceof Error ? err.message : "desconhecido",
-        }),
-      );
-      setExtractedDebtors([]);
-      setExtractionAlert(
-        err instanceof Error
-          ? err.message
-          : "Falha ao processar a extração local. Verifique o formato do arquivo.",
-      );
-    } finally {
-      setIsExtracting(false);
-    }
-  };
-  // Appends parsed extraction items back to the general central view state
-  const sendExtractedToOverview = async () => {
-    if (extractedDebtors.length === 0 || !currentOwnerUserId) return;
-
-    try {
-      const savedDebtors = await financeService.createMany(currentOwnerUserId, extractedDebtors);
-      setDebtors((prev) => [...prev, ...savedDebtors]);
-      setExtractedDebtors([]);
-      setImportText("");
-      setImportFileName("");
-      setCurrentTab("visao_geral");
-    } catch (error) {
-      setExtractionAlert(error instanceof Error ? error.message : "Nao foi possivel salvar os registros importados.");
-    }
-  };
-
-  // Individual editable text change handler on the parsed list
-  const updateExtractedField = (id: string, field: keyof Debtor, val: Debtor[keyof Debtor]) => {
-    setExtractedDebtors(prev => prev.map(d => {
-      if (d.id === id) {
-        return { ...d, [field]: val };
-      }
-      return d;
-    }));
-  };
-
   // Modify individual rows on the main general table
   const updateGeneralDebtorField = async (id: string, field: keyof Debtor, val: string | number) => {
     const currentDebtor = debtors.find((debtor) => debtor.id === id);
@@ -1049,11 +891,6 @@ export default function App() {
     } catch (error) {
       setWorkspaceError(error instanceof Error ? error.message : "Falha ao salvar alteracao do devedor.");
     }
-  };
-
-  // Delete option inside extracted stage
-  const removeExtractedRow = (id: string) => {
-    setExtractedDebtors(prev => prev.filter(d => d.id !== id));
   };
 
   // Delete option inside general table
@@ -1374,7 +1211,6 @@ export default function App() {
                 <h2 className="text-lg font-bold text-white capitalize">
                   {currentTab === "cobrar"     && "Enviar Cobranças"}
                   {currentTab === "dashboard"  && "Dashboard & Métricas"}
-                  {currentTab === "importar"   && "Importação — Vencidos · A Vencer · Liquidação"}
                   {currentTab === "visao_geral"&& "Visão Geral — Base Consolidada"}
                   {currentTab === "cobranca"   && "Cobrança — Z-API / WhatsApp"}
                   {currentTab === "historico"  && "Histórico de Cobrança"}
@@ -1402,12 +1238,6 @@ export default function App() {
                     className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "dashboard" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
                   >
                     Dashboard
-                  </button>
-                  <button
-                    onClick={() => setCurrentTab("importar")}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "importar" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
-                  >
-                    Importar
                   </button>
                   <button
                     onClick={() => setCurrentTab("visao_geral")}
@@ -1844,259 +1674,6 @@ export default function App() {
                     )}
                   </div>
 
-                </div>
-              )}
-
-              {currentTab === "importar" && (
-                <div className="space-y-8">
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    
-                    <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
-                          <Download className="w-4 h-4 text-emerald-400" /> Upload ou Texto de Cobrança
-                        </h4>
-                        <p className="text-xs text-zinc-500 font-light">
-                          Cole faturas, relatórios de ERP ou selecione presets abaixo. O extrator local identifica clientes, vencimentos, valores e documentos automaticamente.
-                        </p>
-                      </div>
-
-                      <div className="p-4 rounded-2xl bg-zinc-950 border-2 border-dashed border-zinc-800 hover:border-emerald-500/30 transition-all text-center space-y-2 relative group">
-                        <div className="w-10 h-10 rounded-full bg-zinc-900/50 flex items-center justify-center text-zinc-400 mx-auto group-hover:bg-emerald-500/10 group-hover:text-emerald-400 transition-colors">
-                          <FileCheck2 className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-zinc-300">Arraste seus relatorios PDF, TXT ou EXCEL aqui</p>
-                          <p className="text-[10px] text-zinc-600">
-                            {isParsingImportFile
-                              ? "Lendo arquivo..."
-                              : importFileName
-                                ? `Arquivo carregado: ${importFileName}`
-                                : "O conteudo real do arquivo tera prioridade sobre presets e textos de exemplo."}
-                          </p>
-                        </div>
-                        <input 
-                          type="file" 
-                          accept=".pdf,.txt,.xlsx,.xls,.csv"
-                          onChange={handleImportFileChange}
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-zinc-500">Fluxo Contábil de Entrada:</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {(["vencidos", "a_vencer", "liquidado"] as const).map((cat) => (
-                            <button
-                              key={cat}
-                              onClick={() => setImportCategory(cat)}
-                              className={`py-2 rounded-xl text-xs font-bold uppercase transition-all border ${importCategory === cat ? "bg-emerald-500 text-black border-emerald-500" : "bg-zinc-950 border-zinc-850 text-zinc-400"}`}
-                            >
-                              {cat === "vencidos" && "Vencidos"}
-                              {cat === "a_vencer" && "A vencer"}
-                              {cat === "liquidado" && "Liquidação"}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-zinc-500">Inserir Presets de Simulação Rápida:</label>
-                        <div className="flex flex-col gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setImportText(`Extrato de Débitos Distribuidora Alfa Ltda
-1. CARLOS MENDES DA SILVA - Titulo 1082-3 - Vencimento 15/06/2026 - Valor R$ 715,66 - tel 11999990001
-2. COMERCIO BETA LTDA ME - Titulo 2031-1 - Vencimento 20/06/2026 - Valor R$ 1.240,00 - tel 11999990002`)}
-                            className="w-full text-left p-2.5 rounded-lg bg-zinc-950 hover:bg-zinc-900 border border-zinc-900 text-[11px] text-zinc-400 block truncate"
-                          >
-                            Preset 1: Exemplo (2 linhas)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setImportText(`LISTA DE RECEBIVEIS
-COMERCIO GAMMA LTDA - Titulo 3010/002 - Vencimento 10/06/2026 - Valor R$ 833,20
-INDUSTRIA DELTA SA - Titulo 4022/001 - Vencimento 12/06/2026 - Valor R$ 6.459,60
-MOVEIS SIGMA LTDA - Titulo 5041-2 - Vencimento 18/06/2026 - Valor R$ 2.248,00
-ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
-                            className="w-full text-left p-2.5 rounded-lg bg-zinc-950 hover:bg-zinc-900 border border-zinc-900 text-[11px] text-zinc-400 block truncate"
-                          >
-                            Preset 2: Exemplo (4 linhas)
-
-                          </button>
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block">Dados textuais para OCR / Extração:</label>
-                        <textarea
-                          rows={6}
-                          value={importText}
-                          onChange={(e) => setImportText(e.target.value)}
-                          placeholder="Cole as linhas financeiras cruas ou digite manualmente ex: Nome, Fatura, Telefone..."
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500 transition-all font-mono"
-                        />
-                      </div>
-
-                      {extractionAlert && (
-                        <div className="p-3 border text-xs rounded-xl flex items-start gap-2 bg-amber-500/10 border-amber-500/20 text-amber-400">
-                          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                          <span className="flex-1">{extractionAlert}</span>
-                        </div>
-                      )}
-
-                      <button
-                        onClick={handleAIExtract}
-                        disabled={isExtracting}
-                        className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all text-sm cursor-pointer disabled:cursor-not-allowed"
-                      >
-                        {isExtracting ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 animate-spin" /> Extraindo dados do documento…
-                          </>
-                        ) : (
-                          <>
-                            <Zap className="w-4 h-4" /> Extrair Dados do Documento
-                          </>
-                        )}
-                      </button>
-
-                    </div>
-
-                    <div className="lg:col-span-7 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl flex flex-col justify-between">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-white">Dados Financeiros Extraídos Revisáveis</h4>
-                        <p className="text-xs text-zinc-500 font-light">
-                          Os dados abaixo foram extraídos pelo pipeline local. Você pode editar os campos e optar por enviá-los de forma consolidada para a Visão Geral.
-                        </p>
-                      </div>
-
-                      {/* ── Post-import summary chips ──────────────────────── */}
-                      {lastExtractionResult && (
-                        <div className="flex flex-wrap gap-1.5 pt-0.5">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            <CheckCircle className="w-3 h-3" />
-                            {lastExtractionResult.records.length} registro{lastExtractionResult.records.length !== 1 ? "s" : ""}
-                          </span>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">
-                            método: {lastExtractionResult.method}
-                          </span>
-                          {lastExtractionResult.lowConfidenceCount > 0 && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                              <AlertTriangle className="w-3 h-3" />
-                              {lastExtractionResult.lowConfidenceCount} baixa confiança
-                            </span>
-                          )}
-                          {lastExtractionResult.missingDocCount > 0 && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-500 border border-zinc-700">
-                              {lastExtractionResult.missingDocCount} doc gerado
-                            </span>
-                          )}
-                          {lastExtractionResult.totalCandidates > lastExtractionResult.records.length && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-500 border border-zinc-700">
-                              {lastExtractionResult.totalCandidates - lastExtractionResult.records.length} descartado{lastExtractionResult.totalCandidates - lastExtractionResult.records.length !== 1 ? "s" : ""}
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="flex-1 min-h-[300px] overflow-y-auto max-h-[420px] pr-1 space-y-4">
-                        {extractedDebtors.length === 0 ? (
-                          <div className="h-full flex flex-col items-center justify-center text-center p-8 border border-zinc-850 border-dashed rounded-2xl text-zinc-500">
-                            <SlidersHorizontal className="w-10 h-10 text-zinc-700 animate-pulse mb-2" />
-                            <p className="text-xs font-semibold">Nenhuma informação estruturada pendente</p>
-                            <p className="text-[10px] text-zinc-600 max-w-sm mt-1">Cole as faturas e clique no botão verde para ver os campos extraídos estruturados em tabela editável.</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            <span className="text-xs font-mono font-bold text-emerald-400 block">? {extractedDebtors.length} Registros Prontos para Revis?o:</span>
-                            
-                            {extractedDebtors.map((item, index) => (
-                              <div key={item.id} className="p-3 bg-zinc-950 border border-zinc-850 rounded-xl space-y-2 relative group">
-                                <button
-                                  onClick={() => removeExtractedRow(item.id)}
-                                  className="absolute top-2.5 right-2.5 text-zinc-600 hover:text-rose-400 p-1 rounded transition-colors"
-                                  title="Ignorar este registro"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-
-                                <div className="grid grid-cols-2 gap-3 text-xs">
-                                  <div>
-                                    <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Cliente</label>
-                                    <input
-                                      type="text"
-                                      value={item.client}
-                                      onChange={(e) => updateExtractedField(item.id, "client", e.target.value)}
-                                      className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white focus:outline-none focus:border-emerald-500"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Fornecedor / S.A</label>
-                                    <input
-                                      type="text"
-                                      value={item.supplier}
-                                      onChange={(e) => updateExtractedField(item.id, "supplier", e.target.value)}
-                                      className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white focus:outline-none focus:border-emerald-500"
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-4 gap-2 text-[11px]">
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Documento</label>
-                                    <input
-                                      type="text"
-                                      value={item.document}
-                                      onChange={(e) => updateExtractedField(item.id, "document", e.target.value)}
-                                      className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white text-center focus:outline-none"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Vencimento</label>
-                                    <input
-                                      type="text"
-                                      value={item.dueDate}
-                                      onChange={(e) => updateExtractedField(item.id, "dueDate", e.target.value)}
-                                      className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white text-center focus:outline-none"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Valor (R$)</label>
-                                    <input
-                                      type="number"
-                                      value={item.value}
-                                      onChange={(e) => updateExtractedField(item.id, "value", Number(e.target.value))}
-                                      className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white focus:outline-none"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Celular (WhatsApp)</label>
-                                    <input
-                                      type="text"
-                                      value={item.phone}
-                                      onChange={(e) => updateExtractedField(item.id, "phone", e.target.value)}
-                                      className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white focus:outline-none font-mono"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="pt-4 border-t border-zinc-900 flex items-center justify-between gap-4 flex-wrap">
-                        <span className="text-zinc-500 text-xs">Aguardando consolidação do operador.</span>
-                        <button
-                          onClick={sendExtractedToOverview}
-                          disabled={extractedDebtors.length === 0}
-                          className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold flex items-center gap-2 shadow disabled:opacity-50 transition-all text-xs cursor-pointer"
-                        >
-                          <CheckCircle className="w-4 h-4" /> Enviar para a Visão Geral
-                        </button>
-                      </div>
-                    </div>
-
-                  </div>
                 </div>
               )}
 
