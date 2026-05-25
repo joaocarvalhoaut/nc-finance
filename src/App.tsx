@@ -47,7 +47,7 @@ import {
   PlusCircle,
   HelpCircle,
   ExternalLink,
-  Info,
+
   DollarSign,
   AlertTriangle,
   History,
@@ -3407,18 +3407,6 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                       </div>
                     </div>
                   )}
-
-                  <div className="bg-zinc-900/30 border border-zinc-800/60 rounded-2xl p-5 space-y-3">
-                    <h4 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-                      <Info className="w-4 h-4 text-zinc-500" /> Configuração do pg_cron (feita uma única vez)
-                    </h4>
-                    <ol className="text-xs text-zinc-500 space-y-1.5 list-decimal list-inside">
-                      <li>Habilite <span className="text-zinc-300 font-mono">pg_cron</span> e <span className="text-zinc-300 font-mono">pg_net</span> no Supabase Dashboard ? Database ? Extensions.</li>
-                      <li>Configure o secret: <span className="text-zinc-300 font-mono">npx supabase secrets set AUTOMATION_CRON_SECRET=&lt;segredo&gt; --project-ref &lt;ref&gt;</span></li>
-                      <li>Faça deploy das Edge Functions: <span className="text-zinc-300 font-mono">npx supabase functions deploy run-automation-scheduler process-dispatch-jobs</span></li>
-                      <li>Rode os comandos <span className="text-zinc-300 font-mono">SELECT cron.schedule(...)</span> documentados na migration <span className="text-zinc-300 font-mono">20260521020000_automation.sql</span>.</li>
-                    </ol>
-                  </div>
 
                 </div>
               )}
