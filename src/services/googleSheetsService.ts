@@ -81,14 +81,44 @@ export const googleSheetsService = {
       { body: params },
     );
 
-    if (error || !data) {
+    if (error) {
+      // Supabase JS lança erro genérico para respostas non-2xx.
+      // Tentamos extrair o corpo JSON real da função para exibir
+      // a mensagem específica (ex: google_nao_configurado, bloqueado_assinatura).
+      let errorMsg  = "Não foi possível contatar o servidor.";
+      let errorStatus: ImportStatus = "erro_interno";
+
+      try {
+        // FunctionsHttpError expõe a Response original em error.context
+        const ctx = (error as unknown as { context?: Response }).context;
+        if (ctx) {
+          const body = await ctx.json() as { error?: string; status?: string };
+          if (body.error)  errorMsg    = body.error;
+          if (body.status) errorStatus = body.status as ImportStatus;
+        }
+      } catch { /* ignora — usa mensagem genérica */ }
+
       return {
         success: false,
-        status: "error",
+        status: errorStatus,
         rowsTotal: 0,
         rowsImported: 0,
         rowsSkipped: 0,
-        error: error?.message ?? "Não foi possível contatar o servidor.",
+        error: errorMsg,
+        logId: null,
+        spreadsheetId: null,
+        lastSyncAt: null,
+      };
+    }
+
+    if (!data) {
+      return {
+        success: false,
+        status: "erro_interno",
+        rowsTotal: 0,
+        rowsImported: 0,
+        rowsSkipped: 0,
+        error: "Resposta inválida do servidor.",
         logId: null,
         spreadsheetId: null,
         lastSyncAt: null,

@@ -259,8 +259,7 @@ const DEFAULT_USER_CONFIG = {
   globalFinePct: 2.0,
   globalInterestDayPct: 0.33,
   selectedTone: "amigavel" as MessageTone,
-  sheetUrlInput:
-    "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKv196_0TBQI8Z-x7y8jGs8dRA5nFM/edit",
+  sheetUrlInput: "",
 };
 
 // (Gemini extraction API types removed — pipeline is now fully local)
