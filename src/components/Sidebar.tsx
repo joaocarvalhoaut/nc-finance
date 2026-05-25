@@ -148,11 +148,6 @@ export default function Sidebar({
             })}
 
             {/* Internal section label */}
-            {isLoggedIn && isExpanded && (
-              <p className="text-[9px] uppercase tracking-widest text-zinc-600 px-3 pt-1 font-mono select-none">
-                Pipeline operacional
-              </p>
-            )}
           </nav>
         </div>
 
