@@ -118,7 +118,7 @@ const mapDebtorToRow = (userId: string, debtor: Debtor) => ({
   user_id: userId,
   client_name: debtor.client,
   supplier_name: debtor.supplier,
-  document_number: debtor.document,
+  document_number: debtor.document?.trim() || null,
   due_date: normalizeDateToStorage(debtor.dueDate),
   amount: Number(debtor.value || 0),
   phone: debtor.phone || null,
