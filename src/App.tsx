@@ -239,8 +239,6 @@ export default function App() {
   // Z-API connection status
   const [zapiStatus, setZapiStatus] = useState<GatewayStatus | null>(null);
   const [isCheckingZapi, setIsCheckingZapi] = useState(false);
-  const [zapiQRCode, setZapiQRCode] = useState<string | null>(null);
-  const [isLoadingQR, setIsLoadingQR] = useState(false);
 
   // Batch WhatsApp send state
   const [selectedDebtorIds, setSelectedDebtorIds] = useState<Set<string>>(new Set());
@@ -635,28 +633,11 @@ export default function App() {
   // Z-API: verifica status de conexão real
   const handleCheckZapiStatus = async () => {
     setIsCheckingZapi(true);
-    setZapiQRCode(null);
     try {
       const result = await whatsappGatewayService.validateConnection();
       setZapiStatus(result);
     } finally {
       setIsCheckingZapi(false);
-    }
-  };
-
-  // Z-API: obtém QR code para reconexão
-  const handleGetZapiQR = async () => {
-    setIsLoadingQR(true);
-    setZapiQRCode(null);
-    try {
-      const result = await whatsappGatewayService.getQRCode();
-      if (result.ok && result.qrCode) {
-        setZapiQRCode(result.qrCode);
-      } else {
-        setZapiQRCode(null);
-      }
-    } finally {
-      setIsLoadingQR(false);
     }
   };
 
@@ -2969,9 +2950,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                             ? "Status não verificado"
                             : zapiStatus.connected
                               ? `Conectado${zapiStatus.phone_number_masked ? ` · ${zapiStatus.phone_number_masked}` : ""}`
-                              : zapiStatus.connected_pending_phone
-                                ? "Aguardando QR Code"
-                                : "Desconectado — reconexão necessária"
+                              : "Desconectado — verifique o painel Z-API"
                           }
                         </div>
                         <div className="flex gap-2">
@@ -2986,31 +2965,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                               : "⟳ Verificar Conexão"
                             }
                           </button>
-                          {(zapiStatus && !zapiStatus.connected) && (
-                            <button
-                              type="button"
-                              onClick={() => void handleGetZapiQR()}
-                              disabled={isLoadingQR}
-                              className="flex-1 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer border border-amber-500/20"
-                            >
-                              {isLoadingQR
-                                ? <><span className="w-2.5 h-2.5 rounded-full border border-amber-300 border-t-transparent animate-spin" /> Gerando QR...</>
-                                : "📱 Exibir QR Code"
-                              }
-                            </button>
-                          )}
                         </div>
-                        {zapiQRCode && (
-                          <div className="bg-white rounded-xl p-3 flex flex-col items-center gap-2">
-                            <p className="text-[10px] text-zinc-700 font-bold text-center">Abra o WhatsApp → Aparelhos conectados → Conectar aparelho</p>
-                            <img
-                              src={zapiQRCode.startsWith("data:") ? zapiQRCode : `data:image/png;base64,${zapiQRCode}`}
-                              alt="QR Code WhatsApp"
-                              className="w-40 h-40 object-contain"
-                            />
-                            <p className="text-[9px] text-zinc-500 text-center">Após escanear, clique em "Verificar Conexão" acima.</p>
-                          </div>
-                        )}
                       </div>
                     </div>
 
