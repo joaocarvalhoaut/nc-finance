@@ -60,7 +60,7 @@ export interface RecordCandidate {
 
 function score(r: RecordCandidate): number {
   let s = 0;
-  if (r.client && r.client.length >= 3) s += 30;
+  if ((r.client && r.client.length >= 3) || (r.supplier && r.supplier.length >= 3)) s += 30;
   if (r.document) s += 25;
   if (r.dueDate) s += 25;
   if (r.value != null && r.value >= 0) s += 20;

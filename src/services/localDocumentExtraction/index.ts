@@ -51,8 +51,9 @@ function candidateToRecord(
   c: RecordCandidate,
   idx: number,
 ): { record: LocalRecord; usedPlaceholder: boolean } | null {
-  // Only discard if there's truly no client name — everything else gets a fallback
-  if (!c.client) return null;
+  // Precisa ter ao menos cliente ou fornecedor para ser um registro válido
+  const clientName = c.client || c.supplier || null;
+  if (!clientName) return null;
 
   // If no document number was found, generate a stable placeholder
   const rawDoc = c.document?.trim();
@@ -65,7 +66,7 @@ function candidateToRecord(
 
   return {
     record: {
-      client: c.client.trim().slice(0, 120),
+      client: clientName.trim().slice(0, 120),
       supplier: (c.supplier ?? "").trim().slice(0, 120),
       document,
       dueDate,
