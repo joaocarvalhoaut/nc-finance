@@ -34,6 +34,16 @@ const formatDate = (value: string | null | undefined) => {
   return new Date(value).toLocaleDateString("pt-BR");
 };
 
+const STATUS_PT: Record<string, string> = {
+  trialing:    "Em avaliação",
+  active:      "Ativa",
+  past_due:    "Pagamento pendente",
+  canceled:    "Cancelada",
+  unpaid:      "Inadimplente",
+  incomplete:  "Incompleta",
+  not_started: "Não iniciada",
+};
+
 export default function SubscriptionGate({
   email,
   loading,
@@ -98,7 +108,7 @@ export default function SubscriptionGate({
                 <div className="mt-4 space-y-1 text-xs">
                   <div>
                     Status:{" "}
-                    <span className="font-semibold text-white">{subscription.status}</span>
+                    <span className="font-semibold text-white">{STATUS_PT[subscription.status] ?? subscription.status}</span>
                   </div>
                   <div>
                     Plano:{" "}

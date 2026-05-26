@@ -126,7 +126,22 @@ export default function LandingPage({
 
       setIsAuthSuccess(true);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Nao foi possivel autenticar agora.";
+      const raw = error instanceof Error ? error.message : "";
+      let message = "Não foi possível autenticar. Tente novamente.";
+      if (raw.includes("Invalid login credentials"))
+        message = "E-mail ou senha incorretos. Verifique seus dados e tente novamente.";
+      else if (raw.includes("Email not confirmed"))
+        message = "E-mail não confirmado. Verifique sua caixa de entrada e clique no link de confirmação.";
+      else if (raw.includes("User already registered") || raw.includes("already been registered"))
+        message = "Este e-mail já está cadastrado. Faça login ou redefina sua senha.";
+      else if (raw.includes("Password should be") || raw.includes("password"))
+        message = "A senha deve ter no mínimo 6 caracteres.";
+      else if (raw.includes("Unable to validate") || raw.includes("session"))
+        message = "Sessão expirada. Faça login novamente.";
+      else if (raw.includes("rate limit") || raw.includes("too many"))
+        message = "Muitas tentativas seguidas. Aguarde alguns minutos e tente novamente.";
+      else if (raw.includes("network") || raw.includes("fetch"))
+        message = "Erro de conexão. Verifique sua internet e tente novamente.";
       setIsAuthSuccess(false);
       setAuthError(message);
     }

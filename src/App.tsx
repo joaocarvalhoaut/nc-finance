@@ -3172,10 +3172,14 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                               {billingLogs.map((log) => (
                                 <React.Fragment key={log.id}>
                                   <tr className="hover:bg-zinc-900/25 transition-colors">
-                                    <td className="px-5 py-4 font-mono text-zinc-500 text-[11px]">{log.dateSent}</td>
+                                    <td className="px-5 py-4 font-mono text-zinc-500 text-[11px]">
+                                      {log.dateSent
+                                        ? new Date(log.dateSent).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })
+                                        : "—"}
+                                    </td>
                                     <td className="px-5 py-4">
                                       <div className="font-bold text-white text-xs">{log.client}</div>
-                                      <div className="text-[10px] text-zinc-500 font-mono">D: {log.document} ? T?l: {log.phone}</div>
+                                      <div className="text-[10px] text-zinc-500 font-mono">Doc: {log.document} · Tel: {log.phone}</div>
                                     </td>
                                     <td className="px-5 py-4">
                                       <div className="flex items-center gap-2">
@@ -3193,7 +3197,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                                     <td className="px-5 py-4 text-center">
                                       {(log.status === "sucesso" || log.status === "sent") ? (
                                         <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded font-mono font-semibold">
-                                          ? Sucesso
+                                          ✓ Sucesso
                                         </span>
                                       ) : log.status === "bloqueado_limite" ? (
                                         <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded font-mono font-semibold">
@@ -3213,7 +3217,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                                         </span>
                                       ) : (
                                         <span className="inline-flex items-center gap-1 text-[10px] text-rose-400 bg-rose-400/10 px-2 py-0.5 rounded font-mono font-semibold">
-                                          ? Erro
+                                          ✗ Erro
                                         </span>
                                       )}
                                     </td>

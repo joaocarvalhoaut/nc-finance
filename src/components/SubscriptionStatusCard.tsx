@@ -16,6 +16,16 @@ const formatDate = (value: string | null | undefined) => {
   return new Date(value).toLocaleDateString("pt-BR");
 };
 
+const STATUS_PT: Record<string, string> = {
+  trialing:    "Em avaliação",
+  active:      "Ativa",
+  past_due:    "Pagamento pendente",
+  canceled:    "Cancelada",
+  unpaid:      "Inadimplente",
+  incomplete:  "Incompleta",
+  not_started: "Não iniciada",
+};
+
 export default function SubscriptionStatusCard({
   subscription,
   usage,
@@ -34,7 +44,7 @@ export default function SubscriptionStatusCard({
           </div>
           <h3 className="text-lg font-black text-white">{plan.name}</h3>
           <p className="text-sm text-zinc-400">
-            Status: <span className="font-semibold text-white">{subscription?.status || "not_started"}</span>
+            Status: <span className="font-semibold text-white">{STATUS_PT[subscription?.status || "not_started"] ?? subscription?.status}</span>
             {subscription?.cancelAtPeriodEnd && (
               <span className="ml-2 text-amber-300">• cancelamento no fim do período</span>
             )}

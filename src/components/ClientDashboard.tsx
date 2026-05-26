@@ -185,7 +185,7 @@ export default function ClientDashboard({
       const logs = await billingLogsService.listByUser(userId);
       const count = logs.filter(l => {
         const d = l.dateSent?.slice(0, 10) ?? "";
-        return d === today && l.status === "sent";
+        return d === today && (l.status === "sent" || l.status === "sucesso");
       }).length;
       setSentToday(count);
     } catch {
