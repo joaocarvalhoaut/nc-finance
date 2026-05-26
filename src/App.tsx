@@ -22,6 +22,7 @@ import { metricsService, type OperationalMetrics } from "./services/metricsServi
 import { parseImportFile } from "./utils/importFileParser";
 import { extractDocumentLocally, type LocalExtractionResult } from "./services/localDocumentExtraction";
 import { exportRelatorio } from "./services/exportRelatorio";
+import Suporte from "./components/Suporte";
 import { 
   Debtor, 
   Representative, 
@@ -188,6 +189,7 @@ export default function App() {
   const [isSubscriptionActionLoading, setIsSubscriptionActionLoading] = useState(false);
   const [currentTab, setCurrentTab] = useState<string>("inicio"); // Defaults to apresentacao so user can read landing page
   const isLoggedIn = Boolean(session);
+  const [showSuporte, setShowSuporte] = useState(false);
   const [subscriptionGateError, setSubscriptionGateError] = useState("");
 
   // Temporary seed data is now persisted by user_id on first authenticated access.
@@ -1306,6 +1308,7 @@ export default function App() {
             onLoginClick={() => {
               setCurrentTab("dashboard");
             }}
+            onSupportClick={() => setShowSuporte(true)}
             userLabel={account?.displayName || "Conta autenticada"}
             userEmail={account?.email || user?.email || ""}
           />
@@ -3672,6 +3675,8 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
             </footer>
 
           </main>
+
+          {showSuporte && <Suporte onClose={() => setShowSuporte(false)} />}
         </>
       )}
     </div>

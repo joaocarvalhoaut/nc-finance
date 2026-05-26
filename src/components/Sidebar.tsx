@@ -10,6 +10,7 @@ import {
   Eye,
   MessageSquare,
   Zap,
+  HelpCircle,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -18,6 +19,7 @@ interface SidebarProps {
   isLoggedIn: boolean;
   onLogout: () => void;
   onLoginClick: () => void;
+  onSupportClick?: () => void;
   userLabel?: string;
   userEmail?: string;
 }
@@ -28,6 +30,7 @@ export default function Sidebar({
   isLoggedIn,
   onLogout,
   onLoginClick,
+  onSupportClick,
   userLabel = "Conta autenticada",
   userEmail = ""
 }: SidebarProps) {
@@ -151,6 +154,25 @@ export default function Sidebar({
                   {userEmail ? <span className="text-zinc-400 font-mono block truncate">{userEmail}</span> : null}
                 </div>
               )}
+              <button
+                onClick={onSupportClick}
+                className={`w-full flex items-center rounded-lg text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all truncate cursor-pointer group relative
+                  ${isExpanded ? "justify-start gap-3.5 p-2" : "justify-center p-2"}
+                `}
+              >
+                <HelpCircle className="w-4 h-4 flex-shrink-0" />
+                {isExpanded && (
+                  <span className="text-xs opacity-100 transition-opacity duration-200">
+                    Suporte
+                  </span>
+                )}
+                {!isExpanded && (
+                  <div className="absolute left-full ml-3 px-2 py-1 bg-black border border-emerald-500/30 text-emerald-400 text-xs rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap shadow-xl">
+                    Suporte
+                  </div>
+                )}
+              </button>
+
               <button
                 onClick={onLogout}
                 className={`w-full flex items-center rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-all truncate cursor-pointer
