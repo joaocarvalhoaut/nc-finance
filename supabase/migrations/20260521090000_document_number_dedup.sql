@@ -4,19 +4,36 @@
 -- Purpose:
 --   Add a unique constraint on (user_id, document_number) so that
 --   financeService.createMany can use upsert and avoid duplicate
---   records when the same file is imported more than once via the
---   local PDF/Excel import flow.
+--   records when the same file is imported more than once.
 --
---   Note: document_number can be empty string (records without a
---   document). The constraint uses a partial index so that only
---   rows with a non-empty document_number are deduplicated.
---   Records without a document_number continue to allow duplicates
---   (the Google Sheets importer falls back to phone+name matching).
+--   Step 1: Remove existing duplicates — keep the most recently
+--           updated row per (user_id, document_number) pair.
+--   Step 2: Create the partial unique index on the clean data.
 -- ============================================================
 
--- ── 1. Partial unique index on (user_id, document_number) ────────────────────
---   Covers only rows where document_number is non-empty.
---   Idempotent: IF NOT EXISTS prevents failure on re-run.
+-- ── 1. Deduplicar registros existentes ───────────────────────────────────────
+--   Para cada (user_id, document_number) com múltiplos registros,
+--   mantém apenas o mais recente (updated_at DESC, id DESC como desempate).
+
+DELETE FROM public.user_registros_financeiros
+WHERE id IN (
+  SELECT id FROM (
+    SELECT
+      id,
+      ROW_NUMBER() OVER (
+        PARTITION BY user_id, document_number
+        ORDER BY updated_at DESC, id DESC
+      ) AS rn
+    FROM public.user_registros_financeiros
+    WHERE document_number IS NOT NULL
+      AND document_number <> ''
+  ) ranked
+  WHERE rn > 1
+);
+
+-- ── 2. Índice único parcial em (user_id, document_number) ────────────────────
+--   Cobre apenas linhas com document_number não-vazio.
+--   Idempotente: IF NOT EXISTS evita falha em re-execução.
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_urf_user_document_unique
   ON public.user_registros_financeiros (user_id, document_number)
@@ -24,18 +41,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_urf_user_document_unique
     AND document_number <> '';
 
 COMMENT ON INDEX idx_urf_user_document_unique IS
-  'Prevents duplicate records per user+document_number. Rows without a document_number are excluded (matched by phone+name instead).';
+  'Prevents duplicate records per user+document_number. Rows without document_number are excluded (matched by phone+name instead).';
 
--- ── 2. pg_cron setup (execute manually after enabling extension) ──────────────
+-- ── 3. pg_cron setup (execução manual necessária) ────────────────────────────
 --
--- Pre-requisites (run once in Supabase Dashboard → Database → Extensions):
---   Enable: pg_cron
---   Enable: pg_net   (required for net.http_post)
+-- Pré-requisitos (Supabase Dashboard → Database → Extensions):
+--   Habilitar: pg_cron
+--   Habilitar: pg_net  (necessário para net.http_post)
 --
--- Then run in SQL Editor (replace <PROJECT_REF> and <AUTOMATION_CRON_SECRET>):
---
--- SELECT cron.unschedule('nc-finance-scheduler')  ON CONFLICT DO NOTHING;
--- SELECT cron.unschedule('nc-finance-worker')     ON CONFLICT DO NOTHING;
+-- Depois executar no SQL Editor (substituir <AUTOMATION_CRON_SECRET>):
 --
 -- SELECT cron.schedule(
 --   'nc-finance-scheduler',
@@ -57,4 +71,4 @@ COMMENT ON INDEX idx_urf_user_document_unique IS
 --   )$$
 -- );
 --
--- Verify: SELECT jobid, schedule, command, active FROM cron.job;
+-- Verificar: SELECT jobid, schedule, command, active FROM cron.job;
