@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import TermosDeUso from "./TermosDeUso";
+import PoliticaPrivacidade from "./PoliticaPrivacidade";
 import { motion } from "motion/react";
 import {
   CheckCircle2,
@@ -40,6 +42,8 @@ export default function LandingPage({
   const [authError, setAuthError] = useState("");
   const [authInfo, setAuthInfo] = useState("");
   const [isAuthSuccess, setIsAuthSuccess] = useState(false);
+  const [showTermos, setShowTermos] = useState(false);
+  const [showPrivacidade, setShowPrivacidade] = useState(false);
 
   // Live Phone billing demo simulation state
   const [demoPhoneName, setDemoPhoneName] = useState("Carlos Eduardo");
@@ -877,13 +881,16 @@ export default function LandingPage({
           <div className="flex flex-col sm:flex-row items-center justify-between pt-8 gap-4 text-[10px]">
             <span>© 2026 NC Finance S/A. Todos os direitos reservados. CNPJ 12.345.678/0001-99</span>
             <div className="flex gap-4">
-              <span className="hover:text-emerald-400 cursor-pointer">Termos de Uso</span>
-              <span className="hover:text-emerald-400 cursor-pointer">Segurança de Dados</span>
+              <span className="hover:text-emerald-400 cursor-pointer" onClick={() => setShowTermos(true)}>Termos de Uso</span>
+              <span className="hover:text-emerald-400 cursor-pointer" onClick={() => setShowPrivacidade(true)}>Privacidade e Dados</span>
               <span className="hover:text-emerald-400 cursor-pointer font-mono">v1.1.0-Release</span>
             </div>
           </div>
         </div>
       </footer>
+
+      {showTermos && <TermosDeUso onClose={() => setShowTermos(false)} />}
+      {showPrivacidade && <PoliticaPrivacidade onClose={() => setShowPrivacidade(false)} />}
     </div>
   );
 }
