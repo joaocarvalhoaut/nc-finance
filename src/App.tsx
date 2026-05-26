@@ -17,6 +17,7 @@ import { googleSheetsService, type ImportResult as SheetsImportResult } from "./
 import { googleDriveService, DRIVE_STATUS_LABELS, type DriveMatchResult, type DriveMatchStatus } from "./services/googleDriveService";
 import { driveFolderService, type DriveFolderStatus } from "./services/driveMatching/driveFolderService";
 import { whatsappBatchService, BATCH_TOP_STATUS_LABELS, type BatchChargeResult, type BatchTopStatus } from "./services/whatsappBatchService";
+import { whatsappGatewayService, type GatewayStatus } from "./services/whatsappGatewayService";
 import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type AutomationRule, type AutomationRun, type AutomationRuleCreate } from "./services/automationService";
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
 import { parseImportFile } from "./utils/importFileParser";
@@ -234,6 +235,12 @@ export default function App() {
   const [isDriveSaving, setIsDriveSaving] = useState<boolean>(false);
   const [driveSaveMsg, setDriveSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [driveFolderStatus, setDriveFolderStatus] = useState<DriveFolderStatus | null>(null);
+
+  // Z-API connection status
+  const [zapiStatus, setZapiStatus] = useState<GatewayStatus | null>(null);
+  const [isCheckingZapi, setIsCheckingZapi] = useState(false);
+  const [zapiQRCode, setZapiQRCode] = useState<string | null>(null);
+  const [isLoadingQR, setIsLoadingQR] = useState(false);
 
   // Batch WhatsApp send state
   const [selectedDebtorIds, setSelectedDebtorIds] = useState<Set<string>>(new Set());
@@ -625,6 +632,34 @@ export default function App() {
     setDriveFolderStatus(status);
   };
 
+  // Z-API: verifica status de conexão real
+  const handleCheckZapiStatus = async () => {
+    setIsCheckingZapi(true);
+    setZapiQRCode(null);
+    try {
+      const result = await whatsappGatewayService.validateConnection();
+      setZapiStatus(result);
+    } finally {
+      setIsCheckingZapi(false);
+    }
+  };
+
+  // Z-API: obtém QR code para reconexão
+  const handleGetZapiQR = async () => {
+    setIsLoadingQR(true);
+    setZapiQRCode(null);
+    try {
+      const result = await whatsappGatewayService.getQRCode();
+      if (result.ok && result.qrCode) {
+        setZapiQRCode(result.qrCode);
+      } else {
+        setZapiQRCode(null);
+      }
+    } finally {
+      setIsLoadingQR(false);
+    }
+  };
+
   // Envio em lote de cobranças — liquidados são bloqueados
   const handleBatchSend = async () => {
     if (selectedDebtorIds.size === 0 || isBatchSending) return;
@@ -697,8 +732,10 @@ export default function App() {
   }, [currentTab, isLoggedIn]);
 
   useEffect(() => {
-    if (currentTab === "cobranca" && isLoggedIn && !driveFolderStatus) {
-      void loadDriveFolderStatus();
+    if (currentTab === "cobranca" && isLoggedIn) {
+      if (!driveFolderStatus) void loadDriveFolderStatus();
+      // Auto-check Z-API status when entering the tab
+      if (!zapiStatus && !isCheckingZapi) void handleCheckZapiStatus();
     }
   }, [currentTab, isLoggedIn]);
 
@@ -1196,10 +1233,10 @@ export default function App() {
         });
       } else {
         // Mapeia status para mensagem legível ao usuário
-        const friendlyText =
-          SEND_STATUS_LABELS[result.status as SendChargeStatus] ??
-          result.error ??
-          "Falha ao enviar cobrança.";
+        const baseLabel = SEND_STATUS_LABELS[result.status as SendChargeStatus];
+        const friendlyText = result.status === "erro" && result.error
+          ? `${baseLabel} Detalhe: ${result.error}`
+          : baseLabel ?? result.error ?? "Falha ao enviar cobrança.";
 
         setMessageFeedback({ success: false, text: friendlyText });
 
@@ -2913,8 +2950,67 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                         )}
                       </div>
 
-                      <div className="p-2.5 rounded-lg bg-emerald-500/10 text-[10px] text-emerald-400 text-center font-bold mt-2">
-                        Canal de envio WhatsApp Z-API centralizado: Conectado
+                      {/* Z-API live connection status */}
+                      <div className="space-y-2 mt-2">
+                        <div className={`p-2.5 rounded-lg text-[10px] text-center font-bold flex items-center justify-center gap-2
+                          ${zapiStatus === null
+                            ? "bg-zinc-800/60 text-zinc-400"
+                            : zapiStatus.connected
+                              ? "bg-emerald-500/10 text-emerald-400"
+                              : "bg-rose-500/10 text-rose-400"
+                          }
+                        `}>
+                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                            zapiStatus === null ? "bg-zinc-500" :
+                            zapiStatus.connected ? "bg-emerald-400 animate-pulse" : "bg-rose-400"
+                          }`} />
+                          Canal WhatsApp Z-API:{" "}
+                          {zapiStatus === null
+                            ? "Status não verificado"
+                            : zapiStatus.connected
+                              ? `Conectado${zapiStatus.phone_number_masked ? ` · ${zapiStatus.phone_number_masked}` : ""}`
+                              : zapiStatus.connected_pending_phone
+                                ? "Aguardando QR Code"
+                                : "Desconectado — reconexão necessária"
+                          }
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void handleCheckZapiStatus()}
+                            disabled={isCheckingZapi}
+                            className="flex-1 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                          >
+                            {isCheckingZapi
+                              ? <><span className="w-2.5 h-2.5 rounded-full border border-zinc-300 border-t-transparent animate-spin" /> Verificando...</>
+                              : "⟳ Verificar Conexão"
+                            }
+                          </button>
+                          {(zapiStatus && !zapiStatus.connected) && (
+                            <button
+                              type="button"
+                              onClick={() => void handleGetZapiQR()}
+                              disabled={isLoadingQR}
+                              className="flex-1 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer border border-amber-500/20"
+                            >
+                              {isLoadingQR
+                                ? <><span className="w-2.5 h-2.5 rounded-full border border-amber-300 border-t-transparent animate-spin" /> Gerando QR...</>
+                                : "📱 Exibir QR Code"
+                              }
+                            </button>
+                          )}
+                        </div>
+                        {zapiQRCode && (
+                          <div className="bg-white rounded-xl p-3 flex flex-col items-center gap-2">
+                            <p className="text-[10px] text-zinc-700 font-bold text-center">Abra o WhatsApp → Aparelhos conectados → Conectar aparelho</p>
+                            <img
+                              src={zapiQRCode.startsWith("data:") ? zapiQRCode : `data:image/png;base64,${zapiQRCode}`}
+                              alt="QR Code WhatsApp"
+                              className="w-40 h-40 object-contain"
+                            />
+                            <p className="text-[9px] text-zinc-500 text-center">Após escanear, clique em "Verificar Conexão" acima.</p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
