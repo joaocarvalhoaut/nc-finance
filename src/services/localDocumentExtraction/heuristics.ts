@@ -63,7 +63,7 @@ function score(r: RecordCandidate): number {
   if (r.client && r.client.length >= 3) s += 30;
   if (r.document) s += 25;
   if (r.dueDate) s += 25;
-  if (r.value && r.value > 0) s += 20;
+  if (r.value != null && r.value >= 0) s += 20;
   return s;
 }
 
@@ -206,7 +206,7 @@ export function parseErpFormat(text: string): RecordCandidate[] {
     };
     record.confidenceScore = score(record);
 
-    if (record.confidenceScore >= 50) records.push(record);
+    if (record.confidenceScore >= 30) records.push(record);
   }
 
   return records;
@@ -252,7 +252,7 @@ export function parseLineByLine(text: string): RecordCandidate[] {
       extractionMethod: "line-by-line",
     };
     record.confidenceScore = score(record);
-    if (record.confidenceScore >= 50) records.push(record);
+    if (record.confidenceScore >= 30) records.push(record);
   }
 
   return records;

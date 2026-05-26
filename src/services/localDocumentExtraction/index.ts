@@ -51,7 +51,7 @@ function candidateToRecord(
   c: RecordCandidate,
   idx: number,
 ): { record: LocalRecord; usedPlaceholder: boolean } | null {
-  if (!c.client || !c.dueDate || !c.value || c.value <= 0) return null;
+  if (!c.client || !c.dueDate || c.value == null || c.value < 0) return null;
 
   // If no document number was found, generate a stable placeholder
   const rawDoc = c.document?.trim();

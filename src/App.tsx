@@ -1949,7 +1949,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                           </div>
                         ) : (
                           <div className="space-y-3">
-                            <span className="text-xs font-mono font-bold text-emerald-400 block">? {extractedDebtors.length} Registros Prontos para Revis?o:</span>
+                            <span className="text-xs font-mono font-bold text-emerald-400 block">✓ {extractedDebtors.length} Registros Prontos para Revisão:</span>
                             
                             {extractedDebtors.map((item, index) => (
                               <div key={item.id} className="p-3 bg-zinc-950 border border-zinc-850 rounded-xl space-y-2 relative group">
