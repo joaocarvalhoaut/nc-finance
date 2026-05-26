@@ -174,25 +174,57 @@ export const financeService = {
     if (!debtors.length) return [];
 
     const supabase = getSupabaseClient();
-    const payload = debtors.map((debtor) => {
-      const row = mapDebtorToRow(userId, debtor);
-      if (debtor.representativeId && !row.representative_id) {
-        console.warn("[finance.write] representativeId invalido ignorado", debtor.representativeId);
-      }
-      delete row.id;
-      return row;
-    });
 
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .insert(payload)
-      .select(SELECT_FIELDS);
+    // Separar registros com document_number (upsert seguro) dos sem (insert simples)
+    const withDoc   = debtors.filter(d => d.document?.trim());
+    const withoutDoc = debtors.filter(d => !d.document?.trim());
 
-    if (error) {
-      throw new Error(error.message || "Falha ao criar lote de registros financeiros.");
+    const results: FinancialRecordRow[] = [];
+
+    // Upsert por (user_id, document_number) — evita duplicatas em reimportações
+    if (withDoc.length) {
+      const payloadWithDoc = withDoc.map((debtor) => {
+        const row = mapDebtorToRow(userId, debtor);
+        if (debtor.representativeId && !row.representative_id) {
+          console.warn("[finance.write] representativeId invalido ignorado");
+        }
+        delete row.id;
+        return row;
+      });
+
+      const { data, error } = await supabase
+        .from(TABLE_NAME)
+        .upsert(payloadWithDoc, {
+          onConflict: "user_id,document_number",
+          ignoreDuplicates: false,   // atualiza se já existir
+        })
+        .select(SELECT_FIELDS);
+
+      if (error) throw new Error(error.message || "Falha ao salvar registros com documento.");
+      results.push(...((data || []) as FinancialRecordRow[]));
     }
 
-    return (data || []).map((row) => mapRowToDebtor(row as FinancialRecordRow));
+    // Insert simples para registros sem document_number (não há como deduplicar)
+    if (withoutDoc.length) {
+      const payloadWithout = withoutDoc.map((debtor) => {
+        const row = mapDebtorToRow(userId, debtor);
+        if (debtor.representativeId && !row.representative_id) {
+          console.warn("[finance.write] representativeId invalido ignorado");
+        }
+        delete row.id;
+        return row;
+      });
+
+      const { data, error } = await supabase
+        .from(TABLE_NAME)
+        .insert(payloadWithout)
+        .select(SELECT_FIELDS);
+
+      if (error) throw new Error(error.message || "Falha ao criar registros sem documento.");
+      results.push(...((data || []) as FinancialRecordRow[]));
+    }
+
+    return results.map(mapRowToDebtor);
   },
 
   async update(userId: string, debtor: Debtor) {

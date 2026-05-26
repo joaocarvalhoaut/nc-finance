@@ -110,13 +110,9 @@ const upsertSubscriptionFromStripe = async (params: {
   logWebhook({
     source: "stripe-webhook.upsert.before",
     user_id: params.userId,
-    subscription_id: params.stripeSubscriptionId,
-    customer_id: params.stripeCustomerId,
     plan: params.plan,
     status: params.status,
-    trial_start: params.trialStart,
-    trial_end: params.trialEnd,
-    payload,
+    // subscription_id, customer_id, trial_* e payload completo omitidos dos logs (PII financeiro)
   });
 
   try {
@@ -133,18 +129,12 @@ const upsertSubscriptionFromStripe = async (params: {
     logWebhook({
       source: "stripe-webhook.upsert.after",
       user_id: params.userId,
-      subscription_id: params.stripeSubscriptionId,
-      data,
+      plan: params.plan,
+      status: params.status,
+      persisted_status: (finalRow as Record<string, unknown> | null)?.status ?? null,
       count,
-      final_row: finalRow,
-      error: error
-        ? {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code,
-          }
-        : null,
+      error: error ? { message: error.message, code: error.code } : null,
+      // data, final_row e subscription_id omitidos dos logs (PII financeiro)
     });
 
     if (error) {

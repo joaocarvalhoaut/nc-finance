@@ -70,8 +70,8 @@ export const getUsageSnapshot = async (
 // ─── Increment ────────────────────────────────────────────────────────────────
 
 /**
- * Incrementa charges_sent pelo delta informado.
- * Usa upsert para criar o registro do período se ainda não existir.
+ * Incrementa charges_sent de forma atômica via RPC SQL.
+ * Evita race condition em envios simultâneos (read-then-write eliminado).
  * Deve ser chamado uma vez ao final do lote, com o total de sucessos.
  */
 export const incrementChargesSent = async (
@@ -82,15 +82,25 @@ export const incrementChargesSent = async (
 ): Promise<void> => {
   if (delta <= 0) return;
 
-  await admin.from("user_usage_counters").upsert(
-    {
-      user_id:        userId,
-      period:         snapshot.period,
-      charges_sent:   snapshot.chargesUsed + delta,
-      sheets_imports: snapshot.sheetsImports,
-      drive_lookups:  snapshot.driveLookups,
-      updated_at:     new Date().toISOString(),
-    },
-    { onConflict: "user_id,period" },
-  );
+  const { error } = await admin.rpc("increment_charges_sent", {
+    p_user_id: userId,
+    p_period:  snapshot.period,
+    p_delta:   delta,
+  });
+
+  if (error) {
+    // Fallback: upsert direto caso a RPC não exista ainda (pré-migration)
+    console.error("[usageGuard] increment_charges_sent RPC error, falling back:", error.message);
+    await admin.from("user_usage_counters").upsert(
+      {
+        user_id:        userId,
+        period:         snapshot.period,
+        charges_sent:   snapshot.chargesUsed + delta,
+        sheets_imports: snapshot.sheetsImports,
+        drive_lookups:  snapshot.driveLookups,
+        updated_at:     new Date().toISOString(),
+      },
+      { onConflict: "user_id,period" },
+    );
+  }
 };

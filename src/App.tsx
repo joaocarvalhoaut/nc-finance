@@ -147,114 +147,7 @@ Atenciosamente, departamento administrativo NC Finance.`
   }
 ];
 
-// Seed initial devedores matching the Portuguese financial context
-const INITIAL_DEBTORS: Debtor[] = [
-  {
-    id: "d1",
-    client: "Carlos Eduardo Neves",
-    supplier: "NC Empreendimentos",
-    document: "4241-2",
-    dueDate: "11/03/2026",
-    value: 2248.60,
-    phone: "5577999887720",
-    category: "vencidos",
-    interestApplied: 2,
-    fineApplied: 1,
-    notes: "Aguardando retorno do e-mail do financeiro",
-    status: "pending"
-  },
-  {
-    id: "d2",
-    client: "Mariana Silva Bastos",
-    supplier: "NC Telecom S/A",
-    document: "8891-B",
-    dueDate: "25/08/2026",
-    value: 540.00,
-    phone: "5577999112233",
-    category: "a_vencer",
-    interestApplied: 0,
-    fineApplied: 0,
-    notes: "Cliente solicitou envio preventivo amigável",
-    status: "pending"
-  },
-  {
-    id: "d3",
-    client: "Julio César de Mello",
-    supplier: "NC Empreendimentos",
-    document: "2104-E",
-    dueDate: "10/05/2026",
-    value: 12500.00,
-    phone: "5511999445566",
-    category: "vencidos",
-    interestApplied: 2,
-    fineApplied: 1,
-    notes: "Acordo de parcelamento em andamento",
-    status: "pending"
-  },
-  {
-    id: "d4",
-    client: "Tech Solutions Ltda",
-    supplier: "NC Distribuidora",
-    document: "99120-X",
-    dueDate: "18/05/2026",
-    value: 3670.40,
-    phone: "5577988884422",
-    category: "liquidado",
-    interestApplied: 0,
-    fineApplied: 0,
-    notes: "Pago via PIX com comprovante anexado",
-    status: "sent"
-  }
-];
-
-// Seed initial representatives — no hardcoded IDs so each user gets fresh UUIDs
-const INITIAL_REPRESENTATIVES: Representative[] = [
-  { id: "", name: "Amanda Azevedo", phone: "5577999881111", role: "Coordenador de Cobrança", color: "text-emerald-400 bg-emerald-500/10" },
-  { id: "", name: "Bruno Pinheiro", phone: "5511988772233", role: "Gestor Contas Sul", color: "text-sky-400 bg-sky-500/10" },
-  { id: "", name: "Clara Vasconcelos", phone: "5521977663344", role: "Jurídico NC Finance", color: "text-amber-400 bg-amber-500/10" }
-];
-
-const INITIAL_BILLING_LOGS: BillingLog[] = [
-  {
-    id: "log-1",
-    client: "Construções Alvorada LTDA",
-    document: "12.345.678/0001-90",
-    phone: "5577999881122",
-    value: 14200.0,
-    dateSent: "20/05/2026, 09:00",
-    tone: "neutro",
-    message:
-      "Prezado gestor da Construções Alvorada LTDA, identificamos em nosso sistema um faturamento em aberto no valor de R$ 14.200,00 com vencimento em 08/05/2026. Solicitamos a regularização conforme boleto em anexo.\n\nCódigo de barras: 00190.00009 02748.294017 38491.104928 1 972600001420000",
-    status: "sent",
-    type: "auto"
-  },
-  {
-    id: "log-2",
-    client: "Supermercado Santos Eireli",
-    document: "98.765.432/0001-10",
-    phone: "5577988776655",
-    value: 6800.0,
-    dateSent: "19/05/2026, 09:02",
-    tone: "amigavel",
-    message:
-      "Olá equipe do Supermercado Santos, tudo bem? 😊 Passando para lembrar que a sua fatura de R$ 6.800,00 vence amanhã, 20/05/2026. O boleto correspondente foi localizado via integração de pastas NC no Google Drive e está disponível no link para download. Obrigado!",
-    status: "sent",
-    type: "auto"
-  },
-  {
-    id: "log-3",
-    client: "Consultório Dr. Marcos Toledo",
-    document: "94.814.731/0001-08",
-    phone: "5577991122334",
-    value: 2350.0,
-    dateSent: "18/05/2026, 14:35",
-    tone: "amigavel",
-    message:
-      "Olá Dr. Marcos, segue em anexo o arquivo referente à mensalidade de suporte financeiro NC no valor de R$ 2.350,00 com vencimento para o dia 25/05/2026. Tenha um excelente dia!",
-    status: "sent",
-    type: "manual"
-  }
-];
+// (dados de demonstração removidos — workspace inicia vazio em produção)
 
 const DEFAULT_USER_CONFIG = {
   globalFinePct: 2.0,
@@ -529,15 +422,10 @@ export default function App() {
           userConfigService.listMessageTemplates(currentOwnerUserId)
         ]);
 
-        const hydratedRecords = records.length
-          ? records
-          : await financeService.createMany(currentOwnerUserId, INITIAL_DEBTORS);
-        const hydratedRepresentatives = reps.length
-          ? reps
-          : await representativesService.createMany(currentOwnerUserId, INITIAL_REPRESENTATIVES);
-        const hydratedLogs = logs.length
-          ? logs
-          : await billingLogsService.createMany(currentOwnerUserId, INITIAL_BILLING_LOGS);
+        // Workspace inicia vazio — sem dados demo em produção
+        const hydratedRecords = records;
+        const hydratedRepresentatives = reps;
+        const hydratedLogs = logs;
         const hydratedConfig =
           config ||
           (await userConfigService.upsertConfig({
@@ -549,9 +437,9 @@ export default function App() {
             driveLinkedFolder: "",
             subscriptionStatus: "trialing",
             stripeCustomerId: null,
-            plan: "starter",
-            usageCounters: { imports: hydratedRecords.length, charges: hydratedLogs.length },
-            whatsappStatus: "mock_pending",
+            plan: "basic",   // plano válido — "starter" não existe em PLAN_LIMITS
+            usageCounters: { imports: 0, charges: 0 },
+            whatsappStatus: "not_configured",
             integrationProvider: null,
             lastConnectionCheck: null
           }));
@@ -3618,6 +3506,11 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                               }`}>
                                 {rule.enabled ? "ATIVA" : "PAUSADA"}
                               </span>
+                              {plan === "basic" && rule.enabled && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border bg-amber-500/10 border-amber-500/30 text-amber-400" title="Automações requerem plano Pro ou Premium. Esta regra não será executada.">
+                                  BLOQUEADA · upgrade necessário
+                                </span>
+                              )}
                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-400 font-mono">
                                 {RULE_TYPE_LABELS[rule.ruleType]}
                                 {rule.ruleType === "due_in_days" && rule.daysBefore != null && ` (${rule.daysBefore}d)`}

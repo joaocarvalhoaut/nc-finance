@@ -344,17 +344,12 @@ Deno.serve(async (request: Request) => {
         });
       }
 
-      await admin.from("user_usage_counters").upsert(
-        {
-          user_id: userId,
-          period,
-          charges_sent: chargesUsed + 1,
-          sheets_imports: Number(usageRow?.sheets_imports ?? 0),
-          drive_lookups: Number(usageRow?.drive_lookups ?? 0),
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id,period" },
-      );
+      // Incremento atômico via RPC — evita race condition em envios simultâneos
+      await admin.rpc("increment_charges_sent", {
+        p_user_id: userId,
+        p_period:  period,
+        p_delta:   1,
+      });
     }
 
     // ── 11. Retorno sanitizado (NUNCA devolve credenciais) ─────────────────────
