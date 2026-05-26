@@ -851,7 +851,7 @@ export default function LandingPage({
               <button
                 type="button"
                 onClick={() => {
-                  setAuthEmail("contato@ncfinance.co");
+                  setAuthEmail("contato@ncfinance.com.br");
                   setAuthPassword("ncfinance123");
                   setAuthName("Diretor NC");
                   setAuthError("");
@@ -881,7 +881,7 @@ export default function LandingPage({
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-between pt-8 gap-4 text-[10px]">
-            <span>© 2026 NC Finance S/A. Todos os direitos reservados. CNPJ 12.345.678/0001-99</span>
+            <span>© 2026 NC Finance Ltda. Todos os direitos reservados.</span>
             <div className="flex gap-4">
               <span className="hover:text-emerald-400 cursor-pointer" onClick={() => setShowTermos(true)}>Termos de Uso</span>
               <span className="hover:text-emerald-400 cursor-pointer" onClick={() => setShowPrivacidade(true)}>Privacidade e Dados</span>
