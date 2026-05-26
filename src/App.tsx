@@ -17,7 +17,6 @@ import { googleSheetsService, type ImportResult as SheetsImportResult } from "./
 import { googleDriveService, DRIVE_STATUS_LABELS, type DriveMatchResult, type DriveMatchStatus } from "./services/googleDriveService";
 import { driveFolderService, type DriveFolderStatus } from "./services/driveMatching/driveFolderService";
 import { whatsappBatchService, BATCH_TOP_STATUS_LABELS, type BatchChargeResult, type BatchTopStatus } from "./services/whatsappBatchService";
-import { whatsappGatewayService, type GatewayStatus } from "./services/whatsappGatewayService";
 import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type AutomationRule, type AutomationRun, type AutomationRuleCreate } from "./services/automationService";
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
 import { parseImportFile } from "./utils/importFileParser";
@@ -236,9 +235,6 @@ export default function App() {
   const [driveSaveMsg, setDriveSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [driveFolderStatus, setDriveFolderStatus] = useState<DriveFolderStatus | null>(null);
 
-  // Z-API connection status
-  const [zapiStatus, setZapiStatus] = useState<GatewayStatus | null>(null);
-  const [isCheckingZapi, setIsCheckingZapi] = useState(false);
 
   // Batch WhatsApp send state
   const [selectedDebtorIds, setSelectedDebtorIds] = useState<Set<string>>(new Set());
@@ -630,16 +626,6 @@ export default function App() {
     setDriveFolderStatus(status);
   };
 
-  // Z-API: verifica status de conexão real
-  const handleCheckZapiStatus = async () => {
-    setIsCheckingZapi(true);
-    try {
-      const result = await whatsappGatewayService.validateConnection();
-      setZapiStatus(result);
-    } finally {
-      setIsCheckingZapi(false);
-    }
-  };
 
   // Envio em lote de cobranças — liquidados são bloqueados
   const handleBatchSend = async () => {
@@ -713,10 +699,8 @@ export default function App() {
   }, [currentTab, isLoggedIn]);
 
   useEffect(() => {
-    if (currentTab === "cobranca" && isLoggedIn) {
-      if (!driveFolderStatus) void loadDriveFolderStatus();
-      // Auto-check Z-API status when entering the tab
-      if (!zapiStatus && !isCheckingZapi) void handleCheckZapiStatus();
+    if (currentTab === "cobranca" && isLoggedIn && !driveFolderStatus) {
+      void loadDriveFolderStatus();
     }
   }, [currentTab, isLoggedIn]);
 
@@ -2929,43 +2913,6 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                             </div>
                           </div>
                         )}
-                      </div>
-
-                      {/* Z-API live connection status */}
-                      <div className="space-y-2 mt-2">
-                        <div className={`p-2.5 rounded-lg text-[10px] text-center font-bold flex items-center justify-center gap-2
-                          ${zapiStatus === null
-                            ? "bg-zinc-800/60 text-zinc-400"
-                            : zapiStatus.connected
-                              ? "bg-emerald-500/10 text-emerald-400"
-                              : "bg-rose-500/10 text-rose-400"
-                          }
-                        `}>
-                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                            zapiStatus === null ? "bg-zinc-500" :
-                            zapiStatus.connected ? "bg-emerald-400 animate-pulse" : "bg-rose-400"
-                          }`} />
-                          Canal WhatsApp Z-API:{" "}
-                          {zapiStatus === null
-                            ? "Status não verificado"
-                            : zapiStatus.connected
-                              ? `Conectado${zapiStatus.phone_number_masked ? ` · ${zapiStatus.phone_number_masked}` : ""}`
-                              : "Desconectado — verifique o painel Z-API"
-                          }
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void handleCheckZapiStatus()}
-                            disabled={isCheckingZapi}
-                            className="flex-1 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                          >
-                            {isCheckingZapi
-                              ? <><span className="w-2.5 h-2.5 rounded-full border border-zinc-300 border-t-transparent animate-spin" /> Verificando...</>
-                              : "⟳ Verificar Conexão"
-                            }
-                          </button>
-                        </div>
                       </div>
                     </div>
 
