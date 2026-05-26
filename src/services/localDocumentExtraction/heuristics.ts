@@ -93,6 +93,23 @@ function cleanName(raw: string): string {
     .trim();
 }
 
+/**
+ * Extrai apenas o nome da empresa do texto antes do CNPJ.
+ * Remove tudo a partir do primeiro valor monetário, data, número de documento
+ * ou status — que são resíduos do registro anterior.
+ */
+function cleanSupplierName(raw: string): string {
+  // Trunca no primeiro sinal de dado financeiro (resíduo do registro anterior)
+  const noiseRe = /R\$|[\d]{2}\/[\d]{2}\/[\d]{4}|[\d]{2}\/[\d]{2}\/[\d]{2}|\bAberto\b|\bPago\b|\bLiquidado\b|\bFechado\b|\bAberta\b/i;
+  const noiseMatch = raw.search(noiseRe);
+  const trimmed = noiseMatch > 0 ? raw.slice(0, noiseMatch) : raw;
+
+  // Remove tokens que parecem número de documento (ex: 1244/002, CH01-3)
+  const withoutDocNums = trimmed.replace(/\b[A-Z]{0,4}\d[\w/-]{1,20}\b/gi, " ");
+
+  return cleanName(withoutDocNums);
+}
+
 // ── ERP / freeform parser ─────────────────────────────────────────────────────
 
 /**
@@ -121,7 +138,7 @@ export function parseErpFormat(text: string): RecordCandidate[] {
     const tail = text.slice(cnpjEnd, nextStart);
 
     // ── Empresa ──────────────────────────────────────────────────────────────
-    const supplier = cleanName(beforeCnpj).slice(0, 120) || null;
+    const supplier = cleanSupplierName(beforeCnpj).slice(0, 120) || null;
 
     // ── Phone ────────────────────────────────────────────────────────────────
     const phone = findFirstPhone(tail);
