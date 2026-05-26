@@ -59,10 +59,8 @@ function candidateToRecord(
   const usedPlaceholder = !rawDoc;
   const document = rawDoc || `DOC-${idx + 1}`;
 
-  // Fallback: missing due date → today; missing/negative value → 0
-  const today = new Date().toISOString().slice(0, 10);
-  const [y, m, d] = (c.dueDate ?? today).split("-");
-  const dueDate = c.dueDate ?? `${d}/${m}/${y}`;
+  // Campos ausentes ficam vazios para o operador preencher manualmente
+  const dueDate = c.dueDate ?? "";
   const value = (c.value != null && c.value >= 0) ? c.value : 0;
 
   return {
