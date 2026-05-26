@@ -626,7 +626,7 @@ export default function LandingPage({
                   <p className="text-xs text-zinc-500 mt-1">Para pequenas carteiras de faturamento</p>
                 </div>
                 <div className="flex items-baseline gap-1 text-white">
-                  <span className="text-3xl sm:text-4xl font-black">R$ 97</span>
+                  <span className="text-3xl sm:text-4xl font-black">R$ 49</span>
                   <span className="text-zinc-500 text-sm font-light">/mês</span>
                 </div>
                 <hr className="border-zinc-900" />
@@ -666,7 +666,7 @@ export default function LandingPage({
                   <p className="text-xs text-zinc-400 mt-1">Robô autônomo com inteligência artificial</p>
                 </div>
                 <div className="flex items-baseline gap-1 text-white">
-                  <span className="text-3xl sm:text-5xl font-black text-emerald-300 font-mono">R$ 197</span>
+                  <span className="text-3xl sm:text-5xl font-black text-emerald-300 font-mono">R$ 97</span>
                   <span className="text-zinc-500 text-sm font-light">/mês</span>
                 </div>
                 <hr className="border-emerald-500/20" />
@@ -701,7 +701,7 @@ export default function LandingPage({
                   <p className="text-xs text-zinc-500 mt-1">Integração ERP robusta para grandes volumes</p>
                 </div>
                 <div className="flex items-baseline gap-1 text-white">
-                  <span className="text-3xl sm:text-4xl font-black">R$ 497</span>
+                  <span className="text-3xl sm:text-4xl font-black">R$ 197</span>
                   <span className="text-zinc-500 text-sm font-light">/mês</span>
                 </div>
                 <hr className="border-zinc-900" />
