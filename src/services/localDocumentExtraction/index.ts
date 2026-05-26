@@ -51,20 +51,27 @@ function candidateToRecord(
   c: RecordCandidate,
   idx: number,
 ): { record: LocalRecord; usedPlaceholder: boolean } | null {
-  if (!c.client || !c.dueDate || c.value == null || c.value < 0) return null;
+  // Only discard if there's truly no client name — everything else gets a fallback
+  if (!c.client) return null;
 
   // If no document number was found, generate a stable placeholder
   const rawDoc = c.document?.trim();
   const usedPlaceholder = !rawDoc;
   const document = rawDoc || `DOC-${idx + 1}`;
 
+  // Fallback: missing due date → today; missing/negative value → 0
+  const today = new Date().toISOString().slice(0, 10);
+  const [y, m, d] = (c.dueDate ?? today).split("-");
+  const dueDate = c.dueDate ?? `${d}/${m}/${y}`;
+  const value = (c.value != null && c.value >= 0) ? c.value : 0;
+
   return {
     record: {
       client: c.client.trim().slice(0, 120),
       supplier: (c.supplier ?? "").trim().slice(0, 120),
       document,
-      dueDate: c.dueDate,
-      value: c.value,
+      dueDate,
+      value,
       phone: (c.phone ?? "").replace(/\D/g, ""),
       status: c.status ?? "Aberto",
       confidenceScore: c.confidenceScore,
