@@ -33,8 +33,8 @@ export default function PoliticaPrivacidade({ onClose }: Props) {
             <h3 className="text-white font-semibold text-base">1. Quem somos</h3>
             <p>
               A <strong className="text-white">NC Finance Ltda.</strong> é a controladora dos dados pessoais tratados nesta plataforma. Para questões relacionadas à privacidade, o contato é:{" "}
-              <a href="mailto:privacidade@ncfinance.com.br" className="text-emerald-400 hover:underline">
-                privacidade@ncfinance.com.br
+              <a href="mailto:ncfinance09@gmail.com" className="text-emerald-400 hover:underline">
+                ncfinance09@gmail.com
               </a>
             </p>
           </section>
@@ -150,8 +150,8 @@ export default function PoliticaPrivacidade({ onClose }: Props) {
             </ul>
             <p className="mt-2">
               Para exercer qualquer direito, envie solicitação para{" "}
-              <a href="mailto:privacidade@ncfinance.com.br" className="text-emerald-400 hover:underline">
-                privacidade@ncfinance.com.br
+              <a href="mailto:ncfinance09@gmail.com" className="text-emerald-400 hover:underline">
+                ncfinance09@gmail.com
               </a>
               . Respondemos em até 15 dias úteis.
             </p>
@@ -182,8 +182,8 @@ export default function PoliticaPrivacidade({ onClose }: Props) {
             <h3 className="text-white font-semibold text-base">11. Encarregado de Dados (DPO)</h3>
             <p>
               O encarregado pelo tratamento de dados pessoais (DPO) pode ser contatado pelo e-mail{" "}
-              <a href="mailto:privacidade@ncfinance.com.br" className="text-emerald-400 hover:underline">
-                privacidade@ncfinance.com.br
+              <a href="mailto:ncfinance09@gmail.com" className="text-emerald-400 hover:underline">
+                ncfinance09@gmail.com
               </a>
               . Você também pode registrar reclamações na Autoridade Nacional de Proteção de Dados (ANPD) em{" "}
               <a href="https://www.gov.br/anpd" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">

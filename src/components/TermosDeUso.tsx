@@ -136,8 +136,8 @@ export default function TermosDeUso({ onClose }: Props) {
             <h3 className="text-white font-semibold text-base">12. Contato</h3>
             <p>
               Dúvidas sobre estes Termos podem ser enviadas para:{" "}
-              <a href="mailto:contato@ncfinance.com.br" className="text-emerald-400 hover:underline">
-                contato@ncfinance.com.br
+              <a href="mailto:ncfinance09@gmail.com" className="text-emerald-400 hover:underline">
+                ncfinance09@gmail.com
               </a>
             </p>
           </section>
