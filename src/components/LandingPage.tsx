@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import TermosDeUso from "./TermosDeUso";
 import PoliticaPrivacidade from "./PoliticaPrivacidade";
+import Suporte from "./Suporte";
 import { motion } from "motion/react";
 import {
   CheckCircle2,
@@ -44,6 +45,7 @@ export default function LandingPage({
   const [isAuthSuccess, setIsAuthSuccess] = useState(false);
   const [showTermos, setShowTermos] = useState(false);
   const [showPrivacidade, setShowPrivacidade] = useState(false);
+  const [showSuporte, setShowSuporte] = useState(false);
 
   // Live Phone billing demo simulation state
   const [demoPhoneName, setDemoPhoneName] = useState("Carlos Eduardo");
@@ -883,6 +885,7 @@ export default function LandingPage({
             <div className="flex gap-4">
               <span className="hover:text-emerald-400 cursor-pointer" onClick={() => setShowTermos(true)}>Termos de Uso</span>
               <span className="hover:text-emerald-400 cursor-pointer" onClick={() => setShowPrivacidade(true)}>Privacidade e Dados</span>
+              <span className="hover:text-emerald-400 cursor-pointer" onClick={() => setShowSuporte(true)}>Suporte</span>
               <span className="hover:text-emerald-400 cursor-pointer font-mono">v1.1.0-Release</span>
             </div>
           </div>
@@ -891,6 +894,7 @@ export default function LandingPage({
 
       {showTermos && <TermosDeUso onClose={() => setShowTermos(false)} />}
       {showPrivacidade && <PoliticaPrivacidade onClose={() => setShowPrivacidade(false)} />}
+      {showSuporte && <Suporte onClose={() => setShowSuporte(false)} />}
     </div>
   );
 }
