@@ -21,6 +21,7 @@ import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type Automation
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
 import { parseImportFile } from "./utils/importFileParser";
 import { extractDocumentLocally, type LocalExtractionResult } from "./services/localDocumentExtraction";
+import { exportRelatorio } from "./services/exportRelatorio";
 import { 
   Debtor, 
   Representative, 
@@ -2287,6 +2288,13 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                           className="px-4.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-100 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs text-center border border-zinc-700"
                         >
                           <Download className="w-3.5 h-3.5 text-emerald-400" /> Exportar Planilha (XLS/CSV)
+                        </button>
+
+                        <button
+                          onClick={() => exportRelatorio(debtors, filteredDebtors, account?.email ?? "")}
+                          className="px-4.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-100 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs text-center border border-zinc-700"
+                        >
+                          <Download className="w-3.5 h-3.5 text-rose-400" /> Exportar Relatório (PDF)
                         </button>
 
                         <button
