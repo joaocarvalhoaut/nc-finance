@@ -2330,7 +2330,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                       <div className="flex items-center gap-3">
                         {plan === "basic" && (
                           <span className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded font-mono">
-                            Plano Basic ? upgrade para Pro/Premium
+                            Plano Basic → upgrade para Pro/Premium
                           </span>
                         )}
                         {remainingCharges === 0 && plan !== "basic" && (
@@ -2965,7 +2965,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                                   
                                   {d.status === "sent" ? (
                                     <span className="text-[9px] text-emerald-400 flex items-center gap-1">
-                                      ? Enviado
+                                      ✓ Enviado
                                     </span>
                                   ) : (
                                     <span className="text-[9px] text-zinc-500 font-light">Pendente</span>
@@ -3017,7 +3017,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                           </div>
 
                           <div className="p-3.5 rounded-2xl bg-zinc-950 border border-zinc-850 space-y-1.5 text-xs text-zinc-400">
-                            <span className="text-[10px] text-zinc-500 font-mono block">Boleto PDF ? Google Drive:</span>
+                            <span className="text-[10px] text-zinc-500 font-mono block">Boleto PDF · Google Drive:</span>
                             {selectedDebtorForMessage?.driveFileId ? (
                               <a
                                 href={selectedDebtorForMessage.driveFileUrl ?? "#"}
@@ -3308,7 +3308,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                   {automationError && (
                     <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-3 text-sm text-rose-200 flex items-center justify-between gap-3">
                       <span>{automationError}</span>
-                      <button onClick={() => setAutomationError("")} className="text-rose-400 hover:text-rose-200 text-xs cursor-pointer">?</button>
+                      <button onClick={() => setAutomationError("")} className="text-rose-400 hover:text-rose-200 text-xs cursor-pointer">✕</button>
                     </div>
                   )}
 
@@ -3408,7 +3408,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                           <>
                             <div>
                               <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
-                                Janela de Envio ? In?cio <span className="text-purple-400">(Premium)</span>
+                                Janela de Envio — Início <span className="text-purple-400">(Premium)</span>
                               </label>
                               <input
                                 type="time"
@@ -3419,7 +3419,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                             </div>
                             <div>
                               <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
-                                Janela de Envio ? Fim <span className="text-purple-400">(Premium)</span>
+                                Janela de Envio — Fim <span className="text-purple-400">(Premium)</span>
                               </label>
                               <input
                                 type="time"
@@ -3447,7 +3447,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
 
                         <div className="sm:col-span-2">
                           <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
-                            Mensagem Personalizada <span className="text-zinc-600">(opcional ? usa template do tom se vazio)</span>
+                            Mensagem Personalizada <span className="text-zinc-600">(opcional — usa template do tom se vazio)</span>
                           </label>
                           <textarea
                             rows={3}
@@ -3529,18 +3529,18 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                                 {rule.ruleType === "due_in_days" && rule.daysBefore != null && ` (${rule.daysBefore}d)`}
                               </span>
                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-400 capitalize">
-                                {rule.messageTone}
+                                {rule.messageTone === "amigavel" ? "Amigável" : rule.messageTone === "neutro" ? "Neutro" : rule.messageTone === "firme" ? "Firme" : "Jurídico"}
                               </span>
                             </div>
                             <div className="flex flex-wrap gap-x-4 mt-1.5 text-[11px] text-zinc-500 font-mono">
                               {rule.sendWindowStart && rule.sendWindowEnd && (
-                                <span>Janela: {rule.sendWindowStart}?{rule.sendWindowEnd}</span>
+                                <span>Janela: {rule.sendWindowStart}–{rule.sendWindowEnd}</span>
                               )}
                               {rule.maxDailySends != null && (
-                                <span>Limite: m?x {rule.maxDailySends}/dia</span>
+                                <span>Limite: máx {rule.maxDailySends}/dia</span>
                               )}
                               {rule.lastRunAt && (
-                                <span>?ltimo run: {new Date(rule.lastRunAt).toLocaleString("pt-BR")}</span>
+                                <span>Último run: {new Date(rule.lastRunAt).toLocaleString("pt-BR")}</span>
                               )}
                               {rule.nextRunAt && (
                                 <span>Próximo: {new Date(rule.nextRunAt).toLocaleString("pt-BR")}</span>
@@ -3563,7 +3563,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                   {automationRuns.length > 0 && (
                     <div className="bg-zinc-900/40 border border-zinc-900 rounded-3xl p-6 space-y-4 shadow-xl">
                       <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <History className="w-4 h-4 text-emerald-400" /> ?ltimas execu??es do Scheduler
+                        <History className="w-4 h-4 text-emerald-400" /> Últimas execuções do Scheduler
                       </h3>
                       <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-xs">
@@ -3592,7 +3592,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                                       ? "bg-amber-500/10 text-amber-400"
                                       : "bg-rose-500/10 text-rose-400"
                                   }`}>
-                                    {run.status.toUpperCase()}
+                                    {run.status === "success" ? "CONCLUÍDO" : run.status === "running" ? "RODANDO" : run.status === "failed" ? "FALHOU" : run.status.toUpperCase()}
                                   </span>
                                 </td>
                                 <td className="px-4 py-3 text-right font-mono">{run.totalCandidates}</td>
