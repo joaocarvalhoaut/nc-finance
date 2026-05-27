@@ -500,7 +500,7 @@ export default function App() {
       userConfigService
         .upsertConfig(payload)
         .catch((error) => {
-          const message = error instanceof Error ? error.message : "Falha ao salvar configuracoes.";
+          const message = error instanceof Error ? error.message : "Falha ao salvar configurações.";
           setWorkspaceError(message);
         })
         .finally(() => {
@@ -926,7 +926,7 @@ export default function App() {
       setImportFileName("");
       setCurrentTab("visao_geral");
     } catch (error) {
-      setExtractionAlert(error instanceof Error ? error.message : "Nao foi possivel salvar os registros importados.");
+      setExtractionAlert(error instanceof Error ? error.message : "Não foi possível salvar os registros importados.");
     }
   };
 
@@ -955,7 +955,7 @@ export default function App() {
         setSelectedDebtorForMessage(savedDebtor);
       }
     } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : "Falha ao salvar alteracao do devedor.");
+      setWorkspaceError(error instanceof Error ? error.message : "Falha ao salvar alteração do devedor.");
     }
   };
 
@@ -1814,13 +1814,13 @@ export default function App() {
                           <FileCheck2 className="w-5 h-5" />
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-zinc-300">Arraste seus relatorios PDF, TXT ou EXCEL aqui</p>
+                          <p className="text-xs font-semibold text-zinc-300">Arraste seus relatórios PDF, TXT ou EXCEL aqui</p>
                           <p className="text-[10px] text-zinc-600">
                             {isParsingImportFile
                               ? "Lendo arquivo..."
                               : importFileName
                                 ? `Arquivo carregado: ${importFileName}`
-                                : "O conteudo real do arquivo tera prioridade sobre presets e textos de exemplo."}
+                                : "O conteúdo real do arquivo terá prioridade sobre presets e textos de exemplo."}
                           </p>
                         </div>
                         <input 
@@ -2383,26 +2383,26 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                                 : "text-rose-300"
                           }`}>
                             {batchSendResult.success
-                              ? `? ${batchSendResult.dryRun ? "[Simula??o] " : ""}Lote processado ? ${batchSendResult.sent} enviados`
-                              : `? ${BATCH_TOP_STATUS_LABELS[batchSendResult.status as BatchTopStatus] ?? batchSendResult.error}`
+                              ? `✓ ${batchSendResult.dryRun ? "[Simulação] " : ""}Lote processado · ${batchSendResult.sent} enviados`
+                              : `✗ ${BATCH_TOP_STATUS_LABELS[batchSendResult.status as BatchTopStatus] ?? batchSendResult.error}`
                             }
                           </div>
                           {batchSendResult.success && (
                             <div className="flex flex-wrap gap-3 text-[10px] font-mono">
                               {batchSendResult.sent > 0 && (
-                                <span className="text-emerald-400">? {batchSendResult.sent} enviados</span>
+                                <span className="text-emerald-400">✓ {batchSendResult.sent} enviados</span>
                               )}
                               {batchSendResult.failed > 0 && (
-                                <span className="text-rose-400">? {batchSendResult.failed} falhas</span>
+                                <span className="text-rose-400">✗ {batchSendResult.failed} falhas</span>
                               )}
                               {batchSendResult.duplicated > 0 && (
-                                <span className="text-zinc-400">? {batchSendResult.duplicated} duplicados</span>
+                                <span className="text-zinc-400">≈ {batchSendResult.duplicated} duplicados</span>
                               )}
                               {batchSendResult.invalidPhone > 0 && (
-                                <span className="text-amber-400">? {batchSendResult.invalidPhone} tel. inv?lidos</span>
+                                <span className="text-amber-400">⚠ {batchSendResult.invalidPhone} tel. inválidos</span>
                               )}
                               {batchSendResult.blockedLimit > 0 && (
-                                <span className="text-zinc-500">? {batchSendResult.blockedLimit} bloqueados (limite)</span>
+                                <span className="text-zinc-500">⚡ {batchSendResult.blockedLimit} bloqueados (limite)</span>
                               )}
                               <span className="text-zinc-600">
                                 Uso: {batchSendResult.usageAfter}/{batchSendResult.usageLimit}
@@ -2429,12 +2429,12 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                                 r.status === "bloqueado_limite"    ? "text-zinc-600"    :
                                 "text-rose-400"
                               }`}>
-                                {r.status === "sucesso"             ? "? enviado"         :
-                                 r.status === "duplicado"           ? "? duplicado"       :
-                                 r.status === "telefone_invalido"   ? "? tel. inv?lido"  :
-                                 r.status === "bloqueado_limite"    ? "? limite"          :
-                                 r.status === "devedor_nao_encontrado" ? "? n?o encontrado" :
-                                 "? erro"}
+                                {r.status === "sucesso"             ? "✓ enviado"           :
+                                 r.status === "duplicado"           ? "≈ duplicado"        :
+                                 r.status === "telefone_invalido"   ? "⚠ tel. inválido"    :
+                                 r.status === "bloqueado_limite"    ? "⚡ limite"           :
+                                 r.status === "devedor_nao_encontrado" ? "✗ não encontrado" :
+                                 "✗ erro"}
                               </span>
                             </div>
                           ))}
