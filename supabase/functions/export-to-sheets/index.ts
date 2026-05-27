@@ -176,8 +176,11 @@ const writeRows = async (
     throw new Error(`Google Sheets API erro de escrita ${res.status}: ${txt}`);
   }
 
+  // totalUpdatedRows inclui o cabeçalho; rows.length já inclui o cabeçalho,
+  // então subtraímos 1 para exibir somente a contagem de linhas de dados.
   const json = await res.json() as { totalUpdatedRows?: number };
-  return json.totalUpdatedRows ?? rows.length - 1; // -1 para excluir cabeçalho
+  const total = json.totalUpdatedRows ?? rows.length;
+  return Math.max(0, total - 1); // desconta o cabeçalho
 };
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
