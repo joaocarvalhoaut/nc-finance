@@ -432,7 +432,7 @@ export default function LandingPage({
               </div>
               <h4 className="text-lg font-bold text-white">Importação Inteligente (IA)</h4>
               <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                Envie relatórios bagunçados, PDFs, txt, boletos brutos ou extratos. Nossa engenharia extrai o nome do cliente, fornecedor, documento, vencimento e valores instantaneamente sem cadastro prévio manual.
+                Envie relatórios bagunçados, PDFs, txt, boletos brutos ou extratos. Nossa engenharia extrai o nome do cliente, documento, vencimento e valores automaticamente — sem nenhum cadastro manual prévio.
               </p>
             </div>
 
@@ -485,9 +485,9 @@ export default function LandingPage({
               <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-xl">
                 <ShieldCheck className="w-6 h-6" />
               </div>
-              <h4 className="text-lg font-bold text-white">Conexão com Z-API Oficial</h4>
+              <h4 className="text-lg font-bold text-white">Disparos via Número Global da Plataforma</h4>
               <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                Insira sua chave de API e Instance ID do serviço Z-API. Integre seu próprio número de WhatsApp secundário ou corporativo para obter 100% de autonomia e visibilidade de respostas dos clientes.
+                As cobranças são enviadas por um número corporativo global da NC Finance, sem precisar conectar o seu celular pessoal. Cada envio é rastreado com status de entrega e registrado no histórico da conta.
               </p>
             </div>
           </div>
@@ -513,7 +513,7 @@ export default function LandingPage({
               </div>
               <h3 className="text-3xl sm:text-4xl font-black text-white">Visualize como o seu cliente irá receber</h3>
               <p className="text-zinc-400 font-light leading-relaxed">
-                Escolha o tom desejado e veja como a mensagem dinâmica se adapta com as variáveis do banco de dados dNC Finance (Representante, Boleto, Vencimento, CPF, Cliente).
+                Escolha o tom desejado e veja como a mensagem se adapta dinamicamente com os dados reais do devedor: nome, valor atualizado, vencimento e documento.
               </p>
 
               {/* Interaction controllers */}
@@ -644,7 +644,7 @@ export default function LandingPage({
               <div className="space-y-6">
                 <div>
                   <h4 className="text-lg font-bold text-zinc-300">Plano Lite</h4>
-                  <p className="text-xs text-zinc-500 mt-1">Para pequenas carteiras de faturamento</p>
+                  <p className="text-xs text-zinc-500 mt-1">Para pequenas carteiras de cobrança</p>
                 </div>
                 <div className="flex items-baseline gap-1 text-white">
                   <span className="text-3xl sm:text-4xl font-black">R$ 49</span>
@@ -653,19 +653,25 @@ export default function LandingPage({
                 <hr className="border-zinc-900" />
                 <ul className="space-y-3.5 text-sm text-zinc-400 font-light">
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Importação de até 150 devedores/mês
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Até 300 cobranças por mês
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> 3 canais de arquivos (Vencidos, A vencer, Pagar)
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Importação de devedores (PDF, Excel, CSV)
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Cobrança Manual de 4 tons via WhatsApp
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Visão Geral com juros e multas automáticos
+                  </li>
+                  <li className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Cobrança manual via WhatsApp (4 tons)
+                  </li>
+                  <li className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Exportação de relatório Excel e PDF
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-600 line-through">
-                    <CheckCircle2 className="w-4 h-4 text-zinc-800 flex-shrink-0" /> Extração Inteligente com IA Gemini
+                    <CheckCircle2 className="w-4 h-4 text-zinc-800 flex-shrink-0" /> Envio em lote
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-600 line-through">
-                    <CheckCircle2 className="w-4 h-4 text-zinc-800 flex-shrink-0" /> Anexos automáticos do Google Drive
+                    <CheckCircle2 className="w-4 h-4 text-zinc-800 flex-shrink-0" /> Automação de cobranças
                   </li>
                 </ul>
               </div>
@@ -684,7 +690,7 @@ export default function LandingPage({
                   <h4 className="text-lg font-bold text-emerald-400 flex items-center gap-1.5">
                     Plano Pro
                   </h4>
-                  <p className="text-xs text-zinc-400 mt-1">Robô autônomo com inteligência artificial</p>
+                  <p className="text-xs text-zinc-400 mt-1">Automação completa para escalar cobranças</p>
                 </div>
                 <div className="flex items-baseline gap-1 text-white">
                   <span className="text-3xl sm:text-5xl font-black text-emerald-300 font-mono">R$ 97</span>
@@ -693,19 +699,22 @@ export default function LandingPage({
                 <hr className="border-emerald-500/20" />
                 <ul className="space-y-3.5 text-sm text-zinc-300 font-light">
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Importação de devedores ilimitados/mês
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Até 1.500 cobranças por mês
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Extração Inteligente Automática com IA Gemini
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Tudo do Plano Lite
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Disparadores agendados automatizados
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Envio em lote via WhatsApp
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Integração Planilhas Sheets & Drive Matching
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Regras de automação de cobranças diárias
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Suporte VIP NC & Multi-representantes
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Sincronização com Google Sheets
+                  </li>
+                  <li className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Drive Matching (vincula PDFs ao devedor)
                   </li>
                 </ul>
               </div>
@@ -714,12 +723,12 @@ export default function LandingPage({
               </a>
             </div>
 
-            {/* Plano 3: Enterprise */}
+            {/* Plano 3: Premium */}
             <div className="bg-zinc-950 border border-zinc-900 p-8 rounded-2xl relative flex flex-col justify-between hover:border-zinc-800 transition-all">
               <div className="space-y-6">
                 <div>
-                  <h4 className="text-lg font-bold text-zinc-300">Plano Corporate</h4>
-                  <p className="text-xs text-zinc-500 mt-1">Integração ERP robusta para grandes volumes</p>
+                  <h4 className="text-lg font-bold text-zinc-300">Plano Premium</h4>
+                  <p className="text-xs text-zinc-500 mt-1">Controle avançado para grandes volumes</p>
                 </div>
                 <div className="flex items-baseline gap-1 text-white">
                   <span className="text-3xl sm:text-4xl font-black">R$ 197</span>
@@ -728,24 +737,24 @@ export default function LandingPage({
                 <hr className="border-zinc-900" />
                 <ul className="space-y-3.5 text-sm text-zinc-400 font-light">
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Tudo do Plano Pro acoplado
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Até 5.000 cobranças por mês
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Múltiplas instâncias simultâneas Z-API
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Tudo do Plano Pro
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> API aberta para integração direta com ERPs
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Janela de envio personalizada (início e fim)
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Gerente de conta exclusivo NC Finance
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Limite diário de disparos por regra
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Infraestrutura em nuvem dedicada
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Prioridade na fila de automação
                   </li>
                 </ul>
               </div>
               <a href="#auth-panel" className="mt-8 px-4 py-2.5 rounded-xl border border-emerald-500/20 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 transition-all text-center block text-sm">
-                Falar com Consultores
+                Assinar Premium
               </a>
             </div>
           </div>
@@ -846,9 +855,8 @@ export default function LandingPage({
               </button>
             </form>
 
-            <div className="mt-8 flex items-center justify-between text-xs text-zinc-500 border-t border-zinc-900 pt-5">
-              <span>Demo rápida disponível sem restrições.</span>
-              <button 
+            <div className="mt-8 flex items-center justify-end text-xs text-zinc-500 border-t border-zinc-900 pt-5">
+              <button
                 type="button"
                 onClick={() => {
                   setIsRegisterMode(!isRegisterMode);
@@ -858,23 +866,6 @@ export default function LandingPage({
                 className="text-emerald-400 font-bold hover:underline"
               >
                 {isRegisterMode ? "Já possuo conta (Entrar)" : "Criar uma conta grátis"}
-              </button>
-            </div>
-
-            {/* Helper button for filling the form without bypassing auth */}
-            <div className="mt-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthEmail("contato@ncfinance.com.br");
-                  setAuthPassword("ncfinance123");
-                  setAuthName("Diretor NC");
-                  setAuthError("");
-                  setAuthInfo("");
-                }}
-                className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 text-xs rounded-xl font-bold transition-all text-center"
-              >
-                Preencher campos de exemplo
               </button>
             </div>
           </div>

@@ -13,12 +13,14 @@ export type ImportStatus =
   | "success"
   | "error"
   | "leitura_erro"
+  | "escrita_erro"
   | "bloqueado_assinatura"
   | "google_nao_configurado"
   | "url_invalida"
   | "google_auth_erro"
   | "payload_invalido"
   | "nao_autenticado"
+  | "sessao_invalida"
   | "erro_interno";
 
 export interface ImportResult {
@@ -31,6 +33,17 @@ export interface ImportResult {
   logId: string | null;
   spreadsheetId: string | null;
   lastSyncAt: string | null;
+}
+
+export interface ExportResult {
+  success: boolean;
+  status: ImportStatus;
+  rowsExported: number;
+  rowsTotal: number;
+  spreadsheetId: string | null;
+  sheetName: string | null;
+  exportedAt: string | null;
+  error: string | null;
 }
 
 export interface GoogleSheetsConfig {
@@ -55,15 +68,17 @@ export interface ImportLog {
 // ─── Status labels ─────────────────────────────────────────────────────────────
 
 export const IMPORT_STATUS_LABELS: Record<ImportStatus, string> = {
-  success:                "Importação concluída com sucesso!",
-  error:                  "Erro ao importar. Verifique os dados e tente novamente.",
+  success:                "Operação concluída com sucesso!",
+  error:                  "Erro ao processar. Verifique os dados e tente novamente.",
   leitura_erro:           "Falha ao ler a planilha. Verifique as permissões.",
-  bloqueado_assinatura:   "Assinatura necessária para importar planilhas.",
+  escrita_erro:           "Falha ao escrever na planilha. Verifique as permissões de edição.",
+  bloqueado_assinatura:   "Assinatura necessária para usar planilhas.",
   google_nao_configurado: "Integração Google Sheets não configurada. Contate o suporte.",
   url_invalida:           "URL ou ID da planilha inválido.",
   google_auth_erro:       "Falha na autenticação com o Google. Contate o suporte.",
   payload_invalido:       "Dados inválidos. Verifique a URL informada.",
   nao_autenticado:        "Sessão expirada. Faça login novamente.",
+  sessao_invalida:        "Sessão inválida. Faça login novamente.",
   erro_interno:           "Erro interno. Tente novamente.",
 };
 
@@ -167,6 +182,58 @@ export const googleSheetsService = {
       errorMessage:  (row.error_message as string | null) ?? null,
       createdAt:     String(row.created_at ?? ""),
     }));
+  },
+
+  async exportToSheets(params: {
+    spreadsheetUrl: string;
+    sheetName?: string;
+  }): Promise<ExportResult> {
+    const supabase = getSupabaseClient();
+
+    const { data, error } = await supabase.functions.invoke<ExportResult>(
+      "export-to-sheets",
+      { body: params },
+    );
+
+    if (error) {
+      let errorMsg    = "Não foi possível contatar o servidor.";
+      let errorStatus: ImportStatus = "erro_interno";
+
+      try {
+        const ctx = (error as unknown as { context?: Response }).context;
+        if (ctx) {
+          const body = await ctx.json() as { error?: string; status?: string };
+          if (body.error)  errorMsg    = body.error;
+          if (body.status) errorStatus = body.status as ImportStatus;
+        }
+      } catch { /* ignora */ }
+
+      return {
+        success: false,
+        status: errorStatus,
+        rowsExported: 0,
+        rowsTotal: 0,
+        spreadsheetId: null,
+        sheetName: null,
+        exportedAt: null,
+        error: errorMsg,
+      };
+    }
+
+    if (!data) {
+      return {
+        success: false,
+        status: "erro_interno",
+        rowsExported: 0,
+        rowsTotal: 0,
+        spreadsheetId: null,
+        sheetName: null,
+        exportedAt: null,
+        error: "Resposta inválida do servidor.",
+      };
+    }
+
+    return data;
   },
 
   labelForStatus(status: ImportStatus): string {

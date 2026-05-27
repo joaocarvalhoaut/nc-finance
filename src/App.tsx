@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
 import LandingPage from "./components/LandingPage";
 import SubscriptionGate from "./components/SubscriptionGate";
@@ -13,7 +14,7 @@ import { representativesService } from "./services/representativesService";
 import { subscriptionService } from "./services/subscriptionService";
 import { userConfigService } from "./services/userConfigService";
 import { whatsappService, SEND_STATUS_LABELS, type SendChargeStatus } from "./services/whatsappService";
-import { googleSheetsService, type ImportResult as SheetsImportResult } from "./services/googleSheetsService";
+import { googleSheetsService, type ImportResult as SheetsImportResult, type ExportResult as SheetsExportResult } from "./services/googleSheetsService";
 import { googleDriveService, DRIVE_STATUS_LABELS, type DriveMatchResult, type DriveMatchStatus } from "./services/googleDriveService";
 import { driveFolderService, type DriveFolderStatus } from "./services/driveMatching/driveFolderService";
 import { whatsappBatchService, BATCH_TOP_STATUS_LABELS, type BatchChargeResult, type BatchTopStatus } from "./services/whatsappBatchService";
@@ -227,6 +228,12 @@ export default function App() {
   const [sheetUrlInput, setSheetUrlInput] = useState<string>(DEFAULT_USER_CONFIG.sheetUrlInput);
   const [sheetNameInput, setSheetNameInput] = useState<string>("");
   const [isSheetsSynching, setIsSheetsSynching] = useState<boolean>(false);
+  // Sheets export (Visão Geral → Sheets)
+  const [isExportingSheets, setIsExportingSheets] = useState<boolean>(false);
+  const [sheetsExportResult, setSheetsExportResult] = useState<SheetsExportResult | null>(null);
+  const [showExportSheetsModal, setShowExportSheetsModal] = useState<boolean>(false);
+  const [exportSheetUrl, setExportSheetUrl] = useState<string>("");
+  const [exportSheetName, setExportSheetName] = useState<string>("Visão Geral");
   const [sheetsImportResult, setSheetsImportResult] = useState<SheetsImportResult | null>(null);
   const [isDriveMatching, setIsDriveMatching] = useState<boolean>(false);
   const [driveMatchResult, setDriveMatchResult] = useState<DriveMatchResult | null>(null);
@@ -266,6 +273,12 @@ export default function App() {
   const [searchFilter, setSearchFilter] = useState<string>("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [repFilter, setRepFilter] = useState<string>("all");
+
+  // Representatives modal
+  const [showRepModal, setShowRepModal] = useState(false);
+  const [repModalForm, setRepModalForm] = useState({ name: "", phone: "", role: "", color: "bg-emerald-500" });
+  const [isSavingRep, setIsSavingRep] = useState(false);
+  const [repModalError, setRepModalError] = useState("");
 
   // Add debtor manually modal
   const [showAddDebtorModal, setShowAddDebtorModal] = useState(false);
@@ -693,7 +706,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (currentTab === "automacoes" && isLoggedIn && automationRules.length === 0 && !isLoadingAutomation) {
+    if ((currentTab === "automacoes" || currentTab === "dashboard") && isLoggedIn && automationRules.length === 0 && !isLoadingAutomation) {
       void loadAutomationData();
     }
   }, [currentTab, isLoggedIn]);
@@ -1049,6 +1062,98 @@ export default function App() {
     }
   };
 
+  // Sincronizar Visão Geral → Google Sheets
+  const handleExportToSheets = async () => {
+    const targetUrl = exportSheetUrl.trim() || sheetUrlInput.trim();
+    if (!targetUrl) {
+      setSheetsExportResult({
+        success: false,
+        status: "payload_invalido",
+        rowsExported: 0,
+        rowsTotal: 0,
+        spreadsheetId: null,
+        sheetName: null,
+        exportedAt: null,
+        error: "Configure a URL da planilha Google Sheets abaixo ou na aba Importar.",
+      });
+      return;
+    }
+    if (debtors.length === 0) {
+      setSheetsExportResult({
+        success: false,
+        status: "payload_invalido",
+        rowsExported: 0,
+        rowsTotal: 0,
+        spreadsheetId: null,
+        sheetName: null,
+        exportedAt: null,
+        error: "Não há registros na Visão Geral para exportar.",
+      });
+      return;
+    }
+    setIsExportingSheets(true);
+    setSheetsExportResult(null);
+    try {
+      const result = await googleSheetsService.exportToSheets({
+        spreadsheetUrl: targetUrl,
+        sheetName: exportSheetName.trim() || "Visão Geral",
+      });
+      setSheetsExportResult(result);
+    } catch {
+      setSheetsExportResult({
+        success: false,
+        status: "erro_interno",
+        rowsExported: 0,
+        rowsTotal: 0,
+        spreadsheetId: null,
+        sheetName: null,
+        exportedAt: null,
+        error: "Erro inesperado ao exportar. Tente novamente.",
+      });
+    } finally {
+      setIsExportingSheets(false);
+    }
+  };
+
+  // Delete representative from modal
+  const handleDeleteRep = async (repId: string) => {
+    if (!currentOwnerUserId) return;
+    try {
+      await representativesService.remove(currentOwnerUserId, repId);
+      setRepresentatives((prev) => prev.filter((r) => r.id !== repId));
+    } catch (error) {
+      setRepModalError(error instanceof Error ? error.message : "Falha ao excluir responsável.");
+    }
+  };
+
+  // Add representative from modal
+  const handleAddRepFromModal = async () => {
+    if (!currentOwnerUserId) return;
+    if (!repModalForm.name.trim()) {
+      setRepModalError("Nome é obrigatório.");
+      return;
+    }
+    setIsSavingRep(true);
+    setRepModalError("");
+    const colors = ["bg-emerald-500", "bg-sky-500", "bg-violet-500", "bg-amber-500", "bg-rose-500", "bg-cyan-500", "bg-indigo-500", "bg-pink-500"];
+    const newRep: Representative = {
+      id: `rep-${Date.now()}`,
+      name: repModalForm.name.trim(),
+      phone: repModalForm.phone.trim() || "5577999880000",
+      role: repModalForm.role.trim() || "Cobrança",
+      color: colors[representatives.length % colors.length],
+    };
+    try {
+      const saved = await representativesService.create(currentOwnerUserId, newRep);
+      setRepresentatives((prev) => [...prev, saved]);
+      setRepModalForm({ name: "", phone: "", role: "", color: "bg-emerald-500" });
+    } catch (error) {
+      setRepModalError(error instanceof Error ? error.message : "Falha ao salvar responsável.");
+    } finally {
+      setIsSavingRep(false);
+    }
+  };
+
   // Importação real do Google Sheets via Edge Function
   const handleImportSheets = async () => {
     if (!sheetUrlInput.trim()) return;
@@ -1087,26 +1192,62 @@ export default function App() {
     }
   };
 
-  // Simulated Excel/CSV formatted text downloader
+  // Excel (.xlsx) export with proper formatting
   const downloadExcelFormat = () => {
-    // Generate valid CSV payload representing excel data structure
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "ID Cliente;Fornecedor;Documento;Vencimento;Valor Base;Juros Aplicados(%);Multa Aplicada(%);Valor Atualizado;Telefone;Categoria;Responsavel;Observacoes\n";
-    
-    debtors.forEach(d => {
-      const rep = representatives.find(r => r.id === d.representativeId);
-      const repName = rep ? rep.name : "Nenhum";
-      const notesClean = d.notes ? d.notes.replace(/;/g, ",") : "";
-      csvContent += `${d.client};${d.supplier};${d.document};${d.dueDate};${d.value.toFixed(2)};${d.interestApplied || 0};${d.fineApplied || 0};${(d.updatedValue || d.value).toFixed(2)};${d.phone};${d.category};${repName};${notesClean}\n`;
+    const CATEGORY_PT: Record<string, string> = {
+      vencidos:  "Vencido",
+      a_vencer:  "A Vencer",
+      liquidado: "Liquidado",
+    };
+
+    const rows = debtors.map((d) => {
+      const rep = representatives.find((r) => r.id === d.representativeId);
+      return {
+        "Cliente":              d.client,
+        "Documento":            d.document || "",
+        "Vencimento":           d.dueDate   || "",
+        "Valor Base (R$)":      d.value,
+        "Juros (%)":            d.interestApplied  ?? 0,
+        "Multa (%)":            d.fineApplied      ?? 0,
+        "Valor Atualizado (R$)":(d.updatedValue || d.value),
+        "Telefone":             d.phone ? String(d.phone) : "",
+        "Categoria":            CATEGORY_PT[d.category] ?? d.category,
+        "Responsável":          rep ? rep.name : "Nenhum",
+        "Observações":          d.notes || "",
+      };
     });
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `nc_finance_devedores_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    // Force Telefone column (index 7, col H) to text so Excel doesn't convert to scientific notation
+    const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
+    for (let R = range.s.r + 1; R <= range.e.r; R++) {
+      const cellAddr = XLSX.utils.encode_cell({ r: R, c: 7 });
+      if (ws[cellAddr]) {
+        ws[cellAddr].t = "s"; // force string type
+      }
+    }
+
+    // Set column widths
+    ws["!cols"] = [
+      { wch: 36 }, // Cliente
+      { wch: 18 }, // Documento
+      { wch: 14 }, // Vencimento
+      { wch: 16 }, // Valor Base
+      { wch: 10 }, // Juros
+      { wch: 10 }, // Multa
+      { wch: 20 }, // Valor Atualizado
+      { wch: 18 }, // Telefone
+      { wch: 14 }, // Categoria
+      { wch: 22 }, // Responsável
+      { wch: 30 }, // Observações
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Devedores");
+
+    const fileName = `nc_finance_devedores_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
   };
 
   // Clear visual matrix debtors
@@ -1603,13 +1744,59 @@ export default function App() {
                       </div>
 
                       <button
-                        onClick={() => setCurrentTab("visao_geral")}
+                        onClick={() => setShowRepModal(true)}
                         className="w-full mt-2 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold text-center transition-all cursor-pointer flex items-center justify-center gap-1.5"
                       >
-                        <UserPlus className="w-3.5 h-3.5" /> Gerenciar Responsáveis e Devedores
+                        <UserPlus className="w-3.5 h-3.5" /> Gerenciar Responsáveis Ativos
                       </button>
                     </div>
 
+                  </div>
+
+                  {/* ── Automation rules card ─────────────────────────────────── */}
+                  <div className="bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                          <Bot className="w-4 h-4 text-emerald-400" /> Regras de Automação
+                        </h4>
+                        <p className="text-xs text-zinc-500 mt-0.5">Regras ativas de disparo automático de cobranças</p>
+                      </div>
+                      <button
+                        onClick={() => setCurrentTab("automacoes")}
+                        className="text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 rounded-xl px-3 py-1.5 transition-colors flex items-center gap-1.5"
+                      >
+                        Gerenciar regras <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                    {isLoadingAutomation ? (
+                      <div className="flex items-center gap-2 text-xs text-zinc-500">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Carregando regras...
+                      </div>
+                    ) : automationRules.length === 0 ? (
+                      <div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-5 text-center space-y-1">
+                        <Bot className="w-8 h-8 text-zinc-700 mx-auto" />
+                        <p className="text-xs font-semibold text-zinc-400">Nenhuma regra configurada</p>
+                        <p className="text-[11px] text-zinc-600">Clique em "Gerenciar regras" para criar sua primeira automação.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {automationRules.map((rule) => (
+                          <div key={rule.id} className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800 gap-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${rule.enabled ? "bg-emerald-400" : "bg-zinc-600"}`} />
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-zinc-200 truncate">{rule.name}</p>
+                                <p className="text-[10px] text-zinc-500">{RULE_TYPE_LABELS[rule.ruleType] ?? rule.ruleType} · tom: {rule.messageTone}</p>
+                              </div>
+                            </div>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border flex-shrink-0 ${rule.enabled ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-zinc-800 border-zinc-700 text-zinc-500"}`}>
+                              {rule.enabled ? "ATIVA" : "PAUSADA"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="p-6 rounded-3xl bg-zinc-900/60 border border-zinc-900">
@@ -1693,95 +1880,6 @@ export default function App() {
                         </div>
                       ))}
                     </div>
-
-                    {operationalMetrics && (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-                        <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4 space-y-3">
-                          <h5 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                            <CloudLightning className="w-3.5 h-3.5 text-sky-400" /> Importações Sheets
-                          </h5>
-                          {operationalMetrics.recentImports.length === 0 ? (
-                            <p className="text-[11px] text-zinc-600">Nenhuma importação ainda.</p>
-                          ) : operationalMetrics.recentImports.slice(0, 4).map((imp) => (
-                            <div key={imp.id} className="flex items-center justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="text-[11px] text-zinc-300 font-mono">
-                                  {imp.rowsImported}/{imp.rowsTotal} linhas
-                                </p>
-                                <p className="text-[10px] text-zinc-600">
-                                  {new Date(imp.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                                </p>
-                              </div>
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${imp.status === "success" ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
-                                {imp.status === "success" ? "OK" : "ERR"}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4 space-y-3">
-                          <h5 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                            <FolderOpen className="w-3.5 h-3.5 text-amber-400" /> Matches Drive
-                          </h5>
-                          {operationalMetrics.recentDriveMatches.length === 0 ? (
-                            <p className="text-[11px] text-zinc-600">Nenhum match ainda.</p>
-                          ) : operationalMetrics.recentDriveMatches.slice(0, 4).map((dm) => (
-                            <div key={dm.id} className="flex items-center justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="text-[11px] text-zinc-300 font-mono">
-                                  {dm.debtorsMatched}/{dm.debtorsTotal} devedores · {dm.filesFound} PDFs
-                                </p>
-                                <p className="text-[10px] text-zinc-600">
-                                  {new Date(dm.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                                </p>
-                              </div>
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${dm.status === "success" ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
-                                {dm.status === "success" ? "OK" : "ERR"}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4 space-y-3">
-                          <h5 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                            <Bot className="w-3.5 h-3.5 text-emerald-400" /> Automações / Erros
-                          </h5>
-                          {operationalMetrics.recentAutomationRuns.length === 0 && operationalMetrics.recentErrors.length === 0 ? (
-                            <p className="text-[11px] text-zinc-600">Sem atividade recente.</p>
-                          ) : (
-                            <>
-                              {operationalMetrics.recentAutomationRuns.slice(0, 3).map((run) => (
-                                <div key={run.id} className="flex items-center justify-between gap-2">
-                                  <div className="min-w-0">
-                                    <p className="text-[11px] text-zinc-300 font-mono">
-                                      {run.jobsCreated} jobs criados · {run.sent} enviados
-                                    </p>
-                                    <p className="text-[10px] text-zinc-600">
-                                      {new Date(run.startedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                                    </p>
-                                  </div>
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${run.status === "success" ? "bg-emerald-500/10 text-emerald-400" : run.status === "running" ? "bg-amber-500/10 text-amber-400" : "bg-rose-500/10 text-rose-400"}`}>
-                                    {run.status === "success" ? "OK" : run.status.toUpperCase().slice(0, 3)}
-                                  </span>
-                                </div>
-                              ))}
-                              {operationalMetrics.recentErrors.length > 0 && (
-                                <div className="pt-1 border-t border-zinc-800/60">
-                                  <p className="text-[10px] text-rose-400 font-semibold mb-1">?ltimos erros:</p>
-                                  {operationalMetrics.recentErrors.slice(0, 2).map((err) => (
-                                    <p key={err.id} className="text-[10px] text-zinc-500 truncate">
-                                      {err.clientName} ? <span className="text-rose-500">{err.status}</span>
-                                    </p>
-                                  ))}
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-
-                      </div>
-                    )}
 
                     {isLoadingMetrics && !operationalMetrics && (
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1924,9 +2022,6 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                             <CheckCircle className="w-3 h-3" />
                             {lastExtractionResult.records.length} registro{lastExtractionResult.records.length !== 1 ? "s" : ""}
                           </span>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">
-                            método: {lastExtractionResult.method}
-                          </span>
                           {lastExtractionResult.lowConfidenceCount > 0 && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20">
                               <AlertTriangle className="w-3 h-3" />
@@ -1967,22 +2062,13 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                                   <Trash2 className="w-4 h-4" />
                                 </button>
 
-                                <div className="grid grid-cols-2 gap-3 text-xs">
+                                <div className="text-xs">
                                   <div>
                                     <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Cliente</label>
                                     <input
                                       type="text"
                                       value={item.client}
                                       onChange={(e) => updateExtractedField(item.id, "client", e.target.value)}
-                                      className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white focus:outline-none focus:border-emerald-500"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Fornecedor / S.A</label>
-                                    <input
-                                      type="text"
-                                      value={item.supplier}
-                                      onChange={(e) => updateExtractedField(item.id, "supplier", e.target.value)}
                                       className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white focus:outline-none focus:border-emerald-500"
                                     />
                                   </div>
@@ -2219,11 +2305,20 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                         }`}>
                           {sheetsImportResult.success ? (
                             <>
-                              <div className="font-bold text-emerald-300">✓ Importação concluída</div>
+                              {sheetsImportResult.rowsImported === 0 && sheetsImportResult.rowsTotal > 0 ? (
+                                <div className="font-bold text-amber-300">⚠ Planilha lida, mas nenhuma linha foi importada</div>
+                              ) : sheetsImportResult.rowsImported === 0 ? (
+                                <div className="font-bold text-amber-300">⚠ Planilha vazia ou sem dados válidos</div>
+                              ) : (
+                                <div className="font-bold text-emerald-300">✓ Importação concluída</div>
+                              )}
                               <div>Linhas lidas: <span className="font-semibold text-white">{sheetsImportResult.rowsTotal}</span></div>
                               <div>Importadas: <span className="font-semibold text-emerald-300">{sheetsImportResult.rowsImported}</span></div>
                               {sheetsImportResult.rowsSkipped > 0 && (
                                 <div>Ignoradas: <span className="font-semibold text-amber-300">{sheetsImportResult.rowsSkipped}</span></div>
+                              )}
+                              {sheetsImportResult.rowsImported === 0 && (
+                                <div className="text-amber-300/70 text-[11px] mt-1">Verifique se o nome da aba/planilha está correto e se as colunas seguem o formato esperado.</div>
                               )}
                             </>
                           ) : (
@@ -2300,6 +2395,13 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                           className="px-4.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-100 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs text-center border border-zinc-700"
                         >
                           <Download className="w-3.5 h-3.5 text-rose-400" /> Exportar Relatório (PDF)
+                        </button>
+
+                        <button
+                          onClick={() => { setSheetsExportResult(null); setExportSheetUrl(sheetUrlInput); setShowExportSheetsModal(true); }}
+                          className="px-4.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-100 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs text-center border border-zinc-700"
+                        >
+                          <CloudLightning className="w-3.5 h-3.5 text-sky-400" /> Sincronizar com Sheets
                         </button>
 
                         <button
@@ -2645,6 +2747,198 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                   </div>
 
                 </div>{/* end space-y-8 */}
+
+                {/* ── Modal: Sincronizar com Google Sheets ─────────────────── */}
+                {showExportSheetsModal && (
+                  <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                    onClick={(e) => e.target === e.currentTarget && setShowExportSheetsModal(false)}
+                  >
+                    <div className="bg-zinc-900 border border-zinc-700 rounded-3xl shadow-2xl w-full max-w-md">
+                      {/* Header */}
+                      <div className="flex items-center justify-between p-5 border-b border-zinc-800">
+                        <div className="flex items-center gap-2">
+                          <CloudLightning className="w-5 h-5 text-sky-400" />
+                          <h3 className="text-base font-bold text-white">Sincronizar com Google Sheets</h3>
+                        </div>
+                        <button onClick={() => setShowExportSheetsModal(false)} className="text-zinc-500 hover:text-white transition-colors">
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* Body */}
+                      <div className="p-5 space-y-4">
+                        <p className="text-xs text-zinc-400">
+                          Envia todos os registros da Visão Geral para a aba indicada da planilha. O conteúdo existente nessa aba será substituído.
+                        </p>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block mb-1">URL da Planilha *</label>
+                            <input
+                              type="text"
+                              value={exportSheetUrl}
+                              onChange={(e) => setExportSheetUrl(e.target.value)}
+                              placeholder="https://docs.google.com/spreadsheets/d/..."
+                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
+                            />
+                            <p className="text-[10px] text-zinc-600 mt-1">
+                              A planilha deve estar compartilhada com{" "}
+                              <span className="text-sky-400 font-mono select-all">nc-finance@nc-finance-496922.iam.gserviceaccount.com</span>{" "}
+                              com permissão de <strong>Editor</strong>.
+                            </p>
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block mb-1">Nome da Aba</label>
+                            <input
+                              type="text"
+                              value={exportSheetName}
+                              onChange={(e) => setExportSheetName(e.target.value)}
+                              placeholder="Visão Geral"
+                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
+                            />
+                            <p className="text-[10px] text-zinc-600 mt-1">Deixe em branco para usar "Visão Geral" como padrão.</p>
+                          </div>
+                        </div>
+
+                        {/* Result feedback */}
+                        {sheetsExportResult && (
+                          <div className={`rounded-2xl border px-4 py-3 text-xs space-y-1 ${
+                            sheetsExportResult.success
+                              ? "border-sky-500/20 bg-sky-500/8 text-sky-200"
+                              : "border-rose-500/20 bg-rose-500/8 text-rose-200"
+                          }`}>
+                            {sheetsExportResult.success ? (
+                              <>
+                                <div className="font-bold text-sky-300">✓ Sincronização concluída</div>
+                                <div>{sheetsExportResult.rowsExported} de {sheetsExportResult.rowsTotal} registros exportados</div>
+                                {sheetsExportResult.sheetName && (
+                                  <div className="text-sky-400/70">Aba: {sheetsExportResult.sheetName}</div>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <div className="font-bold text-rose-300">✗ Falha na exportação</div>
+                                <div className="text-rose-200/80">{sheetsExportResult.error ?? "Erro desconhecido."}</div>
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        <button
+                          onClick={() => void handleExportToSheets()}
+                          disabled={isExportingSheets}
+                          className="w-full py-2.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          {isExportingSheets ? (
+                            <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Exportando {debtors.length} registros...</>
+                          ) : (
+                            <><CloudLightning className="w-3.5 h-3.5" /> Exportar {debtors.length} registros para Sheets</>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Modal: Gerenciar Responsáveis ─────────────────────────── */}
+                {showRepModal && (
+                  <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                    onClick={(e) => e.target === e.currentTarget && setShowRepModal(false)}
+                  >
+                    <div className="bg-zinc-900 border border-zinc-700 rounded-3xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+                      {/* Header */}
+                      <div className="flex items-center justify-between p-5 border-b border-zinc-800 flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                          <Users className="w-5 h-5 text-emerald-400" />
+                          <h3 className="text-base font-bold text-white">Responsáveis Ativos</h3>
+                        </div>
+                        <button onClick={() => setShowRepModal(false)} className="text-zinc-500 hover:text-white transition-colors">
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* List */}
+                      <div className="overflow-y-auto flex-1 p-5 space-y-2">
+                        {representatives.length === 0 ? (
+                          <p className="text-xs text-zinc-500 text-center py-4">Nenhum responsável cadastrado.</p>
+                        ) : representatives.map((r) => {
+                          const assignedCount = debtors.filter((d) => d.representativeId === r.id).length;
+                          return (
+                            <div key={r.id} className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800 gap-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className={`w-3 h-3 rounded-full flex-shrink-0 ${r.color}`} />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-zinc-200 truncate">{r.name}</p>
+                                  <p className="text-[10px] text-zinc-500">{r.role} · {assignedCount} devedor{assignedCount !== 1 ? "es" : ""}</p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => void handleDeleteRep(r.id)}
+                                className="text-zinc-600 hover:text-rose-400 transition-colors flex-shrink-0 p-1 rounded"
+                                title="Excluir responsável"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Add form */}
+                      <div className="border-t border-zinc-800 p-5 space-y-3 flex-shrink-0">
+                        <p className="text-xs font-bold text-zinc-300">Adicionar novo responsável</p>
+                        {repModalError && (
+                          <p className="text-xs text-rose-400">{repModalError}</p>
+                        )}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Nome *</label>
+                            <input
+                              type="text"
+                              value={repModalForm.name}
+                              onChange={(e) => setRepModalForm((f) => ({ ...f, name: e.target.value }))}
+                              placeholder="Ex: João Silva"
+                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Cargo</label>
+                            <input
+                              type="text"
+                              value={repModalForm.role}
+                              onChange={(e) => setRepModalForm((f) => ({ ...f, role: e.target.value }))}
+                              placeholder="Ex: Cobrança"
+                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Telefone WhatsApp</label>
+                          <input
+                            type="text"
+                            value={repModalForm.phone}
+                            onChange={(e) => setRepModalForm((f) => ({ ...f, phone: e.target.value }))}
+                            placeholder="5511999990000"
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <button
+                          onClick={() => void handleAddRepFromModal()}
+                          disabled={isSavingRep}
+                          className="w-full py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          {isSavingRep ? (
+                            <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Salvando...</>
+                          ) : (
+                            <><UserPlus className="w-3.5 h-3.5" /> Adicionar Responsável</>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* ── Modal: Adicionar Devedor Manualmente ──────────────────── */}
                 {showAddDebtorModal && (
@@ -3499,14 +3793,21 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                             rule.enabled ? "border-emerald-500/20" : "border-zinc-800"
                           }`}
                         >
+                          {/* Animated slide toggle */}
                           <button
                             onClick={() => void handleToggleRule(rule.id, !rule.enabled)}
                             title={rule.enabled ? "Desativar regra" : "Ativar regra"}
-                            className="flex-shrink-0 cursor-pointer"
+                            className="flex-shrink-0 cursor-pointer focus:outline-none group"
+                            role="switch"
+                            aria-checked={rule.enabled}
                           >
-                            {rule.enabled
-                              ? <ToggleRight className="w-7 h-7 text-emerald-400" />
-                              : <ToggleLeft className="w-7 h-7 text-zinc-600" />}
+                            <div className={`relative w-11 h-6 rounded-full transition-colors duration-300 ease-in-out ${
+                              rule.enabled ? "bg-emerald-500" : "bg-zinc-700 group-hover:bg-zinc-600"
+                            }`}>
+                              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ease-in-out ${
+                                rule.enabled ? "translate-x-5" : "translate-x-0"
+                              }`} />
+                            </div>
                           </button>
 
                           <div className="flex-1 min-w-0">

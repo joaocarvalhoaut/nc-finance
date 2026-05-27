@@ -123,8 +123,7 @@ export function exportRelatorio(
 
   // ── Tabela principal ──────────────────────────────────────────────────────────
   const rows = filteredDebtors.map((d) => [
-    d.client.slice(0, 35),
-    d.supplier?.slice(0, 25) || "—",
+    d.client.slice(0, 40),
     d.document || "—",
     d.dueDate || "—",
     BRL(d.value),
@@ -138,7 +137,6 @@ export function exportRelatorio(
     startY: tableY,
     head: [[
       "Cliente",
-      "Fornecedor / S.A",
       "Documento",
       "Vencimento",
       "Valor Original",
@@ -164,24 +162,23 @@ export function exportRelatorio(
       fillColor: [249, 250, 251],
     },
     columnStyles: {
-      0: { cellWidth: 42 },
-      1: { cellWidth: 35 },
+      0: { cellWidth: 58 },
+      1: { cellWidth: 25 },
       2: { cellWidth: 22 },
-      3: { cellWidth: 20 },
-      4: { cellWidth: 24, halign: "right" },
-      5: { cellWidth: 26, halign: "right" },
+      3: { cellWidth: 28, halign: "right" },
+      4: { cellWidth: 28, halign: "right" },
+      5: { cellWidth: 22, halign: "center" },
       6: { cellWidth: 20, halign: "center" },
-      7: { cellWidth: 18, halign: "center" },
-      8: { cellWidth: 24 },
+      7: { cellWidth: 26 },
     },
     didParseCell: (data) => {
-      if (data.section === "body" && data.column.index === 6) {
+      if (data.section === "body" && data.column.index === 5) {
         const val = data.cell.raw as string;
         if (val === "Vencido")    { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = "bold"; }
         if (val === "A Vencer")   { data.cell.styles.textColor = [180, 83, 9]; }
         if (val === "Liquidado")  { data.cell.styles.textColor = [16, 185, 129]; }
       }
-      if (data.section === "body" && data.column.index === 7) {
+      if (data.section === "body" && data.column.index === 6) {
         const val = data.cell.raw as string;
         if (val === "Enviado")    { data.cell.styles.textColor = [16, 185, 129]; }
         if (val === "Falhou")     { data.cell.styles.textColor = [220, 38, 38]; }
