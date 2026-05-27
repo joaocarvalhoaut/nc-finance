@@ -682,7 +682,7 @@ export default function LandingPage({
               <div className="space-y-6">
                 <div>
                   <h4 className="text-lg font-bold text-emerald-400 flex items-center gap-1.5">
-                    Plano Pró <Sparkles className="w-4 h-4" />
+                    Plano Pro
                   </h4>
                   <p className="text-xs text-zinc-400 mt-1">Robô autônomo com inteligência artificial</p>
                 </div>
@@ -728,7 +728,7 @@ export default function LandingPage({
                 <hr className="border-zinc-900" />
                 <ul className="space-y-3.5 text-sm text-zinc-400 font-light">
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Tudo do Plano Pró acoplado
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Tudo do Plano Pro acoplado
                   </li>
                   <li className="flex items-center gap-2.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Múltiplas instâncias simultâneas Z-API
