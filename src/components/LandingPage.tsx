@@ -896,7 +896,7 @@ export default function LandingPage({
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-between pt-8 gap-4 text-[10px]">
-            <span>© 2026 NC Finance Ltda. Todos os direitos reservados.</span>
+            <span>© 2026 NC Finance Ltda. · CNPJ em registro · Todos os direitos reservados.</span>
             <div className="flex gap-4">
               <span className="hover:text-emerald-400 cursor-pointer" onClick={() => setShowTermos(true)}>Termos de Uso</span>
               <span className="hover:text-emerald-400 cursor-pointer" onClick={() => setShowPrivacidade(true)}>Privacidade e Dados</span>
