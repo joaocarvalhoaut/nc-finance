@@ -1,5 +1,5 @@
 /**
- * PilotModeBanner — sticky top bar shown when pilot mode is active.
+ * PilotModeBanner - sticky top bar shown when pilot mode is active.
  *
  * Displays:
  *   - "Modo Piloto Ativo" badge
@@ -8,7 +8,7 @@
  *   - responsible name
  *   - remaining sends counter (orange when < 5)
  *
- * Security: receives only safe fields from PilotConfig — no credentials.
+ * Security: receives only safe fields from PilotConfig - no credentials.
  */
 
 import React from "react";
@@ -16,18 +16,19 @@ import { FlaskConical, Phone, User, AlertTriangle } from "lucide-react";
 import type { PilotConfig, PilotDailySends } from "../types";
 
 interface PilotModeBannerProps {
-  config:   PilotConfig;
-  counter:  PilotDailySends | null;
+  config: PilotConfig;
+  counter: PilotDailySends | null;
 }
 
 export default function PilotModeBanner({ config, counter }: PilotModeBannerProps) {
   if (!config.pilotEnabled) return null;
 
-  const sent      = counter?.sentCount ?? 0;
+  const sent = counter?.sentCount ?? 0;
   const remaining = Math.max(0, config.dailySendLimit - sent);
-  const pct       = config.dailySendLimit > 0 ? (sent / config.dailySendLimit) * 100 : 0;
-  const isLow     = remaining <= 5;
-  const isFull    = remaining === 0;
+  const pct = config.dailySendLimit > 0 ? (sent / config.dailySendLimit) * 100 : 0;
+  const isLow = remaining <= 5;
+  const isFull = remaining === 0;
+  const localWindowLabel = formatUtcWindowToLocal(config.allowedSendStart, config.allowedSendEnd);
 
   return (
     <div
@@ -44,14 +45,12 @@ export default function PilotModeBanner({ config, counter }: PilotModeBannerProp
         }
       `}
     >
-      {/* Badge */}
       <span className="flex items-center gap-1.5 font-semibold">
         <FlaskConical className="w-4 h-4" aria-hidden />
         Modo Piloto Ativo
       </span>
 
-      {/* Send counter */}
-      <span className="flex items-center gap-1.5" title="Envios hoje / limite diário">
+      <span className="flex items-center gap-1.5" title="Envios hoje / limite diario">
         <span
           className={`inline-block w-2 h-2 rounded-full ${
             isFull ? "bg-red-500" : isLow ? "bg-orange-400" : "bg-amber-400"
@@ -70,7 +69,6 @@ export default function PilotModeBanner({ config, counter }: PilotModeBannerProp
         )}
       </span>
 
-      {/* Progress bar */}
       <span className="flex items-center gap-1.5 min-w-[100px]" aria-hidden>
         <div className="h-1.5 w-24 bg-white/60 rounded-full overflow-hidden">
           <div
@@ -82,12 +80,13 @@ export default function PilotModeBanner({ config, counter }: PilotModeBannerProp
         </div>
       </span>
 
-      {/* Allowed window */}
-      <span className="text-xs opacity-75">
-        Janela: {config.allowedSendStart}–{config.allowedSendEnd} UTC
+      <span
+        className="text-xs opacity-75"
+        title={`Janela UTC: ${config.allowedSendStart}-${config.allowedSendEnd}`}
+      >
+        Janela local: {localWindowLabel}
       </span>
 
-      {/* WhatsApp number */}
       {config.whatsappNumberLabel && (
         <span className="flex items-center gap-1 text-xs opacity-75">
           <Phone className="w-3 h-3" aria-hidden />
@@ -95,7 +94,6 @@ export default function PilotModeBanner({ config, counter }: PilotModeBannerProp
         </span>
       )}
 
-      {/* Responsible */}
       {config.responsibleName && (
         <span className="flex items-center gap-1 text-xs opacity-75">
           <User className="w-3 h-3" aria-hidden />
@@ -104,4 +102,24 @@ export default function PilotModeBanner({ config, counter }: PilotModeBannerProp
       )}
     </div>
   );
+}
+
+function formatUtcWindowToLocal(startUtc: string, endUtc: string): string {
+  return `${convertUtcClockToLocal(startUtc)}-${convertUtcClockToLocal(endUtc)}`;
+}
+
+function convertUtcClockToLocal(hhmm: string): string {
+  const [hourText = "0", minuteText = "0"] = hhmm.split(":");
+  const hour = Number.parseInt(hourText, 10);
+  const minute = Number.parseInt(minuteText, 10);
+
+  if (Number.isNaN(hour) || Number.isNaN(minute)) {
+    return hhmm;
+  }
+
+  const base = new Date(Date.UTC(2000, 0, 1, hour, minute, 0));
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(base);
 }

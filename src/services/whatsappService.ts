@@ -18,6 +18,12 @@ export type SendChargeStatus =
   | "telefone_invalido"
   | "zapi_nao_configurada"
   | "nao_autenticado"
+  | "sessao_invalida"
+  | "pilot_desabilitado"
+  | "fora_horario"
+  | "dia_nao_permitido"
+  | "limite_diario"
+  | "config_ausente"
   | "erro_interno"
   | "payload_invalido";
 
@@ -56,6 +62,12 @@ export const SEND_STATUS_LABELS: Record<SendChargeStatus, string> = {
   telefone_invalido:     "Telefone inválido. Use DDI+DDD+número (ex: 5577999887720).",
   zapi_nao_configurada:  "Serviço WhatsApp indisponível no momento. Contate o suporte.",
   nao_autenticado:       "Sessão expirada. Faça login novamente.",
+  sessao_invalida:       "Sessão inválida. Faça login novamente.",
+  pilot_desabilitado:    "Envio bloqueado: modo piloto desabilitado para esta conta.",
+  fora_horario:          "Envio bloqueado: fora da janela permitida do modo piloto.",
+  dia_nao_permitido:     "Envio bloqueado: o modo piloto não permite disparos hoje.",
+  limite_diario:         "Envio bloqueado: limite diário do modo piloto atingido.",
+  config_ausente:        "Envio bloqueado: conta não habilitada no piloto.",
   erro_interno:          "Erro interno. Tente novamente ou contate o suporte.",
   payload_invalido:      "Dados inválidos. Verifique os campos e tente novamente.",
 };
@@ -71,17 +83,43 @@ export const whatsappService = {
       { body: payload },
     );
 
-    // Erro de rede / Edge Function não alcançada
-    if (error || !data) {
+    if (error) {
+      let errorMsg = error.message ?? "Não foi possível contatar o servidor.";
+      let errorStatus: SendChargeStatus = "erro";
+
+      try {
+        const ctx = (error as unknown as { context?: Response }).context;
+        if (ctx) {
+          const body = await ctx.json() as { error?: string; status?: string };
+          if (body.error) errorMsg = body.error;
+          if (body.status) errorStatus = body.status as SendChargeStatus;
+        }
+      } catch {
+        // Usa a mensagem genérica do SDK caso o body não esteja acessível.
+      }
+
       return {
         success: false,
-        status: "erro",
+        status: errorStatus,
         messageId: null,
         zaapId: null,
         logId: null,
         chargesUsed: null,
         chargesLimit: null,
-        error: error?.message ?? "Não foi possível contatar o servidor.",
+        error: errorMsg,
+      };
+    }
+
+    if (!data) {
+      return {
+        success: false,
+        status: "erro_interno",
+        messageId: null,
+        zaapId: null,
+        logId: null,
+        chargesUsed: null,
+        chargesLimit: null,
+        error: "Resposta inválida do servidor.",
       };
     }
 
