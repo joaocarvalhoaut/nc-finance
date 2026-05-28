@@ -210,21 +210,14 @@ export default function ClientDashboard({
 
   // ── Inline phone save ─────────────────────────────────────────────────────────
 
-  const savePhone = useCallback(async (debtorId: string) => {
+  const savePhone = useCallback((debtorId: string) => {
     const phone = editingPhoneValue.trim();
     if (!phone) return;
-    try {
-      const target = debtors.find(d => d.id === debtorId);
-      if (!target) return;
-      const updated = await financeService.update(userId, { ...target, phone });
-      setDebtors(prev => prev.map(d => d.id === debtorId ? { ...d, phone: updated.phone } : d));
-    } catch {
-      // silently ignore — user can try again
-    } finally {
-      setEditingPhoneId(null);
-      setEditingPhoneValue("");
-    }
-  }, [editingPhoneValue, debtors, userId]);
+    // Atualiza só o estado local — será persistido junto com createMany ao enviar
+    setDebtors(prev => prev.map(d => d.id === debtorId ? { ...d, phone } : d));
+    setEditingPhoneId(null);
+    setEditingPhoneValue("");
+  }, [editingPhoneValue]);
 
   // ── File handling ─────────────────────────────────────────────────────────────
 
@@ -745,7 +738,7 @@ export default function ClientDashboard({
                               value={editingPhoneValue}
                               onChange={e => setEditingPhoneValue(e.target.value)}
                               onKeyDown={e => {
-                                if (e.key === "Enter") void savePhone(d.id);
+                                if (e.key === "Enter") savePhone(d.id);
                                 if (e.key === "Escape") { setEditingPhoneId(null); setEditingPhoneValue(""); }
                               }}
                               autoFocus
@@ -754,7 +747,7 @@ export default function ClientDashboard({
                             />
                             <button
                               type="button"
-                              onClick={() => void savePhone(d.id)}
+                              onClick={() => savePhone(d.id)}
                               className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 px-1 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors"
                             >
                               OK
