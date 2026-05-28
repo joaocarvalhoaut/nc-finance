@@ -2572,62 +2572,6 @@ export default function App() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 text-xs">
-                      
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-zinc-500">Fluxo:</span>
-                        <select
-                          value={categoryFilter}
-                          onChange={(e) => setCategoryFilter(e.target.value)}
-                          className="bg-zinc-950 border border-zinc-805 rounded-xl text-xs text-zinc-300 px-2.5 py-1.5"
-                        >
-                          <option value="all">Sinalizar Todos os Fluxos</option>
-                          <option value="vencidos">Vencidos</option>
-                          <option value="a_vencer">A vencer</option>
-                          <option value="liquidado">Liquidado</option>
-                        </select>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-zinc-500">Status:</span>
-                        <select
-                          value={statusFilter}
-                          onChange={(e) => setStatusFilter(e.target.value)}
-                          className="bg-zinc-950 border border-zinc-805 rounded-xl text-xs text-zinc-300 px-2.5 py-1.5"
-                        >
-                          <option value="all">Todos os Status</option>
-                          <option value="pending">Pendente</option>
-                          <option value="sent">Enviado</option>
-                          <option value="failed">Falhou</option>
-                        </select>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-zinc-500">Responsável:</span>
-                        <select
-                          value={repFilter}
-                          onChange={(e) => setRepFilter(e.target.value)}
-                          className="bg-zinc-950 border border-zinc-805 rounded-xl text-xs text-zinc-300 px-2.5 py-1.5"
-                        >
-                          <option value="all">Ver Todos os Representantes</option>
-                          {representatives.map(r => (
-                            <option key={r.id} value={r.id}>{r.name}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <button
-                        onClick={() => setSortNameOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc")}
-                        title="Ordenar por nome do cliente"
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-                          sortNameOrder !== "none"
-                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                            : "bg-zinc-950 border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600"
-                        }`}
-                      >
-                        {sortNameOrder === "asc"  ? "A → Z" :
-                         sortNameOrder === "desc" ? "Z → A" : "A–Z"}
-                      </button>
-
                       <div className="flex gap-2">
                         <button
                           onClick={() => { setShowAddDebtorModal(true); setAddDebtorError(""); }}
@@ -2838,17 +2782,75 @@ export default function App() {
                                 }
                               </button>
                             </th>
-                            <th className="px-5 py-4">Cliente / Sacado</th>
-                            <th className="px-4 py-4 text-center">Documento Id</th>
-                            <th className="px-4 py-4 text-center">Vencimento</th>
-                            <th className="px-4 py-4 text-center">Telefone (WhatsApp)</th>
-                            <th className="px-4 py-4 text-right">Valor Base (R$)</th>
-                            <th className="px-4 py-4 text-right bg-emerald-500/5 text-emerald-400">Total + Multa + Juros (R$)</th>
-                            <th className="px-4 py-4 text-center">Tipo / Status</th>
-                            <th className="px-4 py-4">Responsável Atribuído</th>
-                            <th className="px-4 py-4">Observações</th>
-                            <th className="px-4 py-4 text-center text-emerald-400/60">PDF</th>
-                            <th className="px-5 py-4 text-right">Ação</th>
+                            {/* Cliente / Sacado — com sort A-Z inline */}
+                            <th className="px-5 py-3">
+                              <button
+                                type="button"
+                                onClick={() => setSortNameOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc")}
+                                className={`flex items-center gap-1 group transition-colors ${sortNameOrder !== "none" ? "text-emerald-400" : "text-zinc-400 hover:text-zinc-200"}`}
+                                title="Ordenar por nome"
+                              >
+                                <span>Cliente / Sacado</span>
+                                <span className={`text-[9px] font-bold ${sortNameOrder !== "none" ? "text-emerald-400" : "text-zinc-600 group-hover:text-zinc-400"}`}>
+                                  {sortNameOrder === "asc" ? "↑ A-Z" : sortNameOrder === "desc" ? "↓ Z-A" : "↕"}
+                                </span>
+                              </button>
+                            </th>
+                            <th className="px-4 py-3 text-center">Documento Id</th>
+                            <th className="px-4 py-3 text-center">Vencimento</th>
+                            <th className="px-4 py-3 text-center">Telefone (WhatsApp)</th>
+                            <th className="px-4 py-3 text-right">Valor Base (R$)</th>
+                            <th className="px-4 py-3 text-right bg-emerald-500/5 text-emerald-400">Total + Multa + Juros (R$)</th>
+                            {/* Tipo / Status — com filtros de categoria e status inline */}
+                            <th className="px-4 py-2 text-center">
+                              <div className="flex flex-col items-center gap-1.5">
+                                <span>Tipo / Status</span>
+                                <div className="flex gap-1">
+                                  <select
+                                    value={categoryFilter}
+                                    onChange={(e) => setCategoryFilter(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className={`bg-zinc-900 border rounded-lg text-[9px] px-1.5 py-0.5 cursor-pointer transition-colors focus:outline-none normal-case tracking-normal font-normal ${categoryFilter !== "all" ? "border-emerald-500/50 text-emerald-300" : "border-zinc-700 text-zinc-400"}`}
+                                  >
+                                    <option value="all">Todos</option>
+                                    <option value="vencidos">Vencidos</option>
+                                    <option value="a_vencer">A vencer</option>
+                                    <option value="liquidado">Liquidado</option>
+                                  </select>
+                                  <select
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className={`bg-zinc-900 border rounded-lg text-[9px] px-1.5 py-0.5 cursor-pointer transition-colors focus:outline-none normal-case tracking-normal font-normal ${statusFilter !== "all" ? "border-emerald-500/50 text-emerald-300" : "border-zinc-700 text-zinc-400"}`}
+                                  >
+                                    <option value="all">Status</option>
+                                    <option value="pending">Pendente</option>
+                                    <option value="sent">Enviado</option>
+                                    <option value="failed">Falhou</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </th>
+                            {/* Responsável — com filtro inline */}
+                            <th className="px-4 py-2">
+                              <div className="flex flex-col gap-1.5">
+                                <span>Responsável</span>
+                                <select
+                                  value={repFilter}
+                                  onChange={(e) => setRepFilter(e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className={`bg-zinc-900 border rounded-lg text-[9px] px-1.5 py-0.5 cursor-pointer transition-colors focus:outline-none normal-case tracking-normal font-normal w-full ${repFilter !== "all" ? "border-emerald-500/50 text-emerald-300" : "border-zinc-700 text-zinc-400"}`}
+                                >
+                                  <option value="all">Todos</option>
+                                  {representatives.map(r => (
+                                    <option key={r.id} value={r.id}>{r.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </th>
+                            <th className="px-4 py-3">Observações</th>
+                            <th className="px-4 py-3 text-center text-emerald-400/60">PDF</th>
+                            <th className="px-5 py-3 text-right">Ação</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-800">
