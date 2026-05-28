@@ -283,6 +283,7 @@ export default function App() {
 
   // Representatives modal
   const [showRepModal, setShowRepModal] = useState(false);
+  const [expandedRepId, setExpandedRepId] = useState<string | null>(null);
   const [repModalForm, setRepModalForm] = useState({ name: "", phone: "", role: "", color: "bg-emerald-500" });
   const [isSavingRep, setIsSavingRep] = useState(false);
   const [repModalError, setRepModalError] = useState("");
@@ -1774,23 +1775,59 @@ export default function App() {
                         <p className="text-xs text-zinc-500">Membros de cobrança cadastrados</p>
                       </div>
 
-                      <div className="space-y-3 max-h-[170px] overflow-y-auto pr-1">
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                         {representatives.map(r => {
-                          const assignedCount = debtors.filter(db => db.representativeId === r.id).length;
+                          const assignedDebtors = debtors.filter(db => db.representativeId === r.id);
+                          const assignedCount = assignedDebtors.length;
+                          const isExpanded = expandedRepId === r.id;
                           return (
-                            <div key={r.id} className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950 border border-zinc-800">
-                              <div className="flex items-center gap-2">
-                                <div className={`w-2.5 h-2.5 rounded-full ${r.color}`} />
-                                <div>
-                                  <div className="text-xs font-bold text-zinc-300">{r.name}</div>
-                                  <div className="text-[10px] text-zinc-500">{r.role}</div>
+                            <div key={r.id} className="rounded-xl bg-zinc-950 border border-zinc-800 overflow-hidden">
+                              <div className="flex items-center justify-between p-2.5">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-2.5 h-2.5 rounded-full ${r.color}`} />
+                                  <div>
+                                    <div className="text-xs font-bold text-zinc-300">{r.name}</div>
+                                    <div className="text-[10px] text-zinc-500">{r.role}</div>
+                                  </div>
                                 </div>
+                                <button
+                                  onClick={() => setExpandedRepId(isExpanded ? null : r.id)}
+                                  disabled={assignedCount === 0}
+                                  className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
+                                    assignedCount === 0
+                                      ? "bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-default"
+                                      : isExpanded
+                                        ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-300"
+                                        : "bg-zinc-900 border border-zinc-700 text-zinc-300 hover:border-emerald-500/40 hover:text-emerald-300"
+                                  }`}
+                                >
+                                  {assignedCount} {assignedCount === 1 ? "devedor" : "devedores"} {assignedCount > 0 && (isExpanded ? "▲" : "▼")}
+                                </button>
                               </div>
-                              <div className="text-right">
-                                <span className="text-[10px] uppercase font-mono bg-zinc-900 border border-zinc-850 px-2 py-0.5 rounded text-zinc-300 font-bold">
-                                  {assignedCount} devedores
-                                </span>
-                              </div>
+                              {isExpanded && assignedDebtors.length > 0 && (
+                                <div className="border-t border-zinc-800 divide-y divide-zinc-800/60">
+                                  {assignedDebtors.map(d => (
+                                    <div key={d.id} className="flex items-center justify-between px-3 py-2 gap-2">
+                                      <div className="min-w-0">
+                                        <p className="text-[11px] font-semibold text-zinc-200 truncate">{d.client}</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono">{d.document}</p>
+                                      </div>
+                                      <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                                          d.category === "vencidos"  ? "bg-rose-500/10 text-rose-400"   :
+                                          d.category === "a_vencer"  ? "bg-amber-500/10 text-amber-400" :
+                                          "bg-emerald-500/10 text-emerald-400"
+                                        }`}>
+                                          {d.category === "vencidos" ? "Vencido" : d.category === "a_vencer" ? "A vencer" : "Liquidado"}
+                                        </span>
+                                        <span className="text-[10px] font-mono text-zinc-400">
+                                          {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(d.updatedValue || d.value)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
