@@ -73,7 +73,8 @@ import {
   CalendarClock,
   X,
   Copy,
-  Pencil
+  Pencil,
+  HandCoins
 } from "lucide-react";
 
 // Default Pattern message templates following user specification
@@ -2129,20 +2130,33 @@ export default function App() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-zinc-500">Fluxo Contábil de Entrada:</label>
+                        <label className="text-xs font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-1.5">
+                          <FileCheck2 className="w-3.5 h-3.5" />
+                          Tipo de arquivo
+                        </label>
                         <div className="grid grid-cols-3 gap-2">
-                          {(["vencidos", "a_vencer", "liquidado"] as const).map((cat) => (
+                          {([
+                            { value: "vencidos",  label: "Vencidos",   description: "Títulos já vencidos — cobráveis com juros e multa", inactive: "border-zinc-700 text-zinc-400 hover:border-rose-500/50 hover:text-rose-300",    active: "border-rose-500 bg-rose-500/10 text-rose-300" },
+                            { value: "a_vencer",  label: "A vencer",   description: "Títulos a vencer — aviso preventivo amigável",       inactive: "border-zinc-700 text-zinc-400 hover:border-amber-500/50 hover:text-amber-300",   active: "border-amber-500 bg-amber-500/10 text-amber-300" },
+                            { value: "liquidado", label: "Liquidação", description: "Títulos pagos — reconciliação, SEM cobrança",        inactive: "border-zinc-700 text-zinc-400 hover:border-emerald-500/50 hover:text-emerald-300", active: "border-emerald-500 bg-emerald-500/10 text-emerald-300" },
+                          ] as const).map(cat => (
                             <button
-                              key={cat}
-                              onClick={() => setImportCategory(cat)}
-                              className={`py-2 rounded-xl text-xs font-bold uppercase transition-all border ${importCategory === cat ? "bg-emerald-500 text-black border-emerald-500" : "bg-zinc-950 border-zinc-850 text-zinc-400"}`}
+                              key={cat.value}
+                              type="button"
+                              onClick={() => setImportCategory(cat.value)}
+                              className={`px-3 py-3 rounded-xl border transition-all text-left ${importCategory === cat.value ? cat.active : cat.inactive}`}
                             >
-                              {cat === "vencidos" && "Vencidos"}
-                              {cat === "a_vencer" && "A vencer"}
-                              {cat === "liquidado" && "Liquidação"}
+                              <div className="font-semibold text-sm">{cat.label}</div>
+                              <div className="text-[10px] opacity-70 mt-0.5 leading-tight">{cat.description}</div>
                             </button>
                           ))}
                         </div>
+                        {importCategory === "liquidado" && (
+                          <div className="flex items-start gap-2 text-xs text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3">
+                            <HandCoins className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                            <span>Arquivo de <strong>liquidação</strong>: os registros identificados serão marcados como pagos na base consolidada. <strong>Nenhuma cobrança será enviada.</strong></span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-1.5">
@@ -3117,26 +3131,34 @@ export default function App() {
                       <form onSubmit={(e) => void handleAddDebtorManually(e)} className="p-5 space-y-4">
 
                         {/* Categoria */}
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Tipo / Categoria</label>
+                        <div className="space-y-2">
+                          <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold flex items-center gap-1.5">
+                            <FileCheck2 className="w-3 h-3" />
+                            Tipo de arquivo
+                          </label>
                           <div className="grid grid-cols-3 gap-2">
-                            {(["vencidos", "a_vencer", "liquidado"] as const).map(cat => (
+                            {([
+                              { value: "vencidos",  label: "Vencidos",   description: "Títulos já vencidos — cobráveis com juros e multa", inactive: "border-zinc-700 text-zinc-400 hover:border-rose-500/50 hover:text-rose-300",    active: "border-rose-500 bg-rose-500/10 text-rose-300" },
+                              { value: "a_vencer",  label: "A vencer",   description: "Títulos a vencer — aviso preventivo amigável",       inactive: "border-zinc-700 text-zinc-400 hover:border-amber-500/50 hover:text-amber-300",   active: "border-amber-500 bg-amber-500/10 text-amber-300" },
+                              { value: "liquidado", label: "Liquidação", description: "Títulos pagos — reconciliação, SEM cobrança",        inactive: "border-zinc-700 text-zinc-400 hover:border-emerald-500/50 hover:text-emerald-300", active: "border-emerald-500 bg-emerald-500/10 text-emerald-300" },
+                            ] as const).map(cat => (
                               <button
-                                key={cat}
+                                key={cat.value}
                                 type="button"
-                                onClick={() => setAddDebtorForm(f => ({ ...f, category: cat }))}
-                                className={`py-2 rounded-xl text-xs font-bold transition-all border ${
-                                  addDebtorForm.category === cat
-                                    ? cat === "vencidos"   ? "border-rose-500 bg-rose-500/10 text-rose-300"
-                                    : cat === "a_vencer"   ? "border-amber-500 bg-amber-500/10 text-amber-300"
-                                    : "border-emerald-500 bg-emerald-500/10 text-emerald-300"
-                                    : "border-zinc-700 text-zinc-500 hover:border-zinc-500"
-                                }`}
+                                onClick={() => setAddDebtorForm(f => ({ ...f, category: cat.value }))}
+                                className={`px-2.5 py-2.5 rounded-xl border transition-all text-left ${addDebtorForm.category === cat.value ? cat.active : cat.inactive}`}
                               >
-                                {cat === "vencidos" ? "Vencido" : cat === "a_vencer" ? "A Vencer" : "Liquidado"}
+                                <div className="font-semibold text-xs">{cat.label}</div>
+                                <div className="text-[9px] opacity-70 mt-0.5 leading-tight">{cat.description}</div>
                               </button>
                             ))}
                           </div>
+                          {addDebtorForm.category === "liquidado" && (
+                            <div className="flex items-start gap-2 text-xs text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-2.5">
+                              <HandCoins className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                              <span>Registro será salvo como <strong>liquidado</strong> — sem cobrança.</span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Nome + Fornecedor */}
