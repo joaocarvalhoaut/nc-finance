@@ -39,7 +39,7 @@ import { checkSubscription }               from "../_shared/subscriptionGuard.ts
 import { getUsageSnapshot, incrementChargesSent } from "../_shared/usageGuard.ts";
 import { insertBillingLog }                from "../_shared/billingLog.ts";
 import { buildMessage }                    from "../_shared/messageBuilder.ts";
-import { loadZApiCredentials }             from "../_shared/platformIntegrations.ts";
+import { loadZApiCredentialsForUser }       from "../_shared/platformIntegrations.ts";
 import { sanitizeError }                   from "../_shared/sanitize.ts";
 import { checkPilotGuard, incrementPilotDailyCount } from "../_shared/pilotGuard.ts";
 
@@ -48,7 +48,7 @@ import { checkPilotGuard, incrementPilotDailyCount } from "../_shared/pilotGuard
 const SUPABASE_URL      = Deno.env.get("SUPABASE_URL")            || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")       || "";
 const SERVICE_ROLE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-// Z-API credentials loaded dynamically via loadZApiCredentials() — not hardcoded
+// Z-API credentials loaded via loadZApiCredentialsForUser() — user_zapi_config → platform_integrations → env vars
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -148,9 +148,9 @@ Deno.serve(async (request: Request) => {
     const customMessage  = typeof body.customMessage === "string" ? body.customMessage : null;
     const dryRun         = body.dryRun === true;
 
-    // ── 3. Valida credenciais Z-API (platform_integrations → env vars) ──────────
-    // P4: usa SOMENTE platform_integrations — NUNCA company_integrations
-    const zapiCreds = await loadZApiCredentials(admin);
+    // ── 3. Valida credenciais Z-API — número próprio (add-on) tem prioridade ─────
+    // Lookup order: user_zapi_config → platform_integrations → env vars
+    const zapiCreds = await loadZApiCredentialsForUser(admin, userId);
     if (!zapiCreds) {
       return errResponse(503, {
         error: "Z-API nao configurada na plataforma. Configure as credenciais no painel de integrações.",

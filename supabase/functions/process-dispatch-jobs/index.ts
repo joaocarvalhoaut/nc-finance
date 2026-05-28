@@ -30,7 +30,7 @@ import { checkSubscription }                     from "../_shared/subscriptionGu
 import { getUsageSnapshot, incrementChargesSent, getPlanLimit } from "../_shared/usageGuard.ts";
 import { insertBillingLog }                      from "../_shared/billingLog.ts";
 import { buildMessage }                          from "../_shared/messageBuilder.ts";
-import { loadZApiCredentials }                   from "../_shared/platformIntegrations.ts";
+import { loadZApiCredentialsForUser }             from "../_shared/platformIntegrations.ts";
 import { sanitizeError }                         from "../_shared/sanitize.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
@@ -92,9 +92,9 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
   };
 
   try {
-    // ── 1. Carrega credenciais Z-API (platform_integrations → env vars) ──────
-    // P4: usa SOMENTE platform_integrations — NUNCA company_integrations
-    const zapiCreds = await loadZApiCredentials(admin);
+    // ── 1. Carrega credenciais Z-API — número próprio (add-on) tem prioridade ──
+    // Lookup: user_zapi_config → platform_integrations → env vars
+    const zapiCreds = await loadZApiCredentialsForUser(admin, userId);
     if (!zapiCreds) {
       await markJob("failed", { last_error: "Z-API nao configurada (platform_integrations ausente)." });
       return;

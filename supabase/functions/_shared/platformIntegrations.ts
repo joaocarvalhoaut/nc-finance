@@ -1,19 +1,22 @@
 /**
- * platformIntegrations.ts — load Z-API credentials from platform_integrations.
+ * platformIntegrations.ts — load Z-API credentials.
  *
  * Security contract:
  *   - Credentials are ONLY returned inside Edge Functions (service_role).
  *   - This module MUST NOT be imported by any frontend code.
  *   - The browser never receives token or client_token.
  *
- * Lookup order:
- *   1. platform_integrations table (preferred — managed via whatsapp-gateway API)
- *   2. Deno env vars ZAPI_INSTANCE_ID / ZAPI_TOKEN / ZAPI_CLIENT_TOKEN (bootstrap)
+ * Lookup order for loadZApiCredentialsForUser(admin, userId):
+ *   1. user_zapi_config (add-on número próprio — per-user, if active)
+ *   2. platform_integrations table (número global NC Finance)
+ *   3. Deno env vars ZAPI_INSTANCE_ID / ZAPI_TOKEN / ZAPI_CLIENT_TOKEN (bootstrap)
  *
- * If NEITHER source has complete credentials → returns null.
+ * loadZApiCredentials(admin) — lookup global (sem usuário específico):
+ *   1. platform_integrations table
+ *   2. env vars
+ *
+ * If NO source has complete credentials → returns null.
  * Callers MUST check for null and return a clear "zapi_nao_configurada" error.
- *
- * There is NO fallback to company_integrations or any per-user table.
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
@@ -25,7 +28,9 @@ export interface ZApiCredentials {
   token:       string;
   clientToken: string;
   /** Where the credentials came from — for safe logging only */
-  source: "platform_integrations" | "env_vars";
+  source: "user_zapi_config" | "platform_integrations" | "env_vars";
+  /** true when the user has their own dedicated number (add-on) */
+  isOwnNumber?: boolean;
 }
 
 export interface PlatformStatus {
@@ -80,6 +85,48 @@ export async function loadZApiCredentials(
   }
 
   return null;
+}
+
+// ── Per-user lookup (own number add-on) ──────────────────────────────────────
+
+/**
+ * Load Z-API credentials for a specific user.
+ * Checks user_zapi_config first (own number add-on), then falls back
+ * to the global platform credentials.
+ *
+ * Use this in send-whatsapp-charge and send-whatsapp-batch.
+ */
+export async function loadZApiCredentialsForUser(
+  admin: AdminClient,
+  userId: string,
+): Promise<ZApiCredentials | null> {
+  // 1. Check per-user config (own number add-on)
+  try {
+    const { data, error } = await admin
+      .from("user_zapi_config")
+      .select("instance_id, token, client_token, is_active")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (!error && data) {
+      const row = data as Record<string, string | boolean | null>;
+      if (row.instance_id && row.token && row.client_token) {
+        return {
+          instanceId:  row.instance_id  as string,
+          token:       row.token        as string,
+          clientToken: row.client_token as string,
+          source:      "user_zapi_config",
+          isOwnNumber: true,
+        };
+      }
+    }
+  } catch {
+    // Table may not exist yet — fall through to global
+  }
+
+  // 2. Fall back to global platform credentials
+  return loadZApiCredentials(admin);
 }
 
 // ── Read safe status (no credentials) ────────────────────────────────────────

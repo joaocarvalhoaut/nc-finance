@@ -22,7 +22,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
 import { normalizePhone, validatePhone, sendTextMessage, sendDocumentMessage } from "../_shared/zapi.ts";
 import { downloadDriveFile, getDriveAccessToken } from "../_shared/driveFolderIndex.ts";
-import { loadZApiCredentials } from "../_shared/platformIntegrations.ts";
+import { loadZApiCredentialsForUser } from "../_shared/platformIntegrations.ts";
 import { maskPhone, messagePreview, sanitizeError } from "../_shared/sanitize.ts";
 import { checkPilotGuard, incrementPilotDailyCount } from "../_shared/pilotGuard.ts";
 
@@ -117,9 +117,9 @@ Deno.serve(async (request: Request) => {
       return errResponse(400, { error: "Campos obrigatorios: phone, message.", status: "telefone_invalido" });
     }
 
-    // ── 3. Carrega credenciais Z-API (platform_integrations → env vars) ──────────
-    // P4: usa SOMENTE platform_integrations ou env vars — NUNCA company_integrations
-    const zapiCreds = await loadZApiCredentials(admin);
+    // ── 3. Carrega credenciais Z-API — número próprio (add-on) tem prioridade ────
+    // Lookup order: user_zapi_config → platform_integrations → env vars
+    const zapiCreds = await loadZApiCredentialsForUser(admin, userId);
     if (!zapiCreds) {
       return errResponse(503, {
         error: "Z-API nao configurada na plataforma. Configure as credenciais no painel de integrações.",
