@@ -3036,105 +3036,6 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                   </div>
                 )}
 
-                {/* ── Modal: Gerenciar Responsáveis ─────────────────────────── */}
-                {showRepModal && (
-                  <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-                    onClick={(e) => e.target === e.currentTarget && setShowRepModal(false)}
-                  >
-                    <div className="bg-zinc-900 border border-zinc-700 rounded-3xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
-                      {/* Header */}
-                      <div className="flex items-center justify-between p-5 border-b border-zinc-800 flex-shrink-0">
-                        <div className="flex items-center gap-2">
-                          <Users className="w-5 h-5 text-emerald-400" />
-                          <h3 className="text-base font-bold text-white">Responsáveis Ativos</h3>
-                        </div>
-                        <button onClick={() => setShowRepModal(false)} className="text-zinc-500 hover:text-white transition-colors">
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-
-                      {/* List */}
-                      <div className="overflow-y-auto flex-1 p-5 space-y-2">
-                        {representatives.length === 0 ? (
-                          <p className="text-xs text-zinc-500 text-center py-4">Nenhum responsável cadastrado.</p>
-                        ) : representatives.map((r) => {
-                          const assignedCount = debtors.filter((d) => d.representativeId === r.id).length;
-                          return (
-                            <div key={r.id} className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800 gap-3">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className={`w-3 h-3 rounded-full flex-shrink-0 ${r.color}`} />
-                                <div className="min-w-0">
-                                  <p className="text-xs font-bold text-zinc-200 truncate">{r.name}</p>
-                                  <p className="text-[10px] text-zinc-500">{r.role} · {assignedCount} devedor{assignedCount !== 1 ? "es" : ""}</p>
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => void handleDeleteRep(r.id)}
-                                className="text-zinc-600 hover:text-rose-400 transition-colors flex-shrink-0 p-1 rounded"
-                                title="Excluir responsável"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Add form */}
-                      <div className="border-t border-zinc-800 p-5 space-y-3 flex-shrink-0">
-                        <p className="text-xs font-bold text-zinc-300">Adicionar novo responsável</p>
-                        {repModalError && (
-                          <p className="text-xs text-rose-400">{repModalError}</p>
-                        )}
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Nome *</label>
-                            <input
-                              type="text"
-                              value={repModalForm.name}
-                              onChange={(e) => setRepModalForm((f) => ({ ...f, name: e.target.value }))}
-                              placeholder="Ex: João Silva"
-                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Cargo</label>
-                            <input
-                              type="text"
-                              value={repModalForm.role}
-                              onChange={(e) => setRepModalForm((f) => ({ ...f, role: e.target.value }))}
-                              placeholder="Ex: Cobrança"
-                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Telefone WhatsApp</label>
-                          <input
-                            type="text"
-                            value={repModalForm.phone}
-                            onChange={(e) => setRepModalForm((f) => ({ ...f, phone: e.target.value }))}
-                            placeholder="5511999990000"
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                          />
-                        </div>
-                        <button
-                          onClick={() => void handleAddRepFromModal()}
-                          disabled={isSavingRep}
-                          className="w-full py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                        >
-                          {isSavingRep ? (
-                            <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Salvando...</>
-                          ) : (
-                            <><UserPlus className="w-3.5 h-3.5" /> Adicionar Responsável</>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* ── Modal: Adicionar Devedor Manualmente ──────────────────── */}
                 {showAddDebtorModal && (
                   <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={e => e.target === e.currentTarget && setShowAddDebtorModal(false)}>
@@ -4259,6 +4160,105 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
             </footer>
 
           </main>
+
+          {/* ── Modal Global: Gerenciar Responsáveis (acessível de qualquer aba) ── */}
+          {showRepModal && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={(e) => e.target === e.currentTarget && setShowRepModal(false)}
+            >
+              <div className="bg-zinc-900 border border-zinc-700 rounded-3xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+                {/* Header */}
+                <div className="flex items-center justify-between p-5 border-b border-zinc-800 flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-emerald-400" />
+                    <h3 className="text-base font-bold text-white">Responsáveis Ativos</h3>
+                  </div>
+                  <button onClick={() => setShowRepModal(false)} className="text-zinc-500 hover:text-white transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* List */}
+                <div className="overflow-y-auto flex-1 p-5 space-y-2">
+                  {representatives.length === 0 ? (
+                    <p className="text-xs text-zinc-500 text-center py-4">Nenhum responsável cadastrado.</p>
+                  ) : representatives.map((r) => {
+                    const assignedCount = debtors.filter((d) => d.representativeId === r.id).length;
+                    return (
+                      <div key={r.id} className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800 gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className={`w-3 h-3 rounded-full flex-shrink-0 ${r.color}`} />
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-zinc-200 truncate">{r.name}</p>
+                            <p className="text-[10px] text-zinc-500">{r.role} · {assignedCount} devedor{assignedCount !== 1 ? "es" : ""}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => void handleDeleteRep(r.id)}
+                          className="text-zinc-600 hover:text-rose-400 transition-colors flex-shrink-0 p-1 rounded"
+                          title="Excluir responsável"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Add form */}
+                <div className="border-t border-zinc-800 p-5 space-y-3 flex-shrink-0">
+                  <p className="text-xs font-bold text-zinc-300">Adicionar novo responsável</p>
+                  {repModalError && (
+                    <p className="text-xs text-rose-400">{repModalError}</p>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Nome *</label>
+                      <input
+                        type="text"
+                        value={repModalForm.name}
+                        onChange={(e) => setRepModalForm((f) => ({ ...f, name: e.target.value }))}
+                        placeholder="Ex: João Silva"
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Cargo</label>
+                      <input
+                        type="text"
+                        value={repModalForm.role}
+                        onChange={(e) => setRepModalForm((f) => ({ ...f, role: e.target.value }))}
+                        placeholder="Ex: Cobrança"
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Telefone WhatsApp</label>
+                    <input
+                      type="text"
+                      value={repModalForm.phone}
+                      onChange={(e) => setRepModalForm((f) => ({ ...f, phone: e.target.value }))}
+                      placeholder="5511999990000"
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <button
+                    onClick={() => void handleAddRepFromModal()}
+                    disabled={isSavingRep}
+                    className="w-full py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isSavingRep ? (
+                      <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Salvando...</>
+                    ) : (
+                      <><UserPlus className="w-3.5 h-3.5" /> Adicionar Responsável</>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {showSuporte && <Suporte onClose={() => setShowSuporte(false)} />}
         </>
