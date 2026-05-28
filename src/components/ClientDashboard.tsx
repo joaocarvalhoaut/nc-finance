@@ -37,6 +37,7 @@ import {
   CheckCircle,
   Clock,
   HandCoins,
+  Pencil,
 } from "lucide-react";
 import { whatsappGatewayService } from "../services/whatsappGatewayService";
 import { whatsappBatchService, type BatchChargeResult } from "../services/whatsappBatchService";
@@ -129,6 +130,10 @@ export default function ClientDashboard({
   // ── Today's sent count ───────────────────────────────────────────────────────
   const [sentToday, setSentToday] = useState<number>(0);
 
+  // ── Inline phone editing on debtor cards ─────────────────────────────────────
+  const [editingPhoneId,    setEditingPhoneId]    = useState<string | null>(null);
+  const [editingPhoneValue, setEditingPhoneValue] = useState("");
+
   // ── Import category ──────────────────────────────────────────────────────────
   const [importCategory, setImportCategory] = useState<ImportCategory>("vencidos");
 
@@ -202,6 +207,24 @@ export default function ClientDashboard({
     void refreshTodayCount();
     void refreshPilotStatus();
   }, [refreshWaStatus, refreshTodayCount, refreshPilotStatus]);
+
+  // ── Inline phone save ─────────────────────────────────────────────────────────
+
+  const savePhone = useCallback(async (debtorId: string) => {
+    const phone = editingPhoneValue.trim();
+    if (!phone) return;
+    try {
+      const target = debtors.find(d => d.id === debtorId);
+      if (!target) return;
+      const updated = await financeService.update(userId, { ...target, phone });
+      setDebtors(prev => prev.map(d => d.id === debtorId ? { ...d, phone: updated.phone } : d));
+    } catch {
+      // silently ignore — user can try again
+    } finally {
+      setEditingPhoneId(null);
+      setEditingPhoneValue("");
+    }
+  }, [editingPhoneValue, debtors, userId]);
 
   // ── File handling ─────────────────────────────────────────────────────────────
 
@@ -712,9 +735,48 @@ export default function ClientDashboard({
                         {formatBRL(d.updatedValue ?? d.value)}
                       </p>
                       {!isLiquidacao && !hasPhone && (
-                        <p className="text-[10px] text-amber-400 flex items-center gap-1 justify-end">
-                          <AlertTriangle className="w-3 h-3" /> sem telefone
-                        </p>
+                        editingPhoneId === d.id ? (
+                          <div
+                            className="flex items-center gap-1 mt-1"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <input
+                              type="text"
+                              value={editingPhoneValue}
+                              onChange={e => setEditingPhoneValue(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === "Enter") void savePhone(d.id);
+                                if (e.key === "Escape") { setEditingPhoneId(null); setEditingPhoneValue(""); }
+                              }}
+                              autoFocus
+                              placeholder="5577999998888"
+                              className="w-28 bg-zinc-800 border border-emerald-500/40 rounded px-1.5 py-0.5 text-[10px] font-mono text-white focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void savePhone(d.id)}
+                              className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 px-1 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors"
+                            >
+                              OK
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setEditingPhoneId(null); setEditingPhoneValue(""); }}
+                              className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); setEditingPhoneValue(d.phone || ""); setEditingPhoneId(d.id); }}
+                            className="text-[10px] text-amber-400 hover:text-amber-300 flex items-center gap-1 justify-end mt-0.5 transition-colors cursor-pointer"
+                          >
+                            <AlertTriangle className="w-3 h-3" /> sem telefone
+                            <Pencil className="w-2.5 h-2.5 opacity-70" />
+                          </button>
+                        )
                       )}
                       {isLiquidacao && (
                         <p className="text-[10px] text-emerald-400">liquidado</p>
