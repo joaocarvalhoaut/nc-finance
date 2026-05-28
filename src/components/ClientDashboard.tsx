@@ -134,6 +134,11 @@ export default function ClientDashboard({
   const [editingPhoneId,    setEditingPhoneId]    = useState<string | null>(null);
   const [editingPhoneValue, setEditingPhoneValue] = useState("");
 
+  // ── PDF attachments (keyed by debtor document number) ────────────────────────
+  // Stored locally before send; uploaded to Storage after createMany
+  const [attachedPdfs,    setAttachedPdfs]    = useState<Map<string, File>>(new Map());
+  const [uploadingPdfDoc, setUploadingPdfDoc] = useState<string | null>(null);
+
   // ── Import category ──────────────────────────────────────────────────────────
   const [importCategory, setImportCategory] = useState<ImportCategory>("vencidos");
 
@@ -408,6 +413,23 @@ export default function ClientDashboard({
 
       // Notifica Visão Geral para recarregar
       onDebtorsImported?.();
+
+      // Upload de PDFs anexados — faz após createMany pois agora temos IDs reais
+      if (attachedPdfs.size > 0) {
+        for (const saved of persisted) {
+          const file = attachedPdfs.get(saved.document ?? "");
+          if (file && saved.id) {
+            try {
+              setUploadingPdfDoc(saved.document ?? "");
+              const url = await financeService.uploadChargePdf(userId, saved.id, file);
+              await financeService.updatePdfAttachment(userId, saved.id, { url, name: file.name });
+            } catch (e) {
+              console.warn("[ClientDashboard] PDF upload failed for", saved.document, e);
+            }
+          }
+        }
+        setUploadingPdfDoc(null);
+      }
 
       const validIds = persisted.map(d => d.id).filter(Boolean) as string[];
 
@@ -721,6 +743,56 @@ export default function ClientDashboard({
                       <p className="text-xs text-zinc-500 truncate">
                         Doc: {d.document} · Venc: {d.dueDate}
                       </p>
+                      {/* PDF attachment inline */}
+                      {!isLiquidacao && (() => {
+                        const docKey = d.document ?? "";
+                        const file = attachedPdfs.get(docKey);
+                        const isUploading = uploadingPdfDoc === docKey;
+                        return (
+                          <div className="flex items-center gap-1.5 mt-1" onClick={e => e.stopPropagation()}>
+                            {isUploading ? (
+                              <span className="text-[10px] text-zinc-400 flex items-center gap-1">
+                                <RefreshCw className="w-2.5 h-2.5 animate-spin text-emerald-400" /> enviando PDF…
+                              </span>
+                            ) : file ? (
+                              <>
+                                <span className="text-[10px] text-emerald-400 font-mono truncate max-w-[120px]" title={file.name}>
+                                  📎 {file.name}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setAttachedPdfs(prev => { const m = new Map(prev); m.delete(docKey); return m; })}
+                                  className="text-zinc-600 hover:text-rose-400 transition-colors"
+                                  title="Remover PDF"
+                                >
+                                  <XCircle className="w-3 h-3" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <label
+                                  htmlFor={`pdf-cb-${d.id}`}
+                                  className="text-[10px] text-zinc-500 hover:text-emerald-400 flex items-center gap-1 cursor-pointer transition-colors"
+                                  title="Anexar PDF do boleto"
+                                >
+                                  <Upload className="w-2.5 h-2.5" /> boleto PDF
+                                </label>
+                                <input
+                                  id={`pdf-cb-${d.id}`}
+                                  type="file"
+                                  accept=".pdf,application/pdf"
+                                  className="hidden"
+                                  onChange={e => {
+                                    const f = e.target.files?.[0];
+                                    if (f) setAttachedPdfs(prev => new Map(prev).set(docKey, f));
+                                    e.target.value = "";
+                                  }}
+                                />
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="text-right flex-shrink-0">
