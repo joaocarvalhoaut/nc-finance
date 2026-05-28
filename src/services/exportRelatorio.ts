@@ -4,7 +4,7 @@
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import type { Debtor } from "../types";
+import type { Debtor, Representative } from "../types";
 
 const BRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -25,6 +25,7 @@ export function exportRelatorio(
   debtors: Debtor[],
   filteredDebtors: Debtor[],
   userEmail: string,
+  representatives: Representative[] = [],
 ) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -122,6 +123,8 @@ export function exportRelatorio(
   }
 
   // ── Tabela principal ──────────────────────────────────────────────────────────
+  const repMap = new Map(representatives.map((r) => [r.id, r.name]));
+
   const rows = filteredDebtors.map((d) => [
     d.client.slice(0, 40),
     d.document || "—",
@@ -131,6 +134,7 @@ export function exportRelatorio(
     CATEGORY_LABEL[d.category] ?? d.category,
     STATUS_LABEL[d.status] ?? d.status,
     d.phone || "—",
+    d.representativeId ? (repMap.get(d.representativeId) ?? "—") : "—",
   ]);
 
   autoTable(doc, {
@@ -144,6 +148,7 @@ export function exportRelatorio(
       "Categoria",
       "Status",
       "Telefone",
+      "Representante",
     ]],
     body: rows,
     styles: {
@@ -162,14 +167,15 @@ export function exportRelatorio(
       fillColor: [249, 250, 251],
     },
     columnStyles: {
-      0: { cellWidth: 58 },
-      1: { cellWidth: 25 },
-      2: { cellWidth: 22 },
-      3: { cellWidth: 28, halign: "right" },
-      4: { cellWidth: 28, halign: "right" },
-      5: { cellWidth: 22, halign: "center" },
-      6: { cellWidth: 20, halign: "center" },
-      7: { cellWidth: 26 },
+      0: { cellWidth: 50 },
+      1: { cellWidth: 22 },
+      2: { cellWidth: 20 },
+      3: { cellWidth: 24, halign: "right" },
+      4: { cellWidth: 24, halign: "right" },
+      5: { cellWidth: 20, halign: "center" },
+      6: { cellWidth: 18, halign: "center" },
+      7: { cellWidth: 24 },
+      8: { cellWidth: 30 },
     },
     didParseCell: (data) => {
       if (data.section === "body" && data.column.index === 5) {

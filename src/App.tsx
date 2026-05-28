@@ -72,7 +72,8 @@ import {
   ToggleRight,
   CalendarClock,
   X,
-  Copy
+  Copy,
+  Pencil
 } from "lucide-react";
 
 // Default Pattern message templates following user specification
@@ -207,6 +208,7 @@ export default function App() {
   const [importCategory, setImportCategory] = useState<"vencidos" | "a_vencer" | "liquidado">("vencidos");
   const [isExtracting, setIsExtracting] = useState<boolean>(false);
   const [extractedDebtors, setExtractedDebtors] = useState<Debtor[]>([]);
+  const [extractedSelectedIds, setExtractedSelectedIds] = useState<Set<string>>(new Set());
   const [extractionAlert, setExtractionAlert] = useState<string>("");
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
   // Original File object — needed for OCR fallback on scanned PDFs
@@ -243,6 +245,10 @@ export default function App() {
   const [driveFolderStatus, setDriveFolderStatus] = useState<DriveFolderStatus | null>(null);
 
 
+  // Inline phone editing in Cobrança tab
+  const [editingPhoneDebtorId, setEditingPhoneDebtorId] = useState<string | null>(null);
+  const [editingPhoneValue, setEditingPhoneValue] = useState<string>("");
+
   // Batch WhatsApp send state
   const [selectedDebtorIds, setSelectedDebtorIds] = useState<Set<string>>(new Set());
   const [isBatchSending, setIsBatchSending] = useState<boolean>(false);
@@ -272,6 +278,7 @@ export default function App() {
   // Filters state in Overview Tab
   const [searchFilter, setSearchFilter] = useState<string>("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [repFilter, setRepFilter] = useState<string>("all");
 
   // Representatives modal
@@ -931,13 +938,24 @@ export default function App() {
   const sendExtractedToOverview = async () => {
     if (extractedDebtors.length === 0 || !currentOwnerUserId) return;
 
+    // Use selected items if any are selected, otherwise send all
+    const toSend = extractedSelectedIds.size > 0
+      ? extractedDebtors.filter(d => extractedSelectedIds.has(d.id))
+      : extractedDebtors;
+
+    if (toSend.length === 0) return;
+
     try {
-      const savedDebtors = await financeService.createMany(currentOwnerUserId, extractedDebtors);
+      const savedDebtors = await financeService.createMany(currentOwnerUserId, toSend);
       setDebtors((prev) => [...prev, ...savedDebtors]);
-      setExtractedDebtors([]);
-      setImportText("");
-      setImportFileName("");
-      setCurrentTab("visao_geral");
+      const sentIds = new Set(toSend.map(d => d.id));
+      setExtractedDebtors(prev => prev.filter(d => !sentIds.has(d.id)));
+      setExtractedSelectedIds(new Set());
+      if (extractedDebtors.length === toSend.length) {
+        setImportText("");
+        setImportFileName("");
+        setCurrentTab("visao_geral");
+      }
     } catch (error) {
       setExtractionAlert(error instanceof Error ? error.message : "Não foi possível salvar os registros importados.");
     }
@@ -975,6 +993,40 @@ export default function App() {
   // Delete option inside extracted stage
   const removeExtractedRow = (id: string) => {
     setExtractedDebtors(prev => prev.filter(d => d.id !== id));
+  };
+
+  // Bulk delete selected debtors in Visão Geral
+  const handleBulkDelete = async () => {
+    if (selectedDebtorIds.size === 0 || !currentOwnerUserId) return;
+    const idsToDelete: string[] = Array.from(selectedDebtorIds) as string[];
+    setDebtors(prev => prev.filter(d => !selectedDebtorIds.has(d.id)));
+    setSelectedDebtorIds(new Set());
+    setBatchSendResult(null);
+    const ownerUid = currentOwnerUserId as string;
+    try {
+      await Promise.all(idsToDelete.map(id => financeService.remove(ownerUid, id)));
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "Erro ao excluir selecionados.");
+    }
+  };
+
+  // Save inline phone edit in Cobrança tab
+  const saveCobrancaPhone = async (debtorId: string) => {
+    if (!currentOwnerUserId) return;
+    const phone = editingPhoneValue.trim();
+    const debtor = debtors.find(d => d.id === debtorId);
+    if (!debtor) return;
+    const updatedDebtor = { ...debtor, phone };
+    setDebtors(prev => prev.map(d => d.id === debtorId ? updatedDebtor : d));
+    if (selectedDebtorForMessage?.id === debtorId) {
+      setSelectedDebtorForMessage(updatedDebtor);
+    }
+    setEditingPhoneDebtorId(null);
+    try {
+      await financeService.update(currentOwnerUserId, updatedDebtor);
+    } catch {
+      // silently ignore — local state already updated
+    }
   };
 
   // Delete option inside general table
@@ -1376,13 +1428,14 @@ export default function App() {
 
   // Apply filters to display debtors lists
   const filteredDebtors = debtors.filter(d => {
-    const matchesSearch = d.client.toLowerCase().includes(searchFilter.toLowerCase()) || 
+    const matchesSearch = d.client.toLowerCase().includes(searchFilter.toLowerCase()) ||
                           d.document.toLowerCase().includes(searchFilter.toLowerCase()) ||
                           d.supplier.toLowerCase().includes(searchFilter.toLowerCase());
     const matchesCategory = categoryFilter === "all" ? true : d.category === categoryFilter;
+    const matchesStatus = statusFilter === "all" ? true : d.status === statusFilter;
     const matchesRep = repFilter === "all" ? true : d.representativeId === repFilter;
 
-    return matchesSearch && matchesCategory && matchesRep;
+    return matchesSearch && matchesCategory && matchesStatus && matchesRep;
   });
 
   // Hot template text quick inserts
@@ -1890,6 +1943,79 @@ export default function App() {
                     )}
                   </div>
 
+                  {/* ── Resumo por Representante ──────────────────────────── */}
+                  <div className="bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl">
+                    <div>
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Users className="w-4 h-4 text-emerald-400" /> Resumo por Representante
+                      </h4>
+                      <p className="text-xs text-zinc-500 mt-0.5">Distribuição de clientes e valores por responsável atribuído</p>
+                    </div>
+
+                    {(() => {
+                      // Group debtors by representativeId
+                      const repGroups = new Map<string, { rep: Representative | null; items: typeof debtors }>();
+
+                      // Add "Sem representante" group
+                      repGroups.set("__none__", { rep: null, items: [] });
+                      representatives.forEach(r => repGroups.set(r.id, { rep: r, items: [] }));
+
+                      debtors.forEach(d => {
+                        const key = d.representativeId && repGroups.has(d.representativeId) ? d.representativeId : "__none__";
+                        repGroups.get(key)!.items.push(d);
+                      });
+
+                      const rows = Array.from(repGroups.entries())
+                        .map(([key, { rep, items }]) => ({
+                          key,
+                          name: rep ? rep.name : "Sem representante",
+                          color: rep?.color ?? "text-zinc-400",
+                          total: items.length,
+                          vencidos: items.filter(d => d.category === "vencidos").length,
+                          aVencer: items.filter(d => d.category === "a_vencer").length,
+                          liquidados: items.filter(d => d.category === "liquidado").length,
+                          valorTotal: items.reduce((s, d) => s + (d.updatedValue || d.value), 0),
+                        }))
+                        .filter(r => r.total > 0)
+                        .sort((a, b) => b.total - a.total);
+
+                      if (rows.length === 0) {
+                        return (
+                          <p className="text-xs text-zinc-500 text-center py-4">Nenhum cliente cadastrado ainda.</p>
+                        );
+                      }
+
+                      return (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs text-left text-zinc-300">
+                            <thead className="text-[10px] uppercase font-mono tracking-wider bg-zinc-900/80 border-b border-zinc-800 text-zinc-400">
+                              <tr>
+                                <th className="px-4 py-3">Representante</th>
+                                <th className="px-4 py-3 text-center">Total clientes</th>
+                                <th className="px-4 py-3 text-center text-rose-400">Vencidos</th>
+                                <th className="px-4 py-3 text-center text-amber-400">A Vencer</th>
+                                <th className="px-4 py-3 text-center text-emerald-400">Liquidados</th>
+                                <th className="px-4 py-3 text-right">Valor Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-800">
+                              {rows.map(r => (
+                                <tr key={r.key} className="hover:bg-zinc-900/30 transition-colors">
+                                  <td className="px-4 py-3 font-semibold text-zinc-200">{r.name}</td>
+                                  <td className="px-4 py-3 text-center font-mono font-bold text-white">{r.total}</td>
+                                  <td className="px-4 py-3 text-center font-mono text-rose-400">{r.vencidos}</td>
+                                  <td className="px-4 py-3 text-center font-mono text-amber-400">{r.aVencer}</td>
+                                  <td className="px-4 py-3 text-center font-mono text-emerald-400">{r.liquidados}</td>
+                                  <td className="px-4 py-3 text-right font-mono font-bold text-emerald-300">{formatBRL(r.valorTotal)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
                 </div>
               )}
 
@@ -2050,10 +2176,41 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                           </div>
                         ) : (
                           <div className="space-y-3">
-                            <span className="text-xs font-mono font-bold text-emerald-400 block">✓ {extractedDebtors.length} Registros Prontos para Revisão:</span>
-                            
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-mono font-bold text-emerald-400">✓ {extractedDebtors.length} Registros Prontos para Revisão:</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const allSelected = extractedDebtors.every(d => extractedSelectedIds.has(d.id));
+                                  setExtractedSelectedIds(allSelected ? new Set() : new Set(extractedDebtors.map(d => d.id)));
+                                }}
+                                className="flex items-center gap-1.5 text-[10px] text-zinc-400 hover:text-emerald-400 transition-colors font-semibold"
+                              >
+                                {extractedDebtors.every(d => extractedSelectedIds.has(d.id))
+                                  ? <><CheckSquare className="w-3.5 h-3.5 text-emerald-400" /> Desmarcar todos</>
+                                  : <><Square className="w-3.5 h-3.5" /> Selecionar todos</>
+                                }
+                              </button>
+                            </div>
+
                             {extractedDebtors.map((item, index) => (
-                              <div key={item.id} className="p-3 bg-zinc-950 border border-zinc-850 rounded-xl space-y-2 relative group">
+                              <div key={item.id} className={`p-3 bg-zinc-950 border rounded-xl space-y-2 relative group ${extractedSelectedIds.has(item.id) ? "border-emerald-500/50" : "border-zinc-850"}`}>
+                                <div className="flex items-center gap-2 absolute top-2.5 left-2.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setExtractedSelectedIds(prev => {
+                                      const next = new Set(prev);
+                                      next.has(item.id) ? next.delete(item.id) : next.add(item.id);
+                                      return next;
+                                    })}
+                                    className="text-zinc-500 hover:text-emerald-400 transition-colors"
+                                    title="Selecionar para importar"
+                                  >
+                                    {extractedSelectedIds.has(item.id)
+                                      ? <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
+                                      : <Square className="w-3.5 h-3.5" />}
+                                  </button>
+                                </div>
                                 <button
                                   onClick={() => removeExtractedRow(item.id)}
                                   className="absolute top-2.5 right-2.5 text-zinc-600 hover:text-rose-400 p-1 rounded transition-colors"
@@ -2119,13 +2276,20 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                       </div>
 
                       <div className="pt-4 border-t border-zinc-900 flex items-center justify-between gap-4 flex-wrap">
-                        <span className="text-zinc-500 text-xs">Aguardando consolidação do operador.</span>
+                        <span className="text-zinc-500 text-xs">
+                          {extractedSelectedIds.size > 0
+                            ? `${extractedSelectedIds.size} de ${extractedDebtors.length} selecionado(s)`
+                            : "Aguardando consolidação do operador."}
+                        </span>
                         <button
                           onClick={sendExtractedToOverview}
                           disabled={extractedDebtors.length === 0}
                           className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold flex items-center gap-2 shadow disabled:opacity-50 transition-all text-xs cursor-pointer"
                         >
-                          <CheckCircle className="w-4 h-4" /> Enviar para a Visão Geral
+                          <CheckCircle className="w-4 h-4" />
+                          {extractedSelectedIds.size > 0
+                            ? `Enviar ${extractedSelectedIds.size} selecionado(s) para a Visão Geral`
+                            : "Enviar todos para a Visão Geral"}
                         </button>
                       </div>
                     </div>
@@ -2362,6 +2526,20 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                       </div>
 
                       <div className="flex items-center gap-1.5">
+                        <span className="text-zinc-500">Status:</span>
+                        <select
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                          className="bg-zinc-950 border border-zinc-805 rounded-xl text-xs text-zinc-300 px-2.5 py-1.5"
+                        >
+                          <option value="all">Todos os Status</option>
+                          <option value="pending">Pendente</option>
+                          <option value="sent">Enviado</option>
+                          <option value="failed">Falhou</option>
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
                         <span className="text-zinc-500">Responsável:</span>
                         <select
                           value={repFilter}
@@ -2391,7 +2569,7 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                         </button>
 
                         <button
-                          onClick={() => exportRelatorio(debtors, filteredDebtors, account?.email ?? "")}
+                          onClick={() => exportRelatorio(debtors, filteredDebtors, account?.email ?? "", representatives)}
                           className="px-4.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-100 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs text-center border border-zinc-700"
                         >
                           <Download className="w-3.5 h-3.5 text-rose-400" /> Exportar Relatório (PDF)
@@ -2462,6 +2640,20 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                               Enviar cobranças ({selectedDebtorIds.size})
                             </>
                           )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm(`Excluir ${selectedDebtorIds.size} devedor(es) selecionado(s)? Esta ação não pode ser desfeita.`)) {
+                              void handleBulkDelete();
+                            }
+                          }}
+                          disabled={isBatchSending}
+                          className="px-4 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 text-xs font-bold rounded-xl transition-all disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Excluir selecionados ({selectedDebtorIds.size})
                         </button>
                       </div>
                     </div>
@@ -2778,10 +2970,13 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                             <input
                               type="text"
                               value={exportSheetUrl}
-                              onChange={(e) => setExportSheetUrl(e.target.value)}
+                              onChange={(e) => { setExportSheetUrl(e.target.value); if (sheetsExportResult?.status === "payload_invalido") setSheetsExportResult(null); }}
                               placeholder="https://docs.google.com/spreadsheets/d/..."
-                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
+                              className={`w-full bg-zinc-950 border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 ${!exportSheetUrl.trim() ? "border-rose-500/60" : "border-zinc-800"}`}
                             />
+                            {!exportSheetUrl.trim() && (
+                              <p className="text-[10px] text-rose-400 mt-1 font-semibold">Cole a URL da planilha para continuar.</p>
+                            )}
                             <p className="text-[10px] text-zinc-600 mt-1">
                               A planilha deve estar compartilhada com{" "}
                               <span className="text-sky-400 font-mono select-all">nc-finance@nc-finance-496922.iam.gserviceaccount.com</span>{" "}
@@ -2827,8 +3022,8 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
 
                         <button
                           onClick={() => void handleExportToSheets()}
-                          disabled={isExportingSheets}
-                          className="w-full py-2.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                          disabled={isExportingSheets || !exportSheetUrl.trim()}
+                          className="w-full py-2.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                           {isExportingSheets ? (
                             <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Exportando {debtors.length} registros...</>
@@ -3226,46 +3421,95 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                         <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
                           {debtors.map((d) => {
                             const isSelected = selectedDebtorForMessage?.id === d.id;
-                            
+                            const isEditingPhone = editingPhoneDebtorId === d.id;
+
                             return (
-                              <button
+                              <div
                                 key={d.id}
-                                onClick={() => setSelectedDebtorForMessage(d)}
-                                className={`w-full p-3.5 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer block
-                                  ${isSelected 
-                                    ? "bg-emerald-500/10 border-emerald-500/80 shadow-[0_4px_15px_rgba(16,185,129,0.15)]" 
+                                className={`w-full p-3.5 rounded-2xl border text-left transition-all
+                                  ${isSelected
+                                    ? "bg-emerald-500/10 border-emerald-500/80 shadow-[0_4px_15px_rgba(16,185,129,0.15)]"
                                     : "bg-zinc-950 border-zinc-900 hover:border-zinc-800"
                                   }
                                 `}
                               >
-                                <div className="space-y-1 select-none">
-                                  <div className="text-xs font-pro font-black text-white">{d.client}</div>
-                                  <div className="text-[10px] text-zinc-400 font-light font-mono flex items-center gap-1">
-                                    <span>Doc: {d.document}</span> ? <span>{d.dueDate}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedDebtorForMessage(d)}
+                                  className="w-full flex items-center justify-between cursor-pointer"
+                                >
+                                  <div className="space-y-1 select-none text-left">
+                                    <div className="text-xs font-pro font-black text-white">{d.client}</div>
+                                    <div className="text-[10px] text-zinc-400 font-light font-mono flex items-center gap-1">
+                                      <span>Doc: {d.document}</span> · <span>{d.dueDate}</span>
+                                    </div>
+                                    <div className="text-[11px] font-mono text-emerald-400 font-extrabold">{formatBRL(d.updatedValue || d.value)}</div>
                                   </div>
-                                  <div className="text-[11px] font-mono text-emerald-400 font-extrabold">{formatBRL(d.updatedValue || d.value)}</div>
-                                </div>
 
-                                <div className="text-right flex flex-col items-end gap-1.5">
-                                  <span className={`px-2 py-0.5 rounded text-[8px] uppercase tracking-wide font-bold font-mono
-                                    ${d.category === "vencidos" && "bg-rose-500/10 text-rose-400"}
-                                    ${d.category === "a_vencer" && "bg-amber-500/10 text-amber-400"}
-                                    ${d.category === "liquidado" && "bg-emerald-500/10 text-emerald-400"}
-                                  `}>
-                                    {d.category === "vencidos" && "Vencido"}
-                                    {d.category === "a_vencer" && "A vencer"}
-                                    {d.category === "liquidado" && "Liquidado"}
-                                  </span>
-                                  
-                                  {d.status === "sent" ? (
-                                    <span className="text-[9px] text-emerald-400 flex items-center gap-1">
-                                      ✓ Enviado
+                                  <div className="text-right flex flex-col items-end gap-1.5">
+                                    <span className={`px-2 py-0.5 rounded text-[8px] uppercase tracking-wide font-bold font-mono
+                                      ${d.category === "vencidos" && "bg-rose-500/10 text-rose-400"}
+                                      ${d.category === "a_vencer" && "bg-amber-500/10 text-amber-400"}
+                                      ${d.category === "liquidado" && "bg-emerald-500/10 text-emerald-400"}
+                                    `}>
+                                      {d.category === "vencidos" && "Vencido"}
+                                      {d.category === "a_vencer" && "A vencer"}
+                                      {d.category === "liquidado" && "Liquidado"}
                                     </span>
+
+                                    {d.status === "sent" ? (
+                                      <span className="text-[9px] text-emerald-400 flex items-center gap-1">
+                                        ✓ Enviado
+                                      </span>
+                                    ) : (
+                                      <span className="text-[9px] text-zinc-500 font-light">Pendente</span>
+                                    )}
+                                  </div>
+                                </button>
+
+                                {/* Inline phone edit row */}
+                                <div className="mt-2 pt-2 border-t border-zinc-800/60 flex items-center gap-2">
+                                  {isEditingPhone ? (
+                                    <>
+                                      <input
+                                        type="text"
+                                        value={editingPhoneValue}
+                                        onChange={(e) => setEditingPhoneValue(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === "Enter") void saveCobrancaPhone(d.id); if (e.key === "Escape") setEditingPhoneDebtorId(null); }}
+                                        autoFocus
+                                        className="flex-1 bg-zinc-900 border border-emerald-500/40 rounded px-2 py-1 text-[10px] font-mono text-white focus:outline-none"
+                                        placeholder="5577999998888"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => void saveCobrancaPhone(d.id)}
+                                        className="text-emerald-400 hover:text-emerald-300 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors"
+                                      >
+                                        OK
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingPhoneDebtorId(null)}
+                                        className="text-zinc-500 hover:text-zinc-300 text-[10px] px-1 transition-colors"
+                                      >
+                                        ✕
+                                      </button>
+                                    </>
                                   ) : (
-                                    <span className="text-[9px] text-zinc-500 font-light">Pendente</span>
+                                    <>
+                                      <span className="text-[10px] font-mono text-zinc-500 flex-1 truncate">{d.phone || "(sem telefone)"}</span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); setEditingPhoneValue(d.phone || ""); setEditingPhoneDebtorId(d.id); }}
+                                        className="text-zinc-600 hover:text-emerald-400 transition-colors p-0.5 rounded"
+                                        title="Editar telefone"
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </button>
+                                    </>
                                   )}
                                 </div>
-                              </button>
+                              </div>
                             );
                           })}
                         </div>
@@ -3750,6 +3994,43 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                             placeholder="Olá {nome_cliente}, ..."
                             className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 resize-none"
                           />
+                        </div>
+
+                        {/* Matching clients preview */}
+                        <div className="sm:col-span-2">
+                          {(() => {
+                            const ruleType = newRuleForm.ruleType ?? "overdue";
+                            const daysBefore = newRuleForm.daysBefore ?? 3;
+                            let matchCount = 0;
+
+                            if (ruleType === "overdue") {
+                              matchCount = debtors.filter(d => d.category === "vencidos" && d.status !== "sent").length;
+                            } else if (ruleType === "all_pending") {
+                              matchCount = debtors.filter(d => d.category !== "liquidado").length;
+                            } else if (ruleType === "due_in_days") {
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              const limitDate = new Date(today);
+                              limitDate.setDate(limitDate.getDate() + daysBefore);
+                              matchCount = debtors.filter(d => {
+                                if (d.category !== "a_vencer") return false;
+                                const parts = d.dueDate?.split("/");
+                                if (!parts || parts.length !== 3) return false;
+                                const due = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+                                return due >= today && due <= limitDate;
+                              }).length;
+                            } else if (ruleType === "due_today") {
+                              const todayStr = new Date().toLocaleDateString("pt-BR");
+                              matchCount = debtors.filter(d => d.dueDate === todayStr && d.category !== "liquidado").length;
+                            }
+
+                            return (
+                              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/8 border border-emerald-500/20 text-xs text-emerald-300">
+                                <span className="text-base">📋</span>
+                                <span><strong>{matchCount}</strong> cliente(s) se enquadram nesta regra atualmente</span>
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
 
