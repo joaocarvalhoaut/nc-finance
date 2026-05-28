@@ -264,6 +264,48 @@ export const financeService = {
   },
 
   /**
+   * updatePdfAttachment — salva ou remove o PDF anexado a um devedor.
+   * Usa os campos drive_file_* existentes (drive_file_id = "uploaded" para diferenciar de Drive-matched).
+   */
+  async updatePdfAttachment(
+    userId: string,
+    debtorId: string,
+    attachment: { url: string; name: string } | null,
+  ) {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase
+      .from(TABLE_NAME)
+      .update({
+        drive_file_id:   attachment ? "uploaded" : null,
+        drive_file_name: attachment?.name ?? null,
+        drive_file_url:  attachment?.url ?? null,
+        drive_match_score: null,
+      })
+      .eq("id", debtorId)
+      .eq("user_id", userId);
+    if (error) throw new Error(error.message || "Falha ao atualizar anexo PDF.");
+  },
+
+  /**
+   * uploadChargePdf — faz upload de um PDF para o Supabase Storage e retorna a URL pública.
+   * Bucket: "charge-pdfs" (deve existir no projeto Supabase com acesso público de leitura).
+   */
+  async uploadChargePdf(userId: string, debtorId: string, file: File): Promise<string> {
+    const supabase = getSupabaseClient();
+    const ext = file.name.split(".").pop() ?? "pdf";
+    const path = `${userId}/${debtorId}/boleto.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("charge-pdfs")
+      .upload(path, file, { upsert: true, contentType: "application/pdf" });
+
+    if (uploadError) throw new Error(uploadError.message || "Falha ao enviar PDF para o servidor.");
+
+    const { data: urlData } = supabase.storage.from("charge-pdfs").getPublicUrl(path);
+    return urlData.publicUrl;
+  },
+
+  /**
    * reconcileLiquidations — marca como liquidado devedores existentes que
    * correspondem aos registros do arquivo de liquidação (por número de documento).
    *

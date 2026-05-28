@@ -249,6 +249,9 @@ export default function App() {
   const [editingPhoneDebtorId, setEditingPhoneDebtorId] = useState<string | null>(null);
   const [editingPhoneValue, setEditingPhoneValue] = useState<string>("");
 
+  // PDF attachment in Cobrança tab
+  const [uploadingPdfDebtorId, setUploadingPdfDebtorId] = useState<string | null>(null);
+
   // Batch WhatsApp send state
   const [selectedDebtorIds, setSelectedDebtorIds] = useState<Set<string>>(new Set());
   const [isBatchSending, setIsBatchSending] = useState<boolean>(false);
@@ -1028,6 +1031,35 @@ export default function App() {
       await financeService.update(currentOwnerUserId, updatedDebtor);
     } catch {
       // silently ignore — local state already updated
+    }
+  };
+
+  // Upload / remove PDF attachment for a debtor in Cobrança tab
+  const handlePdfUpload = async (debtorId: string, file: File) => {
+    if (!currentOwnerUserId) return;
+    setUploadingPdfDebtorId(debtorId);
+    try {
+      const url = await financeService.uploadChargePdf(currentOwnerUserId, debtorId, file);
+      await financeService.updatePdfAttachment(currentOwnerUserId, debtorId, { url, name: file.name });
+      setDebtors(prev => prev.map(d =>
+        d.id === debtorId ? { ...d, driveFileId: "uploaded", driveFileName: file.name, driveFileUrl: url } : d
+      ));
+    } catch (err) {
+      setWorkspaceError(err instanceof Error ? err.message : "Falha ao enviar PDF.");
+    } finally {
+      setUploadingPdfDebtorId(null);
+    }
+  };
+
+  const handlePdfRemove = async (debtorId: string) => {
+    if (!currentOwnerUserId) return;
+    try {
+      await financeService.updatePdfAttachment(currentOwnerUserId, debtorId, null);
+      setDebtors(prev => prev.map(d =>
+        d.id === debtorId ? { ...d, driveFileId: null, driveFileName: null, driveFileUrl: null } : d
+      ));
+    } catch (err) {
+      setWorkspaceError(err instanceof Error ? err.message : "Falha ao remover PDF.");
     }
   };
 
@@ -3243,125 +3275,6 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
 
               {currentTab === "cobranca" && (
                 <div className="space-y-8">
-                  
-                  <div className="grid grid-cols-1 gap-8">
-
-                    <div className="bg-zinc-900/40 border border-zinc-950 p-5 rounded-3xl space-y-4 shadow-xl flex flex-col justify-between">
-                      <div className="space-y-3">
-                        <div className="space-y-1">
-                          <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                            <FolderOpen className="w-4 h-4 text-emerald-400" /> Google Drive — Localizar PDFs
-                          </h4>
-                          <p className="text-[11px] text-zinc-500 font-light leading-normal">
-                            Cole o link da pasta do Drive onde seus boletos PDF estão armazenados. O sistema associa automaticamente cada arquivo ao devedor por CPF/CNPJ ou nome.
-                            Disponível nos planos <span className="text-emerald-400 font-medium">Pro</span> e <span className="text-emerald-400 font-medium">Premium</span>.
-                          </p>
-                        </div>
-
-                        {/* Folder status */}
-                        {driveFolderStatus?.configured && (
-                          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/8 border border-emerald-500/15 text-[11px] text-emerald-300">
-                            <CheckCircle className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate font-medium">{driveFolderStatus.folderName ?? "Pasta configurada"}</span>
-                            <span className="ml-auto shrink-0 text-zinc-500">{driveFolderStatus.fileCount} arquivo(s)</span>
-                          </div>
-                        )}
-
-                        {/* URL input */}
-                        <div className="space-y-2">
-                          <label className="text-[10px] uppercase font-mono font-bold text-zinc-500 tracking-wider">
-                            Link da pasta do Google Drive
-                          </label>
-                          <div className="flex gap-2">
-                            <input
-                              type="url"
-                              value={driveFolderUrl}
-                              onChange={(e) => setDriveFolderUrl(e.target.value)}
-                              placeholder="https://drive.google.com/drive/folders/..."
-                              className="flex-1 min-w-0 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => void handleSaveDriveFolder()}
-                              disabled={isDriveSaving || !driveFolderUrl.trim()}
-                              className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
-                            >
-                              {isDriveSaving ? <div className="w-3 h-3 rounded-full border border-black border-t-transparent animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                              Salvar
-                            </button>
-                          </div>
-                          {driveSaveMsg && (
-                            <p className={`text-[11px] ${driveSaveMsg.ok ? "text-emerald-400" : "text-rose-400"}`}>
-                              {driveSaveMsg.text}
-                            </p>
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={handleMatchDriveFiles}
-                          disabled={isDriveMatching || !driveFolderStatus?.configured}
-                          className="w-full py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-900 text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:shadow-lg hover:shadow-emerald-500/5 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isDriveMatching ? (
-                            <>
-                              <div className="w-3 h-3 rounded-full border border-emerald-400 border-t-transparent animate-spin" />
-                              Localizando PDFs...
-                            </>
-                          ) : (
-                            <>
-                              <FolderOpen className="w-3.5 h-3.5" /> Localizar PDFs no Drive
-                            </>
-                          )}
-                        </button>
-
-                        {driveMatchResult && (
-                          <div className={`rounded-2xl border px-4 py-3 text-xs space-y-1 ${
-                            driveMatchResult.success
-                              ? "border-emerald-500/20 bg-emerald-500/8 text-emerald-200"
-                              : "border-rose-500/20 bg-rose-500/8 text-rose-200"
-                          }`}>
-                            {driveMatchResult.success ? (
-                              <>
-                                <div className="font-bold text-emerald-300">✓ PDFs localizados</div>
-                                <div>Arquivos encontrados: <span className="font-semibold text-white">{driveMatchResult.filesFound}</span></div>
-                                <div>Devedores associados: <span className="font-semibold text-emerald-300">{driveMatchResult.debtorsMatched}</span> / {driveMatchResult.debtorsTotal}</div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="font-bold text-rose-300">✗ Falha ao localizar PDFs</div>
-                                <div className="text-rose-200/80">
-                                  {DRIVE_STATUS_LABELS[driveMatchResult.status as DriveMatchStatus] ?? driveMatchResult.error ?? "Erro desconhecido."}
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        )}
-
-                        {driveMatchResult?.success && driveMatchResult.debtorsMatched > 0 && (
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">PDFs associados:</label>
-                            <div className="h-[90px] overflow-y-auto bg-zinc-950 p-2 rounded-xl text-[10px] space-y-1 border border-zinc-900 font-mono text-zinc-400">
-                              {debtors.filter((d) => d.driveFileId).map((d) => (
-                                <div key={d.id} className="flex items-center justify-between hover:text-zinc-200 py-0.5 gap-2">
-                                  <span className="truncate flex items-center gap-1">
-                                    PDF: {d.driveFileName ?? "?"}
-                                  </span>
-                                  <span className={`flex-shrink-0 font-bold ${
-                                    (d.driveMatchScore ?? 0) >= 0.9 ? "text-emerald-400" :
-                                    (d.driveMatchScore ?? 0) >= 0.7 ? "text-amber-400" : "text-zinc-500"
-                                  }`}>
-                                    {Math.round((d.driveMatchScore ?? 0) * 100)}%
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                  </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     
@@ -3462,6 +3375,65 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                                       >
                                         <Pencil className="w-3 h-3" />
                                       </button>
+                                    </>
+                                  )}
+                                </div>
+
+                                {/* PDF attachment row */}
+                                <div className="mt-2 pt-2 border-t border-zinc-800/60 flex items-center gap-2 min-w-0">
+                                  {uploadingPdfDebtorId === d.id ? (
+                                    <span className="text-[10px] text-zinc-400 flex items-center gap-1.5 flex-1">
+                                      <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" />
+                                      Enviando PDF…
+                                    </span>
+                                  ) : d.driveFileId ? (
+                                    <>
+                                      <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1 flex-1 truncate" title={d.driveFileName || "boleto.pdf"}>
+                                        📎 {d.driveFileName || "boleto.pdf"}
+                                      </span>
+                                      {d.driveFileUrl && (
+                                        <a
+                                          href={d.driveFileUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-zinc-500 hover:text-emerald-400 transition-colors p-0.5 rounded"
+                                          title="Visualizar PDF"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); void handlePdfRemove(d.id); }}
+                                        className="text-zinc-600 hover:text-rose-400 transition-colors p-0.5 rounded"
+                                        title="Remover PDF"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="text-[10px] font-mono text-zinc-600 flex-1 truncate">Sem boleto PDF</span>
+                                      <label
+                                        htmlFor={`pdf-upload-${d.id}`}
+                                        className="text-zinc-500 hover:text-emerald-400 transition-colors p-0.5 rounded cursor-pointer"
+                                        title="Anexar PDF do boleto"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <Upload className="w-3 h-3" />
+                                      </label>
+                                      <input
+                                        id={`pdf-upload-${d.id}`}
+                                        type="file"
+                                        accept=".pdf,application/pdf"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) void handlePdfUpload(d.id, file);
+                                          e.target.value = "";
+                                        }}
+                                      />
                                     </>
                                   )}
                                 </div>

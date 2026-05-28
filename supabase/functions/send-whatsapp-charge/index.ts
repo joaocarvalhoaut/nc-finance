@@ -257,37 +257,64 @@ Deno.serve(async (request: Request) => {
     // ── 8. Envia via Z-API (com PDF se houver match Drive; fallback texto) ──────
     let zapiResult: { success: boolean; messageId: string | null; zaapId: string | null; error: string | null };
 
-    // Check if this debtor has a pre-matched Drive PDF
-    let debtorDriveFileId: string | null = null;
+    // Check if this debtor has an attached PDF (uploaded or Drive-matched)
+    let debtorDriveFileId:   string | null = null;
     let debtorDriveFileName: string | null = null;
+    let debtorDriveFileUrl:  string | null = null;
     if (body.debtorId) {
       const { data: dr } = await admin
         .from("user_registros_financeiros")
-        .select("drive_file_id, drive_file_name")
+        .select("drive_file_id, drive_file_name, drive_file_url")
         .eq("id", body.debtorId)
         .eq("user_id", userId)
         .maybeSingle();
       if (dr) {
         debtorDriveFileId   = (dr as Record<string, unknown>).drive_file_id   as string | null ?? null;
         debtorDriveFileName = (dr as Record<string, unknown>).drive_file_name as string | null ?? null;
+        debtorDriveFileUrl  = (dr as Record<string, unknown>).drive_file_url  as string | null ?? null;
       }
     }
 
     // Attempt PDF attachment if available
     let sentWithPdf = false;
-    if (debtorDriveFileId) {
+
+    if (debtorDriveFileId === "uploaded" && debtorDriveFileUrl) {
+      // Direct URL download from Supabase Storage (no Drive API needed)
+      try {
+        const pdfRes = await fetch(debtorDriveFileUrl);
+        if (pdfRes.ok) {
+          const pdfBuf = await pdfRes.arrayBuffer();
+          const pdfBytes = new Uint8Array(pdfBuf);
+          if (pdfBytes.length > 0) {
+            zapiResult = await sendDocumentMessage({
+              instanceId:    zapiCreds.instanceId,
+              token:         zapiCreds.token,
+              clientToken:   zapiCreds.clientToken,
+              phone:         normalizedPhone,
+              fileName:      debtorDriveFileName ?? "boleto.pdf",
+              documentBytes: pdfBytes,
+              caption:       body.message,
+            });
+            if (zapiResult.success) sentWithPdf = true;
+          }
+        }
+      } catch (e) {
+        console.warn("[send-whatsapp-charge] PDF download from storage failed, falling back to text:", e instanceof Error ? e.message : String(e));
+      }
+    } else if (debtorDriveFileId) {
+      // Legacy: Drive-matched PDF — download from Google Drive
       const driveToken = await getDriveAccessToken().catch(() => null);
       if (driveToken) {
         const pdfBytes = await downloadDriveFile(debtorDriveFileId, driveToken).catch(() => null);
         if (pdfBytes && pdfBytes.length > 0) {
           zapiResult = await sendDocumentMessage({
-            instanceId:  zapiCreds.instanceId,
-            token:       zapiCreds.token,
-            clientToken: zapiCreds.clientToken,
-            phone:       normalizedPhone,
-            fileName:    debtorDriveFileName ?? "boleto.pdf",
+            instanceId:    zapiCreds.instanceId,
+            token:         zapiCreds.token,
+            clientToken:   zapiCreds.clientToken,
+            phone:         normalizedPhone,
+            fileName:      debtorDriveFileName ?? "boleto.pdf",
             documentBytes: pdfBytes,
-            caption:     body.message,
+            caption:       body.message,
           });
           if (zapiResult.success) sentWithPdf = true;
         }
