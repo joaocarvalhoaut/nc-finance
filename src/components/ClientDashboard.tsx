@@ -34,8 +34,6 @@ import {
   BadgeCheck,
   Wifi,
   WifiOff,
-  FolderOpen,
-  Paperclip,
   CheckCircle,
   Clock,
   HandCoins,
@@ -47,8 +45,6 @@ import { billingLogsService } from "../services/billingLogsService";
 import { pilotService } from "../services/pilotService";
 import { parseImportFile } from "../utils/importFileParser";
 import { extractDocumentLocally } from "../services/localDocumentExtraction";
-import { driveFolderService, isValidDriveUrl } from "../services/driveMatching";
-import type { DriveFolderStatus } from "../services/driveMatching";
 import BatchConfirmModal, { type BatchConfirmData } from "./BatchConfirmModal";
 import type { Debtor, MessageTone } from "../types";
 
@@ -154,13 +150,6 @@ export default function ClientDashboard({
   const [reconciledCount,    setReconciledCount]    = useState(0);
   const [reconcileError,     setReconcileError]     = useState("");
 
-  // ── Drive folder state ───────────────────────────────────────────────────────
-  const [driveFolderUrl,  setDriveFolderUrl]  = useState("");
-  const [driveSaving,     setDriveSaving]     = useState(false);
-  const [driveSaveMsg,    setDriveSaveMsg]    = useState("");
-  const [driveSaveError,  setDriveSaveError]  = useState("");
-  const [driveStatus,     setDriveStatus]     = useState<DriveFolderStatus | null>(null);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Init ─────────────────────────────────────────────────────────────────────
@@ -208,53 +197,11 @@ export default function ClientDashboard({
     }
   }, []);
 
-  const refreshDriveStatus = useCallback(async () => {
-    try {
-      const status = await driveFolderService.getStatus();
-      setDriveStatus(status);
-    } catch {
-      // non-critical
-    }
-  }, []);
-
   useEffect(() => {
     void refreshWaStatus();
     void refreshTodayCount();
     void refreshPilotStatus();
-    void refreshDriveStatus();
-  }, [refreshWaStatus, refreshTodayCount, refreshPilotStatus, refreshDriveStatus]);
-
-  // ── Drive folder save ─────────────────────────────────────────────────────────
-  const handleDriveSave = useCallback(async () => {
-    const url = driveFolderUrl.trim();
-    if (!url) return;
-    if (!isValidDriveUrl(url)) {
-      setDriveSaveError("Cole o link de uma pasta do Google Drive (ex: drive.google.com/drive/folders/...).");
-      return;
-    }
-    setDriveSaving(true);
-    setDriveSaveMsg("");
-    setDriveSaveError("");
-    try {
-      const result = await driveFolderService.saveFolder(url);
-      if (result.success) {
-        setDriveSaveMsg(result.message ?? `Pasta "${result.folderName ?? "Drive"}" salva. Indexando em segundo plano…`);
-        setDriveFolderUrl("");
-        void refreshDriveStatus();
-      } else if (result.status === "drive_sem_acesso") {
-        const hint = result.serviceAccountHint
-          ? ` Compartilhe com: ${result.serviceAccountHint}`
-          : "";
-        setDriveSaveError(`Sem acesso à pasta.${hint}`);
-      } else {
-        setDriveSaveError(result.error ?? result.message ?? "Não foi possível salvar a pasta.");
-      }
-    } catch {
-      setDriveSaveError("Erro ao salvar pasta. Tente novamente.");
-    } finally {
-      setDriveSaving(false);
-    }
-  }, [driveFolderUrl, refreshDriveStatus]);
+  }, [refreshWaStatus, refreshTodayCount, refreshPilotStatus]);
 
   // ── File handling ─────────────────────────────────────────────────────────────
 
@@ -448,11 +395,6 @@ export default function ClientDashboard({
 
       const validIds = persisted.map(d => d.id).filter(Boolean) as string[];
 
-      // Drive matching automático antes do envio (fire-and-forget)
-      if (driveStatus?.configured) {
-        void driveFolderService.syncFolder().catch(() => {/* non-critical */});
-      }
-
       const result = await whatsappBatchService.sendBatchCharges({
         debtorIds: validIds,
         tone:      selectedTone,
@@ -551,75 +493,6 @@ export default function ClientDashboard({
         </div>
       </div>
 
-      {/* ── Drive folder section ────────────────────────────────────────────── */}
-      {step === "upload" && !isLiquidacao && (
-        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <FolderOpen className="w-4 h-4 text-zinc-400" />
-            <span className="text-sm font-medium text-zinc-300">Pasta dos boletos (Google Drive)</span>
-            {driveStatus?.configured && (
-              <span className="flex items-center gap-1 text-xs text-emerald-400 ml-auto">
-                <Paperclip className="w-3 h-3" />
-                {driveStatus.fileCount} boleto{driveStatus.fileCount !== 1 ? "s" : ""} indexado{driveStatus.fileCount !== 1 ? "s" : ""}
-                {driveStatus.unmatchedDebtors > 0 && (
-                  <span className="text-zinc-500 ml-1">· {driveStatus.unmatchedDebtors} sem boleto</span>
-                )}
-              </span>
-            )}
-          </div>
-
-          {driveStatus?.configured ? (
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-zinc-400 truncate">
-                {driveStatus.folderName ?? "Pasta configurada"}
-                {driveStatus.lastIndexedAt && (
-                  <span className="text-zinc-600 ml-2">
-                    · atualizado {new Date(driveStatus.lastIndexedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                )}
-              </p>
-              <button
-                onClick={() => setDriveStatus(null)}
-                className="text-xs text-zinc-500 hover:text-zinc-300 flex-shrink-0 transition-colors"
-              >
-                Alterar
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  value={driveFolderUrl}
-                  onChange={e => { setDriveFolderUrl(e.target.value); setDriveSaveError(""); }}
-                  onKeyDown={e => e.key === "Enter" && void handleDriveSave()}
-                  placeholder="https://drive.google.com/drive/folders/..."
-                  className="flex-1 bg-zinc-800/60 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/60 transition-colors"
-                />
-                <button
-                  onClick={() => void handleDriveSave()}
-                  disabled={driveSaving || !driveFolderUrl.trim()}
-                  className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors flex-shrink-0"
-                >
-                  {driveSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar"}
-                </button>
-              </div>
-              {driveSaveError && (
-                <p className="text-xs text-rose-400 flex items-start gap-1.5">
-                  <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                  {driveSaveError}
-                </p>
-              )}
-              {driveSaveMsg && !driveSaveError && (
-                <p className="text-xs text-emerald-400">{driveSaveMsg}</p>
-              )}
-              <p className="text-xs text-zinc-600">
-                Cole o link da pasta do Google Drive com os PDFs dos boletos.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ── Step: Upload ───────────────────────────────────────────────────── */}
       {step === "upload" && (
