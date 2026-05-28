@@ -280,6 +280,7 @@ export default function App() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [repFilter, setRepFilter] = useState<string>("all");
+  const [sortNameOrder, setSortNameOrder] = useState<"none" | "asc" | "desc">("none");
 
   // Representatives modal
   const [showRepModal, setShowRepModal] = useState(false);
@@ -1428,16 +1429,20 @@ export default function App() {
   const liquidadoValue = debtors.filter(d => d.category === "liquidado").reduce((acc, d) => acc + d.value, 0);
 
   // Apply filters to display debtors lists
-  const filteredDebtors = debtors.filter(d => {
-    const matchesSearch = d.client.toLowerCase().includes(searchFilter.toLowerCase()) ||
-                          d.document.toLowerCase().includes(searchFilter.toLowerCase()) ||
-                          d.supplier.toLowerCase().includes(searchFilter.toLowerCase());
-    const matchesCategory = categoryFilter === "all" ? true : d.category === categoryFilter;
-    const matchesStatus = statusFilter === "all" ? true : d.status === statusFilter;
-    const matchesRep = repFilter === "all" ? true : d.representativeId === repFilter;
-
-    return matchesSearch && matchesCategory && matchesStatus && matchesRep;
-  });
+  const filteredDebtors = (() => {
+    const filtered = debtors.filter(d => {
+      const matchesSearch = d.client.toLowerCase().includes(searchFilter.toLowerCase()) ||
+                            d.document.toLowerCase().includes(searchFilter.toLowerCase()) ||
+                            d.supplier.toLowerCase().includes(searchFilter.toLowerCase());
+      const matchesCategory = categoryFilter === "all" ? true : d.category === categoryFilter;
+      const matchesStatus = statusFilter === "all" ? true : d.status === statusFilter;
+      const matchesRep = repFilter === "all" ? true : d.representativeId === repFilter;
+      return matchesSearch && matchesCategory && matchesStatus && matchesRep;
+    });
+    if (sortNameOrder === "asc")  return [...filtered].sort((a, b) => a.client.localeCompare(b.client, "pt-BR"));
+    if (sortNameOrder === "desc") return [...filtered].sort((a, b) => b.client.localeCompare(a.client, "pt-BR"));
+    return filtered;
+  })();
 
   // Hot template text quick inserts
   const insertTemplatePresetText = (text: string) => {
@@ -2589,6 +2594,19 @@ ELETRO OMEGA ME - Titulo F02-1 - Vencimento 25/06/2026 - Valor R$ 2.941,16`)}
                           ))}
                         </select>
                       </div>
+
+                      <button
+                        onClick={() => setSortNameOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc")}
+                        title="Ordenar por nome do cliente"
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                          sortNameOrder !== "none"
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                            : "bg-zinc-950 border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600"
+                        }`}
+                      >
+                        {sortNameOrder === "asc"  ? "A → Z" :
+                         sortNameOrder === "desc" ? "Z → A" : "A–Z"}
+                      </button>
 
                       <div className="flex gap-2">
                         <button
