@@ -67,13 +67,14 @@ type BatchItemStatus =
   | "devedor_nao_encontrado";
 
 interface BatchItemResult {
-  debtorId:   string;
-  clientName: string;
-  phone:      string;
-  status:     BatchItemStatus;
-  messageId:  string | null;
-  logId:      string | null;
-  error:      string | null;
+  debtorId:    string;
+  clientName:  string;
+  phone:       string;
+  status:      BatchItemStatus;
+  messageId:   string | null;
+  logId:       string | null;
+  error:       string | null;
+  sentWithPdf: boolean;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -87,6 +88,21 @@ const errResponse = (status: number, body: Record<string, unknown>) =>
 const hashKey = async (raw: string): Promise<string> => {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+};
+
+/** Encurta uma URL via TinyURL. Retorna a URL original em caso de falha. */
+const shortenUrl = async (url: string): Promise<string> => {
+  try {
+    const res = await fetch(
+      `https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`,
+      { signal: AbortSignal.timeout(5_000) },
+    );
+    if (res.ok) {
+      const short = (await res.text()).trim();
+      if (short.startsWith("https://")) return short;
+    }
+  } catch { /* ignore — use original URL */ }
+  return url;
 };
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -120,6 +136,7 @@ Deno.serve(async (request: Request) => {
       tone?: string;
       customMessage?: string;
       dryRun?: boolean;
+      debtorPdfPaths?: Record<string, { path: string; name: string }> | null;
     };
     try {
       body = await request.json();
@@ -147,6 +164,10 @@ Deno.serve(async (request: Request) => {
     const tone           = typeof body.tone === "string" ? body.tone : "neutro";
     const customMessage  = typeof body.customMessage === "string" ? body.customMessage : null;
     const dryRun         = body.dryRun === true;
+    // PDF paths provided directly by frontend (bypasses DB roundtrip + RLS)
+    const debtorPdfPaths = (body.debtorPdfPaths && typeof body.debtorPdfPaths === "object")
+      ? body.debtorPdfPaths as Record<string, { path: string; name: string }>
+      : {};
 
     // ── 3. Valida credenciais Z-API — número próprio (add-on) tem prioridade ─────
     // Lookup order: user_zapi_config → platform_integrations → env vars
@@ -208,13 +229,14 @@ Deno.serve(async (request: Request) => {
     // Pré-popula resultados para os IDs acima do limite
     for (const id of idsOverLimit) {
       results.push({
-        debtorId:   id,
-        clientName: "",
-        phone:      "",
-        status:     "bloqueado_limite",
-        messageId:  null,
-        logId:      null,
-        error:      `Limite mensal atingido (${usage.chargesUsed}/${usage.planLimit} cobranças).`,
+        debtorId:    id,
+        clientName:  "",
+        phone:       "",
+        status:      "bloqueado_limite",
+        messageId:   null,
+        logId:       null,
+        error:       `Limite mensal atingido (${usage.chargesUsed}/${usage.planLimit} cobranças).`,
+        sentWithPdf: false,
       });
     }
 
@@ -245,12 +267,13 @@ Deno.serve(async (request: Request) => {
       if (!debtorRow) {
         results.push({
           debtorId,
-          clientName: "",
-          phone:      "",
-          status:     "devedor_nao_encontrado",
-          messageId:  null,
-          logId:      null,
-          error:      "Devedor nao encontrado ou nao pertence a esta conta.",
+          clientName:  "",
+          phone:       "",
+          status:      "devedor_nao_encontrado",
+          messageId:   null,
+          logId:       null,
+          error:       "Devedor nao encontrado ou nao pertence a esta conta.",
+          sentWithPdf: false,
         });
         continue;
       }
@@ -284,9 +307,10 @@ Deno.serve(async (request: Request) => {
 
         results.push({
           debtorId, clientName, phone: rawPhone,
-          status: "telefone_invalido",
-          messageId: null, logId,
-          error: `Telefone invalido: ${rawPhone || "(vazio)"}`,
+          status:      "telefone_invalido",
+          messageId:   null, logId,
+          error:       `Telefone invalido: ${rawPhone || "(vazio)"}`,
+          sentWithPdf: false,
         });
         invalidPhone++;
         continue;
@@ -316,56 +340,78 @@ Deno.serve(async (request: Request) => {
       if (dupRow) {
         results.push({
           debtorId, clientName, phone: normalizedPhone,
-          status: "duplicado",
-          messageId: null,
-          logId: (dupRow as { id: string }).id,
-          error: "Envio duplicado detectado (janela de 5 min).",
+          status:      "duplicado",
+          messageId:   null,
+          logId:       (dupRow as { id: string }).id,
+          error:       "Envio duplicado detectado (janela de 5 min).",
+          sentWithPdf: false,
         });
         duplicateCount++;
         continue;
       }
 
       // e. Envia (ou simula em dryRun)
-      // If a Drive PDF was matched, try to send as document first; fall back to text.
+      // Strategy: send a single text message. If the debtor has a PDF attached,
+      // append the public storage URL to the message so the recipient can tap to
+      // open/download the boleto PDF directly. This is the most reliable approach
+      // because Z-API's send-document endpoint (URL or base64) does not deliver a
+      // proper WhatsApp document on this plan/instance — it converts documents to a
+      // plain-text reference instead.
       let zapiResult = { success: false, messageId: null as string | null, zaapId: null as string | null, error: "dryRun" };
       let sentWithPdf = false;
 
-      if (!dryRun) {
-        // ── Attempt PDF attachment if Drive file is matched ────────────────────
-        if (driveFileId && driveAccessToken) {
-          const pdfBytes = await downloadDriveFile(driveFileId, driveAccessToken).catch(() => null);
-          if (pdfBytes && pdfBytes.length > 0) {
-            zapiResult = await sendDocumentMessage({
-              instanceId:  zapiCreds.instanceId,
-              token:       zapiCreds.token,
-              clientToken: zapiCreds.clientToken,
-              phone:       normalizedPhone,
-              fileName:    driveFileName ?? "boleto.pdf",
-              documentBytes: pdfBytes,
-              caption:     message,
-            });
-            if (zapiResult.success) sentWithPdf = true;
+      // ── Resolve PDF storage path + build message with link ────────────────────
+      const pdfEntry = debtorPdfPaths[debtorId] ?? null;
+      const pdfStoragePath = pdfEntry?.path
+        ?? (driveFileId === "uploaded"
+          ? `${userId}/${debtorId}/boleto.${driveFileName?.split(".").pop() ?? "pdf"}`
+          : null);
+
+      // Build the final message: append short PDF link if available
+      let finalMessage = message;
+      if (pdfStoragePath) {
+        const publicPdfUrl = `${SUPABASE_URL}/storage/v1/object/public/charge-pdfs/${pdfStoragePath}`;
+        const shortUrl = await shortenUrl(publicPdfUrl);
+        finalMessage = `${message}\n\n📎 Boleto: ${shortUrl}`;
+        sentWithPdf = true; // link is included — recipient can access the PDF
+        console.log(`[batch] PDF link appended for debtorId=${debtorId} short=${shortUrl}`);
+      } else if (driveFileId && driveFileId !== "uploaded" && driveAccessToken) {
+        // Legacy: Drive-matched PDF — no public URL, skip link but still try document send
+        const pdfBytes = await downloadDriveFile(driveFileId, driveAccessToken).catch(() => null);
+        if (pdfBytes && pdfBytes.length > 0 && !dryRun) {
+          // Attempt document send for Drive PDFs (no public URL available for these)
+          const pdfResult = await sendDocumentMessage({
+            instanceId:    zapiCreds.instanceId,
+            token:         zapiCreds.token,
+            clientToken:   zapiCreds.clientToken,
+            phone:         normalizedPhone,
+            fileName:      driveFileName ?? "boleto.pdf",
+            documentBytes: pdfBytes,
+            caption:       null,
+          });
+          if (pdfResult.success) {
+            sentWithPdf = true;
+            console.log(`[batch] Drive PDF sent for debtorId=${debtorId}`);
           }
         }
+      }
 
-        // ── Fallback to text-only (no PDF or PDF send failed) ──────────────────
-        if (!zapiResult.success) {
-          zapiResult = await sendTextMessage({
-            instanceId:  zapiCreds.instanceId,
-            token:       zapiCreds.token,
-            clientToken: zapiCreds.clientToken,
-            phone:       normalizedPhone,
-            message,
-          });
-        }
+      if (!dryRun) {
+        zapiResult = await sendTextMessage({
+          instanceId:  zapiCreds.instanceId,
+          token:       zapiCreds.token,
+          clientToken: zapiCreds.clientToken,
+          phone:       normalizedPhone,
+          message:     finalMessage,
+        });
+        console.log(`[batch] text send debtorId=${debtorId} success=${zapiResult.success} withPdfLink=${sentWithPdf}`);
       } else {
         // dryRun: simula sucesso sem enviar
-        zapiResult  = { success: true, messageId: `dry-${debtorId.slice(0, 8)}`, zaapId: null, error: null };
-        sentWithPdf = !!driveFileId;
+        zapiResult = { success: true, messageId: `dry-${debtorId.slice(0, 8)}`, zaapId: null, error: null };
       }
 
       const logStatus: string = zapiResult.success ? "sucesso" : "erro";
-      void sentWithPdf; // used in future for per-item reporting
+      console.log(`[batch] debtorId=${debtorId} status=${logStatus} sentWithPdf=${sentWithPdf}`);
 
       // f. Registra log individual
       // dryRun: NÃO grava idempotencyKey — evita bloquear envio real posterior.
@@ -386,10 +432,11 @@ Deno.serve(async (request: Request) => {
 
       results.push({
         debtorId, clientName, phone: normalizedPhone,
-        status:    logStatus as BatchItemStatus,
-        messageId: zapiResult.messageId,
+        status:      logStatus as BatchItemStatus,
+        messageId:   zapiResult.messageId,
         logId,
-        error:     zapiResult.error,
+        error:       zapiResult.error,
+        sentWithPdf,
       });
 
       if (zapiResult.success) {

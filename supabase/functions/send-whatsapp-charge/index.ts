@@ -58,6 +58,21 @@ const hashKey = async (raw: string): Promise<string> => {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 };
 
+/** Encurta uma URL via TinyURL. Retorna a URL original em caso de falha. */
+const shortenUrl = async (url: string): Promise<string> => {
+  try {
+    const res = await fetch(
+      `https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`,
+      { signal: AbortSignal.timeout(5_000) },
+    );
+    if (res.ok) {
+      const short = (await res.text()).trim();
+      if (short.startsWith("https://")) return short;
+    }
+  } catch { /* ignore — use original URL */ }
+  return url;
+};
+
 // Resposta de erro padronizada — nunca vaza credenciais
 const errResponse = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), {
@@ -254,86 +269,81 @@ Deno.serve(async (request: Request) => {
       });
     }
 
-    // ── 8. Envia via Z-API (com PDF se houver match Drive; fallback texto) ──────
+    // ── 8. Envia via Z-API ────────────────────────────────────────────────────
+    // Strategy: ALWAYS send text message first (guaranteed delivery), THEN send
+    // PDF as a separate additional document message if available.
+    // Reason: Z-API's send-document endpoint returns HTTP 200 but silently fails
+    // to deliver on some plans/configurations. Sending text first ensures the
+    // charge message always arrives regardless of Z-API document behavior.
     let zapiResult: { success: boolean; messageId: string | null; zaapId: string | null; error: string | null };
 
     // Check if this debtor has an attached PDF (uploaded or Drive-matched)
     let debtorDriveFileId:   string | null = null;
     let debtorDriveFileName: string | null = null;
-    let debtorDriveFileUrl:  string | null = null;
     if (body.debtorId) {
       const { data: dr } = await admin
         .from("user_registros_financeiros")
-        .select("drive_file_id, drive_file_name, drive_file_url")
+        .select("drive_file_id, drive_file_name")
         .eq("id", body.debtorId)
         .eq("user_id", userId)
         .maybeSingle();
       if (dr) {
         debtorDriveFileId   = (dr as Record<string, unknown>).drive_file_id   as string | null ?? null;
         debtorDriveFileName = (dr as Record<string, unknown>).drive_file_name as string | null ?? null;
-        debtorDriveFileUrl  = (dr as Record<string, unknown>).drive_file_url  as string | null ?? null;
       }
     }
 
-    // Attempt PDF attachment if available
+    // ── Build final message with PDF link if available ────────────────────────
+    // Z-API's send-document endpoint (URL or base64) does not deliver a proper
+    // WhatsApp document on this plan/instance. Instead we append the public
+    // Supabase Storage URL directly in the text message so the recipient can
+    // tap to open/download the boleto PDF.
     let sentWithPdf = false;
+    let finalMessage = body.message;
 
-    if (debtorDriveFileId === "uploaded" && debtorDriveFileUrl) {
-      // Direct URL download from Supabase Storage (no Drive API needed)
-      try {
-        const pdfRes = await fetch(debtorDriveFileUrl);
-        if (pdfRes.ok) {
-          const pdfBuf = await pdfRes.arrayBuffer();
-          const pdfBytes = new Uint8Array(pdfBuf);
-          if (pdfBytes.length > 0) {
-            zapiResult = await sendDocumentMessage({
-              instanceId:    zapiCreds.instanceId,
-              token:         zapiCreds.token,
-              clientToken:   zapiCreds.clientToken,
-              phone:         normalizedPhone,
-              fileName:      debtorDriveFileName ?? "boleto.pdf",
-              documentBytes: pdfBytes,
-              caption:       body.message,
-            });
-            if (zapiResult.success) sentWithPdf = true;
-          }
-        }
-      } catch (e) {
-        console.warn("[send-whatsapp-charge] PDF download from storage failed, falling back to text:", e instanceof Error ? e.message : String(e));
-      }
-    } else if (debtorDriveFileId) {
-      // Legacy: Drive-matched PDF — download from Google Drive
+    if (debtorDriveFileId === "uploaded" && body.debtorId) {
+      const ext = debtorDriveFileName?.split(".").pop() ?? "pdf";
+      const storagePath = `${userId}/${body.debtorId}/boleto.${ext}`;
+      const publicPdfUrl = `${SUPABASE_URL}/storage/v1/object/public/charge-pdfs/${storagePath}`;
+      const shortUrl = await shortenUrl(publicPdfUrl);
+      finalMessage = `${body.message}\n\n📎 Boleto: ${shortUrl}`;
+      sentWithPdf = true;
+      console.log(`[charge] PDF link appended for debtorId=${body.debtorId} short=${shortUrl}`);
+    } else if (debtorDriveFileId && debtorDriveFileId !== "uploaded") {
+      // Legacy: Drive-matched PDF — no public URL, attempt document send as bytes
       const driveToken = await getDriveAccessToken().catch(() => null);
       if (driveToken) {
         const pdfBytes = await downloadDriveFile(debtorDriveFileId, driveToken).catch(() => null);
         if (pdfBytes && pdfBytes.length > 0) {
-          zapiResult = await sendDocumentMessage({
+          const pdfResult = await sendDocumentMessage({
             instanceId:    zapiCreds.instanceId,
             token:         zapiCreds.token,
             clientToken:   zapiCreds.clientToken,
             phone:         normalizedPhone,
             fileName:      debtorDriveFileName ?? "boleto.pdf",
             documentBytes: pdfBytes,
-            caption:       body.message,
+            caption:       null,
           });
-          if (zapiResult.success) sentWithPdf = true;
+          if (pdfResult.success) {
+            sentWithPdf = true;
+            console.log(`[charge] Drive PDF sent for debtorId=${body.debtorId}`);
+          }
         }
       }
     }
 
-    // Fallback to text-only
-    if (!sentWithPdf) {
-      zapiResult = await sendTextMessage({
-        instanceId:  zapiCreds.instanceId,
-        token:       zapiCreds.token,
-        clientToken: zapiCreds.clientToken,
-        phone:       normalizedPhone,
-        message:     body.message,
-      });
-    }
+    // ── Send text message (with PDF link appended when available) ─────────────
+    zapiResult = await sendTextMessage({
+      instanceId:  zapiCreds.instanceId,
+      token:       zapiCreds.token,
+      clientToken: zapiCreds.clientToken,
+      phone:       normalizedPhone,
+      message:     finalMessage,
+    });
+    console.log(`[charge] text send success=${zapiResult.success} withPdfLink=${sentWithPdf}`);
 
     const logStatus = zapiResult.success ? "sucesso" : "erro";
-    void sentWithPdf;
+    console.log(`[charge] status=${logStatus} sentWithPdf=${sentWithPdf}`);
 
     // ── 9. Persiste log sanitizado (P2) ────────────────────────────────────────
     const { data: insertedLog } = await admin

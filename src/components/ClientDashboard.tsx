@@ -46,6 +46,7 @@ import { billingLogsService } from "../services/billingLogsService";
 import { pilotService } from "../services/pilotService";
 import { parseImportFile } from "../utils/importFileParser";
 import { extractDocumentLocally } from "../services/localDocumentExtraction";
+import { getMessageTemplate, fillMessageTemplate } from "../utils/messageTemplates";
 import BatchConfirmModal, { type BatchConfirmData } from "./BatchConfirmModal";
 import type { Debtor, MessageTone } from "../types";
 
@@ -375,20 +376,34 @@ export default function ClientDashboard({
     const validPhone  = selected.filter(d => d.phone && d.phone.replace(/\D/g, "").length >= 10).length;
     const invalidPhone = selected.length - validPhone;
 
-    const preview = `Olá {nome_cliente}, identificamos uma pendência financeira. Por favor, entre em contato para regularização.`;
+    const template = getMessageTemplate(selectedTone);
+
+    // Build a filled example using the first valid-phone debtor (for preview display)
+    const sampleDebtor = selected.find(d => d.phone && d.phone.replace(/\D/g, "").length >= 10) ?? selected[0];
+    const filledPreview = sampleDebtor
+      ? fillMessageTemplate(template, {
+          clientName:     sampleDebtor.client,
+          documentNumber: sampleDebtor.document,
+          dueDate:        sampleDebtor.dueDate,
+          amount:         sampleDebtor.updatedValue ?? sampleDebtor.value,
+        })
+      : template;
 
     setConfirmData({
-      debtorCount:       selected.length,
-      validPhoneCount:   validPhone,
-      invalidPhoneCount: invalidPhone,
-      messagePreview:    preview.slice(0, 200),
-      tone:              TONE_OPTIONS.find(t => t.value === selectedTone)?.label ?? selectedTone,
+      debtorCount:          selected.length,
+      validPhoneCount:      validPhone,
+      invalidPhoneCount:    invalidPhone,
+      messagePreview:       template,
+      messagePreviewFilled: filledPreview,
+      sampleDebtorName:     sampleDebtor?.client ?? undefined,
+      tone:                 TONE_OPTIONS.find(t => t.value === selectedTone)?.label ?? selectedTone,
+      toneValue:            selectedTone,
       pilotRemaining,
-      whatsappConnected: waConnected ?? false,
+      whatsappConnected:    waConnected ?? false,
     });
   };
 
-  const handleConfirmSend = async () => {
+  const handleConfirmSend = async (customMessage?: string | null) => {
     if (!confirmData) return;
     setConfirmData(null);
     setIsSending(true);
@@ -414,29 +429,53 @@ export default function ClientDashboard({
       // Notifica Visão Geral para recarregar
       onDebtorsImported?.();
 
-      // Upload de PDFs anexados — faz após createMany pois agora temos IDs reais
+      // Upload de PDFs anexados — faz após createMany pois agora temos IDs reais.
+      // Monta mapa debtorId → { path, name } para passar direto à Edge Function,
+      // eliminando dependência de RLS no updatePdfAttachment.
+      const debtorPdfPaths: Record<string, { path: string; name: string }> = {};
+      const pdfUploadFailures: string[] = [];
+
       if (attachedPdfs.size > 0) {
         for (const saved of persisted) {
           const file = attachedPdfs.get(saved.document ?? "");
           if (file && saved.id) {
             try {
               setUploadingPdfDoc(saved.document ?? "");
-              const url = await financeService.uploadChargePdf(userId, saved.id, file);
-              await financeService.updatePdfAttachment(userId, saved.id, { url, name: file.name });
+              const ext  = file.name.split(".").pop() ?? "pdf";
+              const path = `${userId}/${saved.id}/boleto.${ext}`;
+              await financeService.uploadChargePdf(userId, saved.id, file);
+              debtorPdfPaths[saved.id] = { path, name: file.name };
+              // Also persist to DB (best-effort — not critical for current send)
+              void financeService.updatePdfAttachment(userId, saved.id, {
+                url: `${saved.id}`, // placeholder — real URL built in Edge Function
+                name: file.name,
+              }).catch(() => { /* non-fatal */ });
             } catch (e) {
               console.warn("[ClientDashboard] PDF upload failed for", saved.document, e);
+              pdfUploadFailures.push(saved.document ?? saved.id ?? "?");
             }
           }
         }
         setUploadingPdfDoc(null);
+
+        if (pdfUploadFailures.length > 0) {
+          console.warn(
+            `[ClientDashboard] ${pdfUploadFailures.length} PDF(s) não enviados para o servidor:`,
+            pdfUploadFailures,
+          );
+          // Armazena aviso não-bloqueante — cobranças ainda serão enviadas sem PDF
+          // (alert() removido para não bloquear fluxo em navegadores com popup bloqueado)
+        }
       }
 
       const validIds = persisted.map(d => d.id).filter(Boolean) as string[];
 
       const result = await whatsappBatchService.sendBatchCharges({
-        debtorIds: validIds,
-        tone:      selectedTone,
-        dryRun:    false,
+        debtorIds:      validIds,
+        tone:           selectedTone,
+        customMessage:  customMessage ?? undefined,
+        dryRun:         false,
+        debtorPdfPaths: Object.keys(debtorPdfPaths).length > 0 ? debtorPdfPaths : undefined,
       });
 
       setSendResult(result);
@@ -992,10 +1031,15 @@ export default function ClientDashboard({
               }
               <div>
                 <h3 className="text-lg font-bold text-white">
-                  {sendResult.success ? "Cobranças enviadas!" : "Falha no envio"}
+                  {sendResult.success
+                    ? (sendResult.sent > 0 ? "Cobranças enviadas!" : "Lote processado")
+                    : "Falha no envio"}
                 </h3>
                 <p className="text-sm text-zinc-400">
-                  {sendResult.error ?? "Lote processado com sucesso."}
+                  {sendResult.error
+                    ?? (sendResult.sent === 0 && sendResult.duplicated > 0
+                      ? `${sendResult.duplicated} mensagem(ns) bloqueada(s) por anti-duplicata (aguarde 5 min antes de reenviar as mesmas cobranças).`
+                      : "Lote processado com sucesso.")}
                 </p>
               </div>
             </div>
@@ -1015,6 +1059,33 @@ export default function ClientDashboard({
             </div>
           </div>
 
+          {/* ── Enviados com sucesso (debug info) ──────────────────────────── */}
+          {sendResult.results.filter(r => r.status === "sucesso").length > 0 && (
+            <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-zinc-800">
+                <p className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                  Mensagens enviadas
+                </p>
+              </div>
+              <div className="divide-y divide-zinc-800/60 max-h-48 overflow-y-auto">
+                {sendResult.results
+                  .filter(r => r.status === "sucesso")
+                  .map(r => (
+                    <div key={r.debtorId} className="flex items-center justify-between px-4 py-2.5 text-sm gap-2">
+                      <span className="text-zinc-300 truncate flex-1">{r.clientName}</span>
+                      <span className="text-xs text-zinc-500 font-mono flex-shrink-0">+{r.phone}</span>
+                      {r.sentWithPdf
+                        ? <span className="text-xs text-emerald-400 flex-shrink-0">📎 PDF</span>
+                        : <span className="text-xs text-zinc-500 flex-shrink-0">sem PDF</span>
+                      }
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Itens com pendência ─────────────────────────────────────────── */}
           {sendResult.results.filter(r => r.status !== "sucesso").length > 0 && (
             <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden">
               <div className="px-4 py-3 border-b border-zinc-800">
@@ -1030,10 +1101,11 @@ export default function ClientDashboard({
                     <div key={r.debtorId} className="flex items-center justify-between px-4 py-2.5 text-sm">
                       <span className="text-zinc-300 truncate">{r.clientName}</span>
                       <span className="text-xs text-amber-400 flex-shrink-0 ml-2">
-                        {r.status === "telefone_invalido" ? "sem telefone válido"
-                          : r.status === "duplicado"       ? "já enviado hoje"
+                        {r.status === "telefone_invalido"  ? "sem telefone válido"
+                          : r.status === "duplicado"       ? "⏱ aguarde 5 min (anti-spam)"
                           : r.status === "bloqueado_limite" ? "limite atingido"
-                          : "falha no envio"}
+                          : r.status === "devedor_nao_encontrado" ? "devedor não encontrado"
+                          : r.error ?? "falha no envio"}
                       </span>
                     </div>
                   ))}
@@ -1057,7 +1129,7 @@ export default function ClientDashboard({
       {confirmData && (
         <BatchConfirmModal
           data={confirmData}
-          onConfirm={() => void handleConfirmSend()}
+          onConfirm={(msg) => void handleConfirmSend(msg)}
           onCancel={() => setConfirmData(null)}
         />
       )}

@@ -28,13 +28,14 @@ export type BatchTopStatus =
   | "erro_rede";
 
 export interface BatchDebtorResult {
-  debtorId:   string;
-  clientName: string;
-  phone:      string;
-  status:     BatchItemStatus;
-  messageId:  string | null;
-  logId:      string | null;
-  error:      string | null;
+  debtorId:    string;
+  clientName:  string;
+  phone:       string;
+  status:      BatchItemStatus;
+  messageId:   string | null;
+  logId:       string | null;
+  error:       string | null;
+  sentWithPdf: boolean;
 }
 
 export interface BatchChargeResult {
@@ -56,10 +57,12 @@ export interface BatchChargeResult {
 }
 
 export interface BatchChargeOptions {
-  debtorIds:     string[];
-  tone?:         string;
-  customMessage?: string;
-  dryRun?:       boolean;
+  debtorIds:        string[];
+  tone?:            string;
+  customMessage?:   string;
+  dryRun?:          boolean;
+  /** storage path + filename for each debtor that has a PDF attached, keyed by debtorId */
+  debtorPdfPaths?:  Record<string, { path: string; name: string }>;
 }
 
 // ─── Status labels ─────────────────────────────────────────────────────────────
@@ -112,24 +115,31 @@ export const whatsappBatchService = {
       "send-whatsapp-batch",
       {
         body: {
-          debtorIds:     options.debtorIds,
-          tone:          options.tone     ?? "neutro",
-          customMessage: options.customMessage ?? null,
-          dryRun:        options.dryRun   ?? false,
+          debtorIds:       options.debtorIds,
+          tone:            options.tone          ?? "neutro",
+          customMessage:   options.customMessage ?? null,
+          dryRun:          options.dryRun        ?? false,
+          debtorPdfPaths:  options.debtorPdfPaths ?? null,
         },
       },
     );
 
     if (error || !data) {
-      // Tenta extrair status semântico do error body
-      const raw = error?.message ?? "";
-      const statusMatch = raw.match(/"status"\s*:\s*"([^"]+)"/);
-      const knownStatus = (statusMatch?.[1] as BatchTopStatus) ?? "erro_rede";
+      // FunctionsHttpError exposes the real response via error.context (a Response object).
+      // Try to parse it to get the actual status/error from the function body.
+      let bodyStatus: BatchTopStatus = "erro_rede";
+      let bodyError = error?.message ?? "Não foi possível contatar o servidor.";
 
-      return EMPTY_RESULT(
-        knownStatus,
-        error?.message ?? "Não foi possível contatar o servidor.",
-      );
+      const ctx = (error as Record<string, unknown> | null)?.context;
+      if (ctx && typeof (ctx as Response).json === "function") {
+        try {
+          const body = await (ctx as Response).json() as Record<string, unknown>;
+          if (typeof body.status === "string") bodyStatus = body.status as BatchTopStatus;
+          if (typeof body.error  === "string") bodyError  = body.error;
+        } catch { /* ignore parse errors */ }
+      }
+
+      return EMPTY_RESULT(bodyStatus, bodyError);
     }
 
     return data;

@@ -25,8 +25,8 @@ type AdminClient = ReturnType<typeof createClient>;
 export interface PilotConfig {
   pilot_enabled:       boolean;
   daily_send_limit:    number;
-  allowed_send_start:  string;   // "HH:MM" UTC
-  allowed_send_end:    string;   // "HH:MM" UTC
+  allowed_send_start:  string;   // "HH:MM" Horário de Brasília (UTC-3)
+  allowed_send_end:    string;   // "HH:MM" Horário de Brasília (UTC-3)
   allowed_weekdays:    number[]; // 1=Mon … 7=Sun
   whatsapp_number_label?: string | null;
   responsible_name?:      string | null;
@@ -59,8 +59,11 @@ export type PilotGuardResult = PilotGuardPass | PilotGuardBlock;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Brasil não observa horário de verão desde 2019 — offset fixo UTC-3
+const BRASILIA_OFFSET_MS = -3 * 60 * 60 * 1000;
+
 /**
- * Parse "HH:MM" → total minutes since midnight (UTC).
+ * Parse "HH:MM" → total minutes since midnight.
  */
 function hhmm(str: string): number {
   const [h = "0", m = "0"] = str.split(":");
@@ -68,26 +71,30 @@ function hhmm(str: string): number {
 }
 
 /**
- * Current UTC time in minutes since midnight.
+ * Current Brasília time (UTC-3) in minutes since midnight.
+ * Used to compare against allowed_send_start / allowed_send_end.
  */
-function nowMinutes(): number {
-  const now = new Date();
-  return now.getUTCHours() * 60 + now.getUTCMinutes();
+function nowBrasiliaMinutes(): number {
+  const brasiliaMs = Date.now() + BRASILIA_OFFSET_MS;
+  const brasiliaDate = new Date(brasiliaMs);
+  return brasiliaDate.getUTCHours() * 60 + brasiliaDate.getUTCMinutes();
 }
 
 /**
- * Current ISO weekday (1=Mon … 7=Sun).
+ * Current ISO weekday in Brasília time (1=Mon … 7=Sun).
  */
 function isoWeekday(): number {
-  const day = new Date().getUTCDay(); // 0=Sun … 6=Sat
+  const brasiliaDate = new Date(Date.now() + BRASILIA_OFFSET_MS);
+  const day = brasiliaDate.getUTCDay(); // 0=Sun … 6=Sat
   return day === 0 ? 7 : day;
 }
 
 /**
- * Today's date as "YYYY-MM-DD" (UTC).
+ * Today's date as "YYYY-MM-DD" in Brasília time.
  */
-function todayUtc(): string {
-  return new Date().toISOString().slice(0, 10);
+function todayBrasilia(): string {
+  const brasiliaDate = new Date(Date.now() + BRASILIA_OFFSET_MS);
+  return brasiliaDate.toISOString().slice(0, 10);
 }
 
 // ─── Main guard ───────────────────────────────────────────────────────────────
@@ -146,9 +153,9 @@ export async function checkPilotGuard(
     };
   }
 
-  // ── 4. Time window check ────────────────────────────────────────────────────
+  // ── 4. Time window check (Brasília UTC-3) ───────────────────────────────────
 
-  const now   = nowMinutes();
+  const now   = nowBrasiliaMinutes();
   const start = hhmm(config.allowed_send_start ?? "08:00");
   const end   = hhmm(config.allowed_send_end   ?? "18:00");
 
@@ -156,14 +163,14 @@ export async function checkPilotGuard(
     return {
       ok:         false,
       reason:     "fora_horario",
-      message:    `Envio via piloto permitido entre ${config.allowed_send_start} e ${config.allowed_send_end} UTC. Tente novamente dentro do horário.`,
+      message:    `Envio via piloto permitido entre ${config.allowed_send_start} e ${config.allowed_send_end} (Horário de Brasília). Tente novamente dentro do horário.`,
       statusCode: 403,
     };
   }
 
   // ── 5. Daily limit ──────────────────────────────────────────────────────────
 
-  const today = todayUtc();
+  const today = todayBrasilia();
   const { data: counter } = await admin
     .from("pilot_daily_sends")
     .select("sent_count")

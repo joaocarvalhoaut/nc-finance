@@ -124,13 +124,8 @@ export const buildMessage = (
     .replace(/{valor_atualizado}/g, amountFormatted)
     .replace(/{dias_atraso}/g,     daysOverdueStr);
 
-  // Appenda link do PDF do Drive, se disponível
-  if (debtor.driveFileUrl) {
-    const label = debtor.driveFileName
-      ? ` (${debtor.driveFileName})`
-      : "";
-    msg += `\n\n📎 Boleto PDF${label}:\n${debtor.driveFileUrl}`;
-  }
+  // NOTE: PDF link is appended by the calling Edge Function (not here),
+  // so that it can use the correct public Storage URL with optional shortening.
 
   return msg;
 };
