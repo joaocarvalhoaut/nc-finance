@@ -58,16 +58,25 @@ const hashKey = async (raw: string): Promise<string> => {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 };
 
-/** Encurta uma URL via TinyURL. Retorna a URL original em caso de falha. */
+/** Encurta uma URL via Bitly API v4. Retorna a URL original em caso de falha. */
 const shortenUrl = async (url: string): Promise<string> => {
+  const bitlyToken = Deno.env.get("BITLY_ACCESS_TOKEN");
+  if (!bitlyToken) return url; // token não configurado — usa URL original
+
   try {
-    const res = await fetch(
-      `https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`,
-      { signal: AbortSignal.timeout(5_000) },
-    );
+    const res = await fetch("https://api-ssl.bitly.com/v4/shorten", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${bitlyToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ long_url: url }),
+      signal: AbortSignal.timeout(5_000),
+    });
     if (res.ok) {
-      const short = (await res.text()).trim();
-      if (short.startsWith("https://")) return short;
+      const data = await res.json() as Record<string, unknown>;
+      const link = data.link as string | undefined;
+      if (link?.startsWith("https://")) return link;
     }
   } catch { /* ignore — use original URL */ }
   return url;
