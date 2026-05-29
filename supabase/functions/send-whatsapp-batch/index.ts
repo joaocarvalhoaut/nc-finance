@@ -93,7 +93,7 @@ const hashKey = async (raw: string): Promise<string> => {
 /** Encurta uma URL via Short.io API. Retorna a URL original em caso de falha. */
 const shortenUrl = async (url: string): Promise<string> => {
   const apiKey = Deno.env.get("SHORTIO_API_KEY");
-  const domain = Deno.env.get("SHORTIO_DOMAIN") ?? "short.io";
+  const domain = Deno.env.get("SHORTIO_DOMAIN") ?? "ncfinance.s.gy";
   if (!apiKey) return url; // token não configurado — usa URL original
 
   try {
