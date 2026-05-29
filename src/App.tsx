@@ -978,6 +978,29 @@ export default function App() {
   };
 
   // Modify individual rows on the main general table
+  // ── Local-only update (instant, no API call) ─────────────────────────────────
+  const updateDebtorFieldLocal = (id: string, field: keyof Debtor, val: string | number) => {
+    setDebtors((prev) => prev.map((debtor) =>
+      debtor.id === id ? { ...debtor, [field]: val } : debtor
+    ));
+  };
+
+  // ── Persist to DB (called on onBlur) ─────────────────────────────────────────
+  const saveDebtorFieldToDB = async (id: string) => {
+    const currentDebtor = debtors.find((debtor) => debtor.id === id);
+    if (!currentDebtor || !currentOwnerUserId) return;
+    try {
+      const savedDebtor = await financeService.update(currentOwnerUserId, currentDebtor);
+      setDebtors((prev) => prev.map((debtor) => (debtor.id === id ? savedDebtor : debtor)));
+      if (selectedDebtorForMessage?.id === id) {
+        setSelectedDebtorForMessage(savedDebtor);
+      }
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "Falha ao salvar alteração do devedor.");
+    }
+  };
+
+  // Legacy wrapper — used for non-text updates (category click, status, etc.)
   const updateGeneralDebtorField = async (id: string, field: keyof Debtor, val: string | number) => {
     const currentDebtor = debtors.find((debtor) => debtor.id === id);
     if (!currentDebtor || !currentOwnerUserId) return;
@@ -2890,7 +2913,8 @@ export default function App() {
                                     <input
                                       type="text"
                                       value={d.client}
-                                      onChange={(e) => updateGeneralDebtorField(d.id, "client", e.target.value)}
+                                      onChange={(e) => updateDebtorFieldLocal(d.id, "client", e.target.value)}
+                                      onBlur={() => saveDebtorFieldToDB(d.id)}
                                       className="w-full bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded p-1 font-bold text-white"
                                     />
                                   </td>
@@ -2898,7 +2922,8 @@ export default function App() {
                                     <input
                                       type="text"
                                       value={d.document}
-                                      onChange={(e) => updateGeneralDebtorField(d.id, "document", e.target.value)}
+                                      onChange={(e) => updateDebtorFieldLocal(d.id, "document", e.target.value)}
+                                      onBlur={() => saveDebtorFieldToDB(d.id)}
                                       className="w-20 text-center bg-transparent focus:bg-zinc-950 rounded p-1 font-mono"
                                     />
                                   </td>
@@ -2906,7 +2931,8 @@ export default function App() {
                                     <input
                                       type="text"
                                       value={d.dueDate}
-                                      onChange={(e) => updateGeneralDebtorField(d.id, "dueDate", e.target.value)}
+                                      onChange={(e) => updateDebtorFieldLocal(d.id, "dueDate", e.target.value)}
+                                      onBlur={() => saveDebtorFieldToDB(d.id)}
                                       className="w-22 text-center bg-transparent focus:bg-zinc-950 rounded p-1 font-mono text-xs"
                                     />
                                   </td>
@@ -2914,7 +2940,8 @@ export default function App() {
                                     <input
                                       type="text"
                                       value={d.phone || ""}
-                                      onChange={(e) => updateGeneralDebtorField(d.id, "phone", e.target.value)}
+                                      onChange={(e) => updateDebtorFieldLocal(d.id, "phone", e.target.value)}
+                                      onBlur={() => saveDebtorFieldToDB(d.id)}
                                       placeholder="Ex: 5577999998888"
                                       className="w-32 text-center bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded p-1 font-mono text-xs text-zinc-300 focus:outline-none"
                                     />
@@ -2923,7 +2950,8 @@ export default function App() {
                                     <input
                                       type="number"
                                       value={d.value}
-                                      onChange={(e) => updateGeneralDebtorField(d.id, "value", Number(e.target.value))}
+                                      onChange={(e) => updateDebtorFieldLocal(d.id, "value", Number(e.target.value))}
+                                      onBlur={() => saveDebtorFieldToDB(d.id)}
                                       className="w-24 text-right bg-transparent focus:bg-zinc-950 rounded p-1 font-mono text-xs"
                                     />
                                   </td>
@@ -2965,7 +2993,8 @@ export default function App() {
                                     <input
                                       type="text"
                                       value={d.notes || ""}
-                                      onChange={(e) => updateGeneralDebtorField(d.id, "notes", e.target.value)}
+                                      onChange={(e) => updateDebtorFieldLocal(d.id, "notes", e.target.value)}
+                                      onBlur={() => saveDebtorFieldToDB(d.id)}
                                       placeholder="Anotar follow-up..."
                                       className="w-full bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded px-1.5 py-1"
                                     />
