@@ -563,10 +563,7 @@ export default function ClientDashboard({
               <span className="font-semibold text-white">{selectedIds.size}</span> selecionados
             </span>
           )}
-          <span className="flex items-center gap-1.5">
-            <BadgeCheck className="w-4 h-4 text-emerald-500" />
-            <span className="font-semibold text-white">{sentToday}</span> enviadas hoje
-          </span>
+
         </div>
       </div>
 
