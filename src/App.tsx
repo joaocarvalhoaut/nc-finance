@@ -2834,6 +2834,7 @@ export default function App() {
                                       value={d.client}
                                       onChange={(e) => updateDebtorFieldLocal(d.id, "client", e.target.value)}
                                       onBlur={() => saveDebtorFieldToDB(d.id)}
+                                      onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
                                       className="w-full bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded p-1 font-bold text-white"
                                     />
                                   </td>
@@ -2843,6 +2844,7 @@ export default function App() {
                                       value={d.document}
                                       onChange={(e) => updateDebtorFieldLocal(d.id, "document", e.target.value)}
                                       onBlur={() => saveDebtorFieldToDB(d.id)}
+                                      onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
                                       className="w-20 text-center bg-transparent focus:bg-zinc-950 rounded p-1 font-mono"
                                     />
                                   </td>
@@ -2852,6 +2854,7 @@ export default function App() {
                                       value={d.dueDate}
                                       onChange={(e) => updateDebtorFieldLocal(d.id, "dueDate", e.target.value)}
                                       onBlur={() => saveDebtorFieldToDB(d.id)}
+                                      onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
                                       className="w-22 text-center bg-transparent focus:bg-zinc-950 rounded p-1 font-mono text-xs"
                                     />
                                   </td>
@@ -2861,6 +2864,7 @@ export default function App() {
                                       value={d.phone || ""}
                                       onChange={(e) => updateDebtorFieldLocal(d.id, "phone", e.target.value)}
                                       onBlur={() => saveDebtorFieldToDB(d.id)}
+                                      onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
                                       placeholder="Ex: 5577999998888"
                                       className="w-32 text-center bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded p-1 font-mono text-xs text-zinc-300 focus:outline-none"
                                     />
@@ -2871,6 +2875,7 @@ export default function App() {
                                       value={d.value}
                                       onChange={(e) => updateDebtorFieldLocal(d.id, "value", Number(e.target.value))}
                                       onBlur={() => saveDebtorFieldToDB(d.id)}
+                                      onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
                                       className="w-24 text-right bg-transparent focus:bg-zinc-950 rounded p-1 font-mono text-xs"
                                     />
                                   </td>
@@ -2914,6 +2919,7 @@ export default function App() {
                                       value={d.notes || ""}
                                       onChange={(e) => updateDebtorFieldLocal(d.id, "notes", e.target.value)}
                                       onBlur={() => saveDebtorFieldToDB(d.id)}
+                                      onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
                                       placeholder="Anotar follow-up..."
                                       className="w-full bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded px-1.5 py-1"
                                     />
