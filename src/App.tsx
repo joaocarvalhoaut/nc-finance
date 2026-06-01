@@ -4011,13 +4011,13 @@ export default function App() {
                         <table className="w-full text-left border-collapse text-xs">
                           <thead>
                             <tr className="border-b border-zinc-800 text-[10px] uppercase font-mono text-zinc-500 tracking-wider">
-                              <th className="px-4 py-3">Iniciado em</th>
+                              <th className="px-4 py-3">Executado em</th>
                               <th className="px-4 py-3">Status</th>
-                              <th className="px-4 py-3 text-right">Candidatos</th>
-                              <th className="px-4 py-3 text-right">Jobs criados</th>
-                              <th className="px-4 py-3 text-right">Pulados</th>
+                              <th className="px-4 py-3 text-right">Devedores Elegíveis</th>
+                              <th className="px-4 py-3 text-right">Cobranças Criadas</th>
+                              <th className="px-4 py-3 text-right">Ignorados</th>
                               <th className="px-4 py-3 text-right">Enviados</th>
-                              <th className="px-4 py-3 text-right">Falhas</th>
+                              <th className="px-4 py-3 text-right">Erros</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-zinc-800/60 text-zinc-300">
