@@ -41,6 +41,7 @@ export default function LandingPage({
   const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
   const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authInfo, setAuthInfo] = useState("");
   const [isAuthSuccess, setIsAuthSuccess] = useState(false);
@@ -954,10 +955,37 @@ export default function LandingPage({
                 />
               </div>
 
+              {isRegisterMode && (
+                <div className="flex items-start gap-2.5 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setAcceptedTerms(p => !p)}
+                    className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-all ${acceptedTerms ? "bg-emerald-500 border-emerald-500" : "border-zinc-600 hover:border-zinc-400"}`}
+                  >
+                    {acceptedTerms && <Check className="w-2.5 h-2.5 text-black" strokeWidth={3} />}
+                  </button>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Li e aceito os{" "}
+                    <button type="button" onClick={() => setShowTermos(true)} className="text-emerald-400 hover:underline font-semibold">
+                      Termos de Uso
+                    </button>
+                    {" "}e a{" "}
+                    <button type="button" onClick={() => setShowPrivacidade(true)} className="text-emerald-400 hover:underline font-semibold">
+                      Política de Privacidade
+                    </button>
+                    {" "}da NC Finance.
+                  </p>
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={isAuthLoading || isAuthSuccess || Boolean(authConfigError)}
-                className="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold shadow-[0_4px_15px_rgba(16,185,129,0.3)] hover:-translate-y-0.5 transition-all text-sm mt-2 cursor-pointer"
+                disabled={isAuthLoading || isAuthSuccess || Boolean(authConfigError) || (isRegisterMode && !acceptedTerms)}
+                className={`w-full py-3.5 rounded-xl font-extrabold shadow-[0_4px_15px_rgba(16,185,129,0.3)] transition-all text-sm mt-2 ${
+                  isRegisterMode && !acceptedTerms
+                    ? "bg-zinc-700 text-zinc-500 cursor-not-allowed"
+                    : "bg-emerald-500 hover:bg-emerald-400 text-black hover:-translate-y-0.5 cursor-pointer"
+                }`}
               >
                 {isAuthLoading
                   ? "Validando acesso..."
@@ -972,6 +1000,7 @@ export default function LandingPage({
                 type="button"
                 onClick={() => {
                   setIsRegisterMode(!isRegisterMode);
+                  setAcceptedTerms(false);
                   setAuthError("");
                   setAuthInfo("");
                 }}
