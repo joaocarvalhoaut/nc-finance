@@ -468,9 +468,9 @@ export default function LandingPage({
               <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-xl">
                 <FileSpreadsheet className="w-6 h-6" />
               </div>
-              <h4 className="text-lg font-bold text-white">Conexão com Sheets e Drive</h4>
+              <h4 className="text-lg font-bold text-white">Conexão com Google Sheets</h4>
               <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                Suba parcelas integrando diretamente com Google Sheets. Vincule faturas e PDF de boletos guardados em pastas do Google Drive para que sejam enviados acoplados à cobrança do WhatsApp de forma limpa.
+                Importe parcelas diretamente de uma planilha Google Sheets. Basta configurar o ID da planilha e os dados dos devedores são carregados automaticamente, prontos para revisão e envio de cobranças.
               </p>
             </div>
 
