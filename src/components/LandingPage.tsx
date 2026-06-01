@@ -1011,7 +1011,7 @@ export default function LandingPage({
               <span className="hover:text-emerald-400 cursor-pointer" onClick={() => setShowTermos(true)}>Termos de Uso</span>
               <span className="hover:text-emerald-400 cursor-pointer" onClick={() => setShowPrivacidade(true)}>Privacidade e Dados</span>
               <span className="hover:text-emerald-400 cursor-pointer" onClick={() => setShowSuporte(true)}>Suporte</span>
-              <span className="hover:text-emerald-400 cursor-pointer font-mono">v1.1.0-Release</span>
+
             </div>
           </div>
         </div>
