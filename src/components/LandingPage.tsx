@@ -760,13 +760,19 @@ export default function LandingPage({
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Envio em lote via WhatsApp
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Regras de automação de cobranças diárias
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Automação de cobranças diárias
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Sincronização com Google Sheets
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Importação via Google Sheets
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Drive Matching (vincula PDFs ao devedor)
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Link de boleto PDF na mensagem
+                  </li>
+                  <li className="flex items-center gap-2.5 text-zinc-600 line-through">
+                    <CheckCircle2 className="w-4 h-4 text-zinc-800 flex-shrink-0" /> Janela de envio personalizada
+                  </li>
+                  <li className="flex items-center gap-2.5 text-zinc-600 line-through">
+                    <CheckCircle2 className="w-4 h-4 text-zinc-800 flex-shrink-0" /> Prioridade na fila de automação
                   </li>
                 </ul>
                 {/* Add-on número próprio */}
@@ -837,6 +843,9 @@ export default function LandingPage({
                   </li>
                   <li className="flex items-center gap-2.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Prioridade na fila de automação
+                  </li>
+                  <li className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> Suporte dedicado via WhatsApp
                   </li>
                 </ul>
                 {/* Add-on número próprio */}
