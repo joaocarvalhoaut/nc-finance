@@ -490,9 +490,9 @@ export default function LandingPage({
               <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-xl">
                 <ShieldCheck className="w-6 h-6" />
               </div>
-              <h4 className="text-lg font-bold text-white">Disparos via Número Global da Plataforma</h4>
+              <h4 className="text-lg font-bold text-white">Escolha o Número dos Disparos</h4>
               <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                As cobranças são enviadas por um número corporativo global da NC Finance, sem precisar conectar o seu celular pessoal. Cada envio é rastreado com status de entrega e registrado no histórico da conta.
+                Use o número corporativo global da NC Finance e comece a cobrar sem configuração, ou cadastre o seu próprio número WhatsApp para disparar em nome da sua empresa. Cada envio é rastreado com status de entrega e registrado no histórico da conta.
               </p>
             </div>
           </div>
