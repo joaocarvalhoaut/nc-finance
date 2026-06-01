@@ -2263,19 +2263,33 @@ export default function App() {
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-mono font-bold text-emerald-400">✓ {extractedDebtors.length} Registros Prontos para Revisão:</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const allSelected = extractedDebtors.every(d => extractedSelectedIds.has(d.id));
-                                  setExtractedSelectedIds(allSelected ? new Set() : new Set(extractedDebtors.map(d => d.id)));
-                                }}
-                                className="flex items-center gap-1.5 text-[10px] text-zinc-400 hover:text-emerald-400 transition-colors font-semibold"
-                              >
-                                {extractedDebtors.every(d => extractedSelectedIds.has(d.id))
-                                  ? <><CheckSquare className="w-3.5 h-3.5 text-emerald-400" /> Desmarcar todos</>
-                                  : <><Square className="w-3.5 h-3.5" /> Selecionar todos</>
-                                }
-                              </button>
+                              <div className="flex items-center gap-3">
+                                {extractedSelectedIds.size > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setExtractedDebtors(prev => prev.filter(d => !extractedSelectedIds.has(d.id)));
+                                      setExtractedSelectedIds(new Set());
+                                    }}
+                                    className="flex items-center gap-1.5 text-[10px] text-rose-400 hover:text-rose-300 transition-colors font-semibold"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" /> Remover {extractedSelectedIds.size} selecionado{extractedSelectedIds.size !== 1 ? "s" : ""}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const allSelected = extractedDebtors.every(d => extractedSelectedIds.has(d.id));
+                                    setExtractedSelectedIds(allSelected ? new Set() : new Set(extractedDebtors.map(d => d.id)));
+                                  }}
+                                  className="flex items-center gap-1.5 text-[10px] text-zinc-400 hover:text-emerald-400 transition-colors font-semibold"
+                                >
+                                  {extractedDebtors.every(d => extractedSelectedIds.has(d.id))
+                                    ? <><CheckSquare className="w-3.5 h-3.5 text-emerald-400" /> Desmarcar todos</>
+                                    : <><Square className="w-3.5 h-3.5" /> Selecionar todos</>
+                                  }
+                                </button>
+                              </div>
                             </div>
 
                             {extractedDebtors.map((item, index) => (
