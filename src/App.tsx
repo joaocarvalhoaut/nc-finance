@@ -2403,7 +2403,7 @@ export default function App() {
                   
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     
-                    <div className="lg:col-span-4 bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-md">
+                    <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-md">
                       <h4 className="text-sm font-bold text-white flex items-center gap-2">
                         <Percent className="w-4 h-4 text-emerald-400" /> Parâmetros de Encargos Globais
                       </h4>
@@ -2445,7 +2445,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-md">
+                    <div className="lg:col-span-7 bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-md">
                       <h4 className="text-sm font-bold text-white flex items-center gap-2">
                         <UserPlus className="w-4 h-4 text-emerald-400" /> Cadastro de Representantes
                       </h4>
