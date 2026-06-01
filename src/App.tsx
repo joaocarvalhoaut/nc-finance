@@ -4129,7 +4129,7 @@ export default function App() {
             </div>
 
             <footer className="border-t border-zinc-900 bg-zinc-950 py-6 text-zinc-600 text-[10px] text-center">
-              <span>NC Finance v1.3.0 • {new Date().getFullYear()} NC Finance.</span>
+              <span>NC Finance • {new Date().getFullYear()} NC Finance.</span>
             </footer>
 
           </main>
