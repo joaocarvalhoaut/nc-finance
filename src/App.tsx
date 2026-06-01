@@ -2780,7 +2780,6 @@ export default function App() {
                               </div>
                             </th>
                             <th className="px-4 py-3">Observações</th>
-                            <th className="px-4 py-3 text-center text-emerald-400/60">PDF</th>
                             <th className="px-5 py-3 text-right">Ação</th>
                           </tr>
                         </thead>
@@ -2912,21 +2911,6 @@ export default function App() {
                                       placeholder="Anotar follow-up..."
                                       className="w-full bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded px-1.5 py-1"
                                     />
-                                  </td>
-                                  <td className="px-4 py-4 text-center">
-                                    {d.driveFileId ? (
-                                      <a
-                                        href={d.driveFileUrl ?? "#"}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        title={d.driveFileName ?? "Abrir PDF"}
-                                        className="inline-flex items-center justify-center w-6 h-6 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-colors"
-                                      >
-                                        <ExternalLink className="w-3 h-3" />
-                                      </a>
-                                    ) : (
-                                      <span className="text-zinc-700 text-[10px]">?</span>
-                                    )}
                                   </td>
                                   <td className="px-5 py-4 text-right">
                                     <div className="flex items-center justify-end gap-2 text-zinc-400">
