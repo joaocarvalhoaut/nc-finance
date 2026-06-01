@@ -335,10 +335,10 @@ export default function App() {
     }
   };
 
-  const handleSignUp = async ({ name, email, password }: { name: string; email: string; password: string }) => {
+  const handleSignUp = async ({ name, email, password, cpf, phone, cep, address, city, state }: { name: string; email: string; password: string; cpf: string; phone: string; cep: string; address: string; city: string; state: string }) => {
     setIsAuthenticating(true);
     try {
-      const authResult = await signUp({ name, email, password });
+      const authResult = await signUp({ name, email, password, cpf, phone, cep, address, city, state });
       const needsEmailConfirmation = !authResult.session;
 
       if (!needsEmailConfirmation) {

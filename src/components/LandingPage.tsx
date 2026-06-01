@@ -42,6 +42,17 @@ export default function LandingPage({
   const [authName, setAuthName] = useState("");
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+
+  // Campos de registro expandido
+  const [authCPF, setAuthCPF] = useState("");
+  const [authPhone, setAuthPhone] = useState("");
+  const [authCEP, setAuthCEP] = useState("");
+  const [authAddress, setAuthAddress] = useState("");
+  const [authCity, setAuthCity] = useState("");
+  const [authState, setAuthState] = useState("");
+  const [cpfError, setCpfError] = useState("");
+  const [cepLoading, setCepLoading] = useState(false);
+
   const [authError, setAuthError] = useState("");
   const [authInfo, setAuthInfo] = useState("");
   const [isAuthSuccess, setIsAuthSuccess] = useState(false);
@@ -105,6 +116,29 @@ export default function LandingPage({
       setAuthError("Por favor, digite seu nome completo para cadastro.");
       return;
     }
+    if (isRegisterMode) {
+      const cpfDigits = authCPF.replace(/\D/g, "");
+      if (cpfDigits.length !== 11) {
+        setAuthError("Digite o CPF completo (11 dígitos).");
+        return;
+      }
+      if (!validateCPF(authCPF)) {
+        setAuthError("CPF inválido. Verifique o número e tente novamente.");
+        return;
+      }
+      if (authPhone.replace(/\D/g, "").length < 10) {
+        setAuthError("Digite um telefone válido com DDD.");
+        return;
+      }
+      if (!authCEP || authCEP.replace(/\D/g, "").length < 8) {
+        setAuthError("Digite o CEP completo.");
+        return;
+      }
+      if (!authAddress || !authCity || !authState) {
+        setAuthError("Preencha o endereço completo.");
+        return;
+      }
+    }
 
     setAuthError("");
     setAuthInfo("");
@@ -114,7 +148,13 @@ export default function LandingPage({
         const result = await onSignUp({
           name: authName,
           email: authEmail,
-          password: authPassword
+          password: authPassword,
+          cpf: authCPF,
+          phone: authPhone,
+          cep: authCEP,
+          address: authAddress,
+          city: authCity,
+          state: authState,
         });
 
         if (result.needsEmailConfirmation) {
@@ -134,7 +174,9 @@ export default function LandingPage({
     } catch (error) {
       const raw = error instanceof Error ? error.message : "";
       let message = "Não foi possível autenticar. Tente novamente.";
-      if (raw.includes("Invalid login credentials"))
+      if (raw.includes("CPF_JA_CADASTRADO"))
+        message = "Este CPF já possui uma conta cadastrada. Faça login ou entre em contato com o suporte.";
+      else if (raw.includes("Invalid login credentials"))
         message = "E-mail ou senha incorretos. Verifique seus dados e tente novamente.";
       else if (raw.includes("Email not confirmed"))
         message = "E-mail não confirmado. Verifique sua caixa de entrada e clique no link de confirmação.";
@@ -152,6 +194,63 @@ export default function LandingPage({
       setAuthError(message);
     }
   };
+
+  // ── CPF validation ────────────────────────────────────────────────────────
+  const validateCPF = (cpf: string): boolean => {
+    const d = cpf.replace(/\D/g, "");
+    if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+    let sum = 0;
+    for (let i = 0; i < 9; i++) sum += parseInt(d[i]) * (10 - i);
+    let r = (sum * 10) % 11;
+    if (r === 10 || r === 11) r = 0;
+    if (r !== parseInt(d[9])) return false;
+    sum = 0;
+    for (let i = 0; i < 10; i++) sum += parseInt(d[i]) * (11 - i);
+    r = (sum * 10) % 11;
+    if (r === 10 || r === 11) r = 0;
+    return r === parseInt(d[10]);
+  };
+
+  const formatCPF = (v: string) => {
+    const d = v.replace(/\D/g, "").slice(0, 11);
+    return d.replace(/(\d{3})(\d)/, "$1.$2")
+            .replace(/(\d{3})(\d)/, "$1.$2")
+            .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  };
+
+  const formatPhone = (v: string) => {
+    const d = v.replace(/\D/g, "").slice(0, 11);
+    if (d.length <= 2) return d;
+    if (d.length <= 6) return `(${d.slice(0,2)}) ${d.slice(2)}`;
+    if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+    return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  };
+
+  const formatCEP = (v: string) => {
+    const d = v.replace(/\D/g, "").slice(0, 8);
+    return d.length > 5 ? `${d.slice(0,5)}-${d.slice(5)}` : d;
+  };
+
+  const handleCEPChange = async (raw: string) => {
+    const formatted = formatCEP(raw);
+    setAuthCEP(formatted);
+    const digits = formatted.replace(/\D/g, "");
+    if (digits.length === 8) {
+      setCepLoading(true);
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+        const data = await res.json() as { logradouro?: string; localidade?: string; uf?: string; erro?: boolean };
+        if (!data.erro) {
+          setAuthAddress(data.logradouro ?? "");
+          setAuthCity(data.localidade ?? "");
+          setAuthState(data.uf ?? "");
+        }
+      } catch { /* ignora */ }
+      setCepLoading(false);
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   const handleDemoPreset = (name: string, val: string) => {
     setDemoPhoneName(name);
@@ -956,6 +1055,97 @@ export default function LandingPage({
               </div>
 
               {isRegisterMode && (
+                <>
+                  {/* CPF */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">CPF</label>
+                    <input
+                      type="text"
+                      required
+                      value={authCPF}
+                      onChange={(e) => {
+                        const formatted = formatCPF(e.target.value);
+                        setAuthCPF(formatted);
+                        const digits = formatted.replace(/\D/g, "");
+                        if (digits.length === 11) {
+                          setCpfError(validateCPF(formatted) ? "" : "CPF inválido.");
+                        } else {
+                          setCpfError("");
+                        }
+                        setAuthError("");
+                      }}
+                      className={`w-full bg-zinc-900/80 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition-all font-mono ${cpfError ? "border-rose-500 focus:border-rose-500" : "border-zinc-800 focus:border-emerald-500"}`}
+                      placeholder="000.000.000-00"
+                    />
+                    {cpfError && <p className="text-rose-400 text-[11px] mt-1">{cpfError}</p>}
+                  </div>
+
+                  {/* Telefone */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Telefone / WhatsApp</label>
+                    <input
+                      type="text"
+                      required
+                      value={authPhone}
+                      onChange={(e) => { setAuthPhone(formatPhone(e.target.value)); setAuthError(""); }}
+                      className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-mono"
+                      placeholder="(00) 00000-0000"
+                    />
+                  </div>
+
+                  {/* CEP + endereço */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">
+                        CEP {cepLoading && <span className="text-emerald-400 font-normal normal-case">buscando...</span>}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={authCEP}
+                        onChange={(e) => { void handleCEPChange(e.target.value); setAuthError(""); }}
+                        className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-mono"
+                        placeholder="00000-000"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Estado</label>
+                      <input
+                        type="text"
+                        value={authState}
+                        onChange={(e) => setAuthState(e.target.value.toUpperCase().slice(0,2))}
+                        className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-mono uppercase"
+                        placeholder="SP"
+                        maxLength={2}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Endereço</label>
+                    <input
+                      type="text"
+                      required
+                      value={authAddress}
+                      onChange={(e) => { setAuthAddress(e.target.value); setAuthError(""); }}
+                      className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light"
+                      placeholder="Rua, número, bairro"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Cidade</label>
+                    <input
+                      type="text"
+                      required
+                      value={authCity}
+                      onChange={(e) => { setAuthCity(e.target.value); setAuthError(""); }}
+                      className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light"
+                      placeholder="São Paulo"
+                    />
+                  </div>
+                </>
+              )}
+
+              {isRegisterMode && (
                 <div className="flex items-start gap-2.5 mt-1">
                   <button
                     type="button"
@@ -1001,6 +1191,9 @@ export default function LandingPage({
                 onClick={() => {
                   setIsRegisterMode(!isRegisterMode);
                   setAcceptedTerms(false);
+                  setAuthCPF(""); setAuthPhone(""); setAuthCEP("");
+                  setAuthAddress(""); setAuthCity(""); setAuthState("");
+                  setCpfError("");
                   setAuthError("");
                   setAuthInfo("");
                 }}

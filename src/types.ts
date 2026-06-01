@@ -54,6 +54,12 @@ export interface AuthCredentials {
 
 export interface SignUpPayload extends AuthCredentials {
   name: string;
+  cpf: string;
+  phone: string;
+  cep: string;
+  address: string;
+  city: string;
+  state: string;
 }
 
 export interface BillingLog {
