@@ -2440,9 +2440,6 @@ export default function App() {
                         </div>
                       </div>
                       
-                      <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-[10px] text-zinc-500 font-light">
-                        * O cálculo é feito com base em 12 dias de atraso presumidos sobre a data histórica base dos boletos em atraso.
-                      </div>
                     </div>
 
                     <div className="lg:col-span-7 bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-md">
