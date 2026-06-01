@@ -1002,7 +1002,7 @@ export default function LandingPage({
               <span className="font-bold text-sm text-zinc-300">NC Finance Ltda.</span>
             </div>
             <p className="max-w-md text-center sm:text-right text-[11px] leading-relaxed">
-              NC Finance é uma plataforma tecnológica de faturamento automatizado e cobranças. A infraestrutura de envio via aplicativo de WhatsApp depende de APIs acessórias contratadas externamente.
+              NC Finance é uma plataforma tecnológica de gestão de cobranças e faturamento automatizado via WhatsApp.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-between pt-8 gap-4 text-[10px]">
