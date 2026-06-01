@@ -2304,7 +2304,7 @@ export default function App() {
                                   <Trash2 className="w-4 h-4" />
                                 </button>
 
-                                <div className="text-xs">
+                                <div className="text-xs pt-5">
                                   <div>
                                     <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Cliente</label>
                                     <input
