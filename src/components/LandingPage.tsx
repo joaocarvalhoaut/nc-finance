@@ -693,7 +693,7 @@ export default function LandingPage({
                 </ul>
                 {/* Add-on número próprio */}
                 <div className={`rounded-xl border p-3 transition-all cursor-pointer ${ownNumber.lite ? "border-amber-500/40 bg-amber-500/5" : "border-zinc-800 hover:border-zinc-700"}`}
-                  onClick={() => setOwnNumber(p => ({ ...p, lite: !p.lite }))}>
+                  onClick={() => setOwnNumber(p => ({ lite: !p.lite, pro: false, premium: false }))}>
                   <div className="flex items-start gap-2.5">
                     <div className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-all ${ownNumber.lite ? "bg-amber-500 border-amber-500" : "border-zinc-600"}`}>
                       {ownNumber.lite && <Check className="w-2.5 h-2.5 text-black" strokeWidth={3} />}
@@ -771,7 +771,7 @@ export default function LandingPage({
                 </ul>
                 {/* Add-on número próprio */}
                 <div className={`rounded-xl border p-3 transition-all cursor-pointer ${ownNumber.pro ? "border-amber-500/40 bg-amber-500/5" : "border-emerald-500/10 hover:border-amber-500/30"}`}
-                  onClick={() => setOwnNumber(p => ({ ...p, pro: !p.pro }))}>
+                  onClick={() => setOwnNumber(p => ({ lite: false, pro: !p.pro, premium: false }))}>
                   <div className="flex items-start gap-2.5">
                     <div className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-all ${ownNumber.pro ? "bg-amber-500 border-amber-500" : "border-zinc-500"}`}>
                       {ownNumber.pro && <Check className="w-2.5 h-2.5 text-black" strokeWidth={3} />}
@@ -841,7 +841,7 @@ export default function LandingPage({
                 </ul>
                 {/* Add-on número próprio */}
                 <div className={`rounded-xl border p-3 transition-all cursor-pointer ${ownNumber.premium ? "border-amber-500/40 bg-amber-500/5" : "border-zinc-800 hover:border-zinc-700"}`}
-                  onClick={() => setOwnNumber(p => ({ ...p, premium: !p.premium }))}>
+                  onClick={() => setOwnNumber(p => ({ lite: false, pro: false, premium: !p.premium }))}>
                   <div className="flex items-start gap-2.5">
                     <div className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-all ${ownNumber.premium ? "bg-amber-500 border-amber-500" : "border-zinc-600"}`}>
                       {ownNumber.premium && <Check className="w-2.5 h-2.5 text-black" strokeWidth={3} />}
