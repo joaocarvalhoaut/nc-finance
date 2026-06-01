@@ -3434,26 +3434,6 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="p-3.5 rounded-2xl bg-zinc-950 border border-zinc-850 space-y-1.5 text-xs text-zinc-400">
-                            <span className="text-[10px] text-zinc-500 font-mono block">Boleto PDF · Google Drive:</span>
-                            {selectedDebtorForMessage?.driveFileId ? (
-                              <a
-                                href={selectedDebtorForMessage.driveFileUrl ?? "#"}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-emerald-400 font-mono text-xs flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded max-w-fit hover:text-emerald-300 transition-colors"
-                              >
-                                <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" />
-                                <span className="truncate max-w-[220px]">{selectedDebtorForMessage.driveFileName}</span>
-                                <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-60" />
-                              </a>
-                            ) : (
-                              <span className="text-zinc-500 text-xs italic">
-                                Nenhum PDF vinculado — clique em "Localizar PDFs no Drive" na aba de Cobrança.
-                              </span>
-                            )}
-                            <span className="text-[8px] text-zinc-600 block leading-none">A NC Finance cruza CPF/CNPJ e nome do cliente para localizar o boleto correto na pasta da plataforma.</span>
-                          </div>
 
                           <div className="space-y-1.5 flex-1 flex flex-col">
                             <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block">Esboço Final da Mensagem (Editável):</label>
