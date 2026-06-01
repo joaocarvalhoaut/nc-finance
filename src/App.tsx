@@ -1743,7 +1743,7 @@ export default function App() {
                     </div>
 
                     <div className="bg-zinc-900/60 border border-emerald-500/10 p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[120px] shadow">
-                      <div className="absolute -top-1 -right-1 w-6 h-6 bg-emerald-500/15 rounded-bl-xl text-[9px] font-bold text-emerald-400 flex items-center justify-center font-mono">+12%</div>
+
                       <div className="flex items-center justify-between text-emerald-400 text-xs uppercase tracking-wider font-mono">
                         <span>Faturamento Corrigido</span>
                         <TrendingUp className="w-4 h-4 text-emerald-400" />
