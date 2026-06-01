@@ -388,13 +388,6 @@ export default function LandingPage({
                           </div>
                         </div>
                       </div>
-                      <div className="absolute bottom-4 left-4 right-4 bg-zinc-950/90 border border-emerald-500/30 backdrop-blur-md p-3 rounded-xl shadow-xl flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-                          <span className="text-xs text-zinc-200">Z-API Disparador Conectado</span>
-                        </div>
-                        <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-mono">LIVE</span>
-                      </div>
                     </div>
 
                     <div className="p-3 text-center w-full">
