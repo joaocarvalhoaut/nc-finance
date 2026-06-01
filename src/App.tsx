@@ -2759,17 +2759,6 @@ export default function App() {
                                     <option value="a_vencer">A vencer</option>
                                     <option value="liquidado">Liquidado</option>
                                   </select>
-                                  <select
-                                    value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className={`bg-zinc-900 border rounded-lg text-[9px] px-1.5 py-0.5 cursor-pointer transition-colors focus:outline-none normal-case tracking-normal font-normal ${statusFilter !== "all" ? "border-emerald-500/50 text-emerald-300" : "border-zinc-700 text-zinc-400"}`}
-                                  >
-                                    <option value="all">Status</option>
-                                    <option value="pending">Pendente</option>
-                                    <option value="sent">Enviado</option>
-                                    <option value="failed">Falhou</option>
-                                  </select>
                                 </div>
                               </div>
                             </th>
