@@ -4005,7 +4005,7 @@ export default function App() {
                   {automationRuns.length > 0 && (
                     <div className="bg-zinc-900/40 border border-zinc-900 rounded-3xl p-6 space-y-4 shadow-xl">
                       <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <History className="w-4 h-4 text-emerald-400" /> Últimas execuções do Scheduler
+                        <History className="w-4 h-4 text-emerald-400" /> Últimas Execuções
                       </h3>
                       <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-xs">
