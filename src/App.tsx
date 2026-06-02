@@ -3686,7 +3686,7 @@ export default function App() {
                         <Bot className="w-5 h-5 text-emerald-400" /> Regras de Automação
                       </h3>
                       <p className="text-xs text-zinc-500 mt-0.5">
-                        O scheduler roda diariamente às 08h UTC e cria jobs na fila. O worker processa a cada 5 min.
+                        As cobranças automáticas são enviadas todos os dias às 08h (horário de Brasília), conforme as regras ativas abaixo.
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
