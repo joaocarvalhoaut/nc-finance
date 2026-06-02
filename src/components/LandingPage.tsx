@@ -344,9 +344,6 @@ export default function LandingPage({
             
             {/* Left Column: CTA Pitch */}
             <div className="lg:col-span-7 flex flex-col space-y-6 text-center lg:text-left">
-              <div className="inline-flex self-center lg:self-start items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-400/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
-                <Sparkles className="w-3.5 h-3.5 animate-pulse" /> Inteligência de Cobrança Autônoma
-              </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-tight tracking-tight">
                 Reduza a inadimplência <br />
