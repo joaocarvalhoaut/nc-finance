@@ -266,8 +266,7 @@ export default function LandingPage({
       {/* Landing Header */}
       <header className="border-b border-zinc-900/80 backdrop-blur-md bg-black/60 sticky top-0 z-50 transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img src="/favicon.png" alt="NC Finance" className="w-8 h-8 rounded-full object-cover" />
+          <div className="flex items-center">
             <span className="font-display font-extrabold text-xl sm:text-2xl tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-zinc-100 via-white to-emerald-400 uppercase select-none drop-shadow-[0_0_10px_rgba(52,211,153,0.15)]">
               NC Finance
             </span>
@@ -1209,7 +1208,6 @@ export default function LandingPage({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center sm:text-left">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6 border-b border-zinc-900/60 pb-8">
             <div className="flex items-center gap-2">
-              <img src="/favicon.png" alt="NC Finance" className="w-7 h-7 rounded-full object-cover" />
               <span className="font-bold text-sm text-zinc-300">NC Finance Ltda.</span>
             </div>
             <p className="max-w-md text-center sm:text-right text-[11px] leading-relaxed">
