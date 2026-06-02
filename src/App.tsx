@@ -3951,12 +3951,6 @@ export default function App() {
                               {rule.maxDailySends != null && (
                                 <span>Limite: máx {rule.maxDailySends}/dia</span>
                               )}
-                              {rule.lastRunAt && (
-                                <span>Último run: {new Date(rule.lastRunAt).toLocaleString("pt-BR")}</span>
-                              )}
-                              {rule.nextRunAt && (
-                                <span>Próximo: {new Date(rule.nextRunAt).toLocaleString("pt-BR")}</span>
-                              )}
                             </div>
                           </div>
 
