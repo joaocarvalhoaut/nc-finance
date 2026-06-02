@@ -1580,7 +1580,7 @@ export default function App() {
                   {currentTab === "dashboard"  && "Dashboard & Métricas"}
                   {currentTab === "importar"   && "Importação — Vencidos · A Vencer · Liquidação"}
                   {currentTab === "visao_geral"&& "Visão Geral — Base Consolidada"}
-                  {currentTab === "cobranca"   && "Cobrança — Z-API / WhatsApp"}
+                  {currentTab === "cobranca"   && "Cobrança — WhatsApp"}
                   {currentTab === "historico"  && "Histórico de Cobrança"}
                   {currentTab === "automacoes" && "Automações de Cobrança"}
                 </h2>
