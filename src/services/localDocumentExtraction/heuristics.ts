@@ -134,6 +134,9 @@ const BANK_KEYWORDS = new Set([
   "ELECTRON","DEBIT","DEBITO","CREDITO","CRÉDITO","PREPAID","PRE-PAGO",
   // ── Abreviações comuns em relatórios / boletos ────────────────────────────
   "BB","CEF","BRB","BNB","BASA","ABR","BESC","BEMGE","BANEB","BANESPA",
+  // ── Financeiras / securitizadoras presentes em boletos ───────────────────
+  "ASSET","FIDC","FUNDO","SECURITIZADORA","CREDITCORP","CREDITCORP",
+  "ACESSO","VORTX","VÓRTX","JIVE","HAVERSINE","TRAVESSIA",
 ]);
 
 /**
@@ -392,7 +395,9 @@ export function parseDelimitedFormat(text: string): RecordCandidate[] {
           : parseBRLAmount(valueRaw);
 
       const rawClient = row.fields.client?.trim() || "";
-      const { cleanClient: cleanDelim, bank: bankDelim } = extractBank(cleanName(rawClient));
+      const { cleanClient: cleanDelim, bank: bankFromClient } = extractBank(cleanName(rawClient));
+      // Prefer the explicit BANCO column; fall back to tokens extracted from client name
+      const bankDelim = (row.fields.bank?.trim() || bankFromClient || "").toUpperCase() || null;
       const record: RecordCandidate = {
         client: cleanDelim || null,
         bank: bankDelim || null,

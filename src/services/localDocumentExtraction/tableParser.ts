@@ -15,7 +15,8 @@ export type FieldName =
   | "value"
   | "phone"
   | "status"
-  | "docType";
+  | "docType"
+  | "bank";
 
 /** Header keywords that map to canonical field names */
 const HEADER_ALIASES: Record<FieldName, string[]> = {
@@ -28,6 +29,7 @@ const HEADER_ALIASES: Record<FieldName, string[]> = {
   phone: ["telefone", "fone", "celular", "tel", "contato"],
   status: ["estado", "situacao", "situação", "status"],
   docType: ["tipo", "especie", "espécie", "tipo titulo"],
+  bank: ["banco", "bank", "instituicao", "instituição", "inst. financeira"],
 };
 
 /** Mapping from column index to field name */
