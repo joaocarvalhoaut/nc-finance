@@ -75,8 +75,13 @@ function candidateToRecord(
   const clientName = c.client || c.supplier || null;
   if (!clientName) return null;
 
-  // If no document number was found, generate a stable placeholder
-  const rawDoc = c.document?.trim();
+  // Rejeita strings que parecem datas (DD/MM, DD/MM/YYYY, DD/MM/YY)
+  const looksLikeDate = (s: string) =>
+    /^\d{1,2}\/\d{1,2}(\/\d{2,4})?$/.test(s) ||   // 20/05 ou 20/05/2026
+    /^\d{4}-\d{2}-\d{2}$/.test(s);                  // 2026-05-20
+
+  const rawDocRaw = c.document?.trim();
+  const rawDoc = rawDocRaw && !looksLikeDate(rawDocRaw) ? rawDocRaw : null;
   const usedPlaceholder = !rawDoc;
   const document = rawDoc || `DOC-${idx + 1}`;
 
