@@ -1869,7 +1869,7 @@ export default function App() {
                       {/* Controls row */}
                       <div className="mt-2 flex items-center gap-2 flex-wrap">
                         <div className="flex items-center gap-1 text-[10px] text-zinc-400">
-                          <span>≥</span>
+                          <span>dias ≥</span>
                           <input
                             type="number"
                             min={1}
@@ -1887,7 +1887,6 @@ export default function App() {
                             }}
                             className="w-12 bg-zinc-800 border border-zinc-700 rounded px-1 py-0.5 text-[10px] text-rose-300 text-center outline-none focus:border-rose-500"
                           />
-                          <span>dias vencidos</span>
                         </div>
                         <button
                           type="button"
