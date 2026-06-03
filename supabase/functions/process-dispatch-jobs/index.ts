@@ -38,6 +38,27 @@ import { sanitizeError }                         from "../_shared/sanitize.ts";
 const SUPABASE_URL       = Deno.env.get("SUPABASE_URL")             || "";
 const SERVICE_ROLE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const CRON_SECRET        = Deno.env.get("AUTOMATION_CRON_SECRET")    || "";
+
+// ─── Short.io helper ──────────────────────────────────────────────────────────
+
+/** Encurta URL via Short.io. Em caso de falha retorna a URL original. */
+const shortenUrl = async (url: string): Promise<string> => {
+  const apiKey = Deno.env.get("SHORTIO_API_KEY");
+  const domain = Deno.env.get("SHORTIO_DOMAIN") ?? "ncfinance.s.gy";
+  if (!apiKey) return url;
+  try {
+    const res = await fetch("https://api.short.io/links", {
+      method: "POST",
+      headers: { "authorization": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ originalURL: url, domain }),
+    });
+    if (!res.ok) return url;
+    const json = await res.json() as { shortURL?: string };
+    return json.shortURL ?? url;
+  } catch {
+    return url;
+  }
+};
 // Z-API credentials loaded dynamically via loadZApiCredentials() — not hardcoded
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -198,12 +219,18 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
       return;
     }
 
-    // ── 8. Monta mensagem ─────────────────────────────────────────────────
-    const message = buildMessage(
+    // ── 8. Monta mensagem (+ link do boleto PDF se disponível) ───────────
+    let message = buildMessage(
       { clientName, documentNumber, dueDate, amount, driveFileUrl, driveFileName },
       tone,
       customMsg,
     );
+
+    if (driveFileUrl) {
+      const shortPdfUrl = await shortenUrl(driveFileUrl);
+      message = `${message}\n\n📎 Boleto: ${shortPdfUrl}`;
+      console.log(`[dispatch] PDF link appended for debtorId=${debtorId} url=${shortPdfUrl}`);
+    }
 
     // ── 9. Idempotência (5 min) ───────────────────────────────────────────
     const today = new Date().toISOString().slice(0, 10);

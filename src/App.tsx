@@ -2777,13 +2777,14 @@ export default function App() {
                               </div>
                             </th>
                             <th className="px-4 py-3">Observações</th>
+                            <th className="px-4 py-3 text-center">Boleto PDF</th>
                             <th className="px-5 py-3 text-right">Ação</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-800">
                           {filteredDebtors.length === 0 ? (
                             <tr>
-                              <td colSpan={13} className="px-6 py-12 text-center text-zinc-500">
+                              <td colSpan={12} className="px-6 py-12 text-center text-zinc-500">
                                 Nenhum devedor encontrado nos parâmetros de filtros ativos.
                                 Vá para o assistente de extração para importar novas faturas ou clique em "Exportar planilha" para ver amostras.
                               </td>
@@ -2908,6 +2909,68 @@ export default function App() {
                                       placeholder="Anotar follow-up..."
                                       className="w-full bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded px-1.5 py-1"
                                     />
+                                  </td>
+                                  {/* ── Coluna PDF ─────────────────────────── */}
+                                  <td className="px-3 py-4 text-center min-w-[110px]">
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      {uploadingPdfDebtorId === d.id ? (
+                                        <span className="flex items-center gap-1 text-[10px] text-zinc-400">
+                                          <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" />
+                                          Enviando…
+                                        </span>
+                                      ) : d.driveFileId ? (
+                                        <>
+                                          {d.driveFileUrl ? (
+                                            <a
+                                              href={d.driveFileUrl}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="flex items-center gap-1 text-[10px] font-mono text-emerald-400 hover:text-emerald-300 transition-colors max-w-[70px] truncate"
+                                              title={d.driveFileName || "boleto.pdf"}
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              <ExternalLink className="w-3 h-3 shrink-0" />
+                                              <span className="truncate">{d.driveFileName || "PDF"}</span>
+                                            </a>
+                                          ) : (
+                                            <span className="text-[10px] font-mono text-emerald-400 truncate max-w-[70px]" title={d.driveFileName || "boleto.pdf"}>
+                                              📎 {d.driveFileName || "PDF"}
+                                            </span>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); void handlePdfRemove(d.id); }}
+                                            className="text-zinc-600 hover:text-rose-400 transition-colors p-0.5 rounded shrink-0"
+                                            title="Remover PDF"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <label
+                                            htmlFor={`pdf-tbl-${d.id}`}
+                                            className="flex items-center gap-1 text-[10px] font-mono text-zinc-500 hover:text-emerald-400 transition-colors cursor-pointer"
+                                            title="Anexar boleto PDF"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            <Upload className="w-3 h-3" />
+                                            <span>Anexar</span>
+                                          </label>
+                                          <input
+                                            id={`pdf-tbl-${d.id}`}
+                                            type="file"
+                                            accept=".pdf,application/pdf"
+                                            className="hidden"
+                                            onChange={(e) => {
+                                              const file = e.target.files?.[0];
+                                              if (file) void handlePdfUpload(d.id, file);
+                                              e.target.value = "";
+                                            }}
+                                          />
+                                        </>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="px-5 py-4 text-right">
                                     <div className="flex items-center justify-end gap-2 text-zinc-400">
