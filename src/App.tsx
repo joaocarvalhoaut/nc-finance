@@ -2274,11 +2274,6 @@ export default function App() {
                               {lastExtractionResult.missingDocCount} doc gerado
                             </span>
                           )}
-                          {lastExtractionResult.totalCandidates > lastExtractionResult.records.length && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-500 border border-zinc-700">
-                              {lastExtractionResult.totalCandidates - lastExtractionResult.records.length} descartado{lastExtractionResult.totalCandidates - lastExtractionResult.records.length !== 1 ? "s" : ""}
-                            </span>
-                          )}
                         </div>
                       )}
 
