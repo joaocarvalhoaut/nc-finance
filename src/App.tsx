@@ -74,7 +74,8 @@ import {
   X,
   Copy,
   Pencil,
-  HandCoins
+  HandCoins,
+  MessageSquare
 } from "lucide-react";
 
 // Default Pattern message templates following user specification
@@ -217,6 +218,7 @@ export default function App() {
   const tableDragRef = React.useRef({ isDown: false, startX: 0, scrollLeft: 0 });
   const [extractionAlert, setExtractionAlert] = useState<string>("");
   const [dupDocModal, setDupDocModal] = useState<{ pending: typeof extractedDebtors; dupes: { doc: string; count: number }[] } | null>(null);
+  const [notesPopover, setNotesPopover] = useState<{ debtorId: string; draft: string } | null>(null);
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
   // Original File object — needed for OCR fallback on scanned PDFs
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -3068,16 +3070,22 @@ export default function App() {
                                       ))}
                                     </select>
                                   </td>
-                                  <td className="px-4 py-4 min-w-[120px]">
-                                    <input
-                                      type="text"
-                                      value={d.notes || ""}
-                                      onChange={(e) => updateDebtorFieldLocal(d.id, "notes", e.target.value)}
-                                      onBlur={() => saveDebtorFieldToDB(d.id)}
-                                      onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
-                                      placeholder="Anotar follow-up..."
-                                      className="w-full bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded px-1.5 py-1"
-                                    />
+                                  <td className="px-4 py-4 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => setNotesPopover({ debtorId: d.id, draft: d.notes || "" })}
+                                      title={d.notes ? d.notes : "Adicionar observação"}
+                                      className={`relative inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors ${
+                                        d.notes
+                                          ? "bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 border border-amber-500/30"
+                                          : "text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800"
+                                      }`}
+                                    >
+                                      <MessageSquare className="w-3.5 h-3.5" />
+                                      {d.notes && (
+                                        <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400" />
+                                      )}
+                                    </button>
                                   </td>
                                   {/* ── Coluna PDF ─────────────────────────── */}
                                   <td className="px-3 py-4 text-center min-w-[110px]">
@@ -4315,6 +4323,58 @@ export default function App() {
             </footer>
 
           </main>
+
+          {/* ── Popover: Observação do Devedor ── */}
+          {notesPopover && (() => {
+            const debtor = debtors.find(d => d.id === notesPopover.debtorId);
+            return (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                onClick={(e) => e.target === e.currentTarget && setNotesPopover(null)}
+              >
+                <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-5 w-full max-w-sm shadow-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-white flex items-center gap-2">
+                      <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
+                      Observação — <span className="text-zinc-400 font-normal truncate max-w-[180px]">{debtor?.client}</span>
+                    </h3>
+                    <button onClick={() => setNotesPopover(null)} className="text-zinc-500 hover:text-white transition-colors">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <textarea
+                    autoFocus
+                    rows={5}
+                    value={notesPopover.draft}
+                    onChange={(e) => setNotesPopover(p => p ? { ...p, draft: e.target.value } : null)}
+                    placeholder="Anotar follow-up, contato realizado, acordo..."
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 resize-none"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        updateDebtorFieldLocal(notesPopover.debtorId, "notes", notesPopover.draft);
+                        setTimeout(() => saveDebtorFieldToDB(notesPopover.debtorId), 50);
+                        setNotesPopover(null);
+                      }}
+                      className="flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                    >
+                      Salvar
+                    </button>
+                    {notesPopover.draft && (
+                      <button
+                        onClick={() => setNotesPopover(p => p ? { ...p, draft: "" } : null)}
+                        className="px-3 py-2 rounded-xl text-xs text-zinc-400 hover:text-rose-400 hover:bg-zinc-800 transition-colors"
+                        title="Limpar observação"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ── Modal: Documentos Duplicados na Importação ── */}
           {dupDocModal && (
