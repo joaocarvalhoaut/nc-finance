@@ -183,7 +183,7 @@ export const financeService = {
 
     // Upsert por (user_id, document_number) — evita duplicatas em reimportações
     if (withDoc.length) {
-      const payloadWithDoc = withDoc.map((debtor) => {
+      const rawWithDoc = withDoc.map((debtor) => {
         const row = mapDebtorToRow(userId, debtor);
         if (debtor.representativeId && !row.representative_id) {
           console.warn("[finance.write] representativeId invalido ignorado");
@@ -191,6 +191,15 @@ export const financeService = {
         delete row.id;
         return row;
       });
+
+      // Deduplicar por document_number dentro do mesmo lote — o Postgres não aceita
+      // ON CONFLICT DO UPDATE quando dois registros do batch colidem entre si.
+      // Mantemos a última ocorrência de cada document_number.
+      const seen = new Map<string, typeof rawWithDoc[number]>();
+      for (const row of rawWithDoc) {
+        seen.set(String(row.document_number), row);
+      }
+      const payloadWithDoc = Array.from(seen.values());
 
       const { data, error } = await supabase
         .from(TABLE_NAME)

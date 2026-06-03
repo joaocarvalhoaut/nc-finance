@@ -210,6 +210,7 @@ export default function App() {
   const [isExtracting, setIsExtracting] = useState<boolean>(false);
   const [extractedDebtors, setExtractedDebtors] = useState<Debtor[]>([]);
   const [extractedSelectedIds, setExtractedSelectedIds] = useState<Set<string>>(new Set());
+  const [lowConfidenceIds, setLowConfidenceIds] = useState<Set<string>>(new Set());
   const [extractionAlert, setExtractionAlert] = useState<string>("");
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
   // Original File object — needed for OCR fallback on scanned PDFs
@@ -883,8 +884,9 @@ export default function App() {
       setLastExtractionResult(result);
 
       if (result.records.length > 0) {
+        const ts = Date.now();
         const parsedList = result.records.map((item, index) => ({
-          id: `ext-${Date.now()}-${index}`,
+          id: `ext-${ts}-${index}`,
           client: item.client,
           supplier: item.supplier,
           document: item.document,
@@ -895,6 +897,13 @@ export default function App() {
           status: "pending" as const,
         }));
 
+        // Marcar IDs com confiança abaixo de 75%
+        const lowIds = new Set(
+          result.records
+            .map((item, index) => item.confidenceScore < 75 ? `ext-${ts}-${index}` : null)
+            .filter(Boolean) as string[]
+        );
+        setLowConfidenceIds(lowIds);
         setExtractedDebtors(parsedList);
 
         if (result.warnings.length > 0) {
@@ -2236,7 +2245,7 @@ export default function App() {
                           {lastExtractionResult.lowConfidenceCount > 0 && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20">
                               <AlertTriangle className="w-3 h-3" />
-                              {lastExtractionResult.lowConfidenceCount} baixa confiança
+                              {lastExtractionResult.lowConfidenceCount} para revisar
                             </span>
                           )}
                           {lastExtractionResult.missingDocCount > 0 && (
@@ -2293,7 +2302,7 @@ export default function App() {
                             </div>
 
                             {extractedDebtors.map((item, index) => (
-                              <div key={item.id} className={`p-3 bg-zinc-950 border rounded-xl space-y-2 relative group ${extractedSelectedIds.has(item.id) ? "border-emerald-500/50" : "border-zinc-850"}`}>
+                              <div key={item.id} className={`p-3 bg-zinc-950 border rounded-xl space-y-2 relative group ${extractedSelectedIds.has(item.id) ? "border-emerald-500/50" : lowConfidenceIds.has(item.id) ? "border-amber-500/50 bg-amber-500/5" : "border-zinc-850"}`}>
                                 <div className="flex items-center gap-2 absolute top-2.5 left-2.5">
                                   <button
                                     type="button"
@@ -2317,6 +2326,13 @@ export default function App() {
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
+
+                                {lowConfidenceIds.has(item.id) && (
+                                  <div className="absolute top-2.5 right-8 flex items-center gap-1 text-[9px] font-mono text-amber-400">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    <span>Revisar</span>
+                                  </div>
+                                )}
 
                                 <div className="text-xs pt-5">
                                   <div>
