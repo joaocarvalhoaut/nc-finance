@@ -211,6 +211,8 @@ export default function App() {
   const [extractedDebtors, setExtractedDebtors] = useState<Debtor[]>([]);
   const [extractedSelectedIds, setExtractedSelectedIds] = useState<Set<string>>(new Set());
   const [lowConfidenceIds, setLowConfidenceIds] = useState<Set<string>>(new Set());
+  const [flashedLowConfId, setFlashedLowConfId] = useState<string | null>(null);
+  const lowConfCursorRef = React.useRef(0);
   const [extractionAlert, setExtractionAlert] = useState<string>("");
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
   // Original File object — needed for OCR fallback on scanned PDFs
@@ -2242,19 +2244,26 @@ export default function App() {
                             <CheckCircle className="w-3 h-3" />
                             {lastExtractionResult.records.length} registro{lastExtractionResult.records.length !== 1 ? "s" : ""}
                           </span>
-                          {lastExtractionResult.lowConfidenceCount > 0 && (
+                          {lowConfidenceIds.size > 0 && (
                             <button
                               type="button"
                               onClick={() => {
-                                const firstId = [...lowConfidenceIds][0];
-                                if (firstId) {
-                                  document.getElementById(`extracted-card-${firstId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-                                }
+                                const ids = [...lowConfidenceIds];
+                                if (!ids.length) return;
+                                // Cicla pelo próximo item de baixa confiança a cada clique
+                                lowConfCursorRef.current = lowConfCursorRef.current % ids.length;
+                                const targetId = ids[lowConfCursorRef.current];
+                                lowConfCursorRef.current++;
+                                // Flash
+                                setFlashedLowConfId(targetId);
+                                setTimeout(() => setFlashedLowConfId(null), 1200);
+                                // Scroll
+                                document.getElementById(`extracted-card-${targetId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
                               }}
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors cursor-pointer"
                             >
                               <AlertTriangle className="w-3 h-3" />
-                              {lastExtractionResult.lowConfidenceCount} para revisar
+                              {lowConfidenceIds.size} para revisar
                             </button>
                           )}
                           {lastExtractionResult.missingDocCount > 0 && (
@@ -2311,7 +2320,7 @@ export default function App() {
                             </div>
 
                             {extractedDebtors.map((item, index) => (
-                              <div key={item.id} id={`extracted-card-${item.id}`} className={`p-3 bg-zinc-950 border rounded-xl space-y-2 relative group ${extractedSelectedIds.has(item.id) ? "border-emerald-500/50" : lowConfidenceIds.has(item.id) ? "border-amber-500/50 bg-amber-500/5" : "border-zinc-850"}`}>
+                              <div key={item.id} id={`extracted-card-${item.id}`} className={`p-3 bg-zinc-950 border rounded-xl space-y-2 relative group transition-all duration-300 ${extractedSelectedIds.has(item.id) ? "border-emerald-500/50" : flashedLowConfId === item.id ? "border-amber-400 bg-amber-500/15 shadow-[0_0_12px_rgba(251,191,36,0.3)]" : lowConfidenceIds.has(item.id) ? "border-amber-500/50 bg-amber-500/5" : "border-zinc-850"}`}>
                                 <div className="flex items-center gap-2 absolute top-2.5 left-2.5">
                                   <button
                                     type="button"

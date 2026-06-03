@@ -167,14 +167,15 @@ export async function extractDocumentLocally(
   }
 
   // 5. Build final records
-  const lowConfCount = candidates.filter((c) => c.confidenceScore < 75).length;
-
   const conversionResults = candidates
     .map((c, i) => candidateToRecord(c, i))
     .filter((r) => r !== null);
 
   const records = conversionResults.map((r) => r!.record);
   const missingDocCount = conversionResults.filter((r) => r!.usedPlaceholder).length;
+
+  // Conta somente registros que chegaram à lista final com baixa confiança
+  const lowConfCount = records.filter((r) => r.confidenceScore < 75).length;
 
   // 6. Warnings
   if (records.length === 0 && candidates.length > 0) {
