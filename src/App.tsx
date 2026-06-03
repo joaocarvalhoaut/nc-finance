@@ -252,6 +252,8 @@ export default function App() {
   // Inline phone editing in Cobrança tab
   const [editingPhoneDebtorId, setEditingPhoneDebtorId] = useState<string | null>(null);
   const [editingPhoneValue, setEditingPhoneValue] = useState<string>("");
+  // Inline value editing — tracks which row's Valor Base is being typed
+  const [editingValueDebtorId, setEditingValueDebtorId] = useState<string | null>(null);
 
   // PDF attachment in Cobrança tab
   const [uploadingPdfDebtorId, setUploadingPdfDebtorId] = useState<string | null>(null);
@@ -2893,10 +2895,18 @@ export default function App() {
                                     <div className="inline-flex items-center justify-end">
                                       <span className="text-zinc-500 text-xs mr-px">R$</span>
                                       <input
-                                        type="number"
-                                        value={d.value}
-                                        onChange={(e) => updateDebtorFieldLocal(d.id, "value", Number(e.target.value))}
-                                        onBlur={() => saveDebtorFieldToDB(d.id)}
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={editingValueDebtorId === d.id
+                                          ? String(d.value)
+                                          : d.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        onFocus={() => setEditingValueDebtorId(d.id)}
+                                        onChange={(e) => {
+                                          const raw = e.target.value.replace(/[^\d,]/g, "").replace(",", ".");
+                                          const num = parseFloat(raw);
+                                          updateDebtorFieldLocal(d.id, "value", isNaN(num) ? 0 : num);
+                                        }}
+                                        onBlur={() => { setEditingValueDebtorId(null); saveDebtorFieldToDB(d.id); }}
                                         onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
                                         className="w-24 text-right bg-transparent focus:bg-zinc-950 rounded p-1 font-mono text-xs"
                                       />
