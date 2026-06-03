@@ -3491,7 +3491,7 @@ export default function App() {
                               className="px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold flex items-center gap-2 shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer text-xs uppercase"
                             >
                               {isSendingMessage ? (
-                                "Disparando via Z-API..."
+                                "Enviando cobrança..."
                               ) : (
                                 <>
                                   <Send className="w-4 h-4" /> Enviar Cobrança WhatsApp
