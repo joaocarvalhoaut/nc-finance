@@ -2812,11 +2812,11 @@ export default function App() {
                   )}
 
                   <div className="bg-zinc-900/40 border border-zinc-900 rounded-3xl overflow-hidden shadow-xl">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900">
                       <table id="tbl-devedores" className="w-full text-xs text-left text-zinc-300">
                         <thead className="text-[10px] uppercase font-mono tracking-wider bg-zinc-900/80 border-b border-zinc-800 text-zinc-400">
                           <tr>
-                            <th className="px-3 py-4 w-8">
+                            <th className="px-3 py-4 w-8 sticky left-0 z-10 bg-zinc-900/80 backdrop-blur-sm">
                               <button
                                 type="button"
                                 title={filteredDebtors.length > 0 && filteredDebtors.every(d => selectedDebtorIds.has(d.id)) ? "Desmarcar todos" : "Selecionar todos"}
@@ -2838,7 +2838,7 @@ export default function App() {
                               </button>
                             </th>
                             {/* Cliente / Sacado — com sort A-Z inline */}
-                            <th className="px-5 py-3">
+                            <th className="px-5 py-3 sticky left-8 z-10 bg-zinc-900/80 backdrop-blur-sm shadow-[2px_0_8px_rgba(0,0,0,0.4)]">
                               <button
                                 type="button"
                                 onClick={() => setSortNameOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc")}
@@ -2912,7 +2912,7 @@ export default function App() {
                               
                               return (
                                 <tr key={d.id} className={`hover:bg-zinc-900/30 transition-colors ${selectedDebtorIds.has(d.id) ? "bg-emerald-500/5" : ""}`}>
-                                  <td className="px-3 py-4">
+                                  <td className={`px-3 py-4 sticky left-0 z-[5] ${selectedDebtorIds.has(d.id) ? "bg-emerald-950/60" : "bg-zinc-950"} backdrop-blur-sm`}>
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -2931,7 +2931,7 @@ export default function App() {
                                       }
                                     </button>
                                   </td>
-                                  <td className="px-5 py-4 font-bold text-white min-w-[150px]">
+                                  <td className={`px-5 py-4 font-bold text-white min-w-[160px] sticky left-8 z-[5] ${selectedDebtorIds.has(d.id) ? "bg-emerald-950/60" : "bg-zinc-950"} backdrop-blur-sm shadow-[2px_0_8px_rgba(0,0,0,0.4)]`}>
                                     <input
                                       type="text"
                                       value={d.client}
