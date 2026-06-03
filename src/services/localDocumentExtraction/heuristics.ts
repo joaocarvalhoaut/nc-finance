@@ -88,7 +88,7 @@ function isHeaderWord(word: string): boolean {
 
 // ── Bank / card product detection ────────────────────────────────────────────
 
-const BANK_KEYWORDS = new Set([
+export const BANK_KEYWORDS = new Set([
   // ── Grandes bancos de varejo ──────────────────────────────────────────────
   "BRADESCO","ITAU","ITAÚ","CAIXA","SANTANDER","BANCODOBRASIL",
   "NUBANK","NU","INTER","SICOOB","SICREDI","BANRISUL","SAFRA",

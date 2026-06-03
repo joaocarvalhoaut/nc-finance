@@ -14,9 +14,28 @@ import {
   parseDelimitedFormat,
   parseLineByLine,
   RecordCandidate,
+  BANK_KEYWORDS,
 } from "./heuristics";
 import { extractOCRFromPdfFile } from "./ocrFallback";
 import { maskName } from "./piiUtils";
+
+/**
+ * Tenta extrair o nome do banco a partir do nome do arquivo.
+ * Ex: "VENCIDOS_ABR_maio.pdf" → "ABR"
+ *     "BRADESCO vencidos 2026.pdf" → "BRADESCO"
+ * Retorna string vazia se não encontrar.
+ */
+function extractBankFromFilename(filename: string): string {
+  const stem = filename.replace(/\.[^.]+$/, ""); // remove extensão
+  // Tokeniza por espaço, underscore, hífen, ponto
+  const tokens = stem.split(/[\s_\-\.]+/).map((t) => t.toUpperCase().replace(/[^A-ZÁÉÍÓÚÂÊÎÔÛÃÕÀÇ]/gi, ""));
+  for (const token of tokens) {
+    if (token.length >= 2 && BANK_KEYWORDS.has(token)) {
+      return token;
+    }
+  }
+  return "";
+}
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -149,6 +168,12 @@ export async function extractDocumentLocally(
     };
   }
 
+  // 4a. Tenta extrair banco do nome do arquivo (prioridade máxima)
+  const bankFromFilename = file ? extractBankFromFilename(file.name) : "";
+  if (bankFromFilename) {
+    warnings.push(`Banco detectado no nome do arquivo: "${bankFromFilename}" — será usado como padrão para todos os registros sem banco definido.`);
+  }
+
   // 4. Choose strategy and parse
   const strategy = choosePrimaryStrategy(text);
   let candidates: RecordCandidate[] = [];
@@ -173,7 +198,11 @@ export async function extractDocumentLocally(
     .map((c, i) => candidateToRecord(c, i))
     .filter((r) => r !== null);
 
-  const records = conversionResults.map((r) => r!.record);
+  const records = conversionResults.map((r) => r!.record).map((rec) => ({
+    ...rec,
+    // Banco do filename tem prioridade; se já veio do documento, mantém
+    bank: rec.bank || bankFromFilename,
+  }));
   const missingDocCount = conversionResults.filter((r) => r!.usedPlaceholder).length;
 
   // Conta somente registros que chegaram à lista final com baixa confiança
