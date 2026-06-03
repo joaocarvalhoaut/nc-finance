@@ -2890,8 +2890,8 @@ export default function App() {
                                     />
                                   </td>
                                   <td className="px-4 py-4 text-right font-mono">
-                                    <div className="flex items-center justify-end gap-0.5">
-                                      <span className="text-zinc-500 text-xs">R$</span>
+                                    <div className="inline-flex items-center justify-end">
+                                      <span className="text-zinc-500 text-xs mr-px">R$</span>
                                       <input
                                         type="number"
                                         value={d.value}
