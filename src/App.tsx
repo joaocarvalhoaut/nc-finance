@@ -2458,11 +2458,17 @@ export default function App() {
                           <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Multa Geral (%)</label>
                           <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-905 p-2 rounded-xl">
                             <input
-                              type="number"
-                              step="0.5"
-                              value={globalFinePct}
-                              onChange={(e) => setGlobalFinePct(Math.max(0, parseFloat(e.target.value) || 0))}
-                              className="w-full bg-transparent focus:outline-none focus:border-none text-sm text-center font-mono font-bold text-emerald-400"
+                              type="text"
+                              inputMode="decimal"
+                              value={globalFinePct === 0 ? "" : String(globalFinePct)}
+                              onChange={(e) => {
+                                const raw = e.target.value.replace(",", ".");
+                                if (raw === "" || raw === ".") { setGlobalFinePct(0); return; }
+                                const n = parseFloat(raw);
+                                if (!isNaN(n)) setGlobalFinePct(Math.max(0, n));
+                              }}
+                              placeholder="0"
+                              className="w-full bg-transparent focus:outline-none focus:border-none text-sm text-center font-mono font-bold text-emerald-400 placeholder:text-zinc-700"
                             />
                             <span className="text-xs text-zinc-500">%</span>
                           </div>
@@ -2471,11 +2477,17 @@ export default function App() {
                           <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Juros / Dia (%)</label>
                           <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-905 p-2 rounded-xl">
                             <input
-                              type="number"
-                              step="0.01"
-                              value={globalInterestDayPct}
-                              onChange={(e) => setGlobalInterestDayPct(Math.max(0, parseFloat(e.target.value) || 0))}
-                              className="w-full bg-transparent focus:outline-none focus:border-none text-sm text-center font-mono font-bold text-emerald-400"
+                              type="text"
+                              inputMode="decimal"
+                              value={globalInterestDayPct === 0 ? "" : String(globalInterestDayPct)}
+                              onChange={(e) => {
+                                const raw = e.target.value.replace(",", ".");
+                                if (raw === "" || raw === ".") { setGlobalInterestDayPct(0); return; }
+                                const n = parseFloat(raw);
+                                if (!isNaN(n)) setGlobalInterestDayPct(Math.max(0, n));
+                              }}
+                              placeholder="0"
+                              className="w-full bg-transparent focus:outline-none focus:border-none text-sm text-center font-mono font-bold text-emerald-400 placeholder:text-zinc-700"
                             />
                             <span className="text-xs text-zinc-500">%</span>
                           </div>
