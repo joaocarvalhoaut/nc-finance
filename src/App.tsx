@@ -214,6 +214,7 @@ export default function App() {
   const [flashedLowConfId, setFlashedLowConfId] = useState<string | null>(null);
   const lowConfCursorRef = React.useRef(0);
   const [extractionAlert, setExtractionAlert] = useState<string>("");
+  const [dupDocModal, setDupDocModal] = useState<{ pending: typeof extractedDebtors; dupes: { doc: string; count: number }[] } | null>(null);
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
   // Original File object — needed for OCR fallback on scanned PDFs
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -983,19 +984,50 @@ export default function App() {
   const sendExtractedToOverview = async () => {
     if (extractedDebtors.length === 0 || !currentOwnerUserId) return;
 
-    // Use selected items if any are selected, otherwise send all
     const toSend = extractedSelectedIds.size > 0
       ? extractedDebtors.filter(d => extractedSelectedIds.has(d.id))
       : extractedDebtors;
 
     if (toSend.length === 0) return;
 
+    // Detecta duplicatas de document_number dentro do lote
+    const docCount = new Map<string, number>();
+    for (const d of toSend) {
+      const doc = d.document?.trim();
+      if (doc) docCount.set(doc, (docCount.get(doc) ?? 0) + 1);
+    }
+    const dupes = Array.from(docCount.entries())
+      .filter(([, c]) => c > 1)
+      .map(([doc, count]) => ({ doc, count }));
+
+    if (dupes.length > 0) {
+      setDupDocModal({ pending: toSend, dupes });
+      return;
+    }
+
+    await doSendToOverview(toSend);
+  };
+
+  const doSendToOverview = async (toSend: typeof extractedDebtors, keepAll = true) => {
+    // Se keepAll=false: mantém só o primeiro de cada doc duplicado (descarta o resto)
+    const finalList = keepAll ? toSend : (() => {
+      const seen = new Set<string>();
+      return toSend.filter(d => {
+        const doc = d.document?.trim();
+        if (!doc) return true;
+        if (seen.has(doc)) return false;
+        seen.add(doc);
+        return true;
+      });
+    })();
+
     try {
-      const savedDebtors = await financeService.createMany(currentOwnerUserId, toSend);
+      const savedDebtors = await financeService.createMany(currentOwnerUserId!, finalList);
       setDebtors((prev) => [...prev, ...savedDebtors]);
-      const sentIds = new Set(toSend.map(d => d.id));
+      const sentIds = new Set(finalList.map(d => d.id));
       setExtractedDebtors(prev => prev.filter(d => !sentIds.has(d.id)));
       setExtractedSelectedIds(new Set());
+      setDupDocModal(null);
       if (extractedDebtors.length === toSend.length) {
         setImportText("");
         setImportFileName("");
@@ -1003,6 +1035,7 @@ export default function App() {
       }
     } catch (error) {
       setExtractionAlert(error instanceof Error ? error.message : "Não foi possível salvar os registros importados.");
+      setDupDocModal(null);
     }
   };
 
@@ -4250,6 +4283,50 @@ export default function App() {
             </footer>
 
           </main>
+
+          {/* ── Modal: Documentos Duplicados na Importação ── */}
+          {dupDocModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+              <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  ⚠️ Documentos Duplicados Detectados
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Os seguintes números de documento aparecem mais de uma vez no arquivo. Como deseja prosseguir?
+                </p>
+                <div className="bg-zinc-950 rounded-xl p-3 max-h-40 overflow-y-auto space-y-1">
+                  {dupDocModal.dupes.map(({ doc, count }) => (
+                    <div key={doc} className="flex items-center justify-between text-xs font-mono">
+                      <span className="text-zinc-300">{doc}</span>
+                      <span className="text-amber-400 font-bold">{count}× duplicado</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <button
+                    onClick={() => void doSendToOverview(dupDocModal.pending, true)}
+                    className="py-2.5 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                  >
+                    Salvar todos
+                    <span className="block text-[10px] font-normal opacity-80">Duplicatas recebem sufixo -2, -3…</span>
+                  </button>
+                  <button
+                    onClick={() => void doSendToOverview(dupDocModal.pending, false)}
+                    className="py-2.5 px-3 rounded-xl text-xs font-bold bg-zinc-700 hover:bg-zinc-600 text-white transition-colors"
+                  >
+                    Manter só o primeiro
+                    <span className="block text-[10px] font-normal opacity-80">Descarta os registros duplicados</span>
+                  </button>
+                </div>
+                <button
+                  onClick={() => setDupDocModal(null)}
+                  className="w-full text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors pt-1"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* ── Modal Global: Gerenciar Responsáveis (acessível de qualquer aba) ── */}
           {showRepModal && (
