@@ -237,6 +237,11 @@ export default function App() {
   const [globalInterestDayPct, setGlobalInterestDayPct] = useState<number>(DEFAULT_USER_CONFIG.globalInterestDayPct);
   const [globalInterestDayPctStr, setGlobalInterestDayPctStr] = useState<string>(String(DEFAULT_USER_CONFIG.globalInterestDayPct));
 
+  // Pendência Crítica controls
+  const [criticalDays, setCriticalDays] = useState<number>(30);
+  const [criticalDaysStr, setCriticalDaysStr] = useState<string>("30");
+  const [criticalWithInterest, setCriticalWithInterest] = useState<boolean>(true);
+
   // Sheets and Drive properties
   const [sheetUrlInput, setSheetUrlInput] = useState<string>(DEFAULT_USER_CONFIG.sheetUrlInput);
   const [sheetNameInput, setSheetNameInput] = useState<string>("");
@@ -1562,6 +1567,22 @@ export default function App() {
 
   const vencidosValue = debtors.filter(d => d.category === "vencidos").reduce((acc, d) => acc + (d.updatedValue || d.value), 0);
   const aVencerValue = debtors.filter(d => d.category === "a_vencer").reduce((acc, d) => acc + (d.updatedValue || d.value), 0);
+
+  // Pendência Crítica: vencidos debtors delayed at least criticalDays
+  const criticalDebtors = debtors.filter(d => {
+    if (d.category !== "vencidos") return false;
+    if (!d.dueDate) return false;
+    const [dd, mm, yyyy] = d.dueDate.split("/");
+    if (!dd || !mm || !yyyy) return false;
+    const due = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const delayDays = Math.floor((today.getTime() - due.getTime()) / 86_400_000);
+    return delayDays >= criticalDays;
+  });
+  const criticalValue = criticalDebtors.reduce((acc, d) => {
+    return acc + (criticalWithInterest ? (d.updatedValue || d.value) : d.value);
+  }, 0);
   const liquidadoValue = debtors.filter(d => d.category === "liquidado").reduce((acc, d) => acc + d.value, 0);
 
   // Apply filters to display debtors lists
@@ -1842,10 +1863,43 @@ export default function App() {
                         <AlertTriangle className="w-4 h-4 text-rose-400" />
                       </div>
                       <div className="mt-2 flex items-baseline justify-between">
-                        <span className="text-2xl sm:text-3xl font-extrabold text-rose-400 font-mono">{formatBRL(vencidosValue)}</span>
+                        <span className="text-2xl sm:text-3xl font-extrabold text-rose-400 font-mono">{formatBRL(criticalValue)}</span>
+                        <span className="text-[10px] text-rose-400/70 font-mono ml-2">{criticalDebtors.length} reg.</span>
                       </div>
-                      <div className="text-[10px] text-zinc-500 mt-2">
-                        Boletos vencidos há cerca de 12 dias.
+                      {/* Controls row */}
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1 text-[10px] text-zinc-400">
+                          <span>≥</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={9999}
+                            value={criticalDaysStr}
+                            onChange={e => {
+                              const raw = e.target.value;
+                              setCriticalDaysStr(raw);
+                              const n = parseInt(raw, 10);
+                              if (!isNaN(n) && n > 0) setCriticalDays(n);
+                            }}
+                            onBlur={() => {
+                              const n = parseInt(criticalDaysStr, 10);
+                              if (isNaN(n) || n <= 0) { setCriticalDays(1); setCriticalDaysStr("1"); }
+                            }}
+                            className="w-12 bg-zinc-800 border border-zinc-700 rounded px-1 py-0.5 text-[10px] text-rose-300 text-center outline-none focus:border-rose-500"
+                          />
+                          <span>dias vencidos</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setCriticalWithInterest(v => !v)}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border transition-colors ${
+                            criticalWithInterest
+                              ? "bg-rose-500/20 border-rose-500/50 text-rose-300"
+                              : "bg-zinc-800 border-zinc-700 text-zinc-400"
+                          }`}
+                        >
+                          {criticalWithInterest ? "c/ juros" : "s/ juros"}
+                        </button>
                       </div>
                     </div>
 
