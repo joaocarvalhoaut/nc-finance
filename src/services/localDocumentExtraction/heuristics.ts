@@ -88,7 +88,15 @@ function isHeaderWord(word: string): boolean {
 function cleanName(raw: string): string {
   return raw
     .split(/\s+/)
-    .filter((t) => t.length > 1 && !isHeaderWord(t) && !/^\d+$/.test(t))
+    .filter((t) => {
+      if (t.length <= 1) return false;
+      if (isHeaderWord(t)) return false;
+      // Remove pure numbers
+      if (/^\d+$/.test(t)) return false;
+      // Remove document-number tokens like "1227/3", "1244/002", "CH01-3", "NF2024/01"
+      if (/^[A-Z]{0,4}\d[\d\-/]{1,15}$/i.test(t)) return false;
+      return true;
+    })
     .join(" ")
     .trim();
 }
