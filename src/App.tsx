@@ -2890,14 +2890,17 @@ export default function App() {
                                     />
                                   </td>
                                   <td className="px-4 py-4 text-right font-mono">
-                                    <input
-                                      type="number"
-                                      value={d.value}
-                                      onChange={(e) => updateDebtorFieldLocal(d.id, "value", Number(e.target.value))}
-                                      onBlur={() => saveDebtorFieldToDB(d.id)}
-                                      onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
-                                      className="w-24 text-right bg-transparent focus:bg-zinc-950 rounded p-1 font-mono text-xs"
-                                    />
+                                    <div className="flex items-center justify-end gap-0.5">
+                                      <span className="text-zinc-500 text-xs">R$</span>
+                                      <input
+                                        type="number"
+                                        value={d.value}
+                                        onChange={(e) => updateDebtorFieldLocal(d.id, "value", Number(e.target.value))}
+                                        onBlur={() => saveDebtorFieldToDB(d.id)}
+                                        onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+                                        className="w-24 text-right bg-transparent focus:bg-zinc-950 rounded p-1 font-mono text-xs"
+                                      />
+                                    </div>
                                   </td>
                                   <td className="px-4 py-4 text-right font-mono text-emerald-300 font-bold bg-emerald-500/5">
                                     {formatBRL(d.updatedValue || d.value)}
