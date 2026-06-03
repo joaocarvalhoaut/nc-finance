@@ -2702,10 +2702,16 @@ export default function App() {
                         </button>
 
                         <button
-                          onClick={() => exportRelatorio(debtors, filteredDebtors, account?.email ?? "", representatives)}
+                          onClick={() => {
+                            const exportList = selectedDebtorIds.size > 0
+                              ? filteredDebtors.filter(d => selectedDebtorIds.has(d.id))
+                              : filteredDebtors;
+                            exportRelatorio(debtors, exportList, account?.email ?? "", representatives);
+                          }}
                           className="px-4.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-100 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs text-center border border-zinc-700"
                         >
-                          <Download className="w-3.5 h-3.5 text-rose-400" /> Exportar Relatório (PDF)
+                          <Download className="w-3.5 h-3.5 text-rose-400" />
+                          {selectedDebtorIds.size > 0 ? `Exportar PDF (${selectedDebtorIds.size})` : "Exportar Relatório (PDF)"}
                         </button>
 
                         <button
