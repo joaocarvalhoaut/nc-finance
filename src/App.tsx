@@ -2964,7 +2964,7 @@ export default function App() {
                             {/* Tipo / Status — com filtros de categoria e status inline */}
                             <th className="px-4 py-2 text-center">
                               <div className="flex flex-col items-center gap-1.5">
-                                <span>Tipo / Status</span>
+                                <span>Tipo</span>
                                 <div className="flex gap-1">
                                   <select
                                     value={categoryFilter}
