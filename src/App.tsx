@@ -602,7 +602,9 @@ export default function App() {
     if (hasChanged) {
       setDebtors(updated);
     }
-  }, [globalFinePct, globalInterestDayPct]);
+  // debtors.length garante que o cálculo re-executa quando os devedores carregam do banco
+  // O guard hasChanged impede loop infinito
+  }, [globalFinePct, globalInterestDayPct, debtors.length]);
 
   // Sync drafted text message when selected debitor or tone updates
   useEffect(() => {
