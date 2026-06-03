@@ -213,6 +213,8 @@ export default function App() {
   const [lowConfidenceIds, setLowConfidenceIds] = useState<Set<string>>(new Set());
   const [flashedLowConfId, setFlashedLowConfId] = useState<string | null>(null);
   const lowConfCursorRef = React.useRef(0);
+  const tableScrollRef = React.useRef<HTMLDivElement>(null);
+  const tableDragRef = React.useRef({ isDown: false, startX: 0, scrollLeft: 0 });
   const [extractionAlert, setExtractionAlert] = useState<string>("");
   const [dupDocModal, setDupDocModal] = useState<{ pending: typeof extractedDebtors; dupes: { doc: string; count: number }[] } | null>(null);
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
@@ -2812,7 +2814,35 @@ export default function App() {
                   )}
 
                   <div className="bg-zinc-900/40 border border-zinc-900 rounded-3xl overflow-hidden shadow-xl">
-                    <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900">
+                    <div
+                      ref={tableScrollRef}
+                      className="overflow-x-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900 cursor-grab active:cursor-grabbing select-none"
+                      onMouseDown={(e) => {
+                        // Ignora cliques em inputs, selects e botões para não interferir na edição
+                        if ((e.target as HTMLElement).closest("input,select,button,a,label")) return;
+                        const el = tableScrollRef.current;
+                        if (!el) return;
+                        tableDragRef.current = { isDown: true, startX: e.pageX - el.offsetLeft, scrollLeft: el.scrollLeft };
+                        el.style.cursor = "grabbing";
+                      }}
+                      onMouseLeave={() => {
+                        tableDragRef.current.isDown = false;
+                        if (tableScrollRef.current) tableScrollRef.current.style.cursor = "grab";
+                      }}
+                      onMouseUp={() => {
+                        tableDragRef.current.isDown = false;
+                        if (tableScrollRef.current) tableScrollRef.current.style.cursor = "grab";
+                      }}
+                      onMouseMove={(e) => {
+                        if (!tableDragRef.current.isDown) return;
+                        e.preventDefault();
+                        const el = tableScrollRef.current;
+                        if (!el) return;
+                        const x = e.pageX - el.offsetLeft;
+                        const walk = (x - tableDragRef.current.startX) * 1.2;
+                        el.scrollLeft = tableDragRef.current.scrollLeft - walk;
+                      }}
+                    >
                       <table id="tbl-devedores" className="w-full text-xs text-left text-zinc-300">
                         <thead className="text-[10px] uppercase font-mono tracking-wider bg-zinc-900/80 border-b border-zinc-800 text-zinc-400">
                           <tr>
