@@ -75,12 +75,22 @@ export function exportRelatorio(
   const aVencerVal    = aVencer.reduce((s, d) => s + (d.updatedValue || d.value), 0);
   const liquidadoVal  = liquidados.reduce((s, d) => s + d.value, 0);
 
-  const cards = [
-    { label: "Total de Registros", value: String(totalDebtors),   sub: BRL(totalValor) },
-    { label: "Vencidos",           value: String(vencidos.length), sub: BRL(vencidosVal),  color: [239, 68, 68] as const },
-    { label: "A Vencer",           value: String(aVencer.length),  sub: BRL(aVencerVal),   color: [245, 158, 11] as const },
-    { label: "Liquidados",         value: String(liquidados.length), sub: BRL(liquidadoVal), color: [16, 185, 129] as const },
+  // Descobre quantas categorias distintas há nos dados
+  const categoriesPresent = new Set(debtors.map(d => d.category));
+  const multipleCategories = categoriesPresent.size > 1;
+
+  // Card Total sempre aparece; cards de categoria só se houver mais de uma
+  const cards: { label: string; value: string; sub: string; color?: readonly [number, number, number] }[] = [
+    { label: "Total de Registros", value: String(totalDebtors), sub: BRL(totalValor) },
   ];
+  if (multipleCategories) {
+    if (categoriesPresent.has("vencidos"))
+      cards.push({ label: "Vencidos",  value: String(vencidos.length),  sub: BRL(vencidosVal),  color: [239, 68, 68] });
+    if (categoriesPresent.has("a_vencer"))
+      cards.push({ label: "A Vencer",  value: String(aVencer.length),   sub: BRL(aVencerVal),   color: [245, 158, 11] });
+    if (categoriesPresent.has("liquidado"))
+      cards.push({ label: "Liquidados", value: String(liquidados.length), sub: BRL(liquidadoVal), color: [16, 185, 129] });
+  }
 
   const cardW = (pageW - 20) / cards.length;
   cards.forEach((card, i) => {
