@@ -1857,19 +1857,27 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="bg-zinc-900/60 border border-zinc-900 p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[120px] shadow">
-                      <div className="flex items-center justify-between text-rose-400 text-xs uppercase tracking-wider font-mono">
-                        <span>Pendência Crítica</span>
-                        <AlertTriangle className="w-4 h-4 text-rose-400" />
+                    <div className="bg-zinc-900/60 border border-rose-950/40 p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[120px] shadow-lg shadow-rose-950/20">
+                      {/* subtle glow accent */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-rose-950/20 via-transparent to-transparent pointer-events-none rounded-2xl" />
+
+                      {/* Header */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-rose-400/80 uppercase tracking-widest font-mono font-semibold">Pendência Crítica</span>
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
                       </div>
-                      <div className="mt-2 flex items-baseline justify-between">
-                        <span className="text-2xl sm:text-3xl font-extrabold text-rose-400 font-mono">{formatBRL(criticalValue)}</span>
-                        <span className="text-[10px] text-rose-400/70 font-mono ml-2">{criticalDebtors.length} reg.</span>
+
+                      {/* Value + count */}
+                      <div className="mt-2 flex items-end justify-between gap-2">
+                        <span className="text-2xl sm:text-3xl font-extrabold text-rose-400 font-mono leading-none">{formatBRL(criticalValue)}</span>
+                        <span className="text-[11px] text-rose-400/50 font-mono mb-0.5 shrink-0">{criticalDebtors.length} reg.</span>
                       </div>
-                      {/* Controls row */}
-                      <div className="mt-2 flex items-center gap-2 flex-wrap">
-                        <div className="flex items-center gap-1 text-[10px] text-zinc-400">
-                          <span>dias ≥</span>
+
+                      {/* Controls */}
+                      <div className="mt-3 flex items-center gap-2">
+                        {/* Days input pill */}
+                        <div className="flex items-center gap-1.5 bg-zinc-800/80 border border-zinc-700/60 rounded-lg px-2.5 py-1">
+                          <span className="text-[10px] text-zinc-500 select-none">dias ≥</span>
                           <input
                             type="number"
                             min={1}
@@ -1885,18 +1893,21 @@ export default function App() {
                               const n = parseInt(criticalDaysStr, 10);
                               if (isNaN(n) || n <= 0) { setCriticalDays(1); setCriticalDaysStr("1"); }
                             }}
-                            className="w-12 bg-zinc-800 border border-zinc-700 rounded px-1 py-0.5 text-[10px] text-rose-300 text-center outline-none focus:border-rose-500"
+                            className="w-10 bg-transparent text-[11px] text-rose-300 font-mono text-center outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                           />
                         </div>
+
+                        {/* Interest toggle */}
                         <button
                           type="button"
                           onClick={() => setCriticalWithInterest(v => !v)}
-                          className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border transition-colors ${
+                          className={`relative flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all duration-200 ${
                             criticalWithInterest
-                              ? "bg-rose-500/20 border-rose-500/50 text-rose-300"
-                              : "bg-zinc-800 border-zinc-700 text-zinc-400"
+                              ? "bg-rose-500/15 border-rose-500/40 text-rose-300"
+                              : "bg-zinc-800/80 border-zinc-700/60 text-zinc-500 hover:text-zinc-300"
                           }`}
                         >
+                          <span className={`w-1.5 h-1.5 rounded-full transition-colors ${criticalWithInterest ? "bg-rose-400" : "bg-zinc-600"}`} />
                           {criticalWithInterest ? "c/ juros" : "s/ juros"}
                         </button>
                       </div>
