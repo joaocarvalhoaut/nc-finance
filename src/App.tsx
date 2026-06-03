@@ -2243,10 +2243,19 @@ export default function App() {
                             {lastExtractionResult.records.length} registro{lastExtractionResult.records.length !== 1 ? "s" : ""}
                           </span>
                           {lastExtractionResult.lowConfidenceCount > 0 && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const firstId = [...lowConfidenceIds][0];
+                                if (firstId) {
+                                  document.getElementById(`extracted-card-${firstId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors cursor-pointer"
+                            >
                               <AlertTriangle className="w-3 h-3" />
                               {lastExtractionResult.lowConfidenceCount} para revisar
-                            </span>
+                            </button>
                           )}
                           {lastExtractionResult.missingDocCount > 0 && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-500 border border-zinc-700">
@@ -2302,7 +2311,7 @@ export default function App() {
                             </div>
 
                             {extractedDebtors.map((item, index) => (
-                              <div key={item.id} className={`p-3 bg-zinc-950 border rounded-xl space-y-2 relative group ${extractedSelectedIds.has(item.id) ? "border-emerald-500/50" : lowConfidenceIds.has(item.id) ? "border-amber-500/50 bg-amber-500/5" : "border-zinc-850"}`}>
+                              <div key={item.id} id={`extracted-card-${item.id}`} className={`p-3 bg-zinc-950 border rounded-xl space-y-2 relative group ${extractedSelectedIds.has(item.id) ? "border-emerald-500/50" : lowConfidenceIds.has(item.id) ? "border-amber-500/50 bg-amber-500/5" : "border-zinc-850"}`}>
                                 <div className="flex items-center gap-2 absolute top-2.5 left-2.5">
                                   <button
                                     type="button"
