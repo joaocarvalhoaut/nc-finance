@@ -3077,15 +3077,18 @@ export default function App() {
                                       type="button"
                                       onClick={() => setNotesPopover({ debtorId: d.id, draft: d.notes || "" })}
                                       title={d.notes ? d.notes : "Adicionar observação"}
-                                      className={`relative inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors ${
+                                      className={`relative inline-flex items-center justify-center w-7 h-7 rounded-lg transition-all ${
                                         d.notes
-                                          ? "bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 border border-amber-500/30"
-                                          : "text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800"
+                                          ? "bg-amber-400/20 text-amber-300 hover:bg-amber-400/30 border border-amber-400/40 shadow-[0_0_6px_rgba(251,191,36,0.25)]"
+                                          : "text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800 border border-transparent"
                                       }`}
                                     >
-                                      <MessageSquare className="w-3.5 h-3.5" />
+                                      {d.notes
+                                        ? <MessageSquare className="w-3.5 h-3.5 fill-amber-400/30" />
+                                        : <MessageSquare className="w-3.5 h-3.5" />
+                                      }
                                       {d.notes && (
-                                        <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400" />
+                                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 border border-zinc-950" />
                                       )}
                                     </button>
                                   </td>
@@ -4354,10 +4357,19 @@ export default function App() {
                   />
                   <div className="flex gap-2">
                     <button
-                      onClick={() => {
-                        updateDebtorFieldLocal(notesPopover.debtorId, "notes", notesPopover.draft);
-                        setTimeout(() => saveDebtorFieldToDB(notesPopover.debtorId), 50);
+                      onClick={async () => {
+                        const debtor = debtors.find(d => d.id === notesPopover.debtorId);
+                        if (!debtor || !currentOwnerUserId) { setNotesPopover(null); return; }
+                        // Atualiza estado local imediatamente
+                        const updated = { ...debtor, notes: notesPopover.draft };
+                        setDebtors(prev => prev.map(d => d.id === updated.id ? updated : d));
                         setNotesPopover(null);
+                        // Salva no banco com o valor correto (não depende do closure do estado)
+                        try {
+                          await financeService.update(currentOwnerUserId, updated);
+                        } catch (err) {
+                          setWorkspaceError(err instanceof Error ? err.message : "Falha ao salvar observação.");
+                        }
                       }}
                       className="flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
                     >
