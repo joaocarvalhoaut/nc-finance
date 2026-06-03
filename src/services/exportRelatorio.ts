@@ -133,8 +133,6 @@ export function exportRelatorio(
     BRL(d.value),
     d.updatedValue && d.updatedValue !== d.value ? BRL(d.updatedValue) : "—",
     CATEGORY_LABEL[d.category] ?? d.category,
-    STATUS_LABEL[d.status] ?? d.status,
-    d.phone || "—",
     d.representativeId ? (repMap.get(d.representativeId) ?? "—") : "—",
   ]);
 
@@ -148,8 +146,6 @@ export function exportRelatorio(
       "Valor Original",
       "Valor Atualizado",
       "Categoria",
-      "Status",
-      "Telefone",
       "Representante",
     ]],
     body: rows,
@@ -169,16 +165,14 @@ export function exportRelatorio(
       fillColor: [249, 250, 251],
     },
     columnStyles: {
-      0: { cellWidth: 46 },
-      1: { cellWidth: 20 },
-      2: { cellWidth: 16 },
-      3: { cellWidth: 18 },
-      4: { cellWidth: 22, halign: "right" },
-      5: { cellWidth: 22, halign: "right" },
-      6: { cellWidth: 18, halign: "center" },
-      7: { cellWidth: 16, halign: "center" },
-      8: { cellWidth: 22 },
-      9: { cellWidth: 28 },
+      0: { cellWidth: 52 },
+      1: { cellWidth: 24 },
+      2: { cellWidth: 20 },
+      3: { cellWidth: 22 },
+      4: { cellWidth: 26, halign: "right" },
+      5: { cellWidth: 26, halign: "right" },
+      6: { cellWidth: 22, halign: "center" },
+      7: { cellWidth: 36 },
     },
     didParseCell: (data) => {
       if (data.section === "body" && data.column.index === 6) {
@@ -186,11 +180,6 @@ export function exportRelatorio(
         if (val === "Vencido")    { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = "bold"; }
         if (val === "A Vencer")   { data.cell.styles.textColor = [180, 83, 9]; }
         if (val === "Liquidado")  { data.cell.styles.textColor = [16, 185, 129]; }
-      }
-      if (data.section === "body" && data.column.index === 7) {
-        const val = data.cell.raw as string;
-        if (val === "Enviado")    { data.cell.styles.textColor = [16, 185, 129]; }
-        if (val === "Falhou")     { data.cell.styles.textColor = [220, 38, 38]; }
       }
     },
   });
