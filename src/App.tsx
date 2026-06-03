@@ -3043,7 +3043,7 @@ export default function App() {
                             )}
                             <p className="text-[10px] text-zinc-600 mt-1">
                               A planilha deve estar compartilhada com{" "}
-                              <span className="text-sky-400 font-mono select-all">nc-finance@nc-finance-496922.iam.gserviceaccount.com</span>{" "}
+                              <span className="text-sky-400 font-mono select-all">{import.meta.env.VITE_GOOGLE_SERVICE_ACCOUNT_EMAIL ?? "—"}</span>{" "}
                               com permissão de <strong>Editor</strong>.
                             </p>
                           </div>

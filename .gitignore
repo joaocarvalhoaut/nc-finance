@@ -8,3 +8,8 @@ coverage/
 !.env.example
 
 .vercel
+
+# Relatórios de testes — podem conter URLs e IDs de projeto sensíveis
+e2e-report.json
+hardening-report.json
+*-report.json
