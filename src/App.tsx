@@ -228,7 +228,9 @@ export default function App() {
 
   // Global fine/interest controllers in Overview Panel
   const [globalFinePct, setGlobalFinePct] = useState<number>(DEFAULT_USER_CONFIG.globalFinePct);
+  const [globalFinePctStr, setGlobalFinePctStr] = useState<string>(String(DEFAULT_USER_CONFIG.globalFinePct));
   const [globalInterestDayPct, setGlobalInterestDayPct] = useState<number>(DEFAULT_USER_CONFIG.globalInterestDayPct);
+  const [globalInterestDayPctStr, setGlobalInterestDayPctStr] = useState<string>(String(DEFAULT_USER_CONFIG.globalInterestDayPct));
 
   // Sheets and Drive properties
   const [sheetUrlInput, setSheetUrlInput] = useState<string>(DEFAULT_USER_CONFIG.sheetUrlInput);
@@ -488,7 +490,9 @@ export default function App() {
         setRepresentatives(hydratedRepresentatives);
         setBillingLogs(hydratedLogs);
         setGlobalFinePct(hydratedConfig.globalFinePct);
+        setGlobalFinePctStr(String(hydratedConfig.globalFinePct));
         setGlobalInterestDayPct(hydratedConfig.globalInterestDayPct);
+        setGlobalInterestDayPctStr(String(hydratedConfig.globalInterestDayPct));
         setSelectedTone(hydratedConfig.selectedTone);
         setSheetUrlInput(hydratedConfig.sheetUrlInput || DEFAULT_USER_CONFIG.sheetUrlInput);
         setPatternTemplates(
@@ -2481,9 +2485,10 @@ export default function App() {
                             <input
                               type="text"
                               inputMode="decimal"
-                              value={globalFinePct === 0 ? "" : String(globalFinePct)}
+                              value={globalFinePctStr}
                               onChange={(e) => {
                                 const raw = e.target.value.replace(",", ".");
+                                setGlobalFinePctStr(e.target.value);
                                 if (raw === "" || raw === ".") { setGlobalFinePct(0); return; }
                                 const n = parseFloat(raw);
                                 if (!isNaN(n)) setGlobalFinePct(Math.max(0, n));
@@ -2500,9 +2505,10 @@ export default function App() {
                             <input
                               type="text"
                               inputMode="decimal"
-                              value={globalInterestDayPct === 0 ? "" : String(globalInterestDayPct)}
+                              value={globalInterestDayPctStr}
                               onChange={(e) => {
                                 const raw = e.target.value.replace(",", ".");
+                                setGlobalInterestDayPctStr(e.target.value);
                                 if (raw === "" || raw === ".") { setGlobalInterestDayPct(0); return; }
                                 const n = parseFloat(raw);
                                 if (!isNaN(n)) setGlobalInterestDayPct(Math.max(0, n));
