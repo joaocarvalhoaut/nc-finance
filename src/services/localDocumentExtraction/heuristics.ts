@@ -89,16 +89,51 @@ function isHeaderWord(word: string): boolean {
 // ── Bank / card product detection ────────────────────────────────────────────
 
 const BANK_KEYWORDS = new Set([
-  // Bancos brasileiros
-  "BRADESCO","ITAU","ITAÚ","CAIXA","SANTANDER","NUBANK","INTER","SICOOB","SICREDI",
-  "BANRISUL","SAFRA","BTG","ORIGINAL","MODAL","BANPARA","BANPARÁ","NACIONAL",
-  "MERCANTIL","VOTORANTIM","DAYCOVAL","PINE","FIBRA","SEMEAR","NEON","NEXT",
-  "PAN","BMG","AGIBANK","PARANÁ","PARANA","C6","BS2","RENDIMENTO","GENIAL",
-  // Bandeiras / produtos de cartão
-  "PLATINUM","GOLD","BLACK","CLASSIC","STANDARD","PREMIUM","INFINITE","SIGNATURE",
-  "VISA","MASTER","MASTERCARD","ELO","AMEX","HIPERCARD","DINERSCLUB","DINERS",
-  // Abreviações comuns em relatórios
-  "ABR","CEF","BB","BRB","BNB","BASA",
+  // ── Grandes bancos de varejo ──────────────────────────────────────────────
+  "BRADESCO","ITAU","ITAÚ","CAIXA","SANTANDER","BANCODOBRASIL",
+  "NUBANK","NU","INTER","SICOOB","SICREDI","BANRISUL","SAFRA",
+  "BTG","BTGPACTUAL","ORIGINAL","MODAL","NEON","NEXT","PAN","BMG",
+  "AGIBANK","C6","C6BANK","BS2","RENDIMENTO","GENIAL","DAYCOVAL",
+  "VOTORANTIM","PINE","FIBRA","SEMEAR","PARANA","PARANÁ",
+  // ── Bancos públicos ───────────────────────────────────────────────────────
+  "BANPARA","BANPARÁ","BANRISUL","BNB","BASA","BRB","BANESE","BANESTES",
+  "BRDE","BDMG","DESENBAHIA","BANDES","BANCOOB",
+  // ── Cooperativas de crédito ───────────────────────────────────────────────
+  "UNICRED","UNIPRIME","CRESOL","AILOS","CREDITAG","COCRED","CECRED",
+  "CREDISIS","CREDITARPE","CREDICITRUS","SICREDI","SICOOB",
+  // ── Fintechs e bancos digitais ────────────────────────────────────────────
+  "PICPAY","MERCADOPAGO","PAGSEGURO","GERENCIANET","EFIPAY","EFI",
+  "ASAAS","JUNO","IUGU","STONE","GETNET","CIELO","REDE","PAGBANK",
+  "BANCO99","BANCO99CONTAS","WILL","WILL BANK","WILLBANK",
+  "SUPERDIGITAL","MELIUZ","HASH","BITZ","NOMAD","WISE","REMESSA",
+  "REMESSAONLINE","TOPAZIO","TOPÁZIO","SOFISA","SOFISADIRETO",
+  "MODALMAIS","XPEDUCACAO","XPI","XP","CLEAR","RICO","GUIDE","TERRA",
+  "TORO","AVENUE","ÓRAMA","ORAMA","WARREN","KINVO","VERIFIN",
+  // ── Bancos médios / nicho ─────────────────────────────────────────────────
+  "NACIONAL","MERCANTIL","ABR","CEF","ABC","ABCBRASIL",
+  "INDUSTRIAL","INDUSTRIALDO","CLASSEINVEST","OURINVEST",
+  "PARANÁ","PARANAENSE","BANCOAMAZONIA","AMAZONIA",
+  "BANCOVOTORANTIM","MIDWAY","LOJAS","RIACHUELO","CARREFOUR",
+  "CREFISA","PORTOCRED","PORTOSEG","PORTO","OMNI","CREDZ","AVISTA",
+  "LOSANGO","HIPERFINANCEIRA","FINANCEIRA","BV","BVFINANCEIRA",
+  "FININVEST","LEMON","CREDITOPESSOAL","QUINTO","QUINTOANDAR",
+  "CREDITAS","REBEL","REBEL","GERU","BCREDI","JEITTO","TRIGG",
+  "SERASA","DIGIO","NEXT","OUROCARD","BRADESCARD","ITAUCARD",
+  "SANTANDERFINANCIAMENTO","BANCO18","BANCO18",
+  // ── Corretoras / investimentos ────────────────────────────────────────────
+  "BTG","BTGPACTUAL","ITAUUNIBANCO","BRADESCOBBI","CATEDRAL",
+  "MIRAE","AGORA","GENIAL","WARBURGPINCUS","NUINVEST",
+  // ── Bandeiras de cartão ───────────────────────────────────────────────────
+  "VISA","MASTER","MASTERCARD","ELO","AMEX","AMERICANEXPRESS",
+  "HIPERCARD","DINERS","DINERSCLUB","CABAL","SOROCRED","SICOOB",
+  "BANRICOMPRAS","CREDSYSTEM","TICKET","ALELO","SODEXO","VR",
+  "IFOOD","CAJU","FLASH","SWILE","PLUXEE","BENEFLEX","GREENCARD",
+  // ── Produtos / categorias de cartão ──────────────────────────────────────
+  "PLATINUM","GOLD","BLACK","CLASSIC","STANDARD","PREMIUM",
+  "INFINITE","SIGNATURE","INTERNATIONAL","NACIONAL","TITANIUM",
+  "ELECTRON","DEBIT","DEBITO","CREDITO","CRÉDITO","PREPAID","PRE-PAGO",
+  // ── Abreviações comuns em relatórios / boletos ────────────────────────────
+  "BB","CEF","BRB","BNB","BASA","ABR","BESC","BEMGE","BANEB","BANESPA",
 ]);
 
 /**
