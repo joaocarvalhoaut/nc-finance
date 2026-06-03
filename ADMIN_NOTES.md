@@ -17,7 +17,7 @@
 - Cliente abre WhatsApp → Aparelhos Conectados → Escanear QR
 
 **3. Inserir no Supabase Dashboard**
-- URL: https://supabase.com/dashboard/project/hiabmnyyxbedtkigcjdx/editor
+- URL: https://supabase.com/dashboard/project/<PROJECT_REF>/editor
 - Tabela: `user_zapi_config`
 - Clique em **Insert row** e preencha:
 
@@ -39,7 +39,7 @@
 
 ## Como encontrar o UUID de um cliente
 
-1. Acesse: https://supabase.com/dashboard/project/hiabmnyyxbedtkigcjdx/auth/users
+1. Acesse: https://supabase.com/dashboard/project/<PROJECT_REF>/auth/users
 2. Busque pelo e-mail do cliente
 3. Copie o campo `id` (UUID)
 

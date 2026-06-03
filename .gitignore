@@ -10,6 +10,9 @@ coverage/
 .vercel
 supabase/.temp/
 
+# Scripts de teste — contêm telefones reais, IDs de pastas e credenciais de teste
+scripts/
+
 # Relatórios de testes — podem conter URLs e IDs de projeto sensíveis
 e2e-report.json
 hardening-report.json

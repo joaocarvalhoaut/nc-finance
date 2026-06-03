@@ -174,10 +174,9 @@ Deno.serve(async (request: Request) => {
     const tone           = typeof body.tone === "string" ? body.tone : "neutro";
     const customMessage  = typeof body.customMessage === "string" ? body.customMessage : null;
     const dryRun         = body.dryRun === true;
-    // PDF paths provided directly by frontend (bypasses DB roundtrip + RLS)
-    const debtorPdfPaths = (body.debtorPdfPaths && typeof body.debtorPdfPaths === "object")
-      ? body.debtorPdfPaths as Record<string, { path: string; name: string }>
-      : {};
+    // NOTE: debtorPdfPaths from the request body is intentionally IGNORED.
+    // PDF storage paths are always derived server-side from the verified userId + debtorId
+    // to prevent cross-user document access (IDOR vulnerability).
 
     // ── 3. Valida credenciais Z-API — número próprio (add-on) tem prioridade ─────
     // Lookup order: user_zapi_config → platform_integrations → env vars
@@ -371,11 +370,11 @@ Deno.serve(async (request: Request) => {
       let sentWithPdf = false;
 
       // ── Resolve PDF storage path + build message with link ────────────────────
-      const pdfEntry = debtorPdfPaths[debtorId] ?? null;
-      const pdfStoragePath = pdfEntry?.path
-        ?? (driveFileId === "uploaded"
-          ? `${userId}/${debtorId}/boleto.${driveFileName?.split(".").pop() ?? "pdf"}`
-          : null);
+      // Path is always derived from the server-verified userId + debtorId.
+      // Never trust caller-supplied paths (prevents IDOR cross-user document access).
+      const pdfStoragePath = driveFileId === "uploaded"
+        ? `${userId}/${debtorId}/boleto.${driveFileName?.split(".").pop() ?? "pdf"}`
+        : null;
 
       // Build the final message: append short PDF link if available
       let finalMessage = message;
