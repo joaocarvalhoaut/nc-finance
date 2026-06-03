@@ -18,6 +18,7 @@ interface FinancialRecordRow {
   fine_applied: number | null;
   updated_value: number | null;
   notes: string | null;
+  bank: string | null;
   representative_id: string | null;
   status: FinancialStatus;
   last_sent_message: string | null;
@@ -47,6 +48,7 @@ const SELECT_FIELDS = `
   fine_applied,
   updated_value,
   notes,
+  bank,
   representative_id,
   status,
   last_sent_message,
@@ -100,6 +102,7 @@ const mapRowToDebtor = (row: FinancialRecordRow): Debtor => ({
   fineApplied: row.fine_applied ?? 0,
   updatedValue: row.updated_value ?? Number(row.amount || 0),
   notes: row.notes || "",
+  bank: row.bank || "",
   representativeId: row.representative_id || undefined,
   status: row.status,
   lastSentMessage: row.last_sent_message || undefined,
@@ -127,6 +130,7 @@ const mapDebtorToRow = (userId: string, debtor: Debtor) => ({
   fine_applied: debtor.fineApplied ?? 0,
   updated_value: debtor.updatedValue ?? debtor.value,
   notes: debtor.notes || null,
+  bank: debtor.bank || null,
   representative_id: isValidUUID(debtor.representativeId) ? debtor.representativeId : null,
   status: debtor.status,
   last_sent_message: debtor.lastSentMessage || null,

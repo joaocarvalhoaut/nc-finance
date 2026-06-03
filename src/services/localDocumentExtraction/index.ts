@@ -23,6 +23,7 @@ import { maskName } from "./piiUtils";
 /** Single extracted financial record, compatible with Debtor / ExtractedDebtorCandidate */
 export interface LocalRecord {
   client: string;
+  bank: string;
   supplier: string;
   document: string;
   dueDate: string;
@@ -67,6 +68,7 @@ function candidateToRecord(
   return {
     record: {
       client: clientName.trim().slice(0, 120),
+      bank: (c.bank ?? "").trim().slice(0, 80),
       supplier: (c.supplier ?? "").trim().slice(0, 120),
       document,
       dueDate,

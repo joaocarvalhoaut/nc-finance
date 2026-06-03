@@ -892,6 +892,7 @@ export default function App() {
         const parsedList = result.records.map((item, index) => ({
           id: `ext-${ts}-${index}`,
           client: item.client,
+          bank: item.bank,
           supplier: item.supplier,
           document: item.document,
           dueDate: item.dueDate,
@@ -2403,6 +2404,16 @@ export default function App() {
                                       className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white focus:outline-none font-mono"
                                     />
                                   </div>
+                                  <div>
+                                    <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Banco</label>
+                                    <input
+                                      type="text"
+                                      value={item.bank || ""}
+                                      onChange={(e) => updateExtractedField(item.id, "bank", e.target.value)}
+                                      placeholder="—"
+                                      className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white focus:outline-none"
+                                    />
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -2812,6 +2823,7 @@ export default function App() {
                                 </select>
                               </div>
                             </th>
+                            <th className="px-4 py-3">Banco</th>
                             <th className="px-4 py-3">Observações</th>
                             <th className="px-4 py-3 text-center">Boleto PDF</th>
                             <th className="px-5 py-3 text-right">Ação</th>
@@ -2820,7 +2832,7 @@ export default function App() {
                         <tbody className="divide-y divide-zinc-800">
                           {filteredDebtors.length === 0 ? (
                             <tr>
-                              <td colSpan={12} className="px-6 py-12 text-center text-zinc-500">
+                              <td colSpan={13} className="px-6 py-12 text-center text-zinc-500">
                                 Nenhum devedor encontrado nos parâmetros de filtros ativos.
                                 Vá para o assistente de extração para importar novas faturas ou clique em "Exportar planilha" para ver amostras.
                               </td>
@@ -2945,6 +2957,17 @@ export default function App() {
                                         <option key={r.id} value={r.id}>{r.name}</option>
                                       ))}
                                     </select>
+                                  </td>
+                                  <td className="px-4 py-4 min-w-[90px]">
+                                    <input
+                                      type="text"
+                                      value={d.bank || ""}
+                                      onChange={(e) => updateDebtorFieldLocal(d.id, "bank", e.target.value)}
+                                      onBlur={() => saveDebtorFieldToDB(d.id)}
+                                      onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+                                      placeholder="—"
+                                      className="w-full bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded px-1.5 py-1 text-zinc-400"
+                                    />
                                   </td>
                                   <td className="px-4 py-4 min-w-[120px]">
                                     <input

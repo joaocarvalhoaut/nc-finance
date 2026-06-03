@@ -17,6 +17,7 @@ export interface Debtor {
   fineApplied?: number; // % rate
   updatedValue?: number; // calculated full value
   notes?: string;
+  bank?: string; // bank / card product extracted from document
   representativeId?: string; // assigned representative ID
   status: "pending" | "sent" | "failed";
   lastSentMessage?: string;

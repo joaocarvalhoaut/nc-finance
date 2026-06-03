@@ -32,6 +32,8 @@ import {
 export interface RecordCandidate {
   /** Debtor / client name (sacado) */
   client: string | null;
+  /** Bank or card product name extracted from the client string */
+  bank: string | null;
   /** Creditor / issuer name */
   supplier: string | null;
   /** Issuer's CNPJ */
@@ -82,6 +84,45 @@ function isHeaderWord(word: string): boolean {
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "");
   return HEADER_WORDS.has(norm);
+}
+
+// ── Bank / card product detection ────────────────────────────────────────────
+
+const BANK_KEYWORDS = new Set([
+  // Bancos brasileiros
+  "BRADESCO","ITAU","ITAÚ","CAIXA","SANTANDER","NUBANK","INTER","SICOOB","SICREDI",
+  "BANRISUL","SAFRA","BTG","ORIGINAL","MODAL","BANPARA","BANPARÁ","NACIONAL",
+  "MERCANTIL","VOTORANTIM","DAYCOVAL","PINE","FIBRA","SEMEAR","NEON","NEXT",
+  "PAN","BMG","AGIBANK","PARANÁ","PARANA","C6","BS2","RENDIMENTO","GENIAL",
+  // Bandeiras / produtos de cartão
+  "PLATINUM","GOLD","BLACK","CLASSIC","STANDARD","PREMIUM","INFINITE","SIGNATURE",
+  "VISA","MASTER","MASTERCARD","ELO","AMEX","HIPERCARD","DINERSCLUB","DINERS",
+  // Abreviações comuns em relatórios
+  "ABR","CEF","BB","BRB","BNB","BASA",
+]);
+
+/**
+ * Extrai palavras que parecem banco/produto de cartão do final do nome.
+ * Retorna { cleanClient, bank }.
+ */
+export function extractBank(raw: string): { cleanClient: string; bank: string } {
+  const tokens = raw.split(/\s+/);
+  const bankTokens: string[] = [];
+
+  // Varre de trás para frente enquanto encontrar termos de banco
+  while (tokens.length > 0) {
+    const last = tokens[tokens.length - 1].toUpperCase().replace(/[^A-ZÁÉÍÓÚÂÊÎÔÛÃÕÀÜÇ]/gi, "");
+    if (BANK_KEYWORDS.has(last)) {
+      bankTokens.unshift(tokens.pop()!);
+    } else {
+      break;
+    }
+  }
+
+  return {
+    cleanClient: tokens.join(" ").trim(),
+    bank: bankTokens.join(" ").trim(),
+  };
 }
 
 /** Remove all header-like words from a candidate name string */
@@ -160,7 +201,9 @@ export function parseErpFormat(text: string): RecordCandidate[] {
       if (firstDateMatch) clientEnd = tail.indexOf(firstDateMatch[0]);
     }
     const clientRaw = tail.slice(0, clientEnd);
-    const client = cleanName(clientRaw).slice(0, 120) || null;
+    const { cleanClient, bank: bankErp } = extractBank(cleanName(clientRaw));
+    const client = cleanClient.slice(0, 120) || null;
+    const bank = bankErp || null;
 
     // ── Text after phone ─────────────────────────────────────────────────────
     const afterPhone = phone
@@ -217,6 +260,7 @@ export function parseErpFormat(text: string): RecordCandidate[] {
 
     const record: RecordCandidate = {
       client,
+      bank,
       supplier,
       cnpj: cnpjValue,
       document: docNumber,
@@ -260,10 +304,13 @@ export function parseLineByLine(text: string): RecordCandidate[] {
 
     // Client = longest run of words before the first date
     const beforeDate = line.slice(0, line.indexOf(dates[0]));
-    const client = cleanName(beforeDate).slice(0, 120) || null;
+    const { cleanClient: cleanLine, bank: bankLine } = extractBank(cleanName(beforeDate));
+    const client = cleanLine.slice(0, 120) || null;
+    const bank = bankLine || null;
 
     const record: RecordCandidate = {
       client,
+      bank,
       supplier: null,
       cnpj: null,
       document: docMatch ? docMatch[1] : null,
@@ -309,8 +356,11 @@ export function parseDelimitedFormat(text: string): RecordCandidate[] {
           ? parseBRLAmount(currencyMatches[0][1])
           : parseBRLAmount(valueRaw);
 
+      const rawClient = row.fields.client?.trim() || "";
+      const { cleanClient: cleanDelim, bank: bankDelim } = extractBank(cleanName(rawClient));
       const record: RecordCandidate = {
-        client: row.fields.client?.trim() || null,
+        client: cleanDelim || null,
+        bank: bankDelim || null,
         supplier: row.fields.supplier?.trim() || null,
         cnpj: row.fields.cnpj?.trim() || null,
         document: row.fields.document?.trim() || null,
