@@ -2783,6 +2783,7 @@ export default function App() {
                               </button>
                             </th>
                             <th className="px-4 py-3 text-center">Documento Id</th>
+                            <th className="px-4 py-3">Banco</th>
                             <th className="px-4 py-3 text-center">Vencimento</th>
                             <th className="px-4 py-3 text-center">Telefone (WhatsApp)</th>
                             <th className="px-4 py-3 text-right">Valor Base (R$)</th>
@@ -2823,7 +2824,6 @@ export default function App() {
                                 </select>
                               </div>
                             </th>
-                            <th className="px-4 py-3">Banco</th>
                             <th className="px-4 py-3">Observações</th>
                             <th className="px-4 py-3 text-center">Boleto PDF</th>
                             <th className="px-5 py-3 text-right">Ação</th>
@@ -2880,6 +2880,17 @@ export default function App() {
                                       onBlur={() => saveDebtorFieldToDB(d.id)}
                                       onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
                                       className="w-20 text-center bg-transparent focus:bg-zinc-950 rounded p-1 font-mono"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-4 min-w-[90px]">
+                                    <input
+                                      type="text"
+                                      value={d.bank || ""}
+                                      onChange={(e) => updateDebtorFieldLocal(d.id, "bank", e.target.value)}
+                                      onBlur={() => saveDebtorFieldToDB(d.id)}
+                                      onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+                                      placeholder="—"
+                                      className="w-full bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded px-1.5 py-1 text-zinc-400"
                                     />
                                   </td>
                                   <td className="px-4 py-4 text-center font-mono">
@@ -2957,17 +2968,6 @@ export default function App() {
                                         <option key={r.id} value={r.id}>{r.name}</option>
                                       ))}
                                     </select>
-                                  </td>
-                                  <td className="px-4 py-4 min-w-[90px]">
-                                    <input
-                                      type="text"
-                                      value={d.bank || ""}
-                                      onChange={(e) => updateDebtorFieldLocal(d.id, "bank", e.target.value)}
-                                      onBlur={() => saveDebtorFieldToDB(d.id)}
-                                      onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
-                                      placeholder="—"
-                                      className="w-full bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded px-1.5 py-1 text-zinc-400"
-                                    />
                                   </td>
                                   <td className="px-4 py-4 min-w-[120px]">
                                     <input
