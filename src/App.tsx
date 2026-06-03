@@ -4335,15 +4335,19 @@ export default function App() {
             return (
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-                onClick={(e) => e.target === e.currentTarget && setNotesPopover(null)}
+                onMouseDown={(e) => { if (e.target === e.currentTarget) setNotesPopover(null); }}
               >
-                <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-5 w-full max-w-sm shadow-2xl space-y-3">
+                <div
+                  className="bg-zinc-900 border border-zinc-700 rounded-2xl p-5 w-full max-w-sm shadow-2xl space-y-3"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-bold text-white flex items-center gap-2">
                       <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
                       Observação — <span className="text-zinc-400 font-normal truncate max-w-[180px]">{debtor?.client}</span>
                     </h3>
-                    <button onClick={() => setNotesPopover(null)} className="text-zinc-500 hover:text-white transition-colors">
+                    <button type="button" onClick={() => setNotesPopover(null)} className="text-zinc-500 hover:text-white transition-colors">
                       <X className="w-4 h-4" />
                     </button>
                   </div>
@@ -4357,14 +4361,14 @@ export default function App() {
                   />
                   <div className="flex gap-2">
                     <button
-                      onClick={async () => {
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation();
                         const debtor = debtors.find(d => d.id === notesPopover.debtorId);
                         if (!debtor || !currentOwnerUserId) { setNotesPopover(null); return; }
-                        // Atualiza estado local imediatamente
                         const updated = { ...debtor, notes: notesPopover.draft };
                         setDebtors(prev => prev.map(d => d.id === updated.id ? updated : d));
                         setNotesPopover(null);
-                        // Salva no banco com o valor correto (não depende do closure do estado)
                         try {
                           await financeService.update(currentOwnerUserId, updated);
                         } catch (err) {
@@ -4377,7 +4381,8 @@ export default function App() {
                     </button>
                     {notesPopover.draft && (
                       <button
-                        onClick={() => setNotesPopover(p => p ? { ...p, draft: "" } : null)}
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setNotesPopover(p => p ? { ...p, draft: "" } : null); }}
                         className="px-3 py-2 rounded-xl text-xs text-zinc-400 hover:text-rose-400 hover:bg-zinc-800 transition-colors"
                         title="Limpar observação"
                       >
