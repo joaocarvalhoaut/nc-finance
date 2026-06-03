@@ -196,14 +196,19 @@ export const financeService = {
         return row;
       });
 
-      // Deduplicar por document_number dentro do mesmo lote — o Postgres não aceita
-      // ON CONFLICT DO UPDATE quando dois registros do batch colidem entre si.
-      // Mantemos a última ocorrência de cada document_number.
-      const seen = new Map<string, typeof rawWithDoc[number]>();
-      for (const row of rawWithDoc) {
-        seen.set(String(row.document_number), row);
-      }
-      const payloadWithDoc = Array.from(seen.values());
+      // O Postgres não aceita ON CONFLICT DO UPDATE quando dois registros do batch
+      // colidem entre si. Para preservar TODOS os registros, renomeamos duplicatas
+      // dentro do lote adicionando sufixo "-2", "-3", etc. em vez de descartar.
+      const seenCount = new Map<string, number>();
+      const payloadWithDoc = rawWithDoc.map((row) => {
+        const key = String(row.document_number);
+        const count = (seenCount.get(key) ?? 0) + 1;
+        seenCount.set(key, count);
+        if (count > 1) {
+          return { ...row, document_number: `${key}-${count}` };
+        }
+        return row;
+      });
 
       const { data, error } = await supabase
         .from(TABLE_NAME)
