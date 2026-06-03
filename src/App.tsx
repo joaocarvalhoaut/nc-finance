@@ -553,25 +553,46 @@ export default function App() {
 
   // Update calculated values when debtors or global parameters change
   useEffect(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const updated = debtors.map(d => {
-      // If vencido, compute simple delays & interest
-      let delayDays = 0;
-      if (d.category === "vencidos") {
-        // Let's assume some delay days from 11/03/2026 or standard 5 days
-        delayDays = 12;
+      // Liquidado: mantém valor original sem encargos
+      if (d.category === "liquidado") {
+        return { ...d, interestApplied: 0, fineApplied: 0, updatedValue: d.value };
       }
-      const multaValue = d.value * (globalFinePct / 100);
-      const jurosValue = d.value * ((globalInterestDayPct * delayDays) / 100);
-      const finalValue = Math.round((d.value + multaValue + jurosValue) * 100) / 100;
+
+      // A vencer: sem encargos ainda
+      if (d.category === "a_vencer") {
+        return { ...d, interestApplied: 0, fineApplied: 0, updatedValue: d.value };
+      }
+
+      // Vencido: calcula dias reais de atraso a partir do vencimento
+      let delayDays = 0;
+      if (d.dueDate) {
+        // dueDate está em DD/MM/YYYY
+        const parts = d.dueDate.split("/");
+        if (parts.length === 3) {
+          const due = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+          due.setHours(0, 0, 0, 0);
+          const diff = today.getTime() - due.getTime();
+          delayDays = Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+        }
+      }
+
+      const multaValue  = d.value * (globalFinePct / 100);
+      const jurosValue  = d.value * (globalInterestDayPct / 100) * delayDays;
+      const finalValue  = Math.round((d.value + multaValue + jurosValue) * 100) / 100;
 
       return {
         ...d,
         interestApplied: globalInterestDayPct,
         fineApplied: globalFinePct,
-        updatedValue: d.category === "liquidado" ? d.value : finalValue
+        updatedValue: finalValue,
       };
     });
-    // Prevent infinite loop by verifying differences before state set
+
+    // Evita loop infinito — só atualiza se houver diferença real
     const hasChanged = JSON.stringify(updated.map(u => u.updatedValue)) !== JSON.stringify(debtors.map(u => u.updatedValue));
     if (hasChanged) {
       setDebtors(updated);
