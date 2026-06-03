@@ -128,6 +128,7 @@ export function exportRelatorio(
   const rows = filteredDebtors.map((d) => [
     d.client.slice(0, 40),
     d.document || "—",
+    (d.bank || "—").slice(0, 12),
     d.dueDate || "—",
     BRL(d.value),
     d.updatedValue && d.updatedValue !== d.value ? BRL(d.updatedValue) : "—",
@@ -142,6 +143,7 @@ export function exportRelatorio(
     head: [[
       "Cliente",
       "Documento",
+      "Banco",
       "Vencimento",
       "Valor Original",
       "Valor Atualizado",
@@ -167,24 +169,25 @@ export function exportRelatorio(
       fillColor: [249, 250, 251],
     },
     columnStyles: {
-      0: { cellWidth: 50 },
-      1: { cellWidth: 22 },
-      2: { cellWidth: 20 },
-      3: { cellWidth: 24, halign: "right" },
-      4: { cellWidth: 24, halign: "right" },
-      5: { cellWidth: 20, halign: "center" },
+      0: { cellWidth: 46 },
+      1: { cellWidth: 20 },
+      2: { cellWidth: 16 },
+      3: { cellWidth: 18 },
+      4: { cellWidth: 22, halign: "right" },
+      5: { cellWidth: 22, halign: "right" },
       6: { cellWidth: 18, halign: "center" },
-      7: { cellWidth: 24 },
-      8: { cellWidth: 30 },
+      7: { cellWidth: 16, halign: "center" },
+      8: { cellWidth: 22 },
+      9: { cellWidth: 28 },
     },
     didParseCell: (data) => {
-      if (data.section === "body" && data.column.index === 5) {
+      if (data.section === "body" && data.column.index === 6) {
         const val = data.cell.raw as string;
         if (val === "Vencido")    { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = "bold"; }
         if (val === "A Vencer")   { data.cell.styles.textColor = [180, 83, 9]; }
         if (val === "Liquidado")  { data.cell.styles.textColor = [16, 185, 129]; }
       }
-      if (data.section === "body" && data.column.index === 6) {
+      if (data.section === "body" && data.column.index === 7) {
         const val = data.cell.raw as string;
         if (val === "Enviado")    { data.cell.styles.textColor = [16, 185, 129]; }
         if (val === "Falhou")     { data.cell.styles.textColor = [220, 38, 38]; }

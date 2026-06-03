@@ -1393,6 +1393,7 @@ export default function App() {
       return {
         "Cliente":              d.client,
         "Documento":            d.document || "",
+        "Banco":                d.bank || "",
         "Vencimento":           d.dueDate   || "",
         "Valor Base (R$)":      d.value,
         "Juros (%)":            d.interestApplied  ?? 0,
@@ -1407,10 +1408,10 @@ export default function App() {
 
     const ws = XLSX.utils.json_to_sheet(rows);
 
-    // Force Telefone column (index 7, col H) to text so Excel doesn't convert to scientific notation
+    // Force Telefone column (index 8, col I) to text so Excel doesn't convert to scientific notation
     const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
     for (let R = range.s.r + 1; R <= range.e.r; R++) {
-      const cellAddr = XLSX.utils.encode_cell({ r: R, c: 7 });
+      const cellAddr = XLSX.utils.encode_cell({ r: R, c: 8 });
       if (ws[cellAddr]) {
         ws[cellAddr].t = "s"; // force string type
       }
@@ -1420,6 +1421,7 @@ export default function App() {
     ws["!cols"] = [
       { wch: 36 }, // Cliente
       { wch: 18 }, // Documento
+      { wch: 14 }, // Banco
       { wch: 14 }, // Vencimento
       { wch: 16 }, // Valor Base
       { wch: 10 }, // Juros
