@@ -2717,7 +2717,9 @@ export default function App() {
                             const exportList = selectedDebtorIds.size > 0
                               ? filteredDebtors.filter(d => selectedDebtorIds.has(d.id))
                               : filteredDebtors;
-                            exportRelatorio(debtors, exportList, account?.email ?? "", representatives);
+                            // Quando há seleção, os cards de totais também refletem só os selecionados
+                            const exportBase = selectedDebtorIds.size > 0 ? exportList : debtors;
+                            exportRelatorio(exportBase, exportList, account?.email ?? "", representatives);
                           }}
                           className="px-4.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-100 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs text-center border border-zinc-700"
                         >
