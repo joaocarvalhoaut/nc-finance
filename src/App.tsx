@@ -20,6 +20,7 @@ import { driveFolderService, type DriveFolderStatus } from "./services/driveMatc
 import { whatsappBatchService, BATCH_TOP_STATUS_LABELS, type BatchChargeResult, type BatchTopStatus } from "./services/whatsappBatchService";
 import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type AutomationRule, type AutomationRun, type AutomationRuleCreate } from "./services/automationService";
 import { isBrazilHoliday, getBrazilHolidayName, isBusinessDay } from "./utils/brazilHolidays";
+import { getMessageTemplate } from "./utils/messageTemplates";
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
 import { parseImportFile } from "./utils/importFileParser";
 import { extractDocumentLocally, type LocalExtractionResult } from "./services/localDocumentExtraction";
@@ -287,7 +288,7 @@ export default function App() {
     ruleType: "overdue",
     daysBefore: 3,
     messageTone: "neutro",
-    customMessage: null,
+    customMessage: getMessageTemplate("neutro"),
     sendWindowStart: null,
     sendWindowEnd: null,
     maxDailySends: null,
@@ -794,7 +795,7 @@ export default function App() {
       });
       setAutomationRules((prev) => [...prev, created]);
       setShowCreateRuleForm(false);
-      setNewRuleForm({ name: "", ruleType: "overdue", daysBefore: 3, messageTone: "neutro" });
+      setNewRuleForm({ name: "", ruleType: "overdue", daysBefore: 3, messageTone: "neutro", customMessage: getMessageTemplate("neutro") });
     } catch (e) {
       setAutomationError(e instanceof Error ? e.message : "Falha ao criar regra.");
     }
@@ -4146,7 +4147,10 @@ export default function App() {
                           <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">Tom da Mensagem</label>
                           <select
                             value={newRuleForm.messageTone ?? "neutro"}
-                            onChange={(e) => setNewRuleForm((p) => ({ ...p, messageTone: e.target.value as AutomationRuleCreate["messageTone"] }))}
+                            onChange={(e) => {
+                              const tone = e.target.value as AutomationRuleCreate["messageTone"];
+                              setNewRuleForm((p) => ({ ...p, messageTone: tone, customMessage: getMessageTemplate(tone ?? "neutro") }));
+                            }}
                             className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
                           >
                             <option value="amigavel">Amigável</option>
@@ -4248,16 +4252,26 @@ export default function App() {
                         </div>
 
                         <div className="sm:col-span-2">
-                          <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
-                            Mensagem Personalizada <span className="text-zinc-600">(opcional — usa template do tom se vazio)</span>
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-[11px] text-zinc-400 uppercase tracking-wider">
+                              Mensagem
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setNewRuleForm((p) => ({ ...p, customMessage: getMessageTemplate(p.messageTone ?? "neutro") }))}
+                              className="text-[10px] text-zinc-500 hover:text-emerald-400 transition-colors underline underline-offset-2"
+                            >
+                              Restaurar template padrão
+                            </button>
+                          </div>
                           <textarea
-                            rows={3}
+                            rows={7}
                             value={newRuleForm.customMessage ?? ""}
                             onChange={(e) => setNewRuleForm((p) => ({ ...p, customMessage: e.target.value || null }))}
                             placeholder="Olá {nome_cliente}, ..."
-                            className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 resize-none"
+                            className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 resize-none font-mono text-xs leading-relaxed"
                           />
+                          <p className="mt-1 text-[10px] text-zinc-600">Variáveis: {"{nome_cliente}"} · {"{documento}"} · {"{vencimento}"} · {"{valor_atualizado}"}</p>
                         </div>
 
                         {/* Matching clients preview */}
