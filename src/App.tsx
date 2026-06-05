@@ -2972,7 +2972,7 @@ export default function App() {
                                 className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200"
                                 title={sortNameOrder === "asc" ? "Clique para Z-A" : "Clique para A-Z"}
                               >
-                                <span className="text-emerald-400">Cliente / Sacado</span>
+                                <span className="text-emerald-400">Cliente</span>
                                 <span className="text-[9px] font-bold px-1 py-0.5 rounded transition-colors bg-emerald-500/20 text-emerald-400">
                                   {sortNameOrder === "desc" ? "Z→A ↓" : "A→Z ↑"}
                                 </span>
