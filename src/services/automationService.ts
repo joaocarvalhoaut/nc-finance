@@ -7,8 +7,9 @@ import { getSupabaseClient } from "./supabaseClient";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type RuleType = "overdue" | "due_today" | "due_in_days";
-export type MessageTone = "amigavel" | "neutro" | "firme" | "juridico";
+export type RuleType     = "overdue" | "due_today" | "due_in_days";
+export type MessageTone  = "amigavel" | "neutro" | "firme" | "juridico";
+export type ScheduleMode = "daily" | "weekdays";
 
 export interface AutomationRule {
   id: string;
@@ -22,6 +23,8 @@ export interface AutomationRule {
   sendWindowStart: string | null;   // "HH:MM"
   sendWindowEnd:   string | null;   // "HH:MM"
   maxDailySends:   number | null;
+  scheduleMode:    ScheduleMode;    // "daily" | "weekdays"
+  skipHolidays:    boolean;         // pular feriados nacionais
   lastRunAt:       string | null;
   nextRunAt:       string | null;
   createdAt?: string;
@@ -37,6 +40,8 @@ export interface AutomationRuleCreate {
   sendWindowStart?: string | null;
   sendWindowEnd?:   string | null;
   maxDailySends?:   number | null;
+  scheduleMode?:    ScheduleMode;
+  skipHolidays?:    boolean;
 }
 
 export interface AutomationRun {
@@ -84,6 +89,8 @@ const mapRule = (r: RuleRow): AutomationRule => ({
   sendWindowStart: (r.send_window_start as string | null)?.slice(0, 5) ?? null,
   sendWindowEnd:   (r.send_window_end   as string | null)?.slice(0, 5) ?? null,
   maxDailySends:   r.max_daily_sends != null ? Number(r.max_daily_sends) : null,
+  scheduleMode:    (r.schedule_mode as ScheduleMode | null) ?? "daily",
+  skipHolidays:    Boolean(r.skip_holidays),
   lastRunAt:       (r.last_run_at  as string | null) ?? null,
   nextRunAt:       (r.next_run_at  as string | null) ?? null,
   createdAt:       r.created_at ? String(r.created_at) : undefined,
@@ -151,6 +158,8 @@ export const automationService = {
         send_window_start: payload.sendWindowStart ?? null,
         send_window_end:   payload.sendWindowEnd   ?? null,
         max_daily_sends:   payload.maxDailySends   ?? null,
+        schedule_mode:     payload.scheduleMode    ?? "daily",
+        skip_holidays:     payload.skipHolidays    ?? false,
         enabled:           true,
       })
       .select("*")
@@ -191,6 +200,8 @@ export const automationService = {
     if (patch.sendWindowStart  !== undefined) row.send_window_start = patch.sendWindowStart;
     if (patch.sendWindowEnd    !== undefined) row.send_window_end   = patch.sendWindowEnd;
     if (patch.maxDailySends    !== undefined) row.max_daily_sends   = patch.maxDailySends;
+    if (patch.scheduleMode     !== undefined) row.schedule_mode     = patch.scheduleMode;
+    if (patch.skipHolidays     !== undefined) row.skip_holidays     = patch.skipHolidays;
     if (patch.enabled          !== undefined) row.enabled           = patch.enabled;
     const { error } = await supabase.from("user_automation_rules").update(row).eq("id", id);
     if (error) throw new Error(error.message);

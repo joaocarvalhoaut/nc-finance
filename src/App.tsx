@@ -19,6 +19,7 @@ import { googleDriveService, DRIVE_STATUS_LABELS, type DriveMatchResult, type Dr
 import { driveFolderService, type DriveFolderStatus } from "./services/driveMatching/driveFolderService";
 import { whatsappBatchService, BATCH_TOP_STATUS_LABELS, type BatchChargeResult, type BatchTopStatus } from "./services/whatsappBatchService";
 import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type AutomationRule, type AutomationRun, type AutomationRuleCreate } from "./services/automationService";
+import { isBrazilHoliday, getBrazilHolidayName, isBusinessDay } from "./utils/brazilHolidays";
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
 import { parseImportFile } from "./utils/importFileParser";
 import { extractDocumentLocally, type LocalExtractionResult } from "./services/localDocumentExtraction";
@@ -788,6 +789,8 @@ export default function App() {
         sendWindowStart: newRuleForm.sendWindowStart ?? null,
         sendWindowEnd: newRuleForm.sendWindowEnd ?? null,
         maxDailySends: newRuleForm.maxDailySends ?? null,
+        scheduleMode: newRuleForm.scheduleMode ?? "daily",
+        skipHolidays: newRuleForm.skipHolidays ?? false,
       });
       setAutomationRules((prev) => [...prev, created]);
       setShowCreateRuleForm(false);
@@ -4194,6 +4197,56 @@ export default function App() {
                           </>
                         )}
 
+                        {/* Frequência de envio */}
+                        <div className="sm:col-span-2">
+                          <label className="block text-[11px] text-zinc-400 mb-2 uppercase tracking-wider">Dias de Envio</label>
+                          <div className="flex gap-2">
+                            {([ ["daily", "Todos os dias"], ["weekdays", "Só dias úteis (Seg–Sex)"] ] as const).map(([val, label]) => (
+                              <button
+                                key={val}
+                                type="button"
+                                onClick={() => setNewRuleForm((p) => ({ ...p, scheduleMode: val }))}
+                                className={`flex-1 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                                  (newRuleForm.scheduleMode ?? "daily") === val
+                                    ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300"
+                                    : "bg-zinc-950 border-zinc-700 text-zinc-400 hover:text-zinc-200"
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Pular feriados */}
+                        <div className="sm:col-span-2">
+                          <label className="block text-[11px] text-zinc-400 mb-2 uppercase tracking-wider">Feriados Nacionais</label>
+                          <button
+                            type="button"
+                            onClick={() => setNewRuleForm((p) => ({ ...p, skipHolidays: !(p.skipHolidays ?? false) }))}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                              (newRuleForm.skipHolidays ?? false)
+                                ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
+                                : "bg-zinc-950 border-zinc-700 text-zinc-400 hover:text-zinc-200"
+                            }`}
+                          >
+                            <span className={`w-2 h-2 rounded-full ${(newRuleForm.skipHolidays ?? false) ? "bg-amber-400" : "bg-zinc-600"}`} />
+                            {(newRuleForm.skipHolidays ?? false) ? "Pular feriados ativado" : "Enviar também em feriados"}
+                          </button>
+                          {/* Aviso se hoje for feriado */}
+                          {isBrazilHoliday() && (
+                            <p className="mt-1.5 text-[10px] text-amber-400/80">
+                              ⚠ Hoje é feriado nacional: {getBrazilHolidayName()}.
+                              {(newRuleForm.skipHolidays ?? false) ? " Esta regra não disparará hoje." : " Esta regra disparará normalmente."}
+                            </p>
+                          )}
+                          {!isBrazilHoliday() && (newRuleForm.scheduleMode ?? "daily") === "weekdays" && !isBusinessDay() && (
+                            <p className="mt-1.5 text-[10px] text-zinc-500">
+                              ⚠ Hoje é fim de semana — esta regra não disparará hoje.
+                            </p>
+                          )}
+                        </div>
+
                         <div className="sm:col-span-2">
                           <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
                             Mensagem Personalizada <span className="text-zinc-600">(opcional — usa template do tom se vazio)</span>
@@ -4326,6 +4379,8 @@ export default function App() {
                               </span>
                             </div>
                             <div className="flex flex-wrap gap-x-4 mt-1.5 text-[11px] text-zinc-500 font-mono">
+                              <span>{rule.scheduleMode === "weekdays" ? "📅 Seg–Sex" : "📅 Todo dia"}</span>
+                              {rule.skipHolidays && <span>🚫 Pula feriados</span>}
                               {rule.sendWindowStart && rule.sendWindowEnd && (
                                 <span>Janela: {rule.sendWindowStart}–{rule.sendWindowEnd}</span>
                               )}
