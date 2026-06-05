@@ -524,9 +524,6 @@ export default function LandingPage({
               transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0 }}
             >
               <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-emerald-500/60 to-transparent" />
-              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                <Clock className="w-5 h-5" />
-              </div>
               <div>
                 <div className="text-4xl font-black text-white tracking-tight">-80%</div>
                 <div className="text-emerald-400 font-bold text-sm mt-1">menos tempo operacional em cobranças</div>
@@ -545,9 +542,6 @@ export default function LandingPage({
               transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0.1 }}
             >
               <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-emerald-500/60 to-transparent" />
-              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                <Sparkles className="w-5 h-5" />
-              </div>
               <div>
                 <div className="text-4xl font-black text-white tracking-tight">+30%</div>
                 <div className="text-emerald-400 font-bold text-sm mt-1">a mais em receita recuperada</div>
@@ -566,9 +560,6 @@ export default function LandingPage({
               transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0.2 }}
             >
               <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-emerald-500/60 to-transparent" />
-              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                <Zap className="w-5 h-5" />
-              </div>
               <div>
                 <div className="text-4xl font-black text-white tracking-tight">10 min</div>
                 <div className="text-emerald-400 font-bold text-sm mt-1">da importação ao primeiro disparo</div>
