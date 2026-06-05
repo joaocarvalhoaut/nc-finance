@@ -402,7 +402,7 @@ export default function LandingPage({
                     <div className="w-full h-4 relative flex justify-between px-2 text-[10px] text-zinc-500 font-mono">
                       <span>14:02 UTC</span>
                       <div className="w-16 h-3.5 bg-zinc-900 rounded-full absolute left-1/2 -translate-x-1/2 -top-1 border-x border-b border-zinc-800" />
-                      <span>5G 📶</span>
+                      <span>5G</span>
                     </div>
 
                     {/* Image showcase — static import ensures correct hashed URL in production */}
@@ -753,7 +753,7 @@ export default function LandingPage({
                         <p className="text-[10px] text-emerald-200">Online & Automatizado</p>
                       </div>
                     </div>
-                    <span className="text-xs text-emerald-100">🔌 Conectado</span>
+                    <span className="text-xs text-emerald-100">Conectado</span>
                   </div>
 
                   {/* Bubble Space */}
