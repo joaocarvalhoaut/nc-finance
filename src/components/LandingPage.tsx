@@ -360,7 +360,7 @@ export default function LandingPage({
                   href="#auth-panel"
                   className="px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_20px_rgba(16,185,129,0.3)] hover:-translate-y-0.5 transition-all text-sm sm:text-base"
                 >
-                  Começar agora — é grátis <ArrowRight className="w-4 h-4" />
+                  Comece agora de graça <ArrowRight className="w-4 h-4" />
                 </a>
                 <a
                   href="#demo-celular"
