@@ -345,10 +345,6 @@ export default function LandingPage({
             {/* Left Column: CTA Pitch */}
             <div className="lg:col-span-7 flex flex-col space-y-6 text-center lg:text-left">
 
-              {/* Badge */}
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold w-fit mx-auto lg:mx-0">
-                <Zap className="w-3.5 h-3.5" /> Configure em menos de 10 minutos. Sem contratos.
-              </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-tight tracking-tight">
                 Automatize suas cobranças.{" "}
