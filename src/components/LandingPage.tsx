@@ -341,18 +341,22 @@ export default function LandingPage({
       <section className="relative pt-12 pb-20 sm:pb-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-            
+
             {/* Left Column: CTA Pitch */}
             <div className="lg:col-span-7 flex flex-col space-y-6 text-center lg:text-left">
 
+              {/* Badge */}
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold w-fit mx-auto lg:mx-0">
+                <Zap className="w-3.5 h-3.5" /> Configure em menos de 10 minutos. Sem contratos.
+              </div>
+
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-tight tracking-tight">
-                Reduza a inadimplência <br />
-                com cobranças via <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-200 drop-shadow-[0_2px_10px_rgba(52,211,153,0.15)]">WhatsApp</span>
+                Envie centenas de cobranças{" "}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-200 drop-shadow-[0_2px_10px_rgba(52,211,153,0.15)]">em minutos</span>
               </h1>
 
               <p className="text-zinc-400 text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed font-light">
-                Importe relatórios de clientes em atraso ou faturas pendentes. 
-                Nossa Inteligência Artificial extrai e organiza as parcelas, calcula juros e multas atualizados, e dispara notificações nos tons ideais de abordagem.
+                Pare de perder horas com cobranças manuais. A NC Finance automatiza todo o processo pelo WhatsApp — do lembrete amigável à notificação jurídica — enquanto você foca no que importa.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start pt-4">
@@ -360,29 +364,29 @@ export default function LandingPage({
                   href="#auth-panel"
                   className="px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_20px_rgba(16,185,129,0.3)] hover:-translate-y-0.5 transition-all text-sm sm:text-base"
                 >
-                  Experimentar NC Finance <ArrowRight className="w-4 h-4" />
+                  Começar agora — é grátis <ArrowRight className="w-4 h-4" />
                 </a>
                 <a
                   href="#demo-celular"
                   className="px-6 py-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 font-medium flex items-center justify-center gap-2 transition-all text-sm sm:text-base"
                 >
-                  Assistir Simulação
+                  Ver simulação ao vivo
                 </a>
               </div>
 
               {/* Dynamic Metrics */}
               <div className="grid grid-cols-3 gap-4 sm:gap-6 pt-8 border-t border-zinc-900 max-w-lg mx-auto lg:mx-0">
                 <div>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-white">82%</div>
-                  <div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-widest font-mono mt-1">Taxa de Abertura</div>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-emerald-400">-80%</div>
+                  <div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-widest font-mono mt-1">Tempo gasto com cobranças</div>
                 </div>
                 <div>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-emerald-400">3.5x</div>
-                  <div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-widest font-mono mt-1">Mais Rápido</div>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-white">+30%</div>
+                  <div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-widest font-mono mt-1">Mais valores recuperados</div>
                 </div>
                 <div>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-white">-45%</div>
-                  <div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-widest font-mono mt-1">Inadimplência</div>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-white">10 min</div>
+                  <div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-widest font-mono mt-1">Para começar a cobrar</div>
                 </div>
               </div>
             </div>
@@ -501,9 +505,47 @@ export default function LandingPage({
         </div>
       </section>
 
+      {/* RESULTS STRIP */}
+      <section className="border-t border-b border-zinc-900/60 bg-zinc-950/60 py-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-0 md:divide-x divide-zinc-800">
+            {/* Pilar 1 */}
+            <div className="flex flex-col items-center md:items-start text-center md:text-left px-8 gap-3">
+              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                <Clock className="w-5 h-5 flex-shrink-0" />
+                Reduza até 80% do tempo gasto com cobranças
+              </div>
+              <p className="text-zinc-400 text-sm font-light leading-relaxed">
+                O que levava horas de ligações e mensagens manuais passa a rodar em segundo plano, automaticamente, todos os dias.
+              </p>
+            </div>
+            {/* Pilar 2 */}
+            <div className="flex flex-col items-center md:items-start text-center md:text-left px-8 gap-3">
+              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                <Sparkles className="w-5 h-5 flex-shrink-0" />
+                Empresas recuperam 30% mais quando cobram nos primeiros dias
+              </div>
+              <p className="text-zinc-400 text-sm font-light leading-relaxed">
+                A NC Finance dispara a cobrança no momento certo — antes que a dívida esfrie e o cliente suma.
+              </p>
+            </div>
+            {/* Pilar 3 */}
+            <div className="flex flex-col items-center md:items-start text-center md:text-left px-8 gap-3">
+              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                <Zap className="w-5 h-5 flex-shrink-0" />
+                Configure em menos de 10 minutos
+              </div>
+              <p className="text-zinc-400 text-sm font-light leading-relaxed">
+                Importe sua planilha ou PDF, revise os dados e comece a cobrar. Sem instalação, sem treinamento, sem contrato.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CORE FEATURES bento style */}
-      <motion.section 
-        id="recursos" 
+      <motion.section
+        id="recursos"
         className="py-20 border-t border-zinc-900/60 bg-zinc-950/30 overflow-hidden"
         initial={{ x: -120, opacity: 0 }}
         whileInView={{ x: 0, opacity: 1 }}
