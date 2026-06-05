@@ -3304,7 +3304,7 @@ export default function App() {
                                         className="p-1 px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500 hover:text-black hover:font-bold text-emerald-400 transition-all font-mono text-[9px] uppercase font-bold"
                                         title="Chamar cliente no WhatsApp"
                                       >
-                                        Disparar WP
+                                        Cobrar
                                       </button>
                                       <button
                                         onClick={() => deleteGeneralDebtor(d.id)}
