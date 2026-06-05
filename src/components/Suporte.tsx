@@ -60,7 +60,12 @@ const FAQS: FAQ[] = [
   {
     category: "Importação de Dados",
     question: "Quais formatos de arquivo posso importar?",
-    answer: "O sistema aceita arquivos PDF, TXT e Excel (XLSX/XLS). O extrator local identifica automaticamente clientes, vencimentos, valores e números de documento. Para melhores resultados, use arquivos de relatório ERP com CNPJ dos fornecedores no texto.",
+    answer: "O sistema aceita arquivos PDF, TXT e Excel (XLSX/XLS). O extrator local identifica automaticamente clientes, vencimentos, valores, banco e números de documento. Para melhores resultados, use arquivos de relatório ERP com CNPJ dos fornecedores no texto.",
+  },
+  {
+    category: "Importação de Dados",
+    question: "O banco é detectado automaticamente?",
+    answer: "Sim. O sistema usa duas fontes para identificar o banco:\n1. Nome do arquivo — se o nome contiver o nome de um banco conhecido (ex: 'BRADESCO_vencidos.pdf'), ele é usado automaticamente para todos os registros.\n2. Coluna 'Banco' no arquivo — se o arquivo tiver uma coluna dedicada ao banco, o valor dela tem prioridade.\nCaso nenhum banco seja encontrado, o campo fica em branco para preenchimento manual.",
   },
   {
     category: "Importação de Dados",
@@ -70,12 +75,56 @@ const FAQS: FAQ[] = [
   {
     category: "Importação de Dados",
     question: "Posso importar o mesmo arquivo duas vezes?",
-    answer: "Sim. O sistema usa o número do documento como chave de deduplicação. Se você importar o mesmo arquivo novamente, os registros existentes serão atualizados (não duplicados) para os que possuem número de documento. Registros sem número de documento serão inseridos novamente.",
+    answer: "Sim. O sistema usa o número do documento como chave de deduplicação. Se você importar o mesmo arquivo novamente, os registros existentes serão atualizados (não duplicados). Caso existam documentos duplicados dentro do mesmo arquivo, o sistema exibirá um aviso perguntando se deseja manter todos ou somente o primeiro de cada.",
   },
   {
     category: "Importação de Dados",
     question: "Como funciona a integração com o Google Sheets?",
     answer: "Nos planos Pro e Premium, você pode importar dados diretamente de uma planilha Google Sheets. Para isso, compartilhe sua planilha com o e-mail da service account da plataforma (visível no painel de importação) como 'Visualizador' e cole o link da planilha no campo indicado.",
+  },
+
+  // Visão Geral
+  {
+    category: "Visão Geral",
+    question: "Como ordenar os registros na tabela?",
+    answer: "A tabela possui filtros de ordenação em várias colunas:\n• Cliente — alterna entre A→Z e Z→A (padrão: A→Z)\n• Vencimento — ordena do mais antigo para o mais novo (↑) ou do mais novo para o mais antigo (↓)\n• Banco — agrupa registros do mesmo banco em ordem alfabética\n• Valor Base — ordena do maior para o menor ou do menor para o maior\nAo ativar um sort, os demais são desativados automaticamente.",
+  },
+  {
+    category: "Visão Geral",
+    question: "Como navegar pela tabela quando há muitas colunas?",
+    answer: "Você pode arrastar a tabela lateralmente clicando e segurando o mouse sobre ela. As colunas de checkbox e Cliente ficam fixas à esquerda (sticky) para sempre ficarem visíveis durante a navegação horizontal.",
+  },
+  {
+    category: "Visão Geral",
+    question: "Como adicionar observações a um registro?",
+    answer: "Na coluna 'Obs.' da tabela, clique no ícone de balão de texto. Um campo de texto abrirá para digitar sua observação. Clique em 'Salvar' para confirmar. Registros com observação exibem um ponto âmbar de indicação na linha.",
+  },
+  {
+    category: "Visão Geral",
+    question: "O que é a 'Pendência Crítica' no Dashboard?",
+    answer: "O card Pendência Crítica exibe o total em aberto dos devedores vencidos há pelo menos N dias (configurável). Você pode:\n• Definir o número mínimo de dias de atraso no campo 'dias ≥'\n• Alternar entre 'c/ juros' (usa o valor atualizado com multa e juros) e 's/ juros' (usa o valor original)\nIsso permite identificar rapidamente os casos mais críticos da carteira.",
+  },
+  {
+    category: "Visão Geral",
+    question: "Como funcionam os encargos (multa e juros)?",
+    answer: "Os encargos são calculados automaticamente para devedores na categoria 'Vencidos':\n• Multa: percentual fixo aplicado uma única vez sobre o valor original\n• Juros: percentual diário multiplicado pela quantidade real de dias de atraso (contados a partir da data de vencimento até hoje)\nDevedores 'A Vencer' não recebem encargos. 'Liquidados' mantêm o valor original. Os percentuais são configurados nos Parâmetros de Encargos Globais.",
+  },
+
+  // Exportação
+  {
+    category: "Exportação",
+    question: "Como exportar para PDF ou Excel?",
+    answer: "Na aba Visão Geral, use os botões na parte superior da tabela:\n• 'Exportar Planilha (XLS)' — gera um arquivo Excel com todos os campos, incluindo banco.\n• 'Exportar Relatório (PDF)' — gera um relatório em PDF formatado com cabeçalho, cards de resumo e tabela de registros.\nAmbos exportam os registros filtrados no momento. Se houver clientes selecionados (checkbox), somente eles são exportados.",
+  },
+  {
+    category: "Exportação",
+    question: "Posso exportar apenas alguns clientes selecionados?",
+    answer: "Sim. Marque os checkboxes dos clientes desejados na tabela e clique em 'Exportar PDF (N)' ou 'Exportar XLS'. O número entre parênteses indica quantos registros serão incluídos. Os cards de resumo do PDF também refletirão apenas os selecionados.",
+  },
+  {
+    category: "Exportação",
+    question: "O PDF mostra apenas as categorias presentes?",
+    answer: "Sim. Se os registros exportados pertencem a uma única categoria (ex: apenas Vencidos), o PDF exibe somente o card 'Total de Registros'. Se houver mais de uma categoria, os cards de cada categoria presente são exibidos automaticamente ao lado do Total.",
   },
 
   // Planos e Pagamentos
