@@ -572,6 +572,87 @@ export default function LandingPage({
         </div>
       </motion.section>
 
+      {/* COMO FUNCIONA */}
+      <motion.section
+        className="py-24 overflow-hidden"
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: false, amount: 0.1 }}
+        transition={{ duration: 0.6 }}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header */}
+          <div className="text-center max-w-2xl mx-auto mb-20">
+            <p className="text-emerald-400 font-mono text-xs uppercase tracking-widest font-semibold mb-3">Simples do início ao fim</p>
+            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Como funciona</h2>
+          </div>
+
+          {/* Steps */}
+          <div className="relative">
+            {/* Linha conectora horizontal — visível só em desktop */}
+            <div className="hidden lg:block absolute top-8 left-[calc(12.5%+1.5rem)] right-[calc(12.5%+1.5rem)] h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent z-0" />
+
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-10 lg:gap-6 relative z-10">
+              {[
+                {
+                  step: "01",
+                  icon: <FileSpreadsheet className="w-6 h-6" />,
+                  title: "Importe sua carteira",
+                  desc: "Carregue um PDF, planilha Excel, CSV ou conecte direto ao Google Sheets. Nenhum modelo padrão necessário.",
+                  delay: 0,
+                },
+                {
+                  step: "02",
+                  icon: <Sparkles className="w-6 h-6" />,
+                  title: "A IA organiza tudo",
+                  desc: "Nome do cliente, documento, vencimento e valor são extraídos automaticamente. Juros e multas calculados em tempo real.",
+                  delay: 0.12,
+                },
+                {
+                  step: "03",
+                  icon: <MessageSquare className="w-6 h-6" />,
+                  title: "Revise e dispare",
+                  desc: "Escolha o tom — amigável, neutro, firme ou jurídico — e envie centenas de cobranças pelo WhatsApp em segundos.",
+                  delay: 0.24,
+                },
+                {
+                  step: "04",
+                  icon: <CheckCircle2 className="w-6 h-6" />,
+                  title: "Acompanhe em tempo real",
+                  desc: "Cada mensagem enviada fica registrada com status, data e dados do cliente. Histórico completo para auditoria.",
+                  delay: 0.36,
+                },
+              ].map(({ step, icon, title, desc, delay }) => (
+                <motion.div
+                  key={step}
+                  className="flex flex-col items-center text-center gap-5"
+                  initial={{ opacity: 0, y: 32 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: false, amount: 0.3 }}
+                  transition={{ type: "spring", stiffness: 60, damping: 14, delay }}
+                >
+                  {/* Número + ícone */}
+                  <div className="relative">
+                    <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.08)]">
+                      {icon}
+                    </div>
+                    <div className="absolute -top-3 -right-3 w-6 h-6 rounded-full bg-emerald-500 text-black text-[10px] font-black flex items-center justify-center shadow-md">
+                      {step.replace("0", "")}
+                    </div>
+                  </div>
+
+                  {/* Texto */}
+                  <div className="space-y-2">
+                    <h4 className="text-base font-bold text-white">{title}</h4>
+                    <p className="text-zinc-400 text-sm font-light leading-relaxed max-w-[220px] mx-auto">{desc}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </motion.section>
+
       {/* CORE FEATURES bento style */}
       <motion.section
         id="recursos"
