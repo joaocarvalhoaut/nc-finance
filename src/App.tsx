@@ -1600,7 +1600,7 @@ export default function App() {
                             d.supplier.toLowerCase().includes(searchFilter.toLowerCase());
       const matchesCategory = categoryFilter === "all" ? true : d.category === categoryFilter;
       const matchesStatus = statusFilter === "all" ? true : d.status === statusFilter;
-      const matchesRep = repFilter === "all" ? true : d.representativeId === repFilter;
+      const matchesRep = repFilter === "all" ? true : repFilter === "unassigned" ? !d.representativeId : d.representativeId === repFilter;
       return matchesSearch && matchesCategory && matchesStatus && matchesRep;
     });
     const cmp = (a: string, b: string) =>
@@ -3061,6 +3061,7 @@ export default function App() {
                                   className={`bg-zinc-900 border rounded-lg text-[9px] px-1.5 py-0.5 cursor-pointer transition-colors focus:outline-none normal-case tracking-normal font-normal w-full ${repFilter !== "all" ? "border-emerald-500/50 text-emerald-300" : "border-zinc-700 text-zinc-400"}`}
                                 >
                                   <option value="all">Todos</option>
+                                  <option value="unassigned">Não atribuído</option>
                                   {representatives.map(r => (
                                     <option key={r.id} value={r.id}>{r.name}</option>
                                   ))}
