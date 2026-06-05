@@ -506,42 +506,84 @@ export default function LandingPage({
       </section>
 
       {/* RESULTS STRIP */}
-      <section className="border-t border-b border-zinc-900/60 bg-zinc-950/60 py-10">
+      <motion.section
+        className="py-16 bg-zinc-950 border-t border-zinc-900/60 overflow-hidden"
+        initial={{ opacity: 0, y: 60 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: false, amount: 0.2 }}
+        transition={{ type: "spring", stiffness: 55, damping: 14 }}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-0 md:divide-x divide-zinc-800">
+          <div className="text-center mb-10">
+            <p className="text-xs font-mono uppercase tracking-widest text-zinc-500">Por que a NC Finance funciona</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* Pilar 1 */}
-            <div className="flex flex-col items-center md:items-start text-center md:text-left px-8 gap-3">
-              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
-                <Clock className="w-5 h-5 flex-shrink-0" />
-                Reduza até 80% do tempo gasto com cobranças
+            <motion.div
+              className="relative rounded-2xl bg-zinc-900/60 border border-zinc-800 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: false, amount: 0.3 }}
+              transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0 }}
+            >
+              <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-emerald-500/60 to-transparent" />
+              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-4xl font-black text-white tracking-tight">-80%</div>
+                <div className="text-emerald-400 font-bold text-sm mt-1">do tempo gasto com cobranças</div>
               </div>
               <p className="text-zinc-400 text-sm font-light leading-relaxed">
                 O que levava horas de ligações e mensagens manuais passa a rodar em segundo plano, automaticamente, todos os dias.
               </p>
-            </div>
+            </motion.div>
+
             {/* Pilar 2 */}
-            <div className="flex flex-col items-center md:items-start text-center md:text-left px-8 gap-3">
-              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
-                <Sparkles className="w-5 h-5 flex-shrink-0" />
-                Empresas recuperam 30% mais quando cobram nos primeiros dias
+            <motion.div
+              className="relative rounded-2xl bg-zinc-900/60 border border-zinc-800 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: false, amount: 0.3 }}
+              transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0.1 }}
+            >
+              <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-emerald-500/60 to-transparent" />
+              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-4xl font-black text-white tracking-tight">+30%</div>
+                <div className="text-emerald-400 font-bold text-sm mt-1">mais valores recuperados</div>
               </div>
               <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                A NC Finance dispara a cobrança no momento certo — antes que a dívida esfrie e o cliente suma.
+                Empresas que cobram nos primeiros dias de atraso recuperam significativamente mais. A NC Finance dispara na hora certa, antes que a dívida esfrie.
               </p>
-            </div>
+            </motion.div>
+
             {/* Pilar 3 */}
-            <div className="flex flex-col items-center md:items-start text-center md:text-left px-8 gap-3">
-              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
-                <Zap className="w-5 h-5 flex-shrink-0" />
-                Configure em menos de 10 minutos
+            <motion.div
+              className="relative rounded-2xl bg-zinc-900/60 border border-zinc-800 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: false, amount: 0.3 }}
+              transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0.2 }}
+            >
+              <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-emerald-500/60 to-transparent" />
+              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <Zap className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-4xl font-black text-white tracking-tight">10 min</div>
+                <div className="text-emerald-400 font-bold text-sm mt-1">para começar a cobrar</div>
               </div>
               <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                Importe sua planilha ou PDF, revise os dados e comece a cobrar. Sem instalação, sem treinamento, sem contrato.
+                Importe sua planilha ou PDF, revise os dados e dispare. Sem instalação, sem treinamento, sem contrato.
               </p>
-            </div>
+            </motion.div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* CORE FEATURES bento style */}
       <motion.section
