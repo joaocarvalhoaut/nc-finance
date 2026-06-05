@@ -507,7 +507,7 @@ export default function LandingPage({
 
       {/* RESULTS STRIP */}
       <motion.section
-        className="py-16 bg-zinc-950 border-t border-zinc-900/60 overflow-hidden"
+        className="py-16 border-t border-zinc-900/60 overflow-hidden"
         initial={{ opacity: 0, y: 60 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: false, amount: 0.2 }}
