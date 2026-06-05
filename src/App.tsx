@@ -519,7 +519,7 @@ export default function App() {
       } catch (error) {
         if (!isMounted) return;
         const message = error instanceof Error ? error.message : "Falha ao carregar seus dados.";
-        setWorkspaceError(message);
+        console.error('[workspace]', message);
       } finally {
         if (isMounted) {
           setIsWorkspaceLoading(false);
@@ -529,7 +529,7 @@ export default function App() {
 
     bootstrapWorkspace().catch((error) => {
       if (!isMounted) return;
-      setWorkspaceError(error instanceof Error ? error.message : "Falha inesperada ao carregar workspace.");
+      console.error('[workspace]', error instanceof Error ? error.message : 'Falha inesperada ao carregar workspace.');
       setIsWorkspaceLoading(false);
     });
 
@@ -549,7 +549,7 @@ export default function App() {
         .upsertConfig(payload)
         .catch((error) => {
           const message = error instanceof Error ? error.message : "Falha ao salvar configurações.";
-          setWorkspaceError(message);
+          console.error('[workspace]', message);
         })
         .finally(() => {
           setIsSavingConfig(false);
@@ -710,7 +710,7 @@ export default function App() {
 
     if (cobráveis.length === 0) {
       // Todos selecionados são liquidados — avisa e cancela
-      setWorkspaceError("Os registros selecionados estão marcados como liquidados. Cobranças não foram enviadas.");
+      console.error('[workspace]', 'Os registros selecionados estão marcados como liquidados. Cobranças não foram enviadas.');
       return;
     }
 
@@ -1082,7 +1082,7 @@ export default function App() {
         setSelectedDebtorForMessage(savedDebtor);
       }
     } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : "Falha ao salvar alteração do devedor.");
+      console.error('[workspace]', error instanceof Error ? error.message : 'Falha ao salvar alteração do devedor.');
     }
   };
 
@@ -1101,7 +1101,7 @@ export default function App() {
         setSelectedDebtorForMessage(savedDebtor);
       }
     } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : "Falha ao salvar alteração do devedor.");
+      console.error('[workspace]', error instanceof Error ? error.message : 'Falha ao salvar alteração do devedor.');
     }
   };
 
@@ -1121,7 +1121,7 @@ export default function App() {
     try {
       await Promise.all(idsToDelete.map(id => financeService.remove(ownerUid, id)));
     } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : "Erro ao excluir selecionados.");
+      console.error('[workspace]', error instanceof Error ? error.message : 'Erro ao excluir selecionados.');
     }
   };
 
@@ -1155,7 +1155,7 @@ export default function App() {
         d.id === debtorId ? { ...d, driveFileId: "uploaded", driveFileName: file.name, driveFileUrl: url } : d
       ));
     } catch (err) {
-      setWorkspaceError(err instanceof Error ? err.message : "Falha ao enviar PDF.");
+      console.error('[workspace]', err instanceof Error ? err.message : 'Falha ao enviar PDF.');
     } finally {
       setUploadingPdfDebtorId(null);
     }
@@ -1169,7 +1169,7 @@ export default function App() {
         d.id === debtorId ? { ...d, driveFileId: null, driveFileName: null, driveFileUrl: null } : d
       ));
     } catch (err) {
-      setWorkspaceError(err instanceof Error ? err.message : "Falha ao remover PDF.");
+      console.error('[workspace]', err instanceof Error ? err.message : 'Falha ao remover PDF.');
     }
   };
 
@@ -1185,7 +1185,7 @@ export default function App() {
     try {
       await financeService.remove(currentOwnerUserId, id);
     } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : "Falha ao excluir devedor.");
+      console.error('[workspace]', error instanceof Error ? error.message : 'Falha ao excluir devedor.');
     }
   };
 
@@ -1254,7 +1254,7 @@ export default function App() {
       setNewRepName("");
       setNewRepPhone("");
     } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : "Falha ao salvar representante.");
+      console.error('[workspace]', error instanceof Error ? error.message : 'Falha ao salvar representante.');
     }
   };
 
@@ -1459,7 +1459,7 @@ export default function App() {
       try {
         await Promise.all(currentIds.map((debtorId) => financeService.remove(currentOwnerUserId, debtorId)));
       } catch (error) {
-        setWorkspaceError(error instanceof Error ? error.message : "Falha ao limpar registros financeiros.");
+        console.error('[workspace]', error instanceof Error ? error.message : 'Falha ao limpar registros financeiros.');
       }
     }
   };
@@ -1764,7 +1764,7 @@ export default function App() {
               </div>
             </div>
 
-            {(isWorkspaceLoading || workspaceError || isSavingConfig) && (
+            {(isWorkspaceLoading || isSavingConfig) && (
               <div className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
                 <div className="space-y-2">
                   {isWorkspaceLoading && (
@@ -1772,12 +1772,7 @@ export default function App() {
                       Carregando seus dados persistidos no Supabase...
                     </div>
                   )}
-                  {workspaceError && (
-                    <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                      {workspaceError}
-                    </div>
-                  )}
-                  {isSavingConfig && !isWorkspaceLoading && !workspaceError && (
+                  {isSavingConfig && !isWorkspaceLoading && (
                     <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
                       Salvando suas preferencias...
                     </div>
@@ -3892,7 +3887,7 @@ export default function App() {
                             const currentLogIds = billingLogs.map((log) => log.id);
                             setBillingLogs([]);
                             await Promise.all(currentLogIds.map((logId) => billingLogsService.remove(currentOwnerUserId, logId))).catch((error) => {
-                              setWorkspaceError(error instanceof Error ? error.message : "Falha ao limpar historico.");
+                              console.error('[workspace]', error instanceof Error ? error.message : 'Falha ao limpar historico.');
                             });
                           }
                         }}
@@ -4513,7 +4508,7 @@ export default function App() {
                         try {
                           await financeService.update(currentOwnerUserId, updated);
                         } catch (err) {
-                          setWorkspaceError(err instanceof Error ? err.message : "Falha ao salvar observação.");
+                          console.error('[workspace]', err instanceof Error ? err.message : 'Falha ao salvar observação.');
                         }
                       }}
                       className="flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
