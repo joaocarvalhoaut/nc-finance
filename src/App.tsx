@@ -302,6 +302,7 @@ export default function App() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [repFilter, setRepFilter] = useState<string>("all");
   const [sortNameOrder, setSortNameOrder] = useState<"none" | "asc" | "desc">("none");
+  const [sortDateOrder, setSortDateOrder] = useState<"none" | "asc" | "desc">("none");
 
   // Representatives modal
   const [showRepModal, setShowRepModal] = useState(false);
@@ -1600,6 +1601,16 @@ export default function App() {
       a.trim().localeCompare(b.trim(), "pt-BR", { sensitivity: "base", ignorePunctuation: true });
     if (sortNameOrder === "asc")  return [...filtered].sort((a, b) => cmp(a.client, b.client));
     if (sortNameOrder === "desc") return [...filtered].sort((a, b) => cmp(b.client, a.client));
+
+    // Ordena por vencimento: converte DD/MM/YYYY → número para comparação
+    const parseDateNum = (d: string) => {
+      const [dd, mm, yyyy] = (d || "").split("/");
+      if (!dd || !mm || !yyyy) return 0;
+      return Number(yyyy) * 10000 + Number(mm) * 100 + Number(dd);
+    };
+    if (sortDateOrder === "asc")  return [...filtered].sort((a, b) => parseDateNum(a.dueDate) - parseDateNum(b.dueDate));
+    if (sortDateOrder === "desc") return [...filtered].sort((a, b) => parseDateNum(b.dueDate) - parseDateNum(a.dueDate));
+
     return filtered;
   })();
 
@@ -2949,7 +2960,7 @@ export default function App() {
                             <th className="px-5 py-3 sticky left-8 z-10 bg-zinc-900/80 backdrop-blur-sm shadow-[2px_0_8px_rgba(0,0,0,0.4)]">
                               <button
                                 type="button"
-                                onClick={() => setSortNameOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc")}
+                                onClick={() => { setSortDateOrder("none"); setSortNameOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc"); }}
                                 className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200"
                                 title={sortNameOrder === "asc" ? "Clique para Z-A" : sortNameOrder === "desc" ? "Clique para remover ordenação" : "Clique para A-Z"}
                               >
@@ -2965,7 +2976,24 @@ export default function App() {
                             </th>
                             <th className="px-4 py-3 text-center">Documento Id</th>
                             <th className="px-4 py-3">Banco</th>
-                            <th className="px-4 py-3 text-center">Vencimento</th>
+                            <th className="px-4 py-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSortNameOrder("none");
+                                  setSortDateOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc");
+                                }}
+                                className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200 mx-auto"
+                                title={sortDateOrder === "asc" ? "Clique para mais novo primeiro" : sortDateOrder === "desc" ? "Clique para remover ordenação" : "Clique para mais antigo primeiro"}
+                              >
+                                <span className={sortDateOrder !== "none" ? "text-emerald-400" : ""}>Vencimento</span>
+                                <span className={`text-[9px] font-bold px-1 py-0.5 rounded transition-colors ${
+                                  sortDateOrder !== "none" ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-600 group-hover:text-zinc-400"
+                                }`}>
+                                  {sortDateOrder === "asc" ? "↑ ant" : sortDateOrder === "desc" ? "↓ nov" : "↕"}
+                                </span>
+                              </button>
+                            </th>
                             <th className="px-4 py-3 text-center">Telefone (WhatsApp)</th>
                             <th className="px-4 py-3 text-right">Valor Base (R$)</th>
                             <th className="px-4 py-3 text-right bg-emerald-500/5 text-emerald-400">Total + Multa + Juros (R$)</th>
