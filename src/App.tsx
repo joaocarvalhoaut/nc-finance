@@ -304,6 +304,7 @@ export default function App() {
   const [sortNameOrder, setSortNameOrder] = useState<"none" | "asc" | "desc">("asc");
   const [sortDateOrder, setSortDateOrder] = useState<"none" | "asc" | "desc">("none");
   const [sortBankOrder, setSortBankOrder] = useState<"none" | "asc" | "desc">("none");
+  const [sortValueOrder, setSortValueOrder] = useState<"none" | "asc" | "desc">("none");
 
   // Representatives modal
   const [showRepModal, setShowRepModal] = useState(false);
@@ -1604,6 +1605,9 @@ export default function App() {
     // Banco e Data têm prioridade — verificados antes do nome
     if (sortBankOrder === "asc")  return [...filtered].sort((a, b) => cmp(a.bank || "", b.bank || ""));
     if (sortBankOrder === "desc") return [...filtered].sort((a, b) => cmp(b.bank || "", a.bank || ""));
+
+    if (sortValueOrder === "asc")  return [...filtered].sort((a, b) => (a.value || 0) - (b.value || 0));
+    if (sortValueOrder === "desc") return [...filtered].sort((a, b) => (b.value || 0) - (a.value || 0));
 
     const parseDateNum = (d: string) => {
       const [dd, mm, yyyy] = (d || "").split("/");
@@ -2979,7 +2983,7 @@ export default function App() {
                             <th className="px-4 py-3">
                               <button
                                 type="button"
-                                onClick={() => { setSortNameOrder("none"); setSortDateOrder("none"); setSortBankOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc"); }}
+                                onClick={() => { setSortNameOrder("none"); setSortDateOrder("none"); setSortValueOrder("none"); setSortBankOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc"); }}
                                 className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200"
                                 title={sortBankOrder === "asc" ? "Clique para Z-A" : sortBankOrder === "desc" ? "Clique para remover ordenação" : "Clique para A-Z"}
                               >
@@ -2997,6 +3001,7 @@ export default function App() {
                                 onClick={() => {
                                   setSortNameOrder("none");
                                   setSortBankOrder("none");
+                                  setSortValueOrder("none");
                                   setSortDateOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc");
                                 }}
                                 className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200 mx-auto"
@@ -3011,7 +3016,21 @@ export default function App() {
                               </button>
                             </th>
                             <th className="px-4 py-3 text-center">Telefone (WhatsApp)</th>
-                            <th className="px-4 py-3 text-right">Valor Base (R$)</th>
+                            <th className="px-4 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => { setSortNameOrder("none"); setSortBankOrder("none"); setSortDateOrder("none"); setSortValueOrder(o => o === "desc" ? "asc" : o === "asc" ? "none" : "desc"); }}
+                                className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200 ml-auto"
+                                title={sortValueOrder === "desc" ? "Clique para menor primeiro" : sortValueOrder === "asc" ? "Clique para remover ordenação" : "Clique para maior primeiro"}
+                              >
+                                <span className={sortValueOrder !== "none" ? "text-emerald-400" : ""}>Valor Base (R$)</span>
+                                <span className={`text-[9px] font-bold px-1 py-0.5 rounded transition-colors ${
+                                  sortValueOrder !== "none" ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-600 group-hover:text-zinc-400"
+                                }`}>
+                                  {sortValueOrder === "desc" ? "↓" : sortValueOrder === "asc" ? "↑" : "↕"}
+                                </span>
+                              </button>
+                            </th>
                             <th className="px-4 py-3 text-right bg-emerald-500/5 text-emerald-400">Total + Multa + Juros (R$)</th>
                             {/* Tipo / Status — com filtros de categoria e status inline */}
                             <th className="px-4 py-2 text-center">
