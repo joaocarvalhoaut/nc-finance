@@ -85,7 +85,7 @@ const DEFAULT_PATTERNS: PatternMessage[] = [
     id: "amigavel",
     name: "Amigável (Preventivo)",
     description: "Abordagem leve para alertar antes do vencimento.",
-    template: `Olá {nome_cliente}, tudo bem? 😊
+    template: `Olá {nome_cliente}, tudo bem?
 Passando para lembrar de forma tranquila sobre o boleto abaixo, que segue em nosso acompanhamento.
 
 Documento: {documento}
@@ -2865,7 +2865,7 @@ export default function App() {
                                 <span className="text-zinc-400">≈ {batchSendResult.duplicated} duplicados</span>
                               )}
                               {batchSendResult.invalidPhone > 0 && (
-                                <span className="text-amber-400">⚠ {batchSendResult.invalidPhone} tel. inválidos</span>
+                                <span className="text-amber-400">{batchSendResult.invalidPhone} tel. inválidos</span>
                               )}
                               {batchSendResult.blockedLimit > 0 && (
                                 <span className="text-zinc-500">⚡ {batchSendResult.blockedLimit} bloqueados (limite)</span>
@@ -2897,7 +2897,7 @@ export default function App() {
                               }`}>
                                 {r.status === "sucesso"             ? "✓ enviado"           :
                                  r.status === "duplicado"           ? "≈ duplicado"        :
-                                 r.status === "telefone_invalido"   ? "⚠ tel. inválido"    :
+                                 r.status === "telefone_invalido"   ? "tel. inválido"    :
                                  r.status === "bloqueado_limite"    ? "⚡ limite"           :
                                  r.status === "devedor_nao_encontrado" ? "✗ não encontrado" :
                                  "✗ erro"}
@@ -4236,13 +4236,13 @@ export default function App() {
                           {/* Aviso se hoje for feriado */}
                           {isBrazilHoliday() && (
                             <p className="mt-1.5 text-[10px] text-amber-400/80">
-                              ⚠ Hoje é feriado nacional: {getBrazilHolidayName()}.
+                              Hoje é feriado nacional: {getBrazilHolidayName()}.
                               {(newRuleForm.skipHolidays ?? false) ? " Esta regra não disparará hoje." : " Esta regra disparará normalmente."}
                             </p>
                           )}
                           {!isBrazilHoliday() && (newRuleForm.scheduleMode ?? "daily") === "weekdays" && !isBusinessDay() && (
                             <p className="mt-1.5 text-[10px] text-zinc-500">
-                              ⚠ Hoje é fim de semana — esta regra não disparará hoje.
+                              Hoje é fim de semana — esta regra não disparará hoje.
                             </p>
                           )}
                         </div>
@@ -4290,7 +4290,6 @@ export default function App() {
 
                             return (
                               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/8 border border-emerald-500/20 text-xs text-emerald-300">
-                                <span className="text-base">📋</span>
                                 <span><strong>{matchCount}</strong> cliente(s) se enquadram nesta regra atualmente</span>
                               </div>
                             );
@@ -4379,8 +4378,8 @@ export default function App() {
                               </span>
                             </div>
                             <div className="flex flex-wrap gap-x-4 mt-1.5 text-[11px] text-zinc-500 font-mono">
-                              <span>{rule.scheduleMode === "weekdays" ? "📅 Seg–Sex" : "📅 Todo dia"}</span>
-                              {rule.skipHolidays && <span>🚫 Pula feriados</span>}
+                              <span>{rule.scheduleMode === "weekdays" ? "Seg–Sex" : "Todo dia"}</span>
+                              {rule.skipHolidays && <span>Pula feriados</span>}
                               {rule.sendWindowStart && rule.sendWindowEnd && (
                                 <span>Janela: {rule.sendWindowStart}–{rule.sendWindowEnd}</span>
                               )}
@@ -4591,7 +4590,7 @@ export default function App() {
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
               <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  ⚠️ Documentos Duplicados Detectados
+                  Documentos Duplicados Detectados
                 </h3>
                 <p className="text-xs text-zinc-400">
                   Os seguintes números de documento aparecem mais de uma vez no arquivo. Como deseja prosseguir?

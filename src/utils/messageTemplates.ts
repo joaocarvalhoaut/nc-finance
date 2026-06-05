@@ -6,7 +6,7 @@
  */
 
 export const MESSAGE_TEMPLATES: Record<string, string> = {
-  amigavel: `Olá {nome_cliente}, tudo bem? 😊
+  amigavel: `Olá {nome_cliente}, tudo bem?
 Passando para lembrar sobre o boleto abaixo em nosso acompanhamento.
 
 Documento: {documento}

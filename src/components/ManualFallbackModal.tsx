@@ -37,10 +37,10 @@ interface ManualFallbackModalProps {
 }
 
 const RESOLUTION_LABELS: Record<PilotFallbackNote["resolution"], string> = {
-  resolvido_manualmente: "✅ Resolvido manualmente (contato por outro meio)",
-  reenviado:             "🔄 Reenviado via WhatsApp",
-  ignorado:              "🚫 Ignorado (cliente não precisa ser notificado)",
-  contato_direto:        "📞 Contato direto (ligação / e-mail)",
+  resolvido_manualmente: "Resolvido manualmente (contato por outro meio)",
+  reenviado:             "Reenviado via WhatsApp",
+  ignorado:              "Ignorado (cliente não precisa ser notificado)",
+  contato_direto:        "Contato direto (ligação / e-mail)",
 };
 
 export default function ManualFallbackModal({

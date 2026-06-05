@@ -74,7 +74,7 @@ export default function LandingPage({
   const getDemoMessage = () => {
     switch (demoTone) {
       case "amigavel":
-        return `Olá, ${demoPhoneName}, tudo bem? 😊 Passando para lembrar de forma tranquila sobre o boleto da NC Finance no valor de R$ ${demoValue} com vencimento próximo. Se precisar, posso reenviar os dados para facilitar! Abraços.`;
+        return `Olá, ${demoPhoneName}, tudo bem? Passando para lembrar de forma tranquila sobre o boleto da NC Finance no valor de R$ ${demoValue} com vencimento próximo. Se precisar, posso reenviar os dados para facilitar! Abraços.`;
       case "neutro":
         return `Olá, ${demoPhoneName}. Segue o acompanhamento do título com vencimento programado. Valor de R$ ${demoValue}. Solicitamos a confirmação ou envio do comprovante correspondente. Atenciosamente, Setor de Cobrança.`;
       case "firme":
