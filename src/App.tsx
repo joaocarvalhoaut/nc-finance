@@ -303,6 +303,7 @@ export default function App() {
   const [repFilter, setRepFilter] = useState<string>("all");
   const [sortNameOrder, setSortNameOrder] = useState<"none" | "asc" | "desc">("asc");
   const [sortDateOrder, setSortDateOrder] = useState<"none" | "asc" | "desc">("none");
+  const [sortBankOrder, setSortBankOrder] = useState<"none" | "asc" | "desc">("none");
 
   // Representatives modal
   const [showRepModal, setShowRepModal] = useState(false);
@@ -1610,6 +1611,9 @@ export default function App() {
     };
     if (sortDateOrder === "asc")  return [...filtered].sort((a, b) => parseDateNum(a.dueDate) - parseDateNum(b.dueDate));
     if (sortDateOrder === "desc") return [...filtered].sort((a, b) => parseDateNum(b.dueDate) - parseDateNum(a.dueDate));
+
+    if (sortBankOrder === "asc")  return [...filtered].sort((a, b) => cmp(a.bank || "", b.bank || ""));
+    if (sortBankOrder === "desc") return [...filtered].sort((a, b) => cmp(b.bank || "", a.bank || ""));
 
     return filtered;
   })();
@@ -2971,12 +2975,27 @@ export default function App() {
                               </button>
                             </th>
                             <th className="px-4 py-3 text-center">Documento Id</th>
-                            <th className="px-4 py-3">Banco</th>
+                            <th className="px-4 py-3">
+                              <button
+                                type="button"
+                                onClick={() => { setSortNameOrder("asc"); setSortDateOrder("none"); setSortBankOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc"); }}
+                                className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200"
+                                title={sortBankOrder === "asc" ? "Clique para Z-A" : sortBankOrder === "desc" ? "Clique para remover ordenação" : "Clique para A-Z"}
+                              >
+                                <span className={sortBankOrder !== "none" ? "text-emerald-400" : ""}>Banco</span>
+                                <span className={`text-[9px] font-bold px-1 py-0.5 rounded transition-colors ${
+                                  sortBankOrder !== "none" ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-600 group-hover:text-zinc-400"
+                                }`}>
+                                  {sortBankOrder === "asc" ? "↑" : sortBankOrder === "desc" ? "↓" : "↕"}
+                                </span>
+                              </button>
+                            </th>
                             <th className="px-4 py-3 text-center">
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setSortNameOrder("none");
+                                  setSortNameOrder("asc");
+                                  setSortBankOrder("none");
                                   setSortDateOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc");
                                 }}
                                 className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200 mx-auto"
