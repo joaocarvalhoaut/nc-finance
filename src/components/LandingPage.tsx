@@ -584,7 +584,7 @@ export default function LandingPage({
       {/* CORE FEATURES bento style */}
       <motion.section
         id="recursos"
-        className="py-20 border-t border-zinc-900/60 bg-zinc-950/30 overflow-hidden"
+        className="py-20 bg-zinc-950/30 overflow-hidden"
         initial={{ x: -120, opacity: 0 }}
         whileInView={{ x: 0, opacity: 1 }}
         viewport={{ once: false, amount: 0.15 }}
