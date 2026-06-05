@@ -301,7 +301,7 @@ export default function App() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [repFilter, setRepFilter] = useState<string>("all");
-  const [sortNameOrder, setSortNameOrder] = useState<"none" | "asc" | "desc">("none");
+  const [sortNameOrder, setSortNameOrder] = useState<"none" | "asc" | "desc">("asc");
   const [sortDateOrder, setSortDateOrder] = useState<"none" | "asc" | "desc">("none");
 
   // Representatives modal
@@ -2960,17 +2960,13 @@ export default function App() {
                             <th className="px-5 py-3 sticky left-8 z-10 bg-zinc-900/80 backdrop-blur-sm shadow-[2px_0_8px_rgba(0,0,0,0.4)]">
                               <button
                                 type="button"
-                                onClick={() => { setSortDateOrder("none"); setSortNameOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc"); }}
+                                onClick={() => { setSortDateOrder("none"); setSortNameOrder(o => o === "asc" ? "desc" : "asc"); }}
                                 className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200"
-                                title={sortNameOrder === "asc" ? "Clique para Z-A" : sortNameOrder === "desc" ? "Clique para remover ordenação" : "Clique para A-Z"}
+                                title={sortNameOrder === "asc" ? "Clique para Z-A" : "Clique para A-Z"}
                               >
-                                <span className={sortNameOrder !== "none" ? "text-emerald-400" : ""}>Cliente / Sacado</span>
-                                <span className={`text-[9px] font-bold px-1 py-0.5 rounded transition-colors ${
-                                  sortNameOrder === "asc"  ? "bg-emerald-500/20 text-emerald-400" :
-                                  sortNameOrder === "desc" ? "bg-emerald-500/20 text-emerald-400" :
-                                  "text-zinc-600 group-hover:text-zinc-400"
-                                }`}>
-                                  {sortNameOrder === "asc" ? "A→Z ↑" : sortNameOrder === "desc" ? "Z→A ↓" : "↕"}
+                                <span className="text-emerald-400">Cliente / Sacado</span>
+                                <span className="text-[9px] font-bold px-1 py-0.5 rounded transition-colors bg-emerald-500/20 text-emerald-400">
+                                  {sortNameOrder === "desc" ? "Z→A ↓" : "A→Z ↑"}
                                 </span>
                               </button>
                             </th>
