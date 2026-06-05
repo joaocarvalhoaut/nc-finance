@@ -514,14 +514,10 @@ export default function LandingPage({
         transition={{ type: "spring", stiffness: 55, damping: 14 }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10">
-            <p className="text-xs font-mono uppercase tracking-widest text-zinc-500">Por que a NC Finance funciona</p>
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* Pilar 1 */}
             <motion.div
-              className="relative rounded-2xl bg-zinc-900/60 border border-zinc-800 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
+              className="relative rounded-2xl border border-zinc-800/60 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.3 }}
@@ -542,7 +538,7 @@ export default function LandingPage({
 
             {/* Pilar 2 */}
             <motion.div
-              className="relative rounded-2xl bg-zinc-900/60 border border-zinc-800 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
+              className="relative rounded-2xl border border-zinc-800/60 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.3 }}
@@ -563,7 +559,7 @@ export default function LandingPage({
 
             {/* Pilar 3 */}
             <motion.div
-              className="relative rounded-2xl bg-zinc-900/60 border border-zinc-800 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
+              className="relative rounded-2xl border border-zinc-800/60 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.3 }}
