@@ -529,7 +529,7 @@ export default function LandingPage({
               </div>
               <div>
                 <div className="text-4xl font-black text-white tracking-tight">-80%</div>
-                <div className="text-emerald-400 font-bold text-sm mt-1">do tempo gasto com cobranças</div>
+                <div className="text-emerald-400 font-bold text-sm mt-1">menos tempo operacional em cobranças</div>
               </div>
               <p className="text-zinc-400 text-sm font-light leading-relaxed">
                 O que levava horas de ligações e mensagens manuais passa a rodar em segundo plano, automaticamente, todos os dias.
@@ -550,7 +550,7 @@ export default function LandingPage({
               </div>
               <div>
                 <div className="text-4xl font-black text-white tracking-tight">+30%</div>
-                <div className="text-emerald-400 font-bold text-sm mt-1">mais valores recuperados</div>
+                <div className="text-emerald-400 font-bold text-sm mt-1">a mais em receita recuperada</div>
               </div>
               <p className="text-zinc-400 text-sm font-light leading-relaxed">
                 Empresas que cobram nos primeiros dias de atraso recuperam significativamente mais. A NC Finance dispara na hora certa, antes que a dívida esfrie.
@@ -571,7 +571,7 @@ export default function LandingPage({
               </div>
               <div>
                 <div className="text-4xl font-black text-white tracking-tight">10 min</div>
-                <div className="text-emerald-400 font-bold text-sm mt-1">para começar a cobrar</div>
+                <div className="text-emerald-400 font-bold text-sm mt-1">da importação ao primeiro disparo</div>
               </div>
               <p className="text-zinc-400 text-sm font-light leading-relaxed">
                 Importe sua planilha ou PDF, revise os dados e dispare. Sem instalação, sem treinamento, sem contrato.
