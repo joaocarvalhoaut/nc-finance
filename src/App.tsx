@@ -2990,7 +2990,7 @@ export default function App() {
                                 <span className={`text-[9px] font-bold px-1 py-0.5 rounded transition-colors ${
                                   sortDateOrder !== "none" ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-600 group-hover:text-zinc-400"
                                 }`}>
-                                  {sortDateOrder === "asc" ? "↑ ant" : sortDateOrder === "desc" ? "↓ nov" : "↕"}
+                                  {sortDateOrder === "asc" ? "1→9 ↑" : sortDateOrder === "desc" ? "9→1 ↓" : "↕"}
                                 </span>
                               </button>
                             </th>
