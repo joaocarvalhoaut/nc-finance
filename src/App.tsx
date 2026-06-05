@@ -1596,8 +1596,10 @@ export default function App() {
       const matchesRep = repFilter === "all" ? true : d.representativeId === repFilter;
       return matchesSearch && matchesCategory && matchesStatus && matchesRep;
     });
-    if (sortNameOrder === "asc")  return [...filtered].sort((a, b) => a.client.localeCompare(b.client, "pt-BR"));
-    if (sortNameOrder === "desc") return [...filtered].sort((a, b) => b.client.localeCompare(a.client, "pt-BR"));
+    const cmp = (a: string, b: string) =>
+      a.trim().localeCompare(b.trim(), "pt-BR", { sensitivity: "base", ignorePunctuation: true });
+    if (sortNameOrder === "asc")  return [...filtered].sort((a, b) => cmp(a.client, b.client));
+    if (sortNameOrder === "desc") return [...filtered].sort((a, b) => cmp(b.client, a.client));
     return filtered;
   })();
 
