@@ -2948,12 +2948,16 @@ export default function App() {
                               <button
                                 type="button"
                                 onClick={() => setSortNameOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc")}
-                                className={`flex items-center gap-1 group transition-colors ${sortNameOrder !== "none" ? "text-emerald-400" : "text-zinc-400 hover:text-zinc-200"}`}
-                                title="Ordenar por nome"
+                                className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200"
+                                title={sortNameOrder === "asc" ? "Clique para Z-A" : sortNameOrder === "desc" ? "Clique para remover ordenação" : "Clique para A-Z"}
                               >
-                                <span>Cliente / Sacado</span>
-                                <span className={`text-[9px] font-bold ${sortNameOrder !== "none" ? "text-emerald-400" : "text-zinc-600 group-hover:text-zinc-400"}`}>
-                                  {sortNameOrder === "asc" ? "↑ A-Z" : sortNameOrder === "desc" ? "↓ Z-A" : "↕"}
+                                <span className={sortNameOrder !== "none" ? "text-emerald-400" : ""}>Cliente / Sacado</span>
+                                <span className={`text-[9px] font-bold px-1 py-0.5 rounded transition-colors ${
+                                  sortNameOrder === "asc"  ? "bg-emerald-500/20 text-emerald-400" :
+                                  sortNameOrder === "desc" ? "bg-emerald-500/20 text-emerald-400" :
+                                  "text-zinc-600 group-hover:text-zinc-400"
+                                }`}>
+                                  {sortNameOrder === "asc" ? "A→Z ↑" : sortNameOrder === "desc" ? "Z→A ↓" : "↕"}
                                 </span>
                               </button>
                             </th>
