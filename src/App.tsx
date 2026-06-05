@@ -1600,10 +1600,11 @@ export default function App() {
     });
     const cmp = (a: string, b: string) =>
       a.trim().localeCompare(b.trim(), "pt-BR", { sensitivity: "base", ignorePunctuation: true });
-    if (sortNameOrder === "asc")  return [...filtered].sort((a, b) => cmp(a.client, b.client));
-    if (sortNameOrder === "desc") return [...filtered].sort((a, b) => cmp(b.client, a.client));
 
-    // Ordena por vencimento: converte DD/MM/YYYY → número para comparação
+    // Banco e Data têm prioridade — verificados antes do nome
+    if (sortBankOrder === "asc")  return [...filtered].sort((a, b) => cmp(a.bank || "", b.bank || ""));
+    if (sortBankOrder === "desc") return [...filtered].sort((a, b) => cmp(b.bank || "", a.bank || ""));
+
     const parseDateNum = (d: string) => {
       const [dd, mm, yyyy] = (d || "").split("/");
       if (!dd || !mm || !yyyy) return 0;
@@ -1612,8 +1613,8 @@ export default function App() {
     if (sortDateOrder === "asc")  return [...filtered].sort((a, b) => parseDateNum(a.dueDate) - parseDateNum(b.dueDate));
     if (sortDateOrder === "desc") return [...filtered].sort((a, b) => parseDateNum(b.dueDate) - parseDateNum(a.dueDate));
 
-    if (sortBankOrder === "asc")  return [...filtered].sort((a, b) => cmp(a.bank || "", b.bank || ""));
-    if (sortBankOrder === "desc") return [...filtered].sort((a, b) => cmp(b.bank || "", a.bank || ""));
+    if (sortNameOrder === "asc")  return [...filtered].sort((a, b) => cmp(a.client, b.client));
+    if (sortNameOrder === "desc") return [...filtered].sort((a, b) => cmp(b.client, a.client));
 
     return filtered;
   })();
@@ -2978,7 +2979,7 @@ export default function App() {
                             <th className="px-4 py-3">
                               <button
                                 type="button"
-                                onClick={() => { setSortNameOrder("asc"); setSortDateOrder("none"); setSortBankOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc"); }}
+                                onClick={() => { setSortNameOrder("none"); setSortDateOrder("none"); setSortBankOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc"); }}
                                 className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200"
                                 title={sortBankOrder === "asc" ? "Clique para Z-A" : sortBankOrder === "desc" ? "Clique para remover ordenação" : "Clique para A-Z"}
                               >
@@ -2994,7 +2995,7 @@ export default function App() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setSortNameOrder("asc");
+                                  setSortNameOrder("none");
                                   setSortBankOrder("none");
                                   setSortDateOrder(o => o === "asc" ? "desc" : o === "desc" ? "none" : "asc");
                                 }}
