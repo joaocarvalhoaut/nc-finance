@@ -1721,7 +1721,7 @@ export default function App() {
                     onClick={() => setCurrentTab("cobrar")}
                     className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "cobrar" ? "bg-emerald-500 text-black" : "text-zinc-400 hover:text-white"}`}
                   >
-                    Cobrar
+                    COBRAR
                   </button>
 
                   {/* Separador visual */}
@@ -1732,37 +1732,37 @@ export default function App() {
                     onClick={() => setCurrentTab("dashboard")}
                     className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "dashboard" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
                   >
-                    Dashboard
+                    DASHBOARD
                   </button>
                   <button
                     onClick={() => setCurrentTab("importar")}
                     className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "importar" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
                   >
-                    Importar
+                    IMPORTAR
                   </button>
                   <button
                     onClick={() => setCurrentTab("visao_geral")}
                     className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "visao_geral" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
                   >
-                    Visão Geral
+                    VISÃO GERAL
                   </button>
                   <button
                     onClick={() => setCurrentTab("cobranca")}
                     className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "cobranca" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
                   >
-                    Cobrança
+                    COBRANÇA
                   </button>
                   <button
                     onClick={() => setCurrentTab("historico")}
                     className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "historico" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
                   >
-                    Histórico
+                    HISTÓRICO
                   </button>
                   <button
                     onClick={() => setCurrentTab("automacoes")}
                     className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "automacoes" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
                   >
-                    Automações
+                    AUTOMAÇÕES
                   </button>
                 </div>
               </div>
