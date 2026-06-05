@@ -356,7 +356,7 @@ export default function LandingPage({
               </h1>
 
               <p className="text-zinc-400 text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed font-light">
-                Pare de perder horas com cobranças manuais. A NC Finance automatiza todo o processo pelo WhatsApp — do lembrete amigável à notificação jurídica — enquanto você foca no que importa.
+                Importe relatórios de clientes em atraso ou faturas pendentes. Nossa Inteligência Artificial extrai e organiza as parcelas, calcula juros e multas atualizados, e dispara notificações nos tons ideais de abordagem.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start pt-4">
@@ -575,10 +575,10 @@ export default function LandingPage({
       {/* COMO FUNCIONA */}
       <motion.section
         className="py-24 overflow-hidden"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
+        initial={{ opacity: 0, y: 40 }}
+        whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: false, amount: 0.1 }}
-        transition={{ duration: 0.6 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
