@@ -2972,13 +2972,13 @@ export default function App() {
                                 className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200"
                                 title={sortNameOrder === "asc" ? "Clique para Z-A" : "Clique para A-Z"}
                               >
-                                <span className="text-emerald-400">Cliente</span>
+                                <span className="text-emerald-400">CLIENTE</span>
                                 <span className="text-[9px] font-bold px-1 py-0.5 rounded transition-colors bg-emerald-500/20 text-emerald-400">
                                   {sortNameOrder === "desc" ? "Z→A ↓" : "A→Z ↑"}
                                 </span>
                               </button>
                             </th>
-                            <th className="px-4 py-3 text-center">Documento</th>
+                            <th className="px-4 py-3 text-center">DOCUMENTO</th>
                             <th className="px-4 py-3">
                               <button
                                 type="button"
@@ -2986,7 +2986,7 @@ export default function App() {
                                 className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200"
                                 title={sortBankOrder === "asc" ? "Clique para Z-A" : sortBankOrder === "desc" ? "Clique para remover ordenação" : "Clique para A-Z"}
                               >
-                                <span className={sortBankOrder !== "none" ? "text-emerald-400" : ""}>Banco</span>
+                                <span className={sortBankOrder !== "none" ? "text-emerald-400" : ""}>BANCO</span>
                                 <span className={`text-[9px] font-bold px-1 py-0.5 rounded transition-colors ${
                                   sortBankOrder !== "none" ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-600 group-hover:text-zinc-400"
                                 }`}>
@@ -3006,7 +3006,7 @@ export default function App() {
                                 className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200 mx-auto"
                                 title={sortDateOrder === "asc" ? "Clique para mais novo primeiro" : sortDateOrder === "desc" ? "Clique para remover ordenação" : "Clique para mais antigo primeiro"}
                               >
-                                <span className={sortDateOrder !== "none" ? "text-emerald-400" : ""}>Vencimento</span>
+                                <span className={sortDateOrder !== "none" ? "text-emerald-400" : ""}>VENCIMENTO</span>
                                 <span className={`text-[9px] font-bold px-1 py-0.5 rounded transition-colors ${
                                   sortDateOrder !== "none" ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-600 group-hover:text-zinc-400"
                                 }`}>
@@ -3014,7 +3014,7 @@ export default function App() {
                                 </span>
                               </button>
                             </th>
-                            <th className="px-4 py-3 text-center">Telefone (WhatsApp)</th>
+                            <th className="px-4 py-3 text-center">TELEFONE (WHATSAPP)</th>
                             <th className="px-4 py-3 text-right">
                               <button
                                 type="button"
@@ -3022,7 +3022,7 @@ export default function App() {
                                 className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200 ml-auto"
                                 title={sortValueOrder === "desc" ? "Clique para menor primeiro" : sortValueOrder === "asc" ? "Clique para remover ordenação" : "Clique para maior primeiro"}
                               >
-                                <span className={sortValueOrder !== "none" ? "text-emerald-400" : ""}>Valor Base (R$)</span>
+                                <span className={sortValueOrder !== "none" ? "text-emerald-400" : ""}>VALOR BASE (R$)</span>
                                 <span className={`text-[9px] font-bold px-1 py-0.5 rounded transition-colors ${
                                   sortValueOrder !== "none" ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-600 group-hover:text-zinc-400"
                                 }`}>
@@ -3030,11 +3030,11 @@ export default function App() {
                                 </span>
                               </button>
                             </th>
-                            <th className="px-4 py-3 text-right bg-emerald-500/5 text-emerald-400">Total + Multa + Juros (R$)</th>
+                            <th className="px-4 py-3 text-right bg-emerald-500/5 text-emerald-400">TOTAL + MULTA + JUROS (R$)</th>
                             {/* Tipo / Status — com filtros de categoria e status inline */}
                             <th className="px-4 py-2 text-center">
                               <div className="flex flex-col items-center gap-1.5">
-                                <span>Tipo</span>
+                                <span>TIPO</span>
                                 <div className="flex gap-1">
                                   <select
                                     value={categoryFilter}
@@ -3053,7 +3053,7 @@ export default function App() {
                             {/* Responsável — com filtro inline */}
                             <th className="px-4 py-2">
                               <div className="flex flex-col gap-1.5">
-                                <span>Responsável</span>
+                                <span>RESPONSÁVEL</span>
                                 <select
                                   value={repFilter}
                                   onChange={(e) => setRepFilter(e.target.value)}
@@ -3067,9 +3067,9 @@ export default function App() {
                                 </select>
                               </div>
                             </th>
-                            <th className="px-4 py-3">Observações</th>
-                            <th className="px-4 py-3 text-center">Boleto PDF</th>
-                            <th className="px-5 py-3 text-right">Ação</th>
+                            <th className="px-4 py-3">OBSERVAÇÕES</th>
+                            <th className="px-4 py-3 text-center">BOLETO PDF</th>
+                            <th className="px-5 py-3 text-right">AÇÃO</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-800">
