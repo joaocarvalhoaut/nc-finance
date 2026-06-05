@@ -1891,7 +1891,7 @@ export default function App() {
                       {/* Value + count */}
                       <div className="mt-2 flex items-end justify-between gap-2">
                         <span className="text-2xl sm:text-3xl font-extrabold text-rose-400 font-mono leading-none">{formatBRL(criticalValue)}</span>
-                        <span className="text-[11px] text-rose-400/50 font-mono mb-0.5 shrink-0">{criticalDebtors.length} reg.</span>
+                        <span className="text-[11px] text-rose-400/50 font-mono mb-0.5 shrink-0">{criticalDebtors.length} títulos</span>
                       </div>
 
                       {/* Controls */}
