@@ -4271,7 +4271,6 @@ export default function App() {
                             placeholder="Olá {nome_cliente}, ..."
                             className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 resize-none font-mono text-xs leading-relaxed"
                           />
-                          <p className="mt-1 text-[10px] text-zinc-600">Variáveis: {"{nome_cliente}"} · {"{documento}"} · {"{vencimento}"} · {"{valor_atualizado}"}</p>
                         </div>
 
                         {/* Matching clients preview */}
