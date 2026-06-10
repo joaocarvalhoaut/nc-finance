@@ -14,8 +14,23 @@ export const CNPJ_RE = /\b\d{2}\.?\d{3}\.?\d{3}[/\\]?\d{4}-?\d{2}\b/g;
  */
 export const CPF_RE = /\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g;
 
-/** 10-11 isolated digits (area code + number) */
+/** 10-11 isolated digits (area code + number, no surrounding digits) */
 export const PHONE_RE = /\b\d{10,11}\b/g;
+
+/**
+ * Formatted Brazilian phone — requires hyphen as explicit formatting signal.
+ * Matches: (77) 99988-7766 | (77)99988-7766 | (77) 9 9988-7766
+ *          77 99988-7766   | 77 3333-4444
+ *          +55 77 99988-7766 | 55 77 99988-7766
+ */
+export const PHONE_FORMATTED_RE =
+  /(?:(?:\+?55)[\s-]?)?(?:\(\d{2}\)|(?<!\d)\d{2})[\s-]?(?:\d[\s-]?)?\d{4}-\d{4}/g;
+
+/**
+ * DDD in parens + 8-9 raw digit run (no hyphen).
+ * Matches: (77) 999887766 | (77)99988776
+ */
+export const PHONE_PARENS_RE = /\(\d{2}\)[\s-]?\d{8,9}/g;
 
 /** DD/MM/YYYY */
 export const DATE_RE = /\b\d{2}\/\d{2}\/\d{4}\b/g;
@@ -62,7 +77,11 @@ export function findAllCurrencies(text: string): number[] {
 
 /**
  * First phone number in text that doesn't overlap with a CNPJ/CPF match.
- * Returns null if none found.
+ * Tries three passes in descending specificity:
+ *   1. Formatted phone with hyphen: (77) 99988-7766 / 77 99988-7766 / +55 77 …
+ *   2. DDD in parens + raw 8-9 digit run: (77)999887766
+ *   3. Raw 10-11 digit sequence (original behaviour)
+ * Always returns digits only (non-digit chars stripped).
  */
 export function findFirstPhone(text: string): string | null {
   // Build exclusion zones from CNPJ/CPF matches
@@ -71,12 +90,38 @@ export function findFirstPhone(text: string): string | null {
     ...text.matchAll(new RegExp(CPF_RE.source, "g")),
   ].map((m) => [m.index!, m.index! + m[0].length]);
 
+  const inExclusion = (start: number, end: number) =>
+    exclusions.some(([a, b]) => start < b && end > a);
+
+  // Pass 1: formatted phone with hyphen (strong formatting signal)
+  for (const m of text.matchAll(new RegExp(PHONE_FORMATTED_RE.source, "gu"))) {
+    const start = m.index!;
+    const end = start + m[0].length;
+    if (!inExclusion(start, end)) {
+      const digits = m[0].replace(/\D/g, "");
+      // Strip leading country code "55" if result is 12-13 digits
+      const phone = digits.length > 11 ? digits.slice(digits.length - 11) : digits;
+      if (phone.length >= 10 && phone.length <= 11) return phone;
+    }
+  }
+
+  // Pass 2: DDD in parens + 8-9 digit run (no hyphen)
+  for (const m of text.matchAll(new RegExp(PHONE_PARENS_RE.source, "g"))) {
+    const start = m.index!;
+    const end = start + m[0].length;
+    if (!inExclusion(start, end)) {
+      const digits = m[0].replace(/\D/g, "");
+      if (digits.length >= 10 && digits.length <= 11) return digits;
+    }
+  }
+
+  // Pass 3: raw 10-11 digit sequence (original behaviour)
   for (const m of text.matchAll(new RegExp(PHONE_RE.source, "g"))) {
     const start = m.index!;
     const end = start + m[0].length;
-    const overlaps = exclusions.some(([a, b]) => start < b && end > a);
-    if (!overlaps) return m[0];
+    if (!inExclusion(start, end)) return m[0];
   }
+
   return null;
 }
 
