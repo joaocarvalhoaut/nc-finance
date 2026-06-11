@@ -3,6 +3,7 @@ import TermosDeUso from "./TermosDeUso";
 import PoliticaPrivacidade from "./PoliticaPrivacidade";
 import Suporte from "./Suporte";
 import { motion } from "motion/react";
+import PhoneDispatchSimulation from "./PhoneDispatchSimulation";
 import {
   CheckCircle2,
   Sparkles,
@@ -340,10 +341,10 @@ export default function LandingPage({
       {/* HERO SECTION */}
       <section className="relative pt-12 pb-20 sm:pb-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
 
-            {/* CTA Pitch */}
-            <div className="flex flex-col space-y-6 text-center max-w-3xl">
+            {/* Left Column: CTA Pitch */}
+            <div className="lg:col-span-7 flex flex-col space-y-6 text-center lg:text-left">
 
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-tight tracking-tight">
@@ -351,11 +352,11 @@ export default function LandingPage({
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-200 drop-shadow-[0_2px_10px_rgba(52,211,153,0.15)]">Recupere o que é seu.</span>
               </h1>
 
-              <p className="text-zinc-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed font-light">
+              <p className="text-zinc-400 text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed font-light">
                 Importe relatórios de clientes em atraso ou faturas pendentes. Nossa Inteligência Artificial extrai e organiza as parcelas, calcula juros e multas atualizados, e dispara notificações nos tons ideais de abordagem.
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start pt-4">
                 <a
                   href="#auth-panel"
                   className="px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_20px_rgba(16,185,129,0.3)] hover:-translate-y-0.5 transition-all text-sm sm:text-base"
@@ -371,7 +372,7 @@ export default function LandingPage({
               </div>
 
               {/* Dynamic Metrics */}
-              <div className="grid grid-cols-3 gap-4 sm:gap-6 pt-8 border-t border-zinc-900 max-w-lg mx-auto">
+              <div className="grid grid-cols-3 gap-4 sm:gap-6 pt-8 border-t border-zinc-900 max-w-lg mx-auto lg:mx-0">
                 <div>
                   <div className="text-2xl sm:text-3xl font-extrabold text-emerald-400">-80%</div>
                   <div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-widest font-mono mt-1">Tempo gasto com cobranças</div>
@@ -387,6 +388,10 @@ export default function LandingPage({
               </div>
             </div>
 
+            {/* Right Column: looping mass-dispatch simulation on a new-gen iPhone */}
+            <div className="lg:col-span-5 flex justify-center">
+              <PhoneDispatchSimulation />
+            </div>
 
           </div>
         </div>
