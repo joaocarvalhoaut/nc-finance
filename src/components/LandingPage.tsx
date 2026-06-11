@@ -340,10 +340,10 @@ export default function LandingPage({
       {/* HERO SECTION */}
       <section className="relative pt-12 pb-20 sm:pb-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+          <div className="flex flex-col items-center">
 
-            {/* Left Column: CTA Pitch */}
-            <div className="lg:col-span-7 flex flex-col space-y-6 text-center lg:text-left">
+            {/* CTA Pitch */}
+            <div className="flex flex-col space-y-6 text-center max-w-3xl">
 
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-tight tracking-tight">
@@ -351,11 +351,11 @@ export default function LandingPage({
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-200 drop-shadow-[0_2px_10px_rgba(52,211,153,0.15)]">Recupere o que é seu.</span>
               </h1>
 
-              <p className="text-zinc-400 text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed font-light">
+              <p className="text-zinc-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed font-light">
                 Importe relatórios de clientes em atraso ou faturas pendentes. Nossa Inteligência Artificial extrai e organiza as parcelas, calcula juros e multas atualizados, e dispara notificações nos tons ideais de abordagem.
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start pt-4">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
                 <a
                   href="#auth-panel"
                   className="px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_20px_rgba(16,185,129,0.3)] hover:-translate-y-0.5 transition-all text-sm sm:text-base"
@@ -371,7 +371,7 @@ export default function LandingPage({
               </div>
 
               {/* Dynamic Metrics */}
-              <div className="grid grid-cols-3 gap-4 sm:gap-6 pt-8 border-t border-zinc-900 max-w-lg mx-auto lg:mx-0">
+              <div className="grid grid-cols-3 gap-4 sm:gap-6 pt-8 border-t border-zinc-900 max-w-lg mx-auto">
                 <div>
                   <div className="text-2xl sm:text-3xl font-extrabold text-emerald-400">-80%</div>
                   <div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-widest font-mono mt-1">Tempo gasto com cobranças</div>
@@ -387,115 +387,6 @@ export default function LandingPage({
               </div>
             </div>
 
-            {/* Right Column: AI Visual Representation / Generated Mockup */}
-            <div className="lg:col-span-5 flex justify-center">
-              <div className="relative w-full max-w-md group">
-                {/* Glow ring behind phone */}
-                <div className="absolute -inset-1.5 bg-gradient-to-r from-emerald-500 to-emerald-300 rounded-2xl blur opacity-25 group-hover:opacity-35 transition duration-1000"></div>
-                
-                <div className="relative bg-zinc-950/80 border border-zinc-800 p-3 rounded-2xl shadow-2xl overflow-hidden">
-                  <div className="bg-black rounded-xl p-2.5 border border-zinc-900 flex flex-col items-center">
-                    <div className="w-full h-4 relative flex justify-between px-2 text-[10px] text-zinc-500 font-mono">
-                      <span>14:02 UTC</span>
-                      <div className="w-16 h-3.5 bg-zinc-900 rounded-full absolute left-1/2 -translate-x-1/2 -top-1 border-x border-b border-zinc-800" />
-                      <span>5G</span>
-                    </div>
-
-                    {/* Image showcase — static import ensures correct hashed URL in production */}
-                    <div className="w-full overflow-hidden rounded-lg border border-zinc-900 bg-zinc-950 mt-1 relative flex justify-center">
-                      <div
-                        aria-label="WhatsApp Billing Mockup"
-                        className="w-full aspect-square rounded-lg bg-gradient-to-b from-[#0f1c17] via-[#101413] to-[#090b0a] p-3 sm:p-4"
-                      >
-                        <div className="flex h-full flex-col overflow-hidden rounded-[20px] border border-emerald-500/10 bg-[#0b1411] shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
-                          <div className="flex items-center justify-between border-b border-white/5 bg-[#12241d] px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
-                                <FileCheck className="h-5 w-5" />
-                              </div>
-                              <div>
-                                <div className="text-sm font-semibold text-white">NC Finance</div>
-                                <div className="text-[11px] text-emerald-300">Cobrança automatizada</div>
-                              </div>
-                            </div>
-                            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.18em] text-emerald-300">
-                              Live
-                            </span>
-                          </div>
-
-                          <div className="flex-1 space-y-3 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),_transparent_38%),linear-gradient(180deg,#0d1512_0%,#08100d_100%)] px-4 py-4">
-                            <div className="ml-auto max-w-[78%] rounded-2xl rounded-tr-md border border-white/5 bg-white/[0.04] px-3 py-2 text-left shadow-sm">
-                              <div className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Cliente</div>
-                              <p className="mt-1 text-sm leading-relaxed text-zinc-100">
-                                Bom dia! Preciso do boleto atualizado para pagamento ainda hoje.
-                              </p>
-                            </div>
-
-                            <div className="max-w-[88%] rounded-2xl rounded-tl-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-3 text-left shadow-[0_14px_30px_rgba(16,185,129,0.08)]">
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <div className="text-[11px] uppercase tracking-[0.18em] text-emerald-300/80">
-                                    DISTRIBUIDORA ALFA LTDA
-                                  </div>
-                                  <div className="mt-1 text-sm font-semibold text-white">
-                                    Título 1082-3 • Vencimento 15/06/2026
-                                  </div>
-                                </div>
-                                <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[11px] font-semibold text-emerald-200">
-                                  R$ 715,66
-                                </span>
-                              </div>
-
-                              <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3">
-                                <div className="flex items-center justify-between gap-2">
-                                  <div>
-                                    <div className="text-[11px] uppercase tracking-[0.16em] text-zinc-400">Sacado</div>
-                                    <div className="mt-1 text-sm font-medium text-zinc-100">
-                                      CARLOS MENDES DA SILVA
-                                    </div>
-                                  </div>
-                                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-zinc-300">
-                                    PDF anexado
-                                  </span>
-                                </div>
-                                <div className="mt-3 flex items-center gap-3 rounded-xl border border-emerald-400/15 bg-emerald-400/5 px-3 py-2">
-                                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300">
-                                    <Check className="h-5 w-5" />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="truncate text-sm font-medium text-white">
-                                      Boleto_1082-3_CARLOS.pdf
-                                    </div>
-                                    <div className="text-[11px] text-zinc-400">
-                                      Linha digitável e instruções de pagamento enviadas
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="mt-3 flex items-center justify-between text-[11px] text-zinc-400">
-                                <span>Telefone 55 77 9 8137-6867</span>
-                                <span>14:02</span>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-3 py-2 text-center text-[11px] text-zinc-400">
-                              Mensagem enviada com boleto, valor e rastreabilidade do envio
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-3 text-center w-full">
-                      <p className="text-xs text-zinc-400 italic">
-                        "Visualização em tempo real das cobranças enviadas por WhatsApp com arquivos de suporte acoplados"
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
 
           </div>
         </div>
