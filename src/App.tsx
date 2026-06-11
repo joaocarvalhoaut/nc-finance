@@ -77,7 +77,9 @@ import {
   Copy,
   Pencil,
   HandCoins,
-  MessageSquare
+  MessageSquare,
+  Eye,
+  ChevronDown
 } from "lucide-react";
 
 // Default Pattern message templates following user specification
@@ -300,6 +302,7 @@ export default function App() {
 
   // Filters state in Overview Tab
   const [searchFilter, setSearchFilter] = useState<string>("");
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [repFilter, setRepFilter] = useState<string>("all");
@@ -1702,69 +1705,15 @@ export default function App() {
             
             <div className="border-b border-zinc-800/60 bg-zinc-950 p-4 sticky top-0 z-20 flex flex-wrap gap-4 items-center justify-between">
               <div className="flex items-center gap-3">
-                <h2 className="text-lg font-bold text-white capitalize">
+                <h2 className="text-lg font-bold text-white">
                   {currentTab === "cobrar"     && "Enviar Cobranças"}
                   {currentTab === "dashboard"  && "Dashboard & Métricas"}
-                  {currentTab === "importar"   && "Importação — Vencidos · A Vencer · Liquidação"}
+                  {currentTab === "importar"   && "Importação Avançada"}
                   {currentTab === "visao_geral"&& "Visão Geral — Base Consolidada"}
                   {currentTab === "cobranca"   && "Cobrança — WhatsApp"}
                   {currentTab === "historico"  && "Histórico de Cobrança"}
                   {currentTab === "automacoes" && "Automações de Cobrança"}
                 </h2>
-              </div>
-
-              <div className="flex items-center gap-4">
-
-                <div className="flex flex-wrap gap-1.5 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
-                  {/* Fluxo simplificado do cliente */}
-                  <button
-                    onClick={() => setCurrentTab("cobrar")}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "cobrar" ? "bg-emerald-500 text-black" : "text-zinc-400 hover:text-white"}`}
-                  >
-                    COBRAR
-                  </button>
-
-                  {/* Separador visual */}
-                  <span className="w-px bg-zinc-700 self-stretch mx-0.5" />
-
-                  {/* Pipeline interno */}
-                  <button
-                    onClick={() => setCurrentTab("dashboard")}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "dashboard" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
-                  >
-                    DASHBOARD
-                  </button>
-                  <button
-                    onClick={() => setCurrentTab("importar")}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "importar" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
-                  >
-                    IMPORTAR
-                  </button>
-                  <button
-                    onClick={() => setCurrentTab("visao_geral")}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "visao_geral" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
-                  >
-                    VISÃO GERAL
-                  </button>
-                  <button
-                    onClick={() => setCurrentTab("cobranca")}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "cobranca" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
-                  >
-                    COBRANÇA
-                  </button>
-                  <button
-                    onClick={() => setCurrentTab("historico")}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "historico" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
-                  >
-                    HISTÓRICO
-                  </button>
-                  <button
-                    onClick={() => setCurrentTab("automacoes")}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold select-none transition-all ${currentTab === "automacoes" ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-white"}`}
-                  >
-                    AUTOMAÇÕES
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -1790,12 +1739,9 @@ export default function App() {
               {/* ── Tab: Cobrar (novo fluxo simplificado) ──────────────────── */}
               {currentTab === "cobrar" && userId && (
                 <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-bold text-white">Enviar cobranças</h2>
-                    <p className="text-sm text-zinc-400 mt-1">
-                      Importe sua planilha, revise os devedores e envie as mensagens em segundos.
-                    </p>
-                  </div>
+                  <p className="text-sm text-zinc-400">
+                    Importe sua planilha, revise os devedores e envie as mensagens em segundos.
+                  </p>
                   <ClientDashboard
                     userId={userId}
                     globalFinePct={globalFinePct}
@@ -1823,7 +1769,7 @@ export default function App() {
                 </div>
               )}
 
-              {currentTab !== "cobrar" && (
+              {currentTab === "dashboard" && (
               <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-950 border border-emerald-500/10 p-4 sm:p-5 rounded-3xl relative overflow-hidden shadow-xl">
                 <div className="absolute top-0 right-0 w-[200px] h-full bg-[radial-gradient(circle_at_right_top,rgba(16,185,129,0.06),transparent)]" />
                 <div className="flex flex-col gap-4">
@@ -1841,14 +1787,6 @@ export default function App() {
 
               {currentTab === "dashboard" && (
                 <div className="space-y-8">
-                  <SubscriptionStatusCard
-                    subscription={subscription}
-                    usage={usage}
-                    remainingCharges={remainingCharges}
-                    canSendCharge={canSendCharge}
-                    onManageSubscription={() => void handleOpenBillingPortal()}
-                  />
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     
                     <div className="bg-zinc-900/60 border border-zinc-900 p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[120px] shadow">
@@ -2279,11 +2217,31 @@ export default function App() {
                     })()}
                   </div>
 
+                  <SubscriptionStatusCard
+                    subscription={subscription}
+                    usage={usage}
+                    remainingCharges={remainingCharges}
+                    canSendCharge={canSendCharge}
+                    onManageSubscription={() => void handleOpenBillingPortal()}
+                  />
+
                 </div>
               )}
 
               {currentTab === "importar" && (
                 <div className="space-y-8">
+                  <div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs text-sky-200">
+                      Esta é a ferramenta avançada de extração (OCR, presets e texto bruto). Para o fluxo guiado de importação e envio, use a aba <strong>Cobrar</strong>.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentTab("cobrar")}
+                      className="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-300 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
+                    >
+                      Ir para Cobrar <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     
                     <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl">
@@ -2717,52 +2675,65 @@ export default function App() {
                       />
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 text-xs">
-                      <div className="flex gap-2">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <button
+                        onClick={() => { setShowAddDebtorModal(true); setAddDebtorError(""); }}
+                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs whitespace-nowrap"
+                      >
+                        <PlusCircle className="w-3.5 h-3.5" /> Adicionar Devedor
+                      </button>
+
+                      <div className="relative">
                         <button
-                          onClick={() => { setShowAddDebtorModal(true); setAddDebtorError(""); }}
-                          className="px-4.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs text-center font-semibold"
+                          onClick={() => setShowExportMenu((v) => !v)}
+                          className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs border border-zinc-700 whitespace-nowrap"
                         >
-                          <PlusCircle className="w-3.5 h-3.5" /> Adicionar Devedor
+                          <Download className="w-3.5 h-3.5 text-emerald-400" /> Exportar
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showExportMenu ? "rotate-180" : ""}`} />
                         </button>
 
-                        <button
-                          onClick={downloadExcelFormat}
-                          className="px-4.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-100 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs text-center border border-zinc-700"
-                        >
-                          <Download className="w-3.5 h-3.5 text-emerald-400" /> Exportar Planilha (XLS/CSV)
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            const exportList = selectedDebtorIds.size > 0
-                              ? filteredDebtors.filter(d => selectedDebtorIds.has(d.id))
-                              : filteredDebtors;
-                            // Quando há seleção, os cards de totais também refletem só os selecionados
-                            const exportBase = selectedDebtorIds.size > 0 ? exportList : debtors;
-                            exportRelatorio(exportBase, exportList, account?.email ?? "", representatives);
-                          }}
-                          className="px-4.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-100 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs text-center border border-zinc-700"
-                        >
-                          <Download className="w-3.5 h-3.5 text-rose-400" />
-                          {selectedDebtorIds.size > 0 ? `Exportar PDF (${selectedDebtorIds.size})` : "Exportar Relatório (PDF)"}
-                        </button>
-
-                        <button
-                          onClick={() => { setSheetsExportResult(null); setExportSheetUrl(sheetUrlInput); setShowExportSheetsModal(true); }}
-                          className="px-4.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-100 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs text-center border border-zinc-700"
-                        >
-                          <CloudLightning className="w-3.5 h-3.5 text-sky-400" /> Sincronizar com Sheets
-                        </button>
-
-                        <button
-                          onClick={clearOverviewVision}
-                          className="px-4.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/10 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs text-center"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" /> Limpar Visão Geral
-                        </button>
+                        {showExportMenu && (
+                          <>
+                            <div className="fixed inset-0 z-30" onClick={() => setShowExportMenu(false)} />
+                            <div className="absolute right-0 top-full mt-2 z-40 w-60 rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl overflow-hidden">
+                              <button
+                                onClick={() => { setShowExportMenu(false); downloadExcelFormat(); }}
+                                className="w-full px-4 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-800 transition-colors flex items-center gap-2 cursor-pointer"
+                              >
+                                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" /> Planilha (XLS/CSV)
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setShowExportMenu(false);
+                                  const exportList = selectedDebtorIds.size > 0
+                                    ? filteredDebtors.filter(d => selectedDebtorIds.has(d.id))
+                                    : filteredDebtors;
+                                  // Quando há seleção, os cards de totais também refletem só os selecionados
+                                  const exportBase = selectedDebtorIds.size > 0 ? exportList : debtors;
+                                  exportRelatorio(exportBase, exportList, account?.email ?? "", representatives);
+                                }}
+                                className="w-full px-4 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-800 transition-colors flex items-center gap-2 cursor-pointer"
+                              >
+                                <Download className="w-3.5 h-3.5 text-rose-400" />
+                                {selectedDebtorIds.size > 0 ? `Relatório PDF (${selectedDebtorIds.size} selecionados)` : "Relatório PDF"}
+                              </button>
+                              <button
+                                onClick={() => { setShowExportMenu(false); setSheetsExportResult(null); setExportSheetUrl(sheetUrlInput); setShowExportSheetsModal(true); }}
+                                className="w-full px-4 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-800 transition-colors flex items-center gap-2 cursor-pointer"
+                              >
+                                <CloudLightning className="w-3.5 h-3.5 text-sky-400" /> Sincronizar com Sheets
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
 
+                      <button
+                        onClick={clearOverviewVision}
+                        className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs whitespace-nowrap"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Limpar Visão Geral
+                      </button>
                     </div>
                   </div>
 
@@ -3827,7 +3798,14 @@ export default function App() {
                         <div className="h-full flex flex-col items-center justify-center text-center p-8 text-zinc-500">
                           <SlidersHorizontal className="w-12 h-12 text-zinc-700 animate-pulse mb-3" />
                           <p className="font-semibold text-white">Nenhum devedor ativado do painel</p>
-                          <p className="text-xs text-zinc-600 mt-1 max-w-sm">Selecione uma fatura ativa ou inadimplente na lista ao lado para desenhar e projetar a régua de cobrança perfeita.</p>
+                          <p className="text-xs text-zinc-500 mt-1 max-w-sm">Selecione uma fatura ativa ou inadimplente na lista ao lado para desenhar e projetar a régua de cobrança perfeita.</p>
+                          <button
+                            type="button"
+                            onClick={() => setCurrentTab("visao_geral")}
+                            className="mt-4 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> Ir para a Visão Geral
+                          </button>
                         </div>
                       )}
                     </div>
@@ -3844,8 +3822,8 @@ export default function App() {
                         <CheckCircle className="w-5 h-5" />
                       </div>
                       <div>
-                        <span className="text-[10px] uppercase tracking-wider text-zinc-500 block">Total de Disparos</span>
-                        <span className="text-xl font-bold text-white font-mono">{billingLogs.length} ocorridos</span>
+                        <span className="text-xs uppercase tracking-wider text-zinc-400 block">Total de Disparos</span>
+                        <span className="text-xl font-bold text-white font-mono whitespace-nowrap">{billingLogs.length}</span>
                       </div>
                     </div>
                     
@@ -3854,9 +3832,9 @@ export default function App() {
                         <Users className="w-5 h-5" />
                       </div>
                       <div>
-                        <span className="text-[10px] uppercase tracking-wider text-zinc-500 block">Clientes Contatados</span>
-                        <span className="text-xl font-bold text-white font-mono">
-                          {Array.from(new Set(billingLogs.map(log => log.document))).length} únicos
+                        <span className="text-xs uppercase tracking-wider text-zinc-400 block">Clientes Contatados</span>
+                        <span className="text-xl font-bold text-white font-mono whitespace-nowrap">
+                          {Array.from(new Set(billingLogs.map(log => log.document))).length}
                         </span>
                       </div>
                     </div>
@@ -3866,7 +3844,7 @@ export default function App() {
                         <DollarSign className="w-5 h-5" />
                       </div>
                       <div>
-                        <span className="text-[10px] uppercase tracking-wider text-zinc-500 block">Faturamento Notificado</span>
+                        <span className="text-xs uppercase tracking-wider text-zinc-400 block">Faturamento Notificado</span>
                         <span className="text-xl font-bold text-emerald-400 font-mono">
                           {formatBRL(billingLogs.reduce((acc, l) => acc + l.value, 0))}
                         </span>

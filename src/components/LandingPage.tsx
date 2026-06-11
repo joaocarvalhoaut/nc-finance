@@ -371,20 +371,11 @@ export default function LandingPage({
                 </a>
               </div>
 
-              {/* Dynamic Metrics */}
-              <div className="grid grid-cols-3 gap-4 sm:gap-6 pt-8 border-t border-zinc-900 max-w-lg mx-auto lg:mx-0">
-                <div>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-emerald-400">-80%</div>
-                  <div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-widest font-mono mt-1">Tempo gasto com cobranças</div>
-                </div>
-                <div>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-white">+30%</div>
-                  <div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-widest font-mono mt-1">Mais valores recuperados</div>
-                </div>
-                <div>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-white">10 min</div>
-                  <div className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-widest font-mono mt-1">Para começar a cobrar</div>
-                </div>
+              {/* Trust micro-signals (metrics live in the results strip below) */}
+              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-x-5 gap-y-2 pt-8 border-t border-zinc-900 text-xs text-zinc-400">
+                <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Conforme a LGPD</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Sem contrato de fidelidade</span>
+                <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-emerald-400" /> Configuração em 10 minutos</span>
               </div>
             </div>
 
@@ -541,6 +532,102 @@ export default function LandingPage({
                 </motion.div>
               ))}
             </div>
+          </div>
+        </div>
+      </motion.section>
+
+      {/* PRODUCT PREVIEW — dashboard inside a browser frame */}
+      <motion.section
+        className="py-20 overflow-hidden"
+        initial={{ opacity: 0, y: 40 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: false, amount: 0.15 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+      >
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto space-y-4 mb-12">
+            <h2 className="text-emerald-400 font-mono text-sm uppercase tracking-widest font-semibold">Por dentro do painel</h2>
+            <h3 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Tudo em uma tela só</h3>
+            <p className="text-zinc-400 font-light">
+              Faturamento, fluxo de recuperação e disparos automáticos — sem planilhas paralelas.
+            </p>
+          </div>
+
+          {/* Browser frame */}
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-emerald-300/10 to-emerald-500/20 rounded-2xl blur opacity-40 group-hover:opacity-60 transition duration-1000" />
+            <div className="relative rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden">
+              {/* Browser top bar */}
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 border-b border-zinc-800">
+                <span className="w-2.5 h-2.5 rounded-full bg-zinc-700" />
+                <span className="w-2.5 h-2.5 rounded-full bg-zinc-700" />
+                <span className="w-2.5 h-2.5 rounded-full bg-zinc-700" />
+                <div className="ml-3 flex-1 max-w-sm rounded-md bg-zinc-950 border border-zinc-800 px-3 py-1 text-[10px] text-zinc-500 font-mono truncate">
+                  app.ncfinance.com.br/dashboard
+                </div>
+              </div>
+
+              {/* Dashboard mock */}
+              <div className="p-4 sm:p-6 space-y-4 bg-zinc-950">
+                {/* KPI row */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  {[
+                    { label: "FATURAMENTO BASE", value: "R$ 48.230,00", accent: "text-white" },
+                    { label: "FATURAMENTO CORRIGIDO", value: "R$ 51.984,12", accent: "text-emerald-400" },
+                    { label: "VENCIDOS (30+ DIAS)", value: "R$ 9.417,55", accent: "text-rose-400" },
+                    { label: "RECUPERADO NO MÊS", value: "R$ 12.730,80", accent: "text-emerald-300" },
+                  ].map((kpi) => (
+                    <div key={kpi.label} className="rounded-xl border border-zinc-900 bg-zinc-900/50 p-3 sm:p-4">
+                      <div className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-zinc-500">{kpi.label}</div>
+                      <div className={`mt-1.5 text-sm sm:text-lg font-extrabold font-mono ${kpi.accent}`}>{kpi.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
+                  {/* Bar chart mock */}
+                  <div className="lg:col-span-3 rounded-xl border border-zinc-900 bg-zinc-900/50 p-4">
+                    <div className="text-[10px] font-bold text-white mb-3">Fluxo Projetado de Recuperação</div>
+                    <div className="flex items-end gap-2 h-28">
+                      {[42, 65, 38, 80, 55, 92, 70, 60, 85, 48, 74, 95].map((h, i) => (
+                        <div key={i} className="flex-1 rounded-t-sm bg-gradient-to-t from-emerald-600/40 to-emerald-400/80" style={{ height: `${h}%` }} />
+                      ))}
+                    </div>
+                    <div className="flex justify-between mt-2 text-[8px] font-mono text-zinc-600">
+                      <span>JAN</span><span>MAR</span><span>MAI</span><span>JUL</span><span>SET</span><span>NOV</span>
+                    </div>
+                  </div>
+
+                  {/* Dispatch feed mock */}
+                  <div className="lg:col-span-2 rounded-xl border border-zinc-900 bg-zinc-900/50 p-4 space-y-2.5">
+                    <div className="text-[10px] font-bold text-white mb-1">Disparos recentes</div>
+                    {[
+                      { name: "Carlos Mendes", value: "R$ 715,66" },
+                      { name: "Distrib. Alfa LTDA", value: "R$ 1.240,00" },
+                      { name: "Menezes & Batista", value: "R$ 982,40" },
+                    ].map((row) => (
+                      <div key={row.name} className="flex items-center justify-between rounded-lg bg-zinc-950/60 border border-zinc-900 px-3 py-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                          <span className="text-[10px] text-zinc-300 truncate">{row.name}</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-emerald-300 shrink-0">{row.value}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-1.5 text-[9px] text-zinc-500 pt-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Entregues via WhatsApp com boleto anexado
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Security / trust strip */}
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs text-zinc-400">
+            <span className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-400" /> Dados protegidos conforme a LGPD</span>
+            <span className="flex items-center gap-2"><FileCheck className="w-4 h-4 text-emerald-400" /> Criptografia em trânsito e em repouso</span>
+            <span className="flex items-center gap-2"><Smartphone className="w-4 h-4 text-emerald-400" /> Envio via infraestrutura oficial WhatsApp</span>
           </div>
         </div>
       </motion.section>
