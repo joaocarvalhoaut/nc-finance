@@ -38,10 +38,13 @@ import {
   Clock,
   HandCoins,
   Pencil,
+  Check,
+  UserCheck,
 } from "lucide-react";
 import { whatsappGatewayService } from "../services/whatsappGatewayService";
 import { whatsappBatchService, type BatchChargeResult } from "../services/whatsappBatchService";
 import { financeService } from "../services/financeService";
+import { contactsService, contactKeyFromName, type Contact } from "../services/contactsService";
 import { billingLogsService } from "../services/billingLogsService";
 import { pilotService } from "../services/pilotService";
 import { parseImportFile } from "../utils/importFileParser";
@@ -99,6 +102,10 @@ interface ClientDashboardProps {
   userId:               string;
   globalFinePct:        number;
   globalInterestDayPct: number;
+  /** Cadastro de contatos (telefone salvo) por chave de cliente normalizada */
+  knownContacts?: Map<string, Contact>;
+  /** Aprende contatos (telefone) a partir de devedores persistidos */
+  onLearnContacts?: (debtors: Debtor[]) => void | Promise<void>;
   /** Chamado após envio de lote (sucesso ou falha) — atualiza logs no pai */
   onBatchSent?: (result: BatchChargeResult) => void;
   /**
@@ -118,6 +125,8 @@ export default function ClientDashboard({
   userId,
   globalFinePct,
   globalInterestDayPct,
+  knownContacts,
+  onLearnContacts,
   onBatchSent,
   onDebtorsImported,
 }: ClientDashboardProps) {
@@ -134,6 +143,11 @@ export default function ClientDashboard({
   // ── Inline phone editing on debtor cards ─────────────────────────────────────
   const [editingPhoneId,    setEditingPhoneId]    = useState<string | null>(null);
   const [editingPhoneValue, setEditingPhoneValue] = useState("");
+
+  // ── Sugestão de preenchimento via cadastro de contatos ───────────────────────
+  // Devedores importados sem telefone, mas cujo cliente já está cadastrado.
+  const [phoneSuggestIds, setPhoneSuggestIds] = useState<Set<string>>(new Set());
+  const [phoneSuggestDismissed, setPhoneSuggestDismissed] = useState(false);
 
   // ── PDF attachments (keyed by debtor document number) ────────────────────────
   // Stored locally before send; uploaded to Storage after createMany
@@ -282,6 +296,19 @@ export default function ClientDashboard({
       setDebtors(extracted);
       setSelectedIds(new Set(extracted.map(d => d.id)));
 
+      // Detecta registros sem telefone cujo cliente já está cadastrado
+      const suggestIds = new Set<string>();
+      if (knownContacts && knownContacts.size > 0) {
+        for (const d of extracted) {
+          const missingPhone = !d.phone || d.phone.replace(/\D/g, "").length < 10;
+          if (!missingPhone) continue;
+          const match = knownContacts.get(contactKeyFromName(d.client));
+          if (match && match.phone) suggestIds.add(d.id);
+        }
+      }
+      setPhoneSuggestIds(suggestIds);
+      setPhoneSuggestDismissed(false);
+
       // Liquidação → preview com botão de reconciliação (sem envio WhatsApp)
       setStep("preview");
     } catch (err) {
@@ -292,7 +319,19 @@ export default function ClientDashboard({
       setIsProcessing(false);
       setProcessingMsg("");
     }
-  }, [globalFinePct, globalInterestDayPct, importCategory]);
+  }, [globalFinePct, globalInterestDayPct, importCategory, knownContacts]);
+
+  // Preenche os telefones sugeridos a partir do cadastro de contatos
+  const applyPhoneSuggestions = useCallback(() => {
+    if (!knownContacts) return;
+    setDebtors(prev => prev.map(d => {
+      if (!phoneSuggestIds.has(d.id)) return d;
+      const match = knownContacts.get(contactKeyFromName(d.client));
+      return match && match.phone ? { ...d, phone: match.phone } : d;
+    }));
+    setPhoneSuggestIds(new Set());
+    setPhoneSuggestDismissed(true);
+  }, [knownContacts, phoneSuggestIds]);
 
   const handleFileDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -339,6 +378,9 @@ export default function ClientDashboard({
     try {
       // 1. Salva na base consolidada como "liquidado"
       await financeService.createMany(userId, selected);
+
+      // Aprende contatos (telefone) dos registros salvos
+      void onLearnContacts?.(selected);
 
       // 2. Marca devedores existentes com mesmo documento como liquidados
       const docs = selected.map(d => d.document).filter(Boolean);
@@ -428,6 +470,9 @@ export default function ClientDashboard({
 
       // Notifica Visão Geral para recarregar
       onDebtorsImported?.();
+
+      // Aprende contatos (telefone) dos registros enviados
+      void onLearnContacts?.(persisted);
 
       // Upload de PDFs anexados — faz após createMany pois agora temos IDs reais.
       // Monta mapa debtorId → { path, name } para passar direto à Edge Function,
@@ -699,6 +744,35 @@ export default function ClientDashboard({
               </span>
             )}
           </div>
+
+          {/* Sugestão: clientes já cadastrados com telefone salvo */}
+          {phoneSuggestIds.size > 0 && !phoneSuggestDismissed && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/10">
+              <UserCheck className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+              <p className="text-sm text-emerald-100 flex-1">
+                {phoneSuggestIds.size === 1
+                  ? "1 cliente já está cadastrado no sistema com telefone salvo."
+                  : `${phoneSuggestIds.size} clientes já estão cadastrados no sistema com telefone salvo.`}{" "}
+                Deseja preencher os dados automaticamente?
+              </p>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setPhoneSuggestDismissed(true)}
+                  className="px-3 py-1.5 rounded-lg text-xs text-zinc-300 hover:text-white border border-zinc-700 hover:border-zinc-500 transition-colors"
+                >
+                  Agora não
+                </button>
+                <button
+                  type="button"
+                  onClick={applyPhoneSuggestions}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <Check className="w-3.5 h-3.5" strokeWidth={3} /> Preencher automaticamente
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Tone selector — apenas para cobráveis */}
           {!isLiquidacao && (

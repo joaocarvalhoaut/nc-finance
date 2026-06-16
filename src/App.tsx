@@ -11,6 +11,7 @@ import { useSubscription } from "./hooks/useSubscription";
 import { billingLogsService } from "./services/billingLogsService";
 import { financeService } from "./services/financeService";
 import { representativesService } from "./services/representativesService";
+import { contactsService, contactKeyFromName, type Contact } from "./services/contactsService";
 import { subscriptionService } from "./services/subscriptionService";
 import { userConfigService } from "./services/userConfigService";
 import { whatsappService, SEND_STATUS_LABELS, type SendChargeStatus } from "./services/whatsappService";
@@ -79,7 +80,8 @@ import {
   HandCoins,
   MessageSquare,
   Eye,
-  ChevronDown
+  ChevronDown,
+  UserCheck
 } from "lucide-react";
 
 // Default Pattern message templates following user specification
@@ -203,6 +205,8 @@ export default function App() {
   // Temporary seed data is now persisted by user_id on first authenticated access.
   const [debtors, setDebtors] = useState<Debtor[]>([]);
   const [representatives, setRepresentatives] = useState<Representative[]>([]);
+  // Cadastro de contatos (telefone/dados já preenchidos) por cliente normalizado
+  const [contactsByKey, setContactsByKey] = useState<Map<string, Contact>>(new Map());
 
   const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState("");
@@ -469,12 +473,13 @@ export default function App() {
       setWorkspaceError("");
 
       try {
-        const [records, reps, logs, config, templates] = await Promise.all([
+        const [records, reps, logs, config, templates, contacts] = await Promise.all([
           financeService.listByUser(currentOwnerUserId),
           representativesService.listByUser(currentOwnerUserId),
           billingLogsService.listByUser(currentOwnerUserId),
           userConfigService.getConfig(currentOwnerUserId),
-          userConfigService.listMessageTemplates(currentOwnerUserId)
+          userConfigService.listMessageTemplates(currentOwnerUserId),
+          contactsService.listByUser(currentOwnerUserId).catch(() => [] as Contact[])
         ]);
 
         // Workspace inicia vazio — sem dados demo em produção
@@ -506,6 +511,7 @@ export default function App() {
 
         setDebtors(hydratedRecords);
         setRepresentatives(hydratedRepresentatives);
+        setContactsByKey(new Map(contacts.map((c) => [c.contactKey, c])));
         setBillingLogs(hydratedLogs);
         setGlobalFinePct(hydratedConfig.globalFinePct);
         setGlobalFinePctStr(String(hydratedConfig.globalFinePct));
@@ -1196,6 +1202,18 @@ export default function App() {
     }
   };
 
+  // Aprende contatos a partir de devedores com telefone e atualiza o mapa local
+  const learnContactsFromDebtors = async (list: Debtor[]) => {
+    if (!currentOwnerUserId) return;
+    try {
+      await contactsService.syncFromDebtors(currentOwnerUserId, list);
+      const refreshed = await contactsService.listByUser(currentOwnerUserId);
+      setContactsByKey(new Map(refreshed.map((c) => [c.contactKey, c])));
+    } catch {
+      // não-crítico — cadastro de contatos é best-effort
+    }
+  };
+
   // Add debtor manually
   const handleAddDebtorManually = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1226,6 +1244,8 @@ export default function App() {
       };
       const [saved] = await financeService.createMany(currentOwnerUserId, [newDebtor]);
       setDebtors(prev => [saved, ...prev]);
+      // Aprende o contato (telefone) para sugerir em cadastros/importações futuras
+      void learnContactsFromDebtors([saved]);
       setAddDebtorForm({ client: "", supplier: "", document: "", dueDate: "", value: "", phone: "", category: "vencidos" });
       setShowAddDebtorModal(false);
     } catch (err) {
@@ -1750,6 +1770,8 @@ export default function App() {
                     userId={userId}
                     globalFinePct={globalFinePct}
                     globalInterestDayPct={globalInterestDayPct}
+                    knownContacts={contactsByKey}
+                    onLearnContacts={learnContactsFromDebtors}
                     onBatchSent={(result) => {
                       setBatchSendResult(result);
                       // Re-fetch billing logs so Histórico reflects the new batch entries
@@ -3522,6 +3544,30 @@ export default function App() {
                             />
                           </div>
                         </div>
+
+                        {/* Sugestão: cliente já cadastrado com telefone salvo */}
+                        {(() => {
+                          const match = contactsByKey.get(contactKeyFromName(addDebtorForm.client));
+                          const phoneEmpty = addDebtorForm.phone.replace(/\D/g, "").length < 10;
+                          if (!match || !match.phone || !phoneEmpty || addDebtorForm.client.trim().length < 3) return null;
+                          return (
+                            <div className="flex items-start gap-2.5 text-xs bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
+                              <UserCheck className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-emerald-200">
+                                  <span className="font-bold">{match.clientName}</span> já está cadastrado no sistema. Deseja preencher os dados automaticamente?
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => setAddDebtorForm(f => ({ ...f, phone: match.phone }))}
+                                  className="mt-2 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-[11px] font-bold transition-all cursor-pointer inline-flex items-center gap-1.5"
+                                >
+                                  <Check className="w-3 h-3" strokeWidth={3} /> Preencher telefone ({match.phone})
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {addDebtorError && (
                           <div className="flex items-start gap-2 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
