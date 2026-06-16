@@ -1591,7 +1591,11 @@ export default function App() {
     return delayDays >= criticalDays;
   });
   const criticalValue = criticalDebtors.reduce((acc, d) => {
-    return acc + (criticalWithInterest ? (d.updatedValue || d.value) : d.value);
+    // c/ juros: valor + multa + juros (updatedValue)
+    if (criticalWithInterest) return acc + (d.updatedValue || d.value);
+    // s/ juros: valor + multa, sem os juros diários
+    const semJuros = Math.round((d.value * (1 + globalFinePct / 100)) * 100) / 100;
+    return acc + semJuros;
   }, 0);
   const liquidadoValue = debtors.filter(d => d.category === "liquidado").reduce((acc, d) => acc + d.value, 0);
 
@@ -1809,10 +1813,10 @@ export default function App() {
                         <TrendingUp className="w-4 h-4 text-emerald-400" />
                       </div>
                       <div className="mt-3">
-                        <span className="text-2xl sm:text-3xl font-extrabold text-emerald-300 font-mono">{formatBRL(totalUpdatedVolumeStatus)}</span>
+                        <span className="text-2xl sm:text-3xl font-extrabold text-emerald-300 font-mono">{formatBRL(vencidosValue)}</span>
                       </div>
                       <div className="text-[10px] text-emerald-400/60 mt-2">
-                        Somado {globalFinePct}% de multa + {globalInterestDayPct}% de juros diários.
+                        Total dos vencidos com {globalFinePct}% de multa + {globalInterestDayPct}% de juros diários.
                       </div>
                     </div>
 
