@@ -81,7 +81,8 @@ import {
   MessageSquare,
   Eye,
   ChevronDown,
-  UserCheck
+  UserCheck,
+  HardDrive
 } from "lucide-react";
 
 // Default Pattern message templates following user specification
@@ -263,6 +264,9 @@ export default function App() {
   const [sheetsImportResult, setSheetsImportResult] = useState<SheetsImportResult | null>(null);
   const [isDriveMatching, setIsDriveMatching] = useState<boolean>(false);
   const [driveMatchResult, setDriveMatchResult] = useState<DriveMatchResult | null>(null);
+  // Boleto Drive: importação por devedor (estado de loading) e mensagens
+  const [importingBoletoId, setImportingBoletoId] = useState<string | null>(null);
+  const [driveBoletoMsg, setDriveBoletoMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [driveFolderUrl, setDriveFolderUrl] = useState<string>("");
   const [isDriveSaving, setIsDriveSaving] = useState<boolean>(false);
   const [driveSaveMsg, setDriveSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -680,6 +684,42 @@ export default function App() {
       }
     } finally {
       setIsDriveMatching(false);
+    }
+  };
+
+  // Anexar (importar) o boleto sugerido do Drive para o sistema
+  const handleAttachDriveBoleto = async (debtorId: string) => {
+    setImportingBoletoId(debtorId);
+    setDriveBoletoMsg(null);
+    try {
+      const result = await googleDriveService.importBoleto(debtorId);
+      if (result.success) {
+        setDebtors(prev => prev.map(d =>
+          d.id === debtorId
+            ? { ...d, driveFileId: "uploaded", driveFileName: result.fileName, driveFileUrl: result.fileUrl }
+            : d
+        ));
+        setDriveBoletoMsg({ ok: true, text: `Boleto "${result.fileName ?? "PDF"}" anexado ao cliente.` });
+      } else {
+        setDriveBoletoMsg({ ok: false, text: result.error ?? "Falha ao importar o boleto." });
+      }
+    } finally {
+      setImportingBoletoId(null);
+    }
+  };
+
+  // Ignorar a sugestão de boleto do Drive (limpa os campos drive_*)
+  const handleIgnoreDriveBoleto = async (debtorId: string) => {
+    setDebtors(prev => prev.map(d =>
+      d.id === debtorId
+        ? { ...d, driveFileId: null, driveFileName: null, driveFileUrl: null, driveMatchScore: null }
+        : d
+    ));
+    if (!currentOwnerUserId) return;
+    try {
+      await financeService.updatePdfAttachment(currentOwnerUserId, debtorId, null);
+    } catch {
+      // non-critical — estado local já atualizado
     }
   };
 
@@ -3605,8 +3645,86 @@ export default function App() {
               {currentTab === "cobranca" && (
                 <div className="space-y-8">
 
+                  {/* ── Boletos do Google Drive ──────────────────────────────── */}
+                  <div className="bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-xl">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                          <HardDrive className="w-4 h-4 text-emerald-400" /> Boletos do Google Drive
+                        </h4>
+                        <p className="text-xs text-zinc-500 font-light max-w-xl">
+                          Conecte a pasta de boletos do Drive. O sistema casa por nome do cliente + número do documento e sugere anexar o boleto encontrado a cada devedor.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleMatchDriveFiles()}
+                        disabled={isDriveMatching || !driveFolderStatus?.configured}
+                        className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 whitespace-nowrap"
+                        title={driveFolderStatus?.configured ? "Buscar boletos correspondentes no Drive" : "Configure a pasta do Drive primeiro"}
+                      >
+                        {isDriveMatching
+                          ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Buscando…</>
+                          : <><Search className="w-3.5 h-3.5" /> Buscar boletos no Drive</>}
+                      </button>
+                    </div>
+
+                    {/* Status da pasta */}
+                    {driveFolderStatus?.configured ? (
+                      <div className="flex items-center gap-2 text-[11px] text-zinc-400 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2">
+                        <FolderOpen className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                        <span className="truncate">
+                          Pasta: <span className="text-zinc-200 font-medium">{driveFolderStatus.folderName || "Drive"}</span> · {driveFolderStatus.fileCount} arquivo(s) indexado(s)
+                          {driveFolderStatus.unmatchedDebtors > 0 && ` · ${driveFolderStatus.unmatchedDebtors} devedor(es) sem boleto`}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="text"
+                          value={driveFolderUrl}
+                          onChange={(e) => setDriveFolderUrl(e.target.value)}
+                          placeholder="Cole a URL da pasta do Google Drive…"
+                          className="flex-1 bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500 transition-colors"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveDriveFolder()}
+                          disabled={isDriveSaving || !driveFolderUrl.trim()}
+                          className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-100 text-xs font-semibold border border-zinc-700 transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
+                        >
+                          {isDriveSaving ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Salvando…</> : "Conectar pasta"}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Mensagens */}
+                    {driveSaveMsg && (
+                      <div className={`text-[11px] rounded-lg px-3 py-2 border ${driveSaveMsg.ok ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20" : "text-rose-300 bg-rose-500/10 border-rose-500/20"}`}>
+                        {driveSaveMsg.text}
+                      </div>
+                    )}
+                    {driveMatchResult && !driveMatchResult.success && (
+                      <div className="text-[11px] rounded-lg px-3 py-2 border text-rose-300 bg-rose-500/10 border-rose-500/20">
+                        {DRIVE_STATUS_LABELS[driveMatchResult.status] ?? driveMatchResult.error}
+                      </div>
+                    )}
+                    {driveMatchResult && driveMatchResult.success && (
+                      <div className="text-[11px] rounded-lg px-3 py-2 border text-emerald-300 bg-emerald-500/10 border-emerald-500/20">
+                        {driveMatchResult.debtorsMatched > 0
+                          ? `Encontramos ${driveMatchResult.debtorsMatched} boleto(s) — confirme "Anexar" em cada devedor abaixo.`
+                          : "Nenhum boleto correspondente encontrado na pasta."}
+                      </div>
+                    )}
+                    {driveBoletoMsg && (
+                      <div className={`text-[11px] rounded-lg px-3 py-2 border ${driveBoletoMsg.ok ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20" : "text-rose-300 bg-rose-500/10 border-rose-500/20"}`}>
+                        {driveBoletoMsg.text}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    
+
                     <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl">
                       <div className="space-y-1">
                         <h4 className="text-sm font-bold text-white">Selecione o Devedor Alvo</h4>
@@ -3715,7 +3833,36 @@ export default function App() {
                                       <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" />
                                       Enviando PDF…
                                     </span>
-                                  ) : d.driveFileId ? (
+                                  ) : importingBoletoId === d.id ? (
+                                    <span className="text-[10px] text-zinc-400 flex items-center gap-1.5 flex-1">
+                                      <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" />
+                                      Importando do Drive…
+                                    </span>
+                                  ) : (d.driveFileId && d.driveFileId !== "uploaded") ? (
+                                    /* Estado SUGERIDO — achado no Drive, aguardando confirmação */
+                                    <div className="flex-1 flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                      <span className="text-[10px] text-sky-300 flex items-center gap-1 truncate" title={d.driveFileName || "boleto.pdf"}>
+                                        <HardDrive className="w-3 h-3 flex-shrink-0" />
+                                        Achamos o boleto no Drive{typeof d.driveMatchScore === "number" ? ` (${Math.round(d.driveMatchScore * 100)}%)` : ""}: {d.driveFileName || "boleto.pdf"}
+                                      </span>
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); void handleAttachDriveBoleto(d.id); }}
+                                          className="px-2 py-0.5 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-bold transition-all inline-flex items-center gap-1"
+                                        >
+                                          <Check className="w-3 h-3" strokeWidth={3} /> Anexar
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); void handleIgnoreDriveBoleto(d.id); }}
+                                          className="px-2 py-0.5 rounded text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 text-[10px] transition-colors"
+                                        >
+                                          Ignorar
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : d.driveFileId === "uploaded" ? (
                                     <>
                                       <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1 flex-1 truncate" title={d.driveFileName || "boleto.pdf"}>
                                         📎 {d.driveFileName || "boleto.pdf"}

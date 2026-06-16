@@ -94,6 +94,35 @@ export const googleDriveService = {
     return data;
   },
 
+  /**
+   * Importa para o sistema o boleto sugerido (Drive-matched) de um devedor:
+   * copia o PDF do Drive para o Storage `charge-pdfs` e marca como "uploaded".
+   * A partir daí o envio anexa o link público do boleto na mensagem.
+   */
+  async importBoleto(
+    debtorId: string,
+  ): Promise<{ success: boolean; fileName: string | null; fileUrl: string | null; error: string | null }> {
+    const supabase = getSupabaseClient();
+
+    const { data, error } = await supabase.functions.invoke<{
+      success: boolean;
+      fileName: string | null;
+      fileUrl: string | null;
+      error: string | null;
+    }>("drive-import-boleto", { body: { debtorId } });
+
+    if (error || !data) {
+      return {
+        success: false,
+        fileName: null,
+        fileUrl: null,
+        error: error?.message ?? "Não foi possível importar o boleto do Drive.",
+      };
+    }
+
+    return data;
+  },
+
   async getMatchLogs(limit = 5): Promise<DriveMatchLog[]> {
     const supabase = getSupabaseClient();
     const { data } = await supabase
