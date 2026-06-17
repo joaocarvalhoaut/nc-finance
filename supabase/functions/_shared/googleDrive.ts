@@ -97,6 +97,64 @@ export const listFilesInFolder = async (
 };
 
 /**
+ * Lista os filhos diretos de um folder numa ÚNICA query: PDFs + subpastas.
+ * Reduz pela metade o número de chamadas na varredura recursiva.
+ */
+export const listFolderChildren = async (
+  folderId: string,
+  accessToken: string,
+): Promise<{ files: DriveFile[]; folders: Array<{ id: string; name: string }> }> => {
+  const files: DriveFile[] = [];
+  const folders: Array<{ id: string; name: string }> = [];
+  let pageToken: string | undefined;
+
+  do {
+    const params = new URLSearchParams({
+      q: `'${folderId}' in parents and trashed=false and (mimeType='application/pdf' or mimeType='application/vnd.google-apps.folder')`,
+      fields: "nextPageToken,files(id,name,mimeType,webViewLink,size,createdTime)",
+      pageSize: "200",
+    });
+    if (pageToken) params.set("pageToken", pageToken);
+
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?${params.toString()}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+
+    if (res.status === 403 || res.status === 401) {
+      throw new Error(
+        "Sem permissão para acessar a pasta do Drive. " +
+        "Compartilhe-a com o e-mail da service account da plataforma.",
+      );
+    }
+    if (!res.ok) break; // non-critical — para esta pasta, ignora
+
+    const json = await res.json() as {
+      nextPageToken?: string;
+      files: Array<{ id: string; name: string; mimeType: string; webViewLink?: string; size?: string; createdTime?: string }>;
+    };
+
+    for (const f of json.files ?? []) {
+      if (f.mimeType === "application/vnd.google-apps.folder") {
+        folders.push({ id: f.id, name: f.name });
+      } else {
+        files.push({
+          id: f.id,
+          name: f.name,
+          webViewLink: f.webViewLink ?? `https://drive.google.com/file/d/${f.id}/view`,
+          size: f.size ?? "—",
+          createdTime: f.createdTime ?? "",
+        });
+      }
+    }
+
+    pageToken = json.nextPageToken;
+  } while (pageToken);
+
+  return { files, folders };
+};
+
+/**
  * Lista subpastas diretas de um folder do Drive.
  * Retorna array de { id, name }.
  */
@@ -137,34 +195,66 @@ export const listSubfoldersInFolder = async (
   return folders;
 };
 
+// Limites de segurança da varredura recursiva — evitam timeout / estouro de cota
+// da API do Drive em pastas muito grandes ou profundas.
+const DEEP_MAX_DEPTH   = 8;     // níveis de subpasta a partir da raiz
+const DEEP_MAX_FOLDERS = 600;   // total de pastas visitadas
+const DEEP_MAX_FILES   = 3000;  // total de PDFs coletados
+const DEEP_CONCURRENCY = 12;    // pastas listadas em paralelo por "onda"
+
 /**
- * Lista todos os PDFs dentro de um folder do Drive, incluindo PDFs em
- * subpastas de primeiro nível (padrão: uma subpasta por cliente).
+ * Lista TODOS os PDFs dentro de um folder do Drive, descendo recursivamente
+ * por todas as subpastas (BFS) até os limites de segurança acima.
  *
- * PDFs em subpastas recebem `parentFolderName` = nome da subpasta,
- * que o algoritmo de matching usa como nome do cliente.
+ * Como não sabemos como o cliente organiza a pasta, varremos qualquer
+ * profundidade. Cada PDF em subpasta recebe `parentFolderName` = o caminho
+ * de nomes das pastas ancestrais (ex: "MENEZES E BATISTA BOLETOS"), que o
+ * algoritmo de matching usa como sinal de nome do cliente — os termos de
+ * organização ("clientes", "boletos", anos) já têm peso baixo no scoring.
  */
 export const listFilesInFolderDeep = async (
   folderId: string,
   accessToken: string,
 ): Promise<DriveFile[]> => {
-  // 1. PDFs diretos na raiz
-  const directFiles = await listFilesInFolder(folderId, accessToken);
+  const allFiles: DriveFile[] = [];
+  let foldersVisited = 0;
 
-  // 2. Subpastas de primeiro nível
-  const subfolders = await listSubfoldersInFolder(folderId, accessToken);
+  // Fila BFS: cada item carrega o caminho de nomes acumulado e a profundidade
+  const queue: Array<{ id: string; path: string; depth: number }> = [
+    { id: folderId, path: "", depth: 0 },
+  ];
 
-  const allFiles: DriveFile[] = [...directFiles];
+  // BFS em ondas: lista até DEEP_CONCURRENCY pastas em paralelo por iteração
+  while (queue.length > 0 && foldersVisited < DEEP_MAX_FOLDERS && allFiles.length < DEEP_MAX_FILES) {
+    const batch = queue.splice(0, DEEP_CONCURRENCY);
+    foldersVisited += batch.length;
 
-  // 3. Para cada subpasta, lista os PDFs e anexa o nome da pasta
-  for (const folder of subfolders) {
-    try {
-      const subFiles = await listFilesInFolder(folder.id, accessToken);
-      for (const f of subFiles) {
-        allFiles.push({ ...f, parentFolderName: folder.name });
+    const results = await Promise.all(
+      batch.map(async (node) => {
+        try {
+          const children = await listFolderChildren(node.id, accessToken);
+          return { node, children };
+        } catch {
+          return null; // pasta inacessível — ignora
+        }
+      }),
+    );
+
+    for (const res of results) {
+      if (!res) continue;
+      const { node, children } = res;
+
+      for (const f of children.files) {
+        if (allFiles.length >= DEEP_MAX_FILES) break;
+        allFiles.push(node.path ? { ...f, parentFolderName: node.path } : f);
       }
-    } catch {
-      // ignora subpastas inacessíveis
+
+      if (node.depth < DEEP_MAX_DEPTH && allFiles.length < DEEP_MAX_FILES) {
+        for (const folder of children.folders) {
+          const childPath = node.path ? `${node.path} ${folder.name}` : folder.name;
+          queue.push({ id: folder.id, path: childPath, depth: node.depth + 1 });
+        }
+      }
     }
   }
 

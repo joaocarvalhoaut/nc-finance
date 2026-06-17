@@ -135,12 +135,12 @@ Deno.serve(async (request: Request) => {
 
     // ── Fast path: if user has a drive index, use it (no need to re-list Drive) ─
     // batchMatchDebtors reads user_drive_index (pre-indexed) which is much faster.
-    const { data: indexCount } = await admin
+    const { count: indexCount } = await admin
       .from("user_drive_index")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId);
 
-    if ((indexCount as unknown as number ?? 0) > 0) {
+    if ((indexCount ?? 0) > 0) {
       // Use the cached index for fast matching
       const matchResult = await batchMatchDebtors(admin, userId, { onlyUnmatched: false });
       const now2 = new Date().toISOString();
@@ -158,7 +158,7 @@ Deno.serve(async (request: Request) => {
       // Log this match run
       await admin.from("user_drive_match_logs").insert({
         user_id: userId, folder_id: resolvedFolderId,
-        files_found: (indexCount as unknown as number ?? 0),
+        files_found: (indexCount ?? 0),
         debtors_matched: matchedCount2,
         debtors_total: totalDebtors,
         status: "success", metadata: { source: "index_cache", plan: subscription.plan },
@@ -166,7 +166,7 @@ Deno.serve(async (request: Request) => {
 
       return okResponse({
         success: true, status: "success",
-        filesFound: (indexCount as unknown as number ?? 0),
+        filesFound: (indexCount ?? 0),
         debtorsTotal: totalDebtors,
         debtorsMatched: matchedCount2,
         error: null, logId: null, matchedAt: now2,

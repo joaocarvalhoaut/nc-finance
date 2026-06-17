@@ -54,5 +54,17 @@ assert(nameSimilarity("CLIENTE X", "") === 0, 'candidato vazio → 0');
 atLeast("MENEZES E BATISTA", "MENEZESEBATISTALTDAME_42392_4.pdf", 0.0); // sem espaços não tokeniza — ok ser baixo
 atLeast("MENEZES BATISTA LTDA", "boleto MENEZES BATISTA 4239.pdf", 0.6);
 
+// ── Caminhos de pasta profundos (varredura recursiva) ─────────────────────────
+// O parentFolderName passa a ser o caminho de pastas; termos de organização
+// ("clientes", "boletos", anos) têm peso baixo e não devem diluir o nome real.
+atLeast("MENEZES BATISTA LTDA", "CLIENTES MENEZES E BATISTA BOLETOS", 0.6);
+// Nome curto (3 letras) cercado de termos genéricos → sinal fraco por nome só
+// (combina para alta confiança apenas se também casar o número do documento).
+atLeast("GIL MOVEIS ELETRODOMESTICOS LTDA", "CLIENTES GIL BOLETOS 2026", 0.40);
+atLeast("ULTRALAR COMERCIO LTDA", "Clientes 2026 ULTRALAR documentos", 0.55);
+
+// Só termos de organização em comum → não pode casar.
+atMost("ALFA REPRESENTACOES LTDA", "CLIENTES BETA BOLETOS 2026", 0.35);
+
 console.log(`\nnameMatch.test: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

@@ -753,16 +753,25 @@ export default function App() {
     setIsDriveSyncing(true);
     try {
       const r = await driveFolderService.syncFolder();
+      // Mesmo que a chamada retorne timeout, a função segue indexando no servidor.
+      // Recarregamos o status: se o nº de arquivos indexados subiu, mostramos o
+      // progresso real em vez de um erro cru.
+      const status = await driveFolderService.getStatus();
+      setDriveFolderStatus(status);
+
       if (r.success) {
         setDriveSaveMsg({
           ok: true,
-          text: `${prefix}: ${r.filesIndexed} de ${r.filesFound} arquivo(s) indexado(s) · ${r.debtorsMatched} devedor(es) com boleto encontrado.`,
+          text: `${prefix}: ${r.filesFound} arquivo(s) varrido(s) na pasta e subpastas. Agora clique em "Buscar boletos no Drive" para casar com os devedores.`,
+        });
+      } else if (status?.configured && status.fileCount > 0) {
+        setDriveSaveMsg({
+          ok: true,
+          text: `Indexação em andamento: ${status.fileCount} arquivo(s) já varrido(s). Pastas muito grandes são indexadas em partes — clique em "Reindexar" novamente para continuar, ou "Buscar boletos no Drive" para casar o que já foi lido.`,
         });
       } else {
         setDriveSaveMsg({ ok: false, text: r.error || "Falha ao indexar a pasta." });
       }
-      const status = await driveFolderService.getStatus();
-      setDriveFolderStatus(status);
     } finally {
       setIsDriveSyncing(false);
     }

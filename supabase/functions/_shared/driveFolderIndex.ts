@@ -16,7 +16,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { getGoogleAccessToken, listFilesInFolderDeep, type DriveFile } from "./googleDrive.ts";
-import { bestNameSimilarity } from "./nameMatch.ts";
+import { bestNameSimilarity, blockingKeys } from "./nameMatch.ts";
 
 type AdminClient = ReturnType<typeof createClient>;
 
@@ -27,6 +27,15 @@ export const AUTO_ATTACH_THRESHOLD = 0.70;
 
 /** Max PDF size to download for metadata extraction (bytes). Avoids timeouts. */
 const MAX_PDF_BYTES_FOR_EXTRACTION = 5 * 1024 * 1024; // 5 MB
+
+/**
+ * Máximo de arquivos que passam pela extração de conteúdo (download do PDF +
+ * leitura de linha digitável / CPF) por execução. Acima disso, o arquivo é
+ * indexado de forma leve (nome + caminho da pasta), sem download — mantém a
+ * varredura completa e rápida; execuções incrementais preenchem o conteúdo dos
+ * arquivos restantes ao longo do tempo.
+ */
+const MAX_CONTENT_PER_RUN = 25;
 
 /** How long a token cache entry is valid (seconds) */
 const TOKEN_CACHE_TTL_S = 3_500;
@@ -541,56 +550,62 @@ export async function indexFolderForUser(
 
   const filesFound = driveFiles.length;
 
-  // Load existing index for this user+folder (for incremental check)
+  // Load existing index for this user+folder. Arquivos já com conteúdo extraído
+  // são pulados sem nova chamada de API (re-sync rápido + convergência ao longo
+  // de execuções para arquivos novos/incompletos).
   const { data: existingRows } = await admin
     .from("user_drive_index")
-    .select("file_id, md5_checksum")
+    .select("file_id, metadata_extracted")
     .eq("user_id", userId)
     .eq("folder_id", folderId);
 
-  const existingMap = new Map<string, string | null>(
-    ((existingRows ?? []) as Array<{ file_id: string; md5_checksum: string | null }>)
-      .map((r) => [r.file_id, r.md5_checksum]),
+  const existingDone = new Set<string>(
+    ((existingRows ?? []) as Array<{ file_id: string; metadata_extracted: boolean | null }>)
+      .filter((r) => r.metadata_extracted)
+      .map((r) => r.file_id),
+  );
+  const existingAny = new Set<string>(
+    ((existingRows ?? []) as Array<{ file_id: string }>).map((r) => r.file_id),
   );
 
   const now = new Date().toISOString();
 
-  for (const file of driveFiles) {
+  // Particiona: já-prontos (skip), candidatos a conteúdo (até o orçamento),
+  // e o restante indexado de forma leve (só nome + caminho da pasta).
+  const pending = driveFiles.filter((f) => !existingDone.has(f.id));
+  filesSkipped += driveFiles.length - pending.length;
+
+  const heavyFiles = pending.slice(0, MAX_CONTENT_PER_RUN);
+  const lightFiles = pending.slice(MAX_CONTENT_PER_RUN);
+
+  const lightRecord = (file: DriveFile) => ({
+    user_id:              userId,
+    folder_id:            folderId,
+    file_id:              file.id,
+    file_name:            file.name,
+    file_name_normalized: normalizeFilename(file.name),
+    file_size:            0,
+    mime_type:            "application/pdf",
+    md5_checksum:         null,
+    drive_modified_at:    null,
+    indexed_at:           now,
+    updated_at:           now,
+    linha_digitavel:      null,
+    nosso_numero:         null,
+    cpf_cnpj:             null,
+    client_name_extracted: file.parentFolderName ?? null,
+    valor:                null,
+    vencimento:           null,
+    metadata_extracted:           Boolean(file.parentFolderName),
+    metadata_extraction_attempted: false,
+  });
+
+  // Processa um arquivo "pesado": baixa o PDF, extrai metadados e faz upsert.
+  const processHeavy = async (file: DriveFile) => {
     try {
-      // Get current file info (md5 + size)
       const info = await getDriveFileInfo(file.id, accessToken);
-      const newMd5  = info?.md5Checksum ?? null;
       const fileSize = info?.size ?? 0;
-      const modifiedAt = info?.modifiedTime ?? null;
 
-      // Incremental: skip if md5 unchanged
-      if (existingMap.has(file.id) && newMd5 && existingMap.get(file.id) === newMd5) {
-        filesSkipped++;
-        continue;
-      }
-
-      // Build base record.
-      // Sempre usa o nome real do arquivo como file_name_normalized (para matching por filename).
-      // O nome da subpasta pai (quando disponível) vai para client_name_extracted como
-      // sinal adicional de cliente — o scoreRow já usa client_name_extracted em paralelo.
-      const baseRecord = {
-        user_id:              userId,
-        folder_id:            folderId,
-        file_id:              file.id,
-        file_name:            file.name,
-        file_name_normalized: normalizeFilename(file.name),
-        file_size:            fileSize,
-        mime_type:            "application/pdf",
-        md5_checksum:         newMd5,
-        drive_modified_at:    modifiedAt,
-        indexed_at:           now,
-        updated_at:           now,
-      };
-
-      // Attempt metadata extraction (best-effort)
-      // Seed client_name_extracted from parent folder name when available —
-      // this is the most reliable signal when the Drive is organized as
-      // one subfolder per client (pattern: "NOME DO CLIENTE/boleto.pdf").
       let meta: BoletoMetadata = {
         linhaDigitavel: null, nossoNumero: null, cpfCnpj: null,
         clientName: file.parentFolderName ?? null,
@@ -598,14 +613,12 @@ export async function indexFolderForUser(
       };
       let metaExtracted = Boolean(file.parentFolderName);
 
-      // Only attempt PDF content extraction if file is small enough
       if (fileSize <= MAX_PDF_BYTES_FOR_EXTRACTION && fileSize > 0) {
         const pdfBytes = await downloadDriveFile(file.id, accessToken);
         if (pdfBytes && pdfBytes.length > 0) {
           const text = await extractPdfText(pdfBytes);
           if (text.trim().length > 20) {
             const extracted = extractBoletoMetadata(text);
-            // Merge: prefer extracted values, but keep folder-name client as fallback
             meta = {
               linhaDigitavel: extracted.linhaDigitavel,
               nossoNumero:    extracted.nossoNumero,
@@ -619,31 +632,48 @@ export async function indexFolderForUser(
         }
       }
 
-      const fullRecord = {
-        ...baseRecord,
-        linha_digitavel:              meta.linhaDigitavel,
-        nosso_numero:                 meta.nossoNumero,
-        cpf_cnpj:                     meta.cpfCnpj,
-        client_name_extracted:        meta.clientName,
-        valor:                        meta.valor,
-        vencimento:                   meta.vencimento,
+      await admin.from("user_drive_index").upsert({
+        user_id:              userId,
+        folder_id:            folderId,
+        file_id:              file.id,
+        file_name:            file.name,
+        file_name_normalized: normalizeFilename(file.name),
+        file_size:            fileSize,
+        mime_type:            "application/pdf",
+        md5_checksum:         info?.md5Checksum ?? null,
+        drive_modified_at:    info?.modifiedTime ?? null,
+        indexed_at:           now,
+        updated_at:           now,
+        linha_digitavel:      meta.linhaDigitavel,
+        nosso_numero:         meta.nossoNumero,
+        cpf_cnpj:             meta.cpfCnpj,
+        client_name_extracted: meta.clientName,
+        valor:                meta.valor,
+        vencimento:           meta.vencimento,
         metadata_extracted:           metaExtracted,
         metadata_extraction_attempted: true,
-      };
-
-      await admin
-        .from("user_drive_index")
-        .upsert(fullRecord, { onConflict: "user_id,file_id" });
-
+      }, { onConflict: "user_id,file_id" });
       filesIndexed++;
     } catch (e) {
-      console.error(
-        `[driveFolderIndex] indexing error for file ${file.id.slice(0, 8)}:`,
-        e instanceof Error ? e.message : String(e),
-      );
+      console.error(`[driveFolderIndex] index error ${file.id.slice(0, 8)}:`, e instanceof Error ? e.message : String(e));
       filesError++;
     }
+  };
+
+  // Pesados em ondas paralelas
+  const HEAVY_CONCURRENCY = 6;
+  for (let i = 0; i < heavyFiles.length; i += HEAVY_CONCURRENCY) {
+    await Promise.all(heavyFiles.slice(i, i + HEAVY_CONCURRENCY).map(processHeavy));
   }
+
+  // Leves: só os que ainda não existem no índice (não sobrescreve nada útil)
+  const lightToInsert = lightFiles.filter((f) => !existingAny.has(f.id)).map(lightRecord);
+  for (let i = 0; i < lightToInsert.length; i += 200) {
+    const chunk = lightToInsert.slice(i, i + 200);
+    const { error } = await admin.from("user_drive_index").upsert(chunk, { onConflict: "user_id,file_id" });
+    if (error) filesError += chunk.length; else filesIndexed += chunk.length;
+  }
+  filesSkipped += lightFiles.length - lightToInsert.length;
 
   // Mark folder as indexed
   const durationMs = Date.now() - startMs;
@@ -676,6 +706,99 @@ export async function indexFolderForUser(
 // ─── Matching ─────────────────────────────────────────────────────────────────
 
 /**
+ * Índice invertido: prefixo de token distintivo → lista de índices de linhas.
+ * Permite buscar candidatos por nome sem comparar todos×todos (evita estouro de
+ * CPU em pastas com milhares de arquivos).
+ */
+function buildBlockIndex(rows: IndexRow[]): Map<string, number[]> {
+  const idx = new Map<string, number[]>();
+  rows.forEach((row, i) => {
+    const keys = new Set<string>([
+      ...blockingKeys(row.file_name_normalized ?? ""),
+      ...blockingKeys(row.client_name_extracted ?? ""),
+    ]);
+    for (const k of keys) {
+      const arr = idx.get(k);
+      if (arr) arr.push(i); else idx.set(k, [i]);
+    }
+  });
+  return idx;
+}
+
+/** Campos de documento de uma linha, pré-computados uma vez (sem regex no loop). */
+interface RowDoc {
+  linha: string | null;
+  nossoDigits: string;
+  cpf: string | null;
+  fnDigits: string;
+  fnAlpha: string;
+  fnTrim: string;
+}
+
+function precomputeRowDocs(rows: IndexRow[]): RowDoc[] {
+  return rows.map((r) => {
+    const fn = r.file_name_normalized ?? "";
+    return {
+      linha:       r.linha_digitavel,
+      nossoDigits: r.nosso_numero ? digits(r.nosso_numero) : "",
+      cpf:         r.cpf_cnpj,
+      fnDigits:    fn ? digits(fn) : "",
+      fnAlpha:     fn ? fn.replace(/\s/g, "") : "",
+      fnTrim:      fn ? fn.trim() : "",
+    };
+  });
+}
+
+/** Sinal barato de documento usando campos pré-computados (só includes). */
+function hasDocSignal(docDigits: string, docAlpha: string, rd: RowDoc): boolean {
+  if (docDigits.length >= 6 && rd.linha && rd.linha.includes(docDigits)) return true;
+  if (docDigits.length >= 4 && rd.nossoDigits &&
+      (rd.nossoDigits === docDigits || rd.nossoDigits.includes(docDigits) || docDigits.includes(rd.nossoDigits))) return true;
+  if (docDigits.length >= 11 && rd.cpf && rd.cpf === docDigits) return true;
+  if (docDigits.length >= 2 && docDigits.length <= 3 && (rd.fnTrim === docDigits || rd.fnTrim === docAlpha)) return true;
+  if (docDigits.length >= 4 && rd.fnDigits.includes(docDigits)) return true;
+  if (docAlpha.length >= 4 && rd.fnAlpha.includes(docAlpha)) return true;
+  return false;
+}
+
+/**
+ * Seleciona apenas as linhas candidatas a um devedor (por nome compartilhado ou
+ * por sinal de documento) e retorna o melhor match via scoreRow completo.
+ */
+function bestMatchInIndex(
+  debtor: { documentNumber: string; clientName: string; amount?: number | null; dueDate?: string | null },
+  rows: IndexRow[],
+  blockIndex: Map<string, number[]>,
+  rowDocs: RowDoc[],
+): { score: number; fileId: string; fileName: string; reason: string } {
+  const candidates = new Set<number>();
+
+  // 1. Candidatos por nome (índice invertido)
+  for (const k of blockingKeys(debtor.clientName)) {
+    const arr = blockIndex.get(k);
+    if (arr) for (const i of arr) candidates.add(i);
+  }
+
+  // 2. Candidatos por documento (pré-filtro barato sobre campos pré-computados)
+  const docDigits = digits(debtor.documentNumber);
+  const docAlpha  = normalizeText(debtor.documentNumber).replace(/\s/g, "");
+  if (docDigits.length >= 2 || docAlpha.length >= 4) {
+    for (let i = 0; i < rowDocs.length; i++) {
+      if (hasDocSignal(docDigits, docAlpha, rowDocs[i])) candidates.add(i);
+    }
+  }
+
+  let bestScore = 0, bestFileId = "", bestName = "", bestReason = "";
+  for (const i of candidates) {
+    const { score, reason } = scoreRow(debtor, rows[i]);
+    if (score > bestScore) {
+      bestScore = score; bestFileId = rows[i].file_id; bestName = rows[i].file_name; bestReason = reason;
+    }
+  }
+  return { score: bestScore, fileId: bestFileId, fileName: bestName, reason: bestReason };
+}
+
+/**
  * Find the best matching Drive PDF for a single debtor.
  *
  * Queries user_drive_index for this user, scores every candidate,
@@ -703,27 +826,15 @@ export async function matchBoletoForDebtor(
 
   if (!rows || rows.length === 0) return null;
 
-  let bestScore  = 0;
-  let bestFileId = "";
-  let bestName   = "";
-  let bestReason = "";
+  const indexRows = rows as IndexRow[];
+  const best = bestMatchInIndex(debtor, indexRows, buildBlockIndex(indexRows), precomputeRowDocs(indexRows));
 
-  for (const row of rows as IndexRow[]) {
-    const { score, reason } = scoreRow(debtor, row);
-    if (score > bestScore) {
-      bestScore  = score;
-      bestFileId = row.file_id;
-      bestName   = row.file_name;
-      bestReason = reason;
-    }
-  }
-
-  if (bestScore >= AUTO_ATTACH_THRESHOLD) {
+  if (best.score >= AUTO_ATTACH_THRESHOLD) {
     return {
-      fileId:   bestFileId,
-      fileName: bestName,
-      score:    Math.round(bestScore * 1000) / 1000,
-      reason:   bestReason,
+      fileId:   best.fileId,
+      fileName: best.fileName,
+      score:    Math.round(best.score * 1000) / 1000,
+      reason:   best.reason,
     };
   }
 
@@ -775,6 +886,9 @@ export async function batchMatchDebtors(
 
   let matched = 0;
   const now = new Date().toISOString();
+  const rows = indexRows as IndexRow[];
+  const blockIndex = buildBlockIndex(rows);
+  const rowDocs = precomputeRowDocs(rows);
 
   for (const d of debtors as Array<Record<string, unknown>>) {
     const debtor = {
@@ -785,30 +899,17 @@ export async function batchMatchDebtors(
       dueDate:        (d.due_date as string | null) ?? null,
     };
 
-    let bestScore  = 0;
-    let bestFileId = "";
-    let bestName   = "";
-    let bestReason = "";
+    const best = bestMatchInIndex(debtor, rows, blockIndex, rowDocs);
 
-    for (const row of indexRows as IndexRow[]) {
-      const { score, reason } = scoreRow(debtor, row);
-      if (score > bestScore) {
-        bestScore  = score;
-        bestFileId = row.file_id;
-        bestName   = row.file_name;
-        bestReason = reason;
-      }
-    }
-
-    if (bestScore >= AUTO_ATTACH_THRESHOLD) {
+    if (best.score >= AUTO_ATTACH_THRESHOLD) {
       await admin
         .from("user_registros_financeiros")
         .update({
-          drive_file_id:       bestFileId,
-          drive_file_name:     bestName,
-          drive_file_url:      `https://drive.google.com/file/d/${bestFileId}/view`,
-          drive_match_score:   Math.round(bestScore * 1000) / 1000,
-          drive_match_reason:  bestReason,
+          drive_file_id:       best.fileId,
+          drive_file_name:     best.fileName,
+          drive_file_url:      `https://drive.google.com/file/d/${best.fileId}/view`,
+          drive_match_score:   Math.round(best.score * 1000) / 1000,
+          drive_match_reason:  best.reason,
           drive_last_match_at: now,
           updated_at:          now,
         })

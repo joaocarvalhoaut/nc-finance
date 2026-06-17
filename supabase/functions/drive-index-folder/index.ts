@@ -292,12 +292,12 @@ Deno.serve(async (request: Request) => {
         return err(502, { error: "Falha na autenticação com o Google.", status: "google_auth_erro" });
       }
 
-      // Run sync synchronously (returns after indexing + matching)
+      // Sync = SOMENTE indexação (varredura + extração). O casamento é feito
+      // separadamente pelo botão "Buscar boletos" (match-drive-files), evitando
+      // estourar o tempo da função em pastas com milhares de PDFs.
       let indexResult;
-      let matchResult;
       try {
         indexResult = await indexFolderForUser(admin, userId, folderId, accessToken);
-        matchResult = await batchMatchDebtors(admin, userId, { onlyUnmatched: true });
       } catch (e) {
         return err(500, {
           error: e instanceof Error ? e.message : "Erro na sincronização.",
@@ -312,8 +312,8 @@ Deno.serve(async (request: Request) => {
         filesIndexed: indexResult.filesIndexed,
         filesSkipped: indexResult.filesSkipped,
         durationMs:   indexResult.durationMs,
-        debtorsMatched: matchResult.matched,
-        debtorsTotal:   matchResult.total,
+        debtorsMatched: 0,
+        debtorsTotal:   0,
       });
     }
 
