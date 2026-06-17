@@ -270,6 +270,8 @@ export default function App() {
   // Importação em lote de boletos do Drive (Visão Geral)
   const [isAttachingAll, setIsAttachingAll] = useState<boolean>(false);
   const [attachAllProgress, setAttachAllProgress] = useState<{ done: number; total: number; ok: number } | null>(null);
+  // Visualização do PDF do boleto (modal de revisão)
+  const [pdfPreview, setPdfPreview] = useState<{ url: string; name: string } | null>(null);
   // Edição da pasta do Drive (trocar URL de uma pasta já configurada)
   const [editingDriveFolder, setEditingDriveFolder] = useState<boolean>(false);
   const [isDriveSyncing, setIsDriveSyncing] = useState<boolean>(false);
@@ -698,6 +700,14 @@ export default function App() {
     } finally {
       setIsDriveMatching(false);
     }
+  };
+
+  // Converte a URL do boleto para o formato visualizável dentro de um iframe
+  // (links do Drive /view → /preview; URLs públicas do Storage servem direto).
+  const toEmbedUrl = (url: string): string => {
+    const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+    if (m) return `https://drive.google.com/file/d/${m[1]}/preview`;
+    return url;
   };
 
   // Anexar (importar) o boleto sugerido do Drive para o sistema
@@ -3417,17 +3427,15 @@ export default function App() {
                                       ) : d.driveFileId ? (
                                         <>
                                           {d.driveFileUrl ? (
-                                            <a
-                                              href={d.driveFileUrl}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="flex items-center gap-1 text-[10px] font-mono text-emerald-400 hover:text-emerald-300 transition-colors max-w-[70px] truncate"
-                                              title={d.driveFileName || "boleto.pdf"}
-                                              onClick={(e) => e.stopPropagation()}
+                                            <button
+                                              type="button"
+                                              onClick={(e) => { e.stopPropagation(); setPdfPreview({ url: d.driveFileUrl!, name: d.driveFileName || "boleto.pdf" }); }}
+                                              className="flex items-center gap-1 text-[10px] font-mono text-emerald-400 hover:text-emerald-300 transition-colors max-w-[70px] truncate cursor-pointer"
+                                              title={`Visualizar ${d.driveFileName || "boleto.pdf"}`}
                                             >
-                                              <ExternalLink className="w-3 h-3 shrink-0" />
+                                              <Eye className="w-3 h-3 shrink-0" />
                                               <span className="truncate">{d.driveFileName || "PDF"}</span>
-                                            </a>
+                                            </button>
                                           ) : (
                                             <span className="text-[10px] font-mono text-emerald-400 truncate max-w-[70px]" title={d.driveFileName || "boleto.pdf"}>
                                               📎 {d.driveFileName || "PDF"}
@@ -4040,16 +4048,14 @@ export default function App() {
                                         📎 {d.driveFileName || "boleto.pdf"}
                                       </span>
                                       {d.driveFileUrl && (
-                                        <a
-                                          href={d.driveFileUrl}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-zinc-500 hover:text-emerald-400 transition-colors p-0.5 rounded"
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); setPdfPreview({ url: d.driveFileUrl!, name: d.driveFileName || "boleto.pdf" }); }}
+                                          className="text-zinc-500 hover:text-emerald-400 transition-colors p-0.5 rounded cursor-pointer"
                                           title="Visualizar PDF"
-                                          onClick={(e) => e.stopPropagation()}
                                         >
-                                          <ExternalLink className="w-3 h-3" />
-                                        </a>
+                                          <Eye className="w-3 h-3" />
+                                        </button>
                                       )}
                                       <button
                                         type="button"
@@ -5090,6 +5096,49 @@ export default function App() {
           )}
 
           {showSuporte && <Suporte onClose={() => setShowSuporte(false)} />}
+
+          {/* Modal: visualização do PDF do boleto (revisão) */}
+          {pdfPreview && (
+            <div
+              className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+              onClick={() => setPdfPreview(null)}
+            >
+              <div
+                className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-4xl h-[85vh] flex flex-col shadow-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-zinc-800">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileCheck2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <span className="text-sm font-semibold text-white truncate" title={pdfPreview.name}>{pdfPreview.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <a
+                      href={pdfPreview.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700 transition-all inline-flex items-center gap-1.5"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> Abrir em nova aba
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setPdfPreview(null)}
+                      className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                      title="Fechar"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <iframe
+                  src={toEmbedUrl(pdfPreview.url)}
+                  title={pdfPreview.name}
+                  className="flex-1 w-full bg-zinc-950"
+                />
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
