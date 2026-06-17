@@ -586,6 +586,13 @@ export default function App() {
     sheetUrlInput
   ]);
 
+  // Assinatura dos campos que afetam o cálculo de encargos (valor, vencimento,
+  // categoria). Recalcular quando ela muda corrige o bug de encargos
+  // desatualizados ao editar valor/vencimento inline (sem mudar a quantidade).
+  const debtorCalcSignature = debtors
+    .map((d) => `${d.id}|${d.value}|${d.dueDate}|${d.category}`)
+    .join(";");
+
   // Update calculated values when debtors or global parameters change
   useEffect(() => {
     const today = new Date();
@@ -632,9 +639,9 @@ export default function App() {
     if (hasChanged) {
       setDebtors(updated);
     }
-  // debtors.length garante que o cálculo re-executa quando os devedores carregam do banco
-  // O guard hasChanged impede loop infinito
-  }, [globalFinePct, globalInterestDayPct, debtors.length]);
+  // A assinatura re-executa o cálculo sempre que valor/vencimento/categoria de
+  // qualquer título muda (e na carga inicial). O guard hasChanged impede loop.
+  }, [globalFinePct, globalInterestDayPct, debtorCalcSignature]);
 
   // Sync drafted text message when selected debitor or tone updates
   useEffect(() => {
