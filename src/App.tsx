@@ -267,6 +267,9 @@ export default function App() {
   // Boleto Drive: importação por devedor (estado de loading) e mensagens
   const [importingBoletoId, setImportingBoletoId] = useState<string | null>(null);
   const [driveBoletoMsg, setDriveBoletoMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Importação em lote de boletos do Drive (Visão Geral)
+  const [isAttachingAll, setIsAttachingAll] = useState<boolean>(false);
+  const [attachAllProgress, setAttachAllProgress] = useState<{ done: number; total: number; ok: number } | null>(null);
   // Edição da pasta do Drive (trocar URL de uma pasta já configurada)
   const [editingDriveFolder, setEditingDriveFolder] = useState<boolean>(false);
   const [isDriveSyncing, setIsDriveSyncing] = useState<boolean>(false);
@@ -718,6 +721,31 @@ export default function App() {
     }
   };
 
+  // Anexar TODOS os boletos sugeridos (importação em lote) — usado na Visão Geral
+  const handleAttachAllDriveBoletos = async () => {
+    const suggested = debtors.filter(d => d.driveFileId && d.driveFileId !== "uploaded");
+    if (!suggested.length) return;
+    setIsAttachingAll(true);
+    setAttachAllProgress({ done: 0, total: suggested.length, ok: 0 });
+    let done = 0;
+    let ok = 0;
+    for (const target of suggested) {
+      const result = await googleDriveService.importBoleto(target.id);
+      if (result.success) {
+        ok++;
+        setDebtors(prev => prev.map(d =>
+          d.id === target.id
+            ? { ...d, driveFileId: "uploaded", driveFileName: result.fileName, driveFileUrl: result.fileUrl }
+            : d
+        ));
+      }
+      done++;
+      setAttachAllProgress({ done, total: suggested.length, ok });
+    }
+    setIsAttachingAll(false);
+    setDriveBoletoMsg({ ok: true, text: `${ok} de ${suggested.length} boleto(s) anexado(s) aos clientes.` });
+  };
+
   // Ignorar a sugestão de boleto do Drive (limpa os campos drive_*)
   const handleIgnoreDriveBoleto = async (debtorId: string) => {
     setDebtors(prev => prev.map(d =>
@@ -885,7 +913,7 @@ export default function App() {
   }, [currentTab, isLoggedIn]);
 
   useEffect(() => {
-    if (currentTab === "cobranca" && isLoggedIn && !driveFolderStatus) {
+    if ((currentTab === "cobranca" || currentTab === "visao_geral") && isLoggedIn && !driveFolderStatus) {
       void loadDriveFolderStatus();
     }
   }, [currentTab, isLoggedIn]);
@@ -2681,7 +2709,51 @@ export default function App() {
               {currentTab === "visao_geral" && (
                 <>
                 <div className="space-y-8">
-                  
+
+                  {/* ── Boletos do Google Drive (busca + anexar em lote) ──────── */}
+                  {driveFolderStatus?.configured && (() => {
+                    const suggestedCount = debtors.filter(d => d.driveFileId && d.driveFileId !== "uploaded").length;
+                    return (
+                      <div className="bg-zinc-900/40 border border-zinc-900 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <HardDrive className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <span className="text-xs text-zinc-300 truncate">
+                            Boletos do Drive: <span className="text-zinc-400">{driveFolderStatus.folderName || "pasta"}</span>
+                            {driveFolderStatus.indexing && <span className="text-sky-300"> · indexando {driveFolderStatus.contentIndexed ?? 0}/{driveFolderStatus.fileCount}…</span>}
+                            {suggestedCount > 0 && <span className="text-emerald-300 font-semibold"> · {suggestedCount} boleto(s) sugerido(s)</span>}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void handleMatchDriveFiles()}
+                            disabled={isDriveMatching || isAttachingAll}
+                            className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-100 text-xs font-semibold border border-zinc-700 transition-all cursor-pointer inline-flex items-center gap-1.5 whitespace-nowrap"
+                          >
+                            {isDriveMatching ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Buscando…</> : <><Search className="w-3.5 h-3.5" /> Buscar boletos no Drive</>}
+                          </button>
+                          {suggestedCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => void handleAttachAllDriveBoletos()}
+                              disabled={isAttachingAll}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 whitespace-nowrap"
+                            >
+                              {isAttachingAll
+                                ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Anexando {attachAllProgress?.done ?? 0}/{attachAllProgress?.total ?? 0}…</>
+                                : <><Check className="w-3.5 h-3.5" strokeWidth={3} /> Anexar todos ({suggestedCount})</>}
+                            </button>
+                          )}
+                        </div>
+                        {driveBoletoMsg && (
+                          <div className={`w-full text-[11px] rounded-lg px-3 py-1.5 border ${driveBoletoMsg.ok ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20" : "text-rose-300 bg-rose-500/10 border-rose-500/20"}`}>
+                            {driveBoletoMsg.text}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     
                     <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-md">

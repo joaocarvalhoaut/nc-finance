@@ -370,8 +370,43 @@ Deno.serve(async (request: Request) => {
     // Atualiza sent/failed em user_automation_runs para runs em andamento
     // (simplificado: runs ficam com sent/failed=0; os logs reais estão em user_logs_cobranca)
 
+    // ── Rede de segurança: re-ignita indexações de boleto do Drive travadas ────
+    // A indexação roda via auto-encadeamento (EdgeRuntime.waitUntil). Se um elo
+    // da cadeia falhar (rede), ela para. Aqui, a cada tick, redisparamos o
+    // "continue" para pastas com conteúdo ainda pendente — convergência garantida.
+    let driveResumed = 0;
+    try {
+      const { data: pendingIdx } = await admin
+        .from("user_drive_index")
+        .select("user_id, folder_id")
+        .eq("metadata_extraction_attempted", false)
+        .limit(1000);
+
+      if (pendingIdx && pendingIdx.length) {
+        const seen = new Set<string>();
+        const pairs: Array<{ user_id: string; folder_id: string }> = [];
+        for (const r of pendingIdx as Array<{ user_id: string; folder_id: string }>) {
+          const key = `${r.user_id}|${r.folder_id}`;
+          if (!seen.has(key)) { seen.add(key); pairs.push(r); }
+        }
+        const toKick = pairs.slice(0, 20); // limite por tick
+        await Promise.allSettled(
+          toKick.map((p) =>
+            fetch(`${SUPABASE_URL}/functions/v1/drive-index-folder`, {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${CRON_SECRET}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "continue", userId: p.user_id, folderId: p.folder_id }),
+            }),
+          ),
+        );
+        driveResumed = toKick.length;
+      }
+    } catch (e) {
+      console.error("[process-dispatch-jobs] drive resume error:", e instanceof Error ? e.message : String(e));
+    }
+
     return new Response(
-      JSON.stringify({ success: true, jobsProcessed: processed, timestamp: now }),
+      JSON.stringify({ success: true, jobsProcessed: processed, driveResumed, timestamp: now }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
