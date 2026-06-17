@@ -16,6 +16,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { getGoogleAccessToken, listFilesInFolderDeep, type DriveFile } from "./googleDrive.ts";
+import { bestNameSimilarity } from "./nameMatch.ts";
 
 type AdminClient = ReturnType<typeof createClient>;
 
@@ -352,23 +353,6 @@ interface IndexRow {
   vencimento:           string | null;
 }
 
-/** Jaccard similarity between two token sets (tokens ≥ 3 chars) */
-function jaccard(a: Set<string>, b: Set<string>): number {
-  if (a.size === 0 || b.size === 0) return 0;
-  let inter = 0;
-  for (const t of a) if (b.has(t)) inter++;
-  const union = new Set([...a, ...b]).size;
-  return union === 0 ? 0 : inter / union;
-}
-
-function tokenSet(text: string): Set<string> {
-  return new Set(
-    normalizeText(text)
-      .split(" ")
-      .filter((t) => t.length >= 3),
-  );
-}
-
 /**
  * Score a single index row against debtor data.
  *
@@ -450,43 +434,13 @@ export function scoreRow(
   }
 
   // ── Sinal 2: nome do cliente ──────────────────────────────────────────────
-
-  const debtorTokens = tokenSet(debtor.clientName);
-  let nameScore  = 0;
-  let nameReason = "name_tokens_filename";
-
-  // 2a. Jaccard completo (favorece nomes que batem bem no todo)
-  if (row.file_name_normalized) {
-    const fnJ = jaccard(debtorTokens, tokenSet(row.file_name_normalized));
-    if (fnJ > nameScore) { nameScore = fnJ; nameReason = "name_tokens_filename"; }
-  }
-  if (row.client_name_extracted) {
-    const extJ = jaccard(debtorTokens, tokenSet(row.client_name_extracted));
-    if (extJ > nameScore) { nameScore = extJ; nameReason = "name_tokens_extracted"; }
-  }
-
-  // 2b. Token único significativo (≥ 5 chars): um token distintivo do devedor
-  //     aparece no arquivo → sinal moderado mesmo com Jaccard baixo
-  //     (captura "MOBILAR" em "MOBILAR NOTA.pdf", "JOICE" em "CARTA...JOICE.pdf")
-  if (nameScore < 0.60 && row.file_name_normalized) {
-    const fnTokens = tokenSet(row.file_name_normalized);
-    for (const t of debtorTokens) {
-      if (t.length >= 5 && fnTokens.has(t)) {
-        // Pontuação baseada no comprimento do token (mais longo = mais específico)
-        const hit = Math.min(0.65, 0.45 + t.length * 0.025);
-        if (hit > nameScore) { nameScore = hit; nameReason = "name_token_hit"; }
-      }
-    }
-  }
-  if (nameScore < 0.60 && row.client_name_extracted) {
-    const extTokens = tokenSet(row.client_name_extracted);
-    for (const t of debtorTokens) {
-      if (t.length >= 5 && extTokens.has(t)) {
-        const hit = Math.min(0.65, 0.45 + t.length * 0.025);
-        if (hit > nameScore) { nameScore = hit; nameReason = "name_token_hit_extracted"; }
-      }
-    }
-  }
+  // Similaridade ponderada (stopwords societárias ignoradas, termos de ramo com
+  // peso baixo, match por prefixo/substring) — ver nameMatch.ts.
+  const nameScore = bestNameSimilarity(debtor.clientName, [
+    row.file_name_normalized,
+    row.client_name_extracted,
+  ]);
+  const nameReason = "name_similarity";
 
   // ── Score combinado ───────────────────────────────────────────────────────
 

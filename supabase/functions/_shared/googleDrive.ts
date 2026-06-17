@@ -6,6 +6,7 @@
  */
 
 export { getGoogleAccessToken } from "./googleSheets.ts";
+import { bestNameSimilarity } from "./nameMatch.ts";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -188,21 +189,6 @@ const normalizeText = (raw: string): string => {
     .trim();
 };
 
-/** Conjunto de tokens de um texto normalizado (comprimento ≥ 3) */
-const tokenSet = (text: string): Set<string> => {
-  const tokens = normalizeText(text).split(" ").filter((t) => t.length >= 3);
-  return new Set(tokens);
-};
-
-/** Sobreposição de Jaccard entre dois conjuntos de tokens */
-const jaccardOverlap = (a: Set<string>, b: Set<string>): number => {
-  if (a.size === 0 && b.size === 0) return 0;
-  let inter = 0;
-  for (const t of a) if (b.has(t)) inter++;
-  const union = new Set([...a, ...b]).size;
-  return union === 0 ? 0 : inter / union;
-};
-
 // ─── Scoring ───────────────────────────────────────────────────────────────────
 
 /**
@@ -265,37 +251,12 @@ export const matchScore = (debtor: DebtorMatchInput, file: DriveFile): number =>
   }
 
   // ── Sinal 3: nome do cliente ──────────────────────────────────────────────
-  const debtorTokens = tokenSet(debtor.clientName);
-
-  // Referências de nome: arquivo e, quando disponível, subpasta
-  const nameRef1 = file.parentFolderName ?? file.name;
-  const nameRef2 = file.parentFolderName ? file.name : null;
-
-  let nameScore = jaccardOverlap(debtorTokens, tokenSet(nameRef1));
-  if (nameRef2) {
-    const s2 = jaccardOverlap(debtorTokens, tokenSet(nameRef2));
-    if (s2 > nameScore) nameScore = s2;
-  }
-
-  // Token único significativo (≥ 5 chars): captura "MOBILAR" em "MOBILAR NOTA.pdf"
-  if (nameScore < 0.60) {
-    const fileTokens = tokenSet(nameRef1);
-    for (const t of debtorTokens) {
-      if (t.length >= 5 && fileTokens.has(t)) {
-        const hit = Math.min(0.65, 0.45 + t.length * 0.025);
-        if (hit > nameScore) nameScore = hit;
-      }
-    }
-    if (nameRef2) {
-      const fileTokens2 = tokenSet(nameRef2);
-      for (const t of debtorTokens) {
-        if (t.length >= 5 && fileTokens2.has(t)) {
-          const hit = Math.min(0.65, 0.45 + t.length * 0.025);
-          if (hit > nameScore) nameScore = hit;
-        }
-      }
-    }
-  }
+  // Similaridade ponderada (ver nameMatch.ts): nome do arquivo e, quando o PDF
+  // está numa subpasta de cliente, também o nome da subpasta.
+  const nameScore = bestNameSimilarity(debtor.clientName, [
+    file.parentFolderName ?? file.name,
+    file.parentFolderName ? file.name : null,
+  ]);
 
   // ── Score combinado ───────────────────────────────────────────────────────
   if (docScore > 0 && nameScore >= 0.35) return 1.0;
