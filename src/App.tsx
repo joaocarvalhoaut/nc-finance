@@ -269,6 +269,7 @@ export default function App() {
   const [driveBoletoMsg, setDriveBoletoMsg] = useState<{ ok: boolean; text: string } | null>(null);
   // Edição da pasta do Drive (trocar URL de uma pasta já configurada)
   const [editingDriveFolder, setEditingDriveFolder] = useState<boolean>(false);
+  const [isDriveSyncing, setIsDriveSyncing] = useState<boolean>(false);
   const [driveFolderUrl, setDriveFolderUrl] = useState<string>("");
   const [isDriveSaving, setIsDriveSaving] = useState<boolean>(false);
   const [driveSaveMsg, setDriveSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -733,16 +734,37 @@ export default function App() {
     try {
       const result = await driveFolderService.saveFolder(driveFolderUrl.trim());
       if (result.success) {
-        setDriveSaveMsg({ ok: true, text: `Pasta "${result.folderName ?? "Drive"}" salva. ${result.fileCount} arquivo(s) indexado(s).` });
         setDriveFolderUrl("");
         setEditingDriveFolder(false);
-        const status = await driveFolderService.getStatus();
-        setDriveFolderStatus(status);
+        // A indexação no "save" roda em background e pode ser cortada pelo runtime.
+        // Disparamos um sync síncrono para indexar de fato e atualizar o file_count.
+        setDriveSaveMsg({ ok: true, text: `Pasta "${result.folderName ?? "Drive"}" salva. Indexando boletos…` });
+        await handleSyncDriveFolder(`Pasta "${result.folderName ?? "Drive"}" conectada`);
       } else {
         setDriveSaveMsg({ ok: false, text: result.message || result.error || "Falha ao salvar pasta." });
       }
     } finally {
       setIsDriveSaving(false);
+    }
+  };
+
+  // Reindexar a pasta do Drive de forma síncrona (varre + extrai metadados + casa)
+  const handleSyncDriveFolder = async (prefix = "Pasta reindexada") => {
+    setIsDriveSyncing(true);
+    try {
+      const r = await driveFolderService.syncFolder();
+      if (r.success) {
+        setDriveSaveMsg({
+          ok: true,
+          text: `${prefix}: ${r.filesIndexed} de ${r.filesFound} arquivo(s) indexado(s) · ${r.debtorsMatched} devedor(es) com boleto encontrado.`,
+        });
+      } else {
+        setDriveSaveMsg({ ok: false, text: r.error || "Falha ao indexar a pasta." });
+      }
+      const status = await driveFolderService.getStatus();
+      setDriveFolderStatus(status);
+    } finally {
+      setIsDriveSyncing(false);
     }
   };
 
@@ -3680,6 +3702,15 @@ export default function App() {
                           Pasta: <span className="text-zinc-200 font-medium">{driveFolderStatus.folderName || "Drive"}</span> · {driveFolderStatus.fileCount} arquivo(s) indexado(s)
                           {driveFolderStatus.unmatchedDebtors > 0 && ` · ${driveFolderStatus.unmatchedDebtors} devedor(es) sem boleto`}
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => void handleSyncDriveFolder()}
+                          disabled={isDriveSyncing}
+                          className="text-sky-400 hover:text-sky-300 disabled:opacity-50 font-semibold inline-flex items-center gap-1 flex-shrink-0 transition-colors"
+                          title="Revarrer a pasta e atualizar o índice"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${isDriveSyncing ? "animate-spin" : ""}`} /> {isDriveSyncing ? "Indexando…" : "Reindexar"}
+                        </button>
                         <button
                           type="button"
                           onClick={() => { setDriveFolderUrl(""); setDriveSaveMsg(null); setEditingDriveFolder(true); }}
