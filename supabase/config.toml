@@ -109,6 +109,11 @@ verify_jwt = false
 [functions.sync-whatsapp-status]
 verify_jwt = false
 
+# Auto-continuação em background se re-invoca com AUTOMATION_CRON_SECRET.
+# A função valida auth internamente (getUser p/ usuário, cron-secret p/ "continue").
+[functions.drive-index-folder]
+verify_jwt = false
+
 [analytics]
 enabled = false
 port = 54327

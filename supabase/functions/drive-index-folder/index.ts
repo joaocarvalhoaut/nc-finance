@@ -27,6 +27,7 @@ import { getGoogleAccessToken, listFilesInFolderDeep } from "../_shared/googleDr
 import {
   saveFolderConfig,
   indexFolderForUser,
+  extractPendingContent,
   batchMatchDebtors,
   getDriveAccessToken,
 } from "../_shared/driveFolderIndex.ts";
@@ -38,10 +39,40 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")        ?? "";
 const SERVICE_ROLE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const GOOGLE_EMAIL      = Deno.env.get("GOOGLE_CLIENT_EMAIL")      ?? "";
 const GOOGLE_PRIVATE_KEY= Deno.env.get("GOOGLE_PRIVATE_KEY")       ?? "";
+// Segredo usado pela função para se re-invocar em background (auto-encadeamento)
+const CRON_SECRET       = Deno.env.get("AUTOMATION_CRON_SECRET")   ?? "";
+const SELF_URL          = `${SUPABASE_URL}/functions/v1/drive-index-folder`;
 
 // ─── Plan gate ────────────────────────────────────────────────────────────────
 
 const DRIVE_ALLOWED_PLANS = ["pro", "premium"];
+
+/**
+ * Agenda a próxima execução do indexador em segundo plano, sem bloquear a
+ * resposta atual. Usa EdgeRuntime.waitUntil (forma suportada de estender o
+ * trabalho além do retorno) para garantir que o fetch de continuação dispare.
+ * Cada continuação roda numa nova instância → processamento em lotes até
+ * zerar o conteúdo pendente, independente da aba do usuário.
+ */
+function scheduleBackgroundContinue(userId: string, folderId: string): void {
+  if (!CRON_SECRET) {
+    console.warn("[drive-index-folder] AUTOMATION_CRON_SECRET ausente — auto-continuação desabilitada");
+    return;
+  }
+  const kick = (async () => {
+    try {
+      await fetch(SELF_URL, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${CRON_SECRET}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "continue", userId, folderId }),
+      });
+    } catch (e) {
+      console.error("[drive-index-folder] continue kick failed:", e instanceof Error ? e.message : String(e));
+    }
+  })();
+  const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+  if (rt?.waitUntil) rt.waitUntil(kick); else void kick;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -109,6 +140,34 @@ Deno.serve(async (request: Request) => {
     const authHeader = request.headers.get("Authorization");
     if (!authHeader) return err(401, { error: "Nao autenticado.", status: "nao_autenticado" });
 
+    // ── Background self-continuation (auth por cron-secret, sem JWT de usuário) ─
+    if (request.method === "POST" && CRON_SECRET && authHeader === `Bearer ${CRON_SECRET}`) {
+      const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+      let cbody: { action?: string; userId?: string; folderId?: string } = {};
+      try { cbody = await request.json(); } catch { /* corpo vazio */ }
+
+      if (cbody.action === "continue" && cbody.userId && cbody.folderId) {
+        const token = await getDriveAccessToken();
+        if (!token) return ok({ success: false, status: "google_nao_configurado" });
+        try {
+          // Só extrai conteúdo dos pendentes (lê do índice) — NÃO re-varre o Drive
+          const r = await extractPendingContent(admin, cbody.userId, cbody.folderId, token);
+          if (r.remaining > 0) {
+            scheduleBackgroundContinue(cbody.userId, cbody.folderId);
+          } else {
+            // Conteúdo completo — casa devedores ainda sem boleto
+            await batchMatchDebtors(admin, cbody.userId, { onlyUnmatched: true });
+          }
+          return ok({ success: true, status: r.remaining > 0 ? "indexing" : "done", contentPending: r.remaining });
+        } catch (e) {
+          // Em caso de erro, encerra o encadeamento (reindex manual retoma)
+          console.error("[drive-index-folder] continue error:", e instanceof Error ? e.message : String(e));
+          return err(500, { error: "Erro na continuação.", status: "sync_erro" });
+        }
+      }
+      return err(400, { error: "Requisição de continuação inválida.", status: "payload_invalido" });
+    }
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -159,11 +218,24 @@ Deno.serve(async (request: Request) => {
         .eq("user_id", userId)
         .is("drive_file_id", null);
 
+      // Progresso da indexação de conteúdo: quantos PDFs já tiveram o conteúdo lido
+      const fileCount = Number(row.file_count ?? 0);
+      const { count: contentDone } = await admin
+        .from("user_drive_index")
+        .select("file_id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("metadata_extraction_attempted", true);
+
+      const contentIndexed = contentDone ?? 0;
+      const indexing = fileCount > 0 && contentIndexed < fileCount;
+
       return ok({
         configured:     true,
         folderName:     row.folder_name ?? null,
         isAccessible:   row.is_accessible,
-        fileCount:      Number(row.file_count  ?? 0),
+        fileCount,
+        contentIndexed,                 // PDFs com conteúdo já extraído
+        indexing,                       // true enquanto a indexação de conteúdo roda
         lastIndexedAt:  row.last_indexed_at   ?? null,
         lastIndexError: row.last_index_error  ?? null,
         unmatchedDebtors: unmatchedCount ?? 0,
@@ -245,27 +317,34 @@ Deno.serve(async (request: Request) => {
         });
       }
 
-      // Trigger background indexing (do not await — returns fast)
-      void (async () => {
-        try {
-          await indexFolderForUser(admin, userId, folderId, accessToken);
-          await batchMatchDebtors(admin, userId, { onlyUnmatched: true });
-        } catch (e) {
-          console.error("[drive-index-folder] background index error:", e instanceof Error ? e.message : String(e));
-          await admin
-            .from("user_drive_folders")
-            .update({ last_index_error: String(e instanceof Error ? e.message : e).slice(0, 500), updated_at: new Date().toISOString() })
-            .eq("user_id", userId);
-        }
-      })();
+      // Indexa o 1º lote de forma síncrona e encadeia o restante em background.
+      let firstBatch;
+      try {
+        firstBatch = await indexFolderForUser(admin, userId, folderId, accessToken);
+      } catch (e) {
+        await admin
+          .from("user_drive_folders")
+          .update({ last_index_error: String(e instanceof Error ? e.message : e).slice(0, 500), updated_at: new Date().toISOString() })
+          .eq("user_id", userId);
+        return err(500, { error: "Falha ao indexar a pasta.", status: "sync_erro" });
+      }
+
+      if (firstBatch.contentPending > 0) {
+        scheduleBackgroundContinue(userId, folderId);
+      } else {
+        await batchMatchDebtors(admin, userId, { onlyUnmatched: true });
+      }
 
       return ok({
-        success:     true,
-        status:      "indexing",
-        message:     `Pasta "${folderName ?? folderId}" salva. Indexando ${fileCount} boleto(s) em segundo plano…`,
+        success:        true,
+        status:         firstBatch.contentPending > 0 ? "indexing" : "done",
+        message:        firstBatch.contentPending > 0
+          ? `Pasta "${folderName ?? folderId}" conectada. Indexando ${fileCount} boleto(s) em segundo plano…`
+          : `Pasta "${folderName ?? folderId}" conectada e indexada (${fileCount} boleto(s)).`,
         folderId,
         folderName,
         fileCount,
+        contentPending: firstBatch.contentPending,
       });
     }
 
@@ -305,14 +384,24 @@ Deno.serve(async (request: Request) => {
         });
       }
 
+      // Encadeia o restante em background; quando o conteúdo zera, casa devedores.
+      let debtorsMatched = 0;
+      if (indexResult.contentPending > 0) {
+        scheduleBackgroundContinue(userId, folderId);
+      } else {
+        const m = await batchMatchDebtors(admin, userId, { onlyUnmatched: true });
+        debtorsMatched = m.matched;
+      }
+
       return ok({
         success:      true,
-        status:       "synced",
+        status:       indexResult.contentPending > 0 ? "indexing" : "synced",
         filesFound:   indexResult.filesFound,
         filesIndexed: indexResult.filesIndexed,
         filesSkipped: indexResult.filesSkipped,
         durationMs:   indexResult.durationMs,
-        debtorsMatched: 0,
+        contentPending: indexResult.contentPending,
+        debtorsMatched,
         debtorsTotal:   0,
       });
     }

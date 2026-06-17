@@ -15,6 +15,10 @@ export interface DriveFolderStatus {
   folderName:       string | null;
   isAccessible:     boolean;
   fileCount:        number;
+  /** PDFs cujo conteúdo já foi extraído (progresso da indexação) */
+  contentIndexed?:  number;
+  /** true enquanto a indexação de conteúdo ainda está rodando em background */
+  indexing?:        boolean;
   lastIndexedAt:    string | null;
   lastIndexError:   string | null;
   unmatchedDebtors: number;
@@ -39,6 +43,8 @@ export interface DriveSyncResult {
   durationMs:      number;
   debtorsMatched:  number;
   debtorsTotal:    number;
+  /** PDFs ainda aguardando extração de conteúdo (continua em background) */
+  contentPending?: number;
   error?:          string;
 }
 

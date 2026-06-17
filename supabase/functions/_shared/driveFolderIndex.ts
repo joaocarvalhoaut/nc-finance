@@ -56,6 +56,8 @@ export interface IndexResult {
   filesSkipped: number;  // already current (checksum match)
   filesError:   number;
   durationMs:   number;
+  /** PDFs que ainda precisam de extração de conteúdo após esta execução */
+  contentPending: number;
 }
 
 export interface BoletoMetadata {
@@ -555,13 +557,15 @@ export async function indexFolderForUser(
   // de execuções para arquivos novos/incompletos).
   const { data: existingRows } = await admin
     .from("user_drive_index")
-    .select("file_id, metadata_extracted")
+    .select("file_id, metadata_extraction_attempted")
     .eq("user_id", userId)
     .eq("folder_id", folderId);
 
+  // "Done" = já tentamos extrair o conteúdo do PDF (não basta ter o nome da pasta).
+  // Assim todo arquivo passa pela extração pesada uma vez, ao longo das execuções.
   const existingDone = new Set<string>(
-    ((existingRows ?? []) as Array<{ file_id: string; metadata_extracted: boolean | null }>)
-      .filter((r) => r.metadata_extracted)
+    ((existingRows ?? []) as Array<{ file_id: string; metadata_extraction_attempted: boolean | null }>)
+      .filter((r) => r.metadata_extraction_attempted)
       .map((r) => r.file_id),
   );
   const existingAny = new Set<string>(
@@ -700,7 +704,107 @@ export async function indexFolderForUser(
     status:       "success",
   });
 
-  return { filesFound, filesIndexed, filesSkipped, filesError, durationMs };
+  // Quantos PDFs ainda precisam de extração de conteúdo (os "leves" não tentados)
+  const contentPending = Math.max(0, pending.length - heavyFiles.length);
+
+  return { filesFound, filesIndexed, filesSkipped, filesError, durationMs, contentPending };
+}
+
+/**
+ * Extrai o conteúdo (linha digitável, CPF/CNPJ, valor…) de um lote de PDFs que
+ * já estão no índice mas ainda não tiveram o conteúdo lido — SEM re-varrer o
+ * Drive. Lê os pendentes do banco, baixa/parseia cada um e marca como tentado.
+ *
+ * Esta é a unidade de trabalho do processamento em background: chamadas
+ * sucessivas convergem até `remaining = 0`.
+ */
+export async function extractPendingContent(
+  admin: AdminClient,
+  userId: string,
+  folderId: string,
+  accessToken: string,
+  limit = MAX_CONTENT_PER_RUN,
+): Promise<{ processed: number; remaining: number }> {
+  // Pendentes: rows do índice ainda não tentadas
+  const { data: pendingRows } = await admin
+    .from("user_drive_index")
+    .select("file_id, file_name, client_name_extracted")
+    .eq("user_id", userId)
+    .eq("folder_id", folderId)
+    .eq("metadata_extraction_attempted", false)
+    .limit(limit);
+
+  const batch = (pendingRows ?? []) as Array<{ file_id: string; file_name: string; client_name_extracted: string | null }>;
+  const now = new Date().toISOString();
+
+  const processOne = async (row: { file_id: string; file_name: string; client_name_extracted: string | null }) => {
+    try {
+      const info = await getDriveFileInfo(row.file_id, accessToken);
+      const fileSize = info?.size ?? 0;
+
+      let meta: BoletoMetadata = {
+        linhaDigitavel: null, nossoNumero: null, cpfCnpj: null,
+        clientName: row.client_name_extracted ?? null,
+        valor: null, vencimento: null,
+      };
+      let metaExtracted = Boolean(row.client_name_extracted);
+
+      if (fileSize <= MAX_PDF_BYTES_FOR_EXTRACTION && fileSize > 0) {
+        const pdfBytes = await downloadDriveFile(row.file_id, accessToken);
+        if (pdfBytes && pdfBytes.length > 0) {
+          const text = await extractPdfText(pdfBytes);
+          if (text.trim().length > 20) {
+            const extracted = extractBoletoMetadata(text);
+            meta = {
+              linhaDigitavel: extracted.linhaDigitavel,
+              nossoNumero:    extracted.nossoNumero,
+              cpfCnpj:        extracted.cpfCnpj,
+              clientName:     extracted.clientName ?? meta.clientName,
+              valor:          extracted.valor,
+              vencimento:     extracted.vencimento,
+            };
+            metaExtracted = true;
+          }
+        }
+      }
+
+      await admin.from("user_drive_index").update({
+        file_size:            fileSize,
+        md5_checksum:         info?.md5Checksum ?? null,
+        drive_modified_at:    info?.modifiedTime ?? null,
+        updated_at:           now,
+        linha_digitavel:      meta.linhaDigitavel,
+        nosso_numero:         meta.nossoNumero,
+        cpf_cnpj:             meta.cpfCnpj,
+        client_name_extracted: meta.clientName,
+        valor:                meta.valor,
+        vencimento:           meta.vencimento,
+        metadata_extracted:           metaExtracted,
+        metadata_extraction_attempted: true,
+      }).eq("user_id", userId).eq("file_id", row.file_id);
+    } catch (e) {
+      console.error(`[driveFolderIndex] content extract error ${row.file_id.slice(0, 8)}:`, e instanceof Error ? e.message : String(e));
+      // Marca como tentado mesmo em erro, para não travar a convergência
+      await admin.from("user_drive_index")
+        .update({ metadata_extraction_attempted: true, updated_at: now })
+        .eq("user_id", userId).eq("file_id", row.file_id);
+    }
+  };
+
+  const CONCURRENCY = 6;
+  for (let i = 0; i < batch.length; i += CONCURRENCY) {
+    await Promise.all(batch.slice(i, i + CONCURRENCY).map(processOne));
+  }
+
+  // Conta o que ainda resta pendente após este lote
+  const { count: remainingCount } = await admin
+    .from("user_drive_index")
+    .select("file_id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("folder_id", folderId)
+    .eq("metadata_extraction_attempted", false);
+
+  return { processed: batch.length, remaining: remainingCount ?? 0 };
 }
 
 // ─── Matching ─────────────────────────────────────────────────────────────────

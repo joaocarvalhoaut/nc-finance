@@ -726,51 +726,74 @@ export default function App() {
     }
   };
 
-  // Salvar pasta do Google Drive e carregar status
+  // Acompanha o progresso da indexação em background, fazendo polling do status
+  // até o servidor terminar de ler o conteúdo de todos os PDFs.
+  const pollDriveIndexingProgress = async () => {
+    for (let i = 0; i < 120; i++) { // ~6 min de teto; o background segue mesmo após
+      const status = await driveFolderService.getStatus();
+      setDriveFolderStatus(status);
+      if (!status.indexing) {
+        setDriveSaveMsg({
+          ok: true,
+          text: `Indexação concluída: ${status.contentIndexed ?? status.fileCount} de ${status.fileCount} boleto(s) lidos. Clique em "Buscar boletos no Drive" para casar com os devedores.`,
+        });
+        return;
+      }
+      setDriveSaveMsg({
+        ok: true,
+        text: `Indexando em segundo plano: ${status.contentIndexed ?? 0} de ${status.fileCount} boleto(s) lidos…`,
+      });
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  };
+
+  // Salvar pasta do Google Drive — indexa o 1º lote e segue em background
   const handleSaveDriveFolder = async () => {
     if (!driveFolderUrl.trim()) return;
     setIsDriveSaving(true);
     setDriveSaveMsg(null);
     try {
       const result = await driveFolderService.saveFolder(driveFolderUrl.trim());
-      if (result.success) {
-        setDriveFolderUrl("");
-        setEditingDriveFolder(false);
-        // A indexação no "save" roda em background e pode ser cortada pelo runtime.
-        // Disparamos um sync síncrono para indexar de fato e atualizar o file_count.
-        setDriveSaveMsg({ ok: true, text: `Pasta "${result.folderName ?? "Drive"}" salva. Indexando boletos…` });
-        await handleSyncDriveFolder(`Pasta "${result.folderName ?? "Drive"}" conectada`);
-      } else {
+      if (!result.success) {
         setDriveSaveMsg({ ok: false, text: result.message || result.error || "Falha ao salvar pasta." });
+        return;
+      }
+      setDriveFolderUrl("");
+      setEditingDriveFolder(false);
+      setDriveSaveMsg({ ok: true, text: `Pasta "${result.folderName ?? "Drive"}" conectada. Indexando boletos em segundo plano…` });
+      const status = await driveFolderService.getStatus();
+      setDriveFolderStatus(status);
+      setIsDriveSyncing(true);
+      try {
+        if (status.indexing) await pollDriveIndexingProgress();
+        else setDriveSaveMsg({ ok: true, text: `Pasta "${result.folderName ?? "Drive"}" conectada e indexada (${status.fileCount} boleto(s)).` });
+      } finally {
+        setIsDriveSyncing(false);
       }
     } finally {
       setIsDriveSaving(false);
     }
   };
 
-  // Reindexar a pasta do Drive de forma síncrona (varre + extrai metadados + casa)
-  const handleSyncDriveFolder = async (prefix = "Pasta reindexada") => {
+  // Reindexar a pasta — dispara o ciclo de indexação e acompanha o progresso
+  const handleSyncDriveFolder = async () => {
     setIsDriveSyncing(true);
     try {
       const r = await driveFolderService.syncFolder();
-      // Mesmo que a chamada retorne timeout, a função segue indexando no servidor.
-      // Recarregamos o status: se o nº de arquivos indexados subiu, mostramos o
-      // progresso real em vez de um erro cru.
       const status = await driveFolderService.getStatus();
       setDriveFolderStatus(status);
 
-      if (r.success) {
-        setDriveSaveMsg({
-          ok: true,
-          text: `${prefix}: ${r.filesFound} arquivo(s) varrido(s) na pasta e subpastas. Agora clique em "Buscar boletos no Drive" para casar com os devedores.`,
-        });
-      } else if (status?.configured && status.fileCount > 0) {
-        setDriveSaveMsg({
-          ok: true,
-          text: `Indexação em andamento: ${status.fileCount} arquivo(s) já varrido(s). Pastas muito grandes são indexadas em partes — clique em "Reindexar" novamente para continuar, ou "Buscar boletos no Drive" para casar o que já foi lido.`,
-        });
-      } else {
+      if (!r.success && !(status?.configured && status.fileCount > 0)) {
         setDriveSaveMsg({ ok: false, text: r.error || "Falha ao indexar a pasta." });
+        return;
+      }
+      if (status.indexing) {
+        await pollDriveIndexingProgress();
+      } else {
+        setDriveSaveMsg({
+          ok: true,
+          text: `Indexação concluída: ${status.contentIndexed ?? status.fileCount} de ${status.fileCount} boleto(s) lidos. Clique em "Buscar boletos no Drive" para casar com os devedores.`,
+        });
       }
     } finally {
       setIsDriveSyncing(false);
@@ -3708,8 +3731,11 @@ export default function App() {
                       <div className="flex items-center gap-2 text-[11px] text-zinc-400 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2">
                         <FolderOpen className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
                         <span className="truncate flex-1">
-                          Pasta: <span className="text-zinc-200 font-medium">{driveFolderStatus.folderName || "Drive"}</span> · {driveFolderStatus.fileCount} arquivo(s) indexado(s)
-                          {driveFolderStatus.unmatchedDebtors > 0 && ` · ${driveFolderStatus.unmatchedDebtors} devedor(es) sem boleto`}
+                          Pasta: <span className="text-zinc-200 font-medium">{driveFolderStatus.folderName || "Drive"}</span> · {driveFolderStatus.fileCount} arquivo(s)
+                          {driveFolderStatus.indexing
+                            ? <span className="text-sky-300"> · indexando conteúdo {driveFolderStatus.contentIndexed ?? 0}/{driveFolderStatus.fileCount}…</span>
+                            : ` · ${driveFolderStatus.contentIndexed ?? driveFolderStatus.fileCount} lido(s)`}
+                          {driveFolderStatus.unmatchedDebtors > 0 && ` · ${driveFolderStatus.unmatchedDebtors} sem boleto`}
                         </span>
                         <button
                           type="button"
