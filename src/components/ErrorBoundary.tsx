@@ -17,6 +17,9 @@ interface State {
 }
 
 export default class ErrorBoundary extends Component<Props, State> {
+  // @types/react não está instalado neste projeto, então os membros herdados de
+  // Component não são tipados — declaramos explicitamente para o tsc.
+  declare props: Props;
   state: State = { hasError: false, message: "" };
 
   static getDerivedStateFromError(error: unknown): State {
