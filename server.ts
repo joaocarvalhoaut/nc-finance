@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
-import { extractDebtorsWithGemini } from "./src/server/geminiExtraction";
 
 dotenv.config();
 
@@ -11,46 +10,17 @@ const PORT = 3000;
 
 app.use(express.json({ limit: "10mb" }));
 
-app.post("/api/gemini/extract", async (req, res) => {
-  const { textContent, category } = req.body ?? {};
-
-  console.log(
-    JSON.stringify({
-      source: "server.gemini.extract.request",
-      method: req.method,
-      has_body: Boolean(req.body),
-      category,
-      text_length: typeof textContent === "string" ? textContent.length : 0,
-    }),
-  );
-
-  if (!textContent || typeof textContent !== "string") {
-    return res.status(400).json({ error: "O texto para extração é obrigatório." });
-  }
-
-  try {
-    const result = await extractDebtorsWithGemini({ textContent, category });
-    return res.status(200).json(result);
-  } catch (error) {
-    console.error(
-      JSON.stringify({
-        source: "server.gemini.extract.error",
-        message: error instanceof Error ? error.message : "Falha desconhecida",
-        stack: error instanceof Error ? error.stack : undefined,
-      }),
-    );
-
-    return res.status(500).json({ error: "Falha ao processar a extração com Gemini." });
-  }
-});
+// 1. Gemini: endpoint REMOVIDO â€” o pipeline de extracao e 100% local (sem custo
+// de API e sem endpoint publico nao autenticado). Caso volte a usar Gemini como
+// fallback no futuro, reexpor SOMENTE com autenticacao (JWT do Supabase).
 
 // 2. Z-API: endpoint mock REMOVIDO na Fase Z-API.
-// Envio WhatsApp real é feito exclusivamente via Edge Function `send-whatsapp-charge`
+// Envio WhatsApp real ï¿½ feito exclusivamente via Edge Function `send-whatsapp-charge`
 // que roda no backend Supabase com as credenciais ZAPI_INSTANCE_ID / ZAPI_TOKEN / ZAPI_CLIENT_TOKEN.
 // O frontend NUNCA acessa credenciais Z-API diretamente.
 
 // 3. Google Drive: endpoint mock REMOVIDO na Fase Google Drive.
-// Localização de PDFs é feita exclusivamente via Edge Function `match-drive-files`
+// Localizaï¿½ï¿½o de PDFs ï¿½ feita exclusivamente via Edge Function `match-drive-files`
 // que roda no backend Supabase com os segredos GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY, GOOGLE_DRIVE_FOLDER_ID.
 // O frontend NUNCA acessa credenciais Google diretamente.
 
