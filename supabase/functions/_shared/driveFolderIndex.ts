@@ -466,19 +466,49 @@ export function scoreRow(
     !fnDigits.includes(docDigits) &&
     !docDigits.includes(fnDigits);
 
+  // ── Sinal 4: valor + vencimento (extraídos do conteúdo do PDF) ────────────
+  // É o sinal que DESEMPATA múltiplos boletos do mesmo cliente, já que o número
+  // do documento (NF/título) não aparece no boleto. Calculado cedo para compor
+  // com o nome.
+  let valorOk = false;
+  let vencOk  = false;
+  if (debtor.amount && row.valor) {
+    valorOk = Math.abs(debtor.amount - row.valor) < 0.02;
+  }
+  if (debtor.dueDate && row.vencimento) {
+    let due = debtor.dueDate;
+    const ddmm = due.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (ddmm) due = `${ddmm[3]}-${ddmm[2]}-${ddmm[1]}`;
+    vencOk = due.slice(0, 10) === row.vencimento.slice(0, 10);
+  }
+
   // ── Score combinado ───────────────────────────────────────────────────────
 
-  // Ambos os sinais positivos → máxima certeza
+  // Documento (linha/nosso/CPF/filename) + nome → máxima certeza
   if (docScore > 0 && nameScore >= 0.35) {
     return { score: 1.0, reason: `${docReason}+${nameReason}` };
   }
-
-  // Apenas documento
   if (docScore > 0) {
     return { score: docScore, reason: docReason };
   }
 
-  // Apenas nome — mas se o número do arquivo conflita, rebaixa abaixo do limiar
+  // Nome + valor + vencimento → identifica o boleto exato do cliente certo
+  // (desempata quando o cliente tem vários boletos). Tem prioridade sobre
+  // nome-só, inclusive sobrepondo o conflito de número do filename.
+  if (nameScore >= 0.35 && valorOk && vencOk) {
+    return { score: 0.97, reason: "name+valor+vencimento" };
+  }
+  if (nameScore >= 0.35 && valorOk) {
+    return { score: 0.82, reason: "name+valor" };
+  }
+
+  // Valor + vencimento sem nome forte — ainda bastante único
+  if (valorOk && vencOk) {
+    return { score: 0.75, reason: "valor+vencimento" };
+  }
+
+  // Apenas nome — mas se o número do arquivo conflita (boleto de OUTRO título
+  // do mesmo cliente) e não há valor/vencimento corroborando, rebaixa.
   if (nameScore >= 0.60) {
     if (fileHasConflictingNumber) {
       return { score: 0.45, reason: `${nameReason}_doc_conflict` };
@@ -492,22 +522,7 @@ export function scoreRow(
     return { score: 0.30 + nameScore * 0.67, reason: nameReason };
   }
 
-  // ── Fallback: valor + vencimento ─────────────────────────────────────────
-  let valorOk = false;
-  let vencOk  = false;
-
-  if (debtor.amount && row.valor) {
-    valorOk = Math.abs(debtor.amount - row.valor) < 0.02;
-  }
-  if (debtor.dueDate && row.vencimento) {
-    let due = debtor.dueDate;
-    const ddmm = due.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if (ddmm) due = `${ddmm[3]}-${ddmm[2]}-${ddmm[1]}`;
-    vencOk = due.slice(0, 10) === row.vencimento.slice(0, 10);
-  }
-
-  if (valorOk && vencOk) return { score: 0.45, reason: "valor_vencimento" };
-  if (valorOk)           return { score: 0.30, reason: "valor_only" };
+  if (valorOk) return { score: 0.30, reason: "valor_only" };
 
   return { score: 0, reason: "no_match" };
 }
