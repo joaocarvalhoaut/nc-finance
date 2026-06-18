@@ -32,9 +32,10 @@ const mapRowToRepresentative = (row: RepresentativeRow): Representative => ({
 const mapRepresentativeToRow = (userId: string, representative: Representative) => {
   const row: Record<string, unknown> = {
     user_id: userId,
-    name: representative.name,
-    phone: representative.phone,
-    role: representative.role,
+    // trim: evita nomes/telefones com espaços antes/depois sujando o cadastro
+    name: representative.name?.trim() ?? representative.name,
+    phone: representative.phone?.trim() ?? representative.phone,
+    role: representative.role?.trim() ?? representative.role,
     color: representative.color
   };
   // Only include id when it's a valid UUID — omitting it lets Postgres auto-generate one

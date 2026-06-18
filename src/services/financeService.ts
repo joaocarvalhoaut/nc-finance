@@ -119,8 +119,8 @@ const mapRowToDebtor = (row: FinancialRecordRow): Debtor => ({
 const mapDebtorToRow = (userId: string, debtor: Debtor) => ({
   id: debtor.id || undefined,
   user_id: userId,
-  client_name: debtor.client,
-  supplier_name: debtor.supplier,
+  client_name: debtor.client?.trim() ?? debtor.client,
+  supplier_name: debtor.supplier?.trim() ?? debtor.supplier,
   document_number: debtor.document?.trim() || null,
   due_date: normalizeDateToStorage(debtor.dueDate),
   amount: Number(debtor.value || 0),
