@@ -1,6 +1,6 @@
 # NC Finance — Guia de Deploy em Produção
 
-> **Stack**: React + Vite (Vercel) · Supabase (DB + Auth + Edge Functions) · Stripe · Z-API · Gemini AI
+> **Stack**: React + Vite (Vercel) · Supabase (DB + Auth + Edge Functions) · Stripe · Z-API
 
 ---
 
@@ -13,7 +13,6 @@
 | **Stripe** | Conta ativa; 3 produtos/preços criados (Basic, Pro, Premium); webhook configurado |
 | **Z-API** | Instância global criada e conectada a um número WhatsApp |
 | **Google Cloud** | Service Account com APIs Sheets + Drive habilitadas |
-| **Gemini** | Chave de API no Google AI Studio |
 
 ---
 
