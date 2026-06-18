@@ -6,6 +6,12 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    // Remove console.log/info/debug do bundle de produção (minificado), mantendo
+    // console.error/warn para monitoramento. Em dev não há minificação, então os
+    // logs continuam visíveis.
+    esbuild: {
+      pure: ['console.log', 'console.info', 'console.debug'],
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
