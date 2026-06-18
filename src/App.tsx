@@ -5,7 +5,7 @@ import LandingPage from "./components/LandingPage";
 import SubscriptionGate from "./components/SubscriptionGate";
 import SubscriptionStatusCard from "./components/SubscriptionStatusCard";
 import ClientDashboard from "./components/ClientDashboard";
-import { PLAN_LIST } from "./config/plans";
+import { PLAN_LIST, getPlanDefinition } from "./config/plans";
 import { useAccount } from "./hooks/useAccount";
 import { useSubscription } from "./hooks/useSubscription";
 import { billingLogsService } from "./services/billingLogsService";
@@ -974,7 +974,7 @@ export default function App() {
     if (!isLoggedIn) return;
     setIsLoadingMetrics(true);
     try {
-      const limit = usage?.planLimit ?? 300;
+      const limit = getPlanDefinition(plan).monthlyChargeLimit;
       const metrics = await metricsService.load(limit);
       setOperationalMetrics(metrics);
     } catch {
@@ -2257,8 +2257,8 @@ export default function App() {
                       <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-1">
                         <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Envios este mês</p>
                         <p className="text-xl font-extrabold text-white font-mono">
-                          {operationalMetrics?.usageThisMonth?.chargesUsed ?? (usage?.chargesUsed ?? 0)}
-                          <span className="text-xs font-normal text-zinc-500">/{operationalMetrics?.usageThisMonth?.planLimit ?? (usage?.planLimit ?? "?")}</span>
+                          {operationalMetrics?.usageThisMonth?.chargesUsed ?? (usage?.chargesSent ?? 0)}
+                          <span className="text-xs font-normal text-zinc-500">/{operationalMetrics?.usageThisMonth?.planLimit ?? getPlanDefinition(plan).monthlyChargeLimit}</span>
                         </p>
                       </div>
                       <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-1">
@@ -4627,8 +4627,6 @@ export default function App() {
 
                             if (ruleType === "overdue") {
                               matchCount = debtors.filter(d => d.category === "vencidos" && d.status !== "sent").length;
-                            } else if (ruleType === "all_pending") {
-                              matchCount = debtors.filter(d => d.category !== "liquidado").length;
                             } else if (ruleType === "due_in_days") {
                               const today = new Date();
                               today.setHours(0, 0, 0, 0);
