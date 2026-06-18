@@ -10,8 +10,8 @@
  *   <PdfPreviewModal />                       // monte uma vez no topo da árvore
  *   openPdfPreview(url, name)                 // chame de qualquer lugar
  */
-import { useSyncExternalStore } from "react";
-import { ExternalLink, FileCheck2, X } from "lucide-react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { ExternalLink, FileCheck2, Loader2, X } from "lucide-react";
 
 type PdfPreviewState = { url: string; name: string } | null;
 
@@ -51,6 +51,12 @@ function toEmbedUrl(url: string): string {
 
 export function PdfPreviewModal() {
   const pdfPreview = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const [loading, setLoading] = useState(true);
+
+  // Reinicia o estado de carregando sempre que muda o PDF exibido.
+  useEffect(() => {
+    setLoading(true);
+  }, [pdfPreview?.url]);
 
   if (!pdfPreview) return null;
 
@@ -87,12 +93,21 @@ export function PdfPreviewModal() {
             </button>
           </div>
         </div>
-        <iframe
-          key={pdfPreview.url}
-          src={toEmbedUrl(pdfPreview.url)}
-          title={pdfPreview.name}
-          className="flex-1 w-full bg-zinc-950"
-        />
+        <div className="relative flex-1 bg-zinc-950">
+          {loading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-zinc-400">
+              <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
+              <span className="text-xs">Carregando boleto…</span>
+            </div>
+          )}
+          <iframe
+            key={pdfPreview.url}
+            src={toEmbedUrl(pdfPreview.url)}
+            title={pdfPreview.name}
+            onLoad={() => setLoading(false)}
+            className="absolute inset-0 w-full h-full"
+          />
+        </div>
       </div>
     </div>
   );
