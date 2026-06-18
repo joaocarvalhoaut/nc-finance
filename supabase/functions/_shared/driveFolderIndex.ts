@@ -1043,6 +1043,22 @@ export async function batchMatchDebtors(
         .eq("id", d.id as string)
         .eq("user_id", userId);
       matched++;
+    } else if (d.drive_file_id && d.drive_file_id !== "uploaded") {
+      // Re-match auto-corretivo: havia uma sugestão (não importada) que agora
+      // não passa mais no limiar — limpa para não exibir um boleto errado.
+      await admin
+        .from("user_registros_financeiros")
+        .update({
+          drive_file_id:       null,
+          drive_file_name:     null,
+          drive_file_url:      null,
+          drive_match_score:   null,
+          drive_match_reason:  null,
+          drive_last_match_at: now,
+          updated_at:          now,
+        })
+        .eq("id", d.id as string)
+        .eq("user_id", userId);
     }
   }
 
