@@ -36,6 +36,8 @@ export default defineConfig(() => {
             'vendor-supabase': ['@supabase/supabase-js'],
             // Vendor: Lucide icon library
             'vendor-icons': ['lucide-react'],
+            // Vendor: planilhas (xlsx) — pesado, separado p/ cache e carga paralela
+            'vendor-xlsx': ['xlsx'],
           },
         },
       },
