@@ -91,7 +91,7 @@ export const metricsService = {
     const supabase = getSupabaseClient();
     const period = currentPeriod();
 
-    const [importsRes, driveRes, runsRes, errorsRes, usageRes, logsRes, jobsRes] =
+    const [importsRes, driveRes, runsRes, errorsRes, usageRes, logsTotalRes, logsSuccessRes, logsFailedRes, jobsRes] =
       await Promise.allSettled([
         // Recent import logs (last 8)
         supabase
@@ -129,12 +129,21 @@ export const metricsService = {
           .eq("period", period)
           .maybeSingle(),
 
-        // Billing logs this month for success-rate calc
+        // Billing logs this month — contagens exatas (head count, sem cap de linhas)
         supabase
           .from("user_logs_cobranca")
-          .select("status")
-          .gte("created_at", `${period}-01T00:00:00Z`)
-          .limit(500),
+          .select("id", { count: "exact", head: true })
+          .gte("created_at", `${period}-01T00:00:00Z`),
+        supabase
+          .from("user_logs_cobranca")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "sucesso")
+          .gte("created_at", `${period}-01T00:00:00Z`),
+        supabase
+          .from("user_logs_cobranca")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "erro")
+          .gte("created_at", `${period}-01T00:00:00Z`),
 
         // Active jobs in queue
         supabase
@@ -209,11 +218,10 @@ export const metricsService = {
       period,
     };
 
-    // ── Success rate ──
-    const logsData = logsRes.status === "fulfilled" ? (logsRes.value.data ?? []) : [];
-    const totalSentThisMonth   = logsData.filter((r: Row) => r.status === "sucesso").length;
-    const totalFailedThisMonth = logsData.filter((r: Row) => r.status === "erro").length;
-    const totalLogs = logsData.length;
+    // ── Success rate (contagens exatas, sem cap de 500 linhas) ──
+    const totalSentThisMonth   = logsSuccessRes.status === "fulfilled" ? (logsSuccessRes.value.count ?? 0) : 0;
+    const totalFailedThisMonth = logsFailedRes.status  === "fulfilled" ? (logsFailedRes.value.count  ?? 0) : 0;
+    const totalLogs = logsTotalRes.status === "fulfilled" ? (logsTotalRes.value.count ?? 0) : 0;
     const successRateThisMonth =
       totalLogs > 0 ? Math.round((totalSentThisMonth / totalLogs) * 100) : 0;
 
