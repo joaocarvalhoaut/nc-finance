@@ -87,9 +87,13 @@ const mapUsageRow = (row: UserUsageCounterRow): UserUsageCounter => ({
   updatedAt: row.updated_at,
 });
 
+// IMPORTANTE: usa UTC para casar com a chave de período gravada pelo backend
+// (Edge Functions usam getUTCMonth ao incrementar charges_sent). Usar mês local
+// aqui fazia o card "Uso mensal" ler uma linha diferente da que o backend grava,
+// divergindo de "enviadas" perto da virada de mês. Mantém UTC em todo o sistema.
 export const getUsagePeriodKey = (referenceDate = new Date()) => {
-  const year = referenceDate.getFullYear();
-  const month = `${referenceDate.getMonth() + 1}`.padStart(2, "0");
+  const year = referenceDate.getUTCFullYear();
+  const month = `${referenceDate.getUTCMonth() + 1}`.padStart(2, "0");
   return `${year}-${month}`;
 };
 
