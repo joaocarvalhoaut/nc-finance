@@ -28,6 +28,7 @@ import type { AuthCredentials, SignUpPayload } from "../types";
 interface LandingPageProps {
   onLogin: (credentials: AuthCredentials) => Promise<void>;
   onSignUp: (payload: SignUpPayload) => Promise<{ needsEmailConfirmation: boolean; message: string }>;
+  onForgotPassword: (email: string) => Promise<void>;
   isAuthLoading: boolean;
   authConfigError?: string;
 }
@@ -35,6 +36,7 @@ interface LandingPageProps {
 export default function LandingPage({
   onLogin,
   onSignUp,
+  onForgotPassword,
   isAuthLoading,
   authConfigError = ""
 }: LandingPageProps) {
@@ -42,6 +44,8 @@ export default function LandingPage({
   const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
   const [isRegisterMode, setIsRegisterMode] = useState(false);
+  // Modo "esqueci a senha": pede só o email e envia o link de recuperação
+  const [isForgotMode, setIsForgotMode] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   // Campos de registro expandido
@@ -109,6 +113,27 @@ export default function LandingPage({
       setAuthError(authConfigError);
       return;
     }
+
+    // ── Modo "esqueci a senha": só precisa do email ──
+    if (isForgotMode) {
+      if (!authEmail.trim()) {
+        setAuthError("Digite seu e-mail para receber o link de recuperação.");
+        return;
+      }
+      setAuthError("");
+      setAuthInfo("");
+      try {
+        await onForgotPassword(authEmail);
+        setIsAuthSuccess(false);
+        setAuthInfo("Se este e-mail tiver conta, enviamos um link para redefinir a senha. Verifique sua caixa de entrada e o spam.");
+      } catch {
+        // Mensagem genérica para não revelar se o e-mail existe
+        setIsAuthSuccess(false);
+        setAuthInfo("Se este e-mail tiver conta, enviamos um link para redefinir a senha. Verifique sua caixa de entrada e o spam.");
+      }
+      return;
+    }
+
     if (!authEmail || !authPassword) {
       setAuthError("Por favor, preencha todos os campos obrigatorios.");
       return;
@@ -1133,20 +1158,37 @@ export default function LandingPage({
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Senha de Acesso</label>
-                <input
-                  type="password"
-                  required
-                  value={authPassword}
-                  onChange={(e) => {
-                    setAuthPassword(e.target.value);
-                    setAuthError("");
-                  }}
-                  className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light font-mono"
-                  placeholder="••••••••"
-                />
-              </div>
+              {!isForgotMode && (
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Senha de Acesso</label>
+                  <input
+                    type="password"
+                    required={!isForgotMode}
+                    value={authPassword}
+                    onChange={(e) => {
+                      setAuthPassword(e.target.value);
+                      setAuthError("");
+                    }}
+                    className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light font-mono"
+                    placeholder="••••••••"
+                  />
+                  {!isRegisterMode && (
+                    <button
+                      type="button"
+                      onClick={() => { setIsForgotMode(true); setAuthError(""); setAuthInfo(""); }}
+                      className="mt-2 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                    >
+                      Esqueci minha senha
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {isForgotMode && (
+                <p className="text-xs text-zinc-400 -mt-1">
+                  Digite o e-mail da sua conta e enviaremos um link para você criar uma nova senha.
+                </p>
+              )}
 
               {isRegisterMode && (
                 <>
@@ -1273,28 +1315,40 @@ export default function LandingPage({
               >
                 {isAuthLoading
                   ? "Validando acesso..."
-                  : isRegisterMode
-                    ? "Registrar e Entrar"
-                    : "Validar Acesso e Conectar"}
+                  : isForgotMode
+                    ? "Enviar link de recuperação"
+                    : isRegisterMode
+                      ? "Registrar e Entrar"
+                      : "Validar Acesso e Conectar"}
               </button>
             </form>
 
             <div className="mt-8 flex items-center justify-end text-xs text-zinc-500 border-t border-zinc-900 pt-5">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRegisterMode(!isRegisterMode);
-                  setAcceptedTerms(false);
-                  setAuthCPF(""); setAuthPhone(""); setAuthCEP("");
-                  setAuthAddress(""); setAuthCity(""); setAuthState("");
-                  setCpfError("");
-                  setAuthError("");
-                  setAuthInfo("");
-                }}
-                className="text-emerald-400 font-bold hover:underline"
-              >
-                {isRegisterMode ? "Já possuo conta (Entrar)" : "Criar uma conta grátis"}
-              </button>
+              {isForgotMode ? (
+                <button
+                  type="button"
+                  onClick={() => { setIsForgotMode(false); setAuthError(""); setAuthInfo(""); }}
+                  className="text-emerald-400 font-bold hover:underline"
+                >
+                  Voltar ao login
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegisterMode(!isRegisterMode);
+                    setAcceptedTerms(false);
+                    setAuthCPF(""); setAuthPhone(""); setAuthCEP("");
+                    setAuthAddress(""); setAuthCity(""); setAuthState("");
+                    setCpfError("");
+                    setAuthError("");
+                    setAuthInfo("");
+                  }}
+                  className="text-emerald-400 font-bold hover:underline"
+                >
+                  {isRegisterMode ? "Já possuo conta (Entrar)" : "Criar uma conta grátis"}
+                </button>
+              )}
             </div>
           </div>
         </div>

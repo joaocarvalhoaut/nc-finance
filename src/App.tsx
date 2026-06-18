@@ -181,6 +181,9 @@ export default function App() {
     signIn,
     signUp,
     signOut,
+    resetPassword,
+    updatePassword,
+    passwordRecovery,
     configError: authConfigError
   } = useAccount();
   const {
@@ -372,6 +375,41 @@ export default function App() {
       setCurrentTab("cobrar");
     } finally {
       setIsAuthenticating(false);
+    }
+  };
+
+  const handleForgotPassword = async (email: string) => {
+    await resetPassword(email);
+  };
+
+  // ── Recuperação de senha: define a nova senha após abrir o link do email ──
+  const [newPwd, setNewPwd] = useState("");
+  const [newPwdConfirm, setNewPwdConfirm] = useState("");
+  const [newPwdError, setNewPwdError] = useState("");
+  const [newPwdSaving, setNewPwdSaving] = useState(false);
+  const [newPwdDone, setNewPwdDone] = useState(false);
+
+  const handleSetNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setNewPwdError("");
+    if (newPwd.length < 6) {
+      setNewPwdError("A senha deve ter no mínimo 6 caracteres.");
+      return;
+    }
+    if (newPwd !== newPwdConfirm) {
+      setNewPwdError("As senhas não coincidem.");
+      return;
+    }
+    setNewPwdSaving(true);
+    try {
+      await updatePassword(newPwd);
+      setNewPwdDone(true);
+      setNewPwd("");
+      setNewPwdConfirm("");
+    } catch (error) {
+      setNewPwdError(error instanceof Error ? error.message : "Falha ao atualizar a senha.");
+    } finally {
+      setNewPwdSaving(false);
     }
   };
 
@@ -1805,12 +1843,72 @@ export default function App() {
     );
   }
 
+  // ── Tela de definição de nova senha (após abrir o link de recuperação) ──
+  if (passwordRecovery || newPwdDone) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/70 p-8 shadow-2xl">
+          {newPwdDone ? (
+            <div className="text-center space-y-4">
+              <h1 className="text-lg font-bold text-emerald-400">Senha alterada com sucesso</h1>
+              <p className="text-sm text-zinc-400">Você já está conectado com a nova senha.</p>
+              <button
+                type="button"
+                onClick={() => setNewPwdDone(false)}
+                className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-black transition hover:bg-emerald-400"
+              >
+                Ir para o painel
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSetNewPassword} className="space-y-4">
+              <div>
+                <h1 className="text-lg font-bold text-white">Criar nova senha</h1>
+                <p className="mt-1 text-sm text-zinc-400">Defina uma nova senha para sua conta.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1.5">Nova senha</label>
+                <input
+                  type="password"
+                  value={newPwd}
+                  onChange={(e) => { setNewPwd(e.target.value); setNewPwdError(""); }}
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900/80 px-4 py-3 text-sm text-white focus:border-emerald-500 focus:outline-none font-mono"
+                  placeholder="••••••••"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1.5">Confirmar senha</label>
+                <input
+                  type="password"
+                  value={newPwdConfirm}
+                  onChange={(e) => { setNewPwdConfirm(e.target.value); setNewPwdError(""); }}
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900/80 px-4 py-3 text-sm text-white focus:border-emerald-500 focus:outline-none font-mono"
+                  placeholder="••••••••"
+                />
+              </div>
+              {newPwdError && <p className="text-xs text-rose-400">{newPwdError}</p>}
+              <button
+                type="submit"
+                disabled={newPwdSaving}
+                className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-black transition hover:bg-emerald-400 disabled:opacity-50"
+              >
+                {newPwdSaving ? "Salvando..." : "Salvar nova senha"}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-zinc-950 text-zinc-100 min-h-screen">
       {!isLoggedIn ? (
-        <LandingPage 
+        <LandingPage
           onLogin={handleSignIn}
           onSignUp={handleSignUp}
+          onForgotPassword={handleForgotPassword}
           isAuthLoading={isAuthenticating}
           authConfigError={authConfigError}
         />

@@ -4,9 +4,11 @@ import type { AuthCredentials, SignUpPayload } from "../types";
 import {
   getSession,
   onAuthStateChange,
+  resetPassword,
   signIn,
   signOut,
-  signUp
+  signUp,
+  updatePassword
 } from "../services/authService";
 import { hasSupabaseConfig, supabaseConfigError } from "../services/supabaseClient";
 
@@ -14,6 +16,8 @@ export const useSession = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  // true quando o usuário abriu o link de recuperação de senha do email
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     if (!hasSupabaseConfig) {
@@ -44,8 +48,11 @@ export const useSession = () => {
       }
     });
 
-    const unsubscribe = onAuthStateChange((_event, nextSession) => {
+    const unsubscribe = onAuthStateChange((event, nextSession) => {
       if (!isMounted) return;
+      if (event === "PASSWORD_RECOVERY") {
+        setPasswordRecovery(true);
+      }
       setSession(nextSession);
       setUser(nextSession?.user || null);
       setLoading(false);
@@ -69,6 +76,15 @@ export const useSession = () => {
     return signOut();
   }, []);
 
+  const requestPasswordReset = useCallback((email: string) => {
+    return resetPassword(email);
+  }, []);
+
+  const setNewPassword = useCallback(async (newPassword: string) => {
+    await updatePassword(newPassword);
+    setPasswordRecovery(false);
+  }, []);
+
   return {
     user,
     session,
@@ -76,6 +92,9 @@ export const useSession = () => {
     signIn: signInWithPassword,
     signUp: signUpWithPassword,
     signOut: signOutCurrentUser,
+    resetPassword: requestPasswordReset,
+    updatePassword: setNewPassword,
+    passwordRecovery,
     configError: supabaseConfigError
   };
 };

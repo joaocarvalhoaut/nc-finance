@@ -85,6 +85,32 @@ export const signUp = async ({ email, password, name, cpf, phone, cep, address, 
   return data;
 };
 
+/**
+ * resetPassword — envia o email de recuperação de senha.
+ * O link no email leva de volta ao app (redirectTo) com um token de recovery;
+ * o supabase-js dispara o evento PASSWORD_RECOVERY ao abrir, e o app mostra a
+ * tela de nova senha.
+ */
+export const resetPassword = async (email: string) => {
+  const supabase = getSupabaseClient();
+  const redirectTo = typeof window !== "undefined" ? window.location.origin : undefined;
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+
+  if (error) {
+    throw new Error(error.message || "Falha ao enviar o email de recuperação.");
+  }
+};
+
+/** updatePassword — define a nova senha do usuário autenticado (fluxo de recovery). */
+export const updatePassword = async (newPassword: string) => {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+  if (error) {
+    throw new Error(error.message || "Falha ao atualizar a senha.");
+  }
+};
+
 export const signOut = async () => {
   const supabase = getSupabaseClient();
   const { error } = await supabase.auth.signOut();
