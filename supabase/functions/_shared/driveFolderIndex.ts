@@ -453,6 +453,19 @@ export function scoreRow(
   ]);
   const nameReason = "name_similarity";
 
+  // ── Sinal 3: conflito de número ───────────────────────────────────────────
+  // Se o filename tem um número (≥3 díg.) e ele NÃO bate com o documento do
+  // devedor (nenhum contém o outro), é provável que seja o boleto de OUTRO
+  // título do MESMO cliente. Nesse caso, nome igual NÃO é suficiente para
+  // sugerir — penaliza o match por nome para baixo do limiar.
+  const fnDigits = row.file_name_normalized ? digits(row.file_name_normalized) : "";
+  const fileHasConflictingNumber =
+    docScore === 0 &&
+    fnDigits.length >= 3 &&
+    docDigits.length >= 3 &&
+    !fnDigits.includes(docDigits) &&
+    !docDigits.includes(fnDigits);
+
   // ── Score combinado ───────────────────────────────────────────────────────
 
   // Ambos os sinais positivos → máxima certeza
@@ -465,11 +478,17 @@ export function scoreRow(
     return { score: docScore, reason: docReason };
   }
 
-  // Apenas nome
+  // Apenas nome — mas se o número do arquivo conflita, rebaixa abaixo do limiar
   if (nameScore >= 0.60) {
+    if (fileHasConflictingNumber) {
+      return { score: 0.45, reason: `${nameReason}_doc_conflict` };
+    }
     return { score: 0.50 + nameScore * 0.50, reason: nameReason };
   }
   if (nameScore >= 0.30) {
+    if (fileHasConflictingNumber) {
+      return { score: 0.30, reason: `${nameReason}_doc_conflict` };
+    }
     return { score: 0.30 + nameScore * 0.67, reason: nameReason };
   }
 
