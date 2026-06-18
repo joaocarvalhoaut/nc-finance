@@ -214,8 +214,16 @@ Deno.serve(async (request: Request) => {
     // ── 7. Lê devedores do usuário ────────────────────────────────────────────
     const { data: rawDebtors } = await admin
       .from("user_registros_financeiros")
-      .select("id, document_number, client_name, phone")
+      .select("id, document_number, client_name, phone, drive_file_id")
       .eq("user_id", userId);
+
+    // Devedores com boleto já importado ("uploaded") são intocáveis: não devem
+    // ser re-matchados nem ter o vínculo limpo num novo lookup.
+    const uploadedDebtorIds = new Set(
+      ((rawDebtors ?? []) as Array<Record<string, string>>)
+        .filter((r) => r.drive_file_id === "uploaded")
+        .map((r) => r.id),
+    );
 
     const debtors: DebtorMatchInput[] = ((rawDebtors ?? []) as Array<Record<string, string>>).map((r) => ({
       id:             r.id,
@@ -232,6 +240,11 @@ Deno.serve(async (request: Request) => {
     const now = new Date().toISOString();
 
     for (const m of matches) {
+      // Boleto já importado é intocável — preserva o vínculo salvo no Storage.
+      if (uploadedDebtorIds.has(m.debtorId)) {
+        matchedCount++;
+        continue;
+      }
       if (m.fileId) {
         matchedCount++;
         await admin
@@ -310,14 +323,17 @@ Deno.serve(async (request: Request) => {
       error:           null,
       logId:           (logEntry as { id: string } | null)?.id ?? null,
       matchedAt:       now,
-      // Lista dos matches para o frontend atualizar state local
-      matches: matches.map((m) => ({
-        debtorId:  m.debtorId,
-        fileId:    m.fileId,
-        fileName:  m.fileName,
-        fileUrl:   m.fileUrl,
-        score:     m.score,
-      })),
+      // Lista dos matches para o frontend atualizar state local.
+      // Exclui os "uploaded": seu vínculo salvo não deve ser sobrescrito na UI.
+      matches: matches
+        .filter((m) => !uploadedDebtorIds.has(m.debtorId))
+        .map((m) => ({
+          debtorId:  m.debtorId,
+          fileId:    m.fileId,
+          fileName:  m.fileName,
+          fileUrl:   m.fileUrl,
+          score:     m.score,
+        })),
     });
 
   } catch (err) {

@@ -962,7 +962,7 @@ export async function batchMatchDebtors(
   // Build query
   let query = admin
     .from("user_registros_financeiros")
-    .select("id, document_number, client_name, amount, due_date, updated_value")
+    .select("id, document_number, client_name, amount, due_date, updated_value, drive_file_id")
     .eq("user_id", userId);
 
   if (options?.debtorIds?.length) {
@@ -995,6 +995,10 @@ export async function batchMatchDebtors(
   const rowDocs = precomputeRowDocs(rows);
 
   for (const d of debtors as Array<Record<string, unknown>>) {
+    // Nunca sobrescreve um boleto já importado ("uploaded"): ele já foi salvo
+    // no Storage e o usuário não deve precisar reimportar.
+    if (d.drive_file_id === "uploaded") continue;
+
     const debtor = {
       // Passa o número original (alfanumérico) — scoreRow faz a normalização internamente
       documentNumber: String(d.document_number ?? ""),
