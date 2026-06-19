@@ -507,19 +507,16 @@ export function scoreRow(
     return { score: 0.75, reason: "valor+vencimento" };
   }
 
-  // Apenas nome — mas se o número do arquivo conflita (boleto de OUTRO título
-  // do mesmo cliente) e não há valor/vencimento corroborando, rebaixa.
-  if (nameScore >= 0.60) {
-    if (fileHasConflictingNumber) {
-      return { score: 0.45, reason: `${nameReason}_doc_conflict` };
-    }
-    return { score: 0.50 + nameScore * 0.50, reason: nameReason };
-  }
+  // ── Apenas nome → NÃO é prova suficiente ──────────────────────────────────
+  // Um cliente tem vários boletos e há arquivos genéricos (RECIBO.pdf, etc.).
+  // Sem documento/valor/vencimento corroborando, o match por nome fica SEMPRE
+  // abaixo do limiar de sugestão (AUTO_ATTACH_THRESHOLD = 0.70) — registra o
+  // sinal para diagnóstico, mas não sugere.
   if (nameScore >= 0.30) {
-    if (fileHasConflictingNumber) {
-      return { score: 0.30, reason: `${nameReason}_doc_conflict` };
-    }
-    return { score: 0.30 + nameScore * 0.67, reason: nameReason };
+    return {
+      score: 0.50,
+      reason: fileHasConflictingNumber ? `${nameReason}_only_doc_conflict` : `${nameReason}_only_insufficient`,
+    };
   }
 
   if (valorOk) return { score: 0.30, reason: "valor_only" };
