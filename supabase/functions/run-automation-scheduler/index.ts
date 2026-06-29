@@ -115,7 +115,9 @@ const processRule = async (rule: RuleRow): Promise<void> => {
       .from("user_registros_financeiros")
       .select("id, client_name, document_number, due_date, amount, updated_value, phone, drive_file_url, drive_file_name, category, status")
       .eq("user_id", userId)
-      .neq("status", "sent");          // não cobrar quem já foi marcado como enviado
+      .neq("status", "sent")            // não cobrar quem já foi marcado como enviado
+      .or("category.is.null,category.neq.liquidado")   // NUNCA cobrar liquidados (já pagos)
+      .neq("status", "liquidado");      // rede de segurança caso o status marque liquidação
 
     if (ruleType === "overdue") {
       debtorQuery = debtorQuery.lt("due_date", today);
@@ -159,7 +161,11 @@ const processRule = async (rule: RuleRow): Promise<void> => {
 
     // ── 5. Aplica max_daily_sends ───────────────────────────────────────────
     const eligible = (candidates ?? [] as DebtorRow[]).filter(
-      (d: DebtorRow) => !recentDebtorSet.has(String(d.id)),
+      (d: DebtorRow) =>
+        !recentDebtorSet.has(String(d.id)) &&
+        // Defesa em profundidade: nunca cobrar liquidados (já pagos)
+        d.category !== "liquidado" &&
+        d.status !== "liquidado",
     );
     const limited = maxDaily ? eligible.slice(0, maxDaily) : eligible;
     jobsSkipped = totalCandidates - limited.length;
