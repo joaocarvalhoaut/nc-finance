@@ -1760,7 +1760,10 @@ export default function App() {
 
 
   // Metrics calculators for beautiful custom interactive Dashboard
-  const totalOriginalVolumeStatus = debtors.reduce((acc, d) => acc + d.value, 0);
+  // Em aberto: exclui liquidados (já pagos) — só o que ainda está pendente
+  const totalOriginalVolumeStatus = debtors
+    .filter(d => d.category !== "liquidado")
+    .reduce((acc, d) => acc + d.value, 0);
   const totalUpdatedVolumeStatus = debtors.reduce((acc, d) => acc + (d.updatedValue || d.value), 0);
   
   const vencidosCount = debtors.filter(d => d.category === "vencidos").length;
@@ -2056,7 +2059,7 @@ export default function App() {
                         <span className="text-2xl sm:text-3xl font-extrabold text-white font-mono">{formatBRL(totalOriginalVolumeStatus)}</span>
                       </div>
                       <div className="text-[10px] text-zinc-500 mt-2">
-                        Total acumulado original importado das faturas.
+                        Valor original em aberto (não inclui liquidados).
                       </div>
                     </div>
 
