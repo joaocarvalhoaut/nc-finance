@@ -183,6 +183,23 @@ Deno.serve(async (request: Request) => {
       });
     }
 
+    // ── 4a. Guard liquidado — NUNCA cobrar quem já pagou ──────────────────────
+    if (body.debtorId) {
+      const { data: debtorChk } = await admin
+        .from("user_registros_financeiros")
+        .select("category, status")
+        .eq("id", body.debtorId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      const chk = debtorChk as { category?: string; status?: string } | null;
+      if (chk && (chk.category === "liquidado" || chk.status === "liquidado")) {
+        return errResponse(409, {
+          error:  "Cliente liquidado (já pago) — cobrança bloqueada.",
+          status: "bloqueado_liquidado",
+        });
+      }
+    }
+
     // ── 4b. Pilot-mode guard ──────────────────────────────────────────────────
     // If a pilot_config row exists for this user, all pilot rules must pass.
     // Users without a pilot_config row are allowed through (non-pilot tenants).
