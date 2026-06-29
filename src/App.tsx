@@ -28,6 +28,7 @@ import { extractDocumentLocally, type LocalExtractionResult } from "./services/l
 import { exportRelatorio } from "./services/exportRelatorio";
 import Suporte from "./components/Suporte";
 import { PdfPreviewModal, openPdfPreview } from "./components/PdfPreviewModal";
+import DriveHelpPopover from "./components/DriveHelpPopover";
 import { 
   Debtor, 
   Representative, 
@@ -2816,6 +2817,7 @@ export default function App() {
                       <div className="bg-zinc-900/40 border border-zinc-900 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-2 min-w-0">
                           <HardDrive className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <DriveHelpPopover />
                           <span className="text-xs text-zinc-300 truncate">
                             Boletos do Drive: <span className="text-zinc-400">{driveFolderStatus.folderName || "pasta"}</span>
                             {driveFolderStatus.indexing && <span className="text-sky-300"> · indexando {driveFolderStatus.contentIndexed ?? 0}/{driveFolderStatus.fileCount}…</span>}
@@ -3884,6 +3886,7 @@ export default function App() {
                       <div className="space-y-1">
                         <h4 className="text-sm font-bold text-white flex items-center gap-2">
                           <HardDrive className="w-4 h-4 text-emerald-400" /> Boletos do Google Drive
+                          <DriveHelpPopover />
                         </h4>
                         <p className="text-xs text-zinc-500 font-light max-w-xl">
                           Conecte a pasta de boletos do Drive. O sistema casa por nome do cliente + número do documento e sugere anexar o boleto encontrado a cada devedor.
