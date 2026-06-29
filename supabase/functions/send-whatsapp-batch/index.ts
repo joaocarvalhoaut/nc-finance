@@ -64,6 +64,7 @@ type BatchItemStatus =
   | "duplicado"
   | "telefone_invalido"
   | "bloqueado_limite"
+  | "bloqueado_liquidado"
   | "devedor_nao_encontrado";
 
 interface BatchItemResult {
@@ -267,7 +268,7 @@ Deno.serve(async (request: Request) => {
         .from("user_registros_financeiros")
         .select(
           "id, client_name, document_number, due_date, amount, phone, " +
-          "updated_value, category, drive_file_id, drive_file_url, drive_file_name",
+          "updated_value, category, status, drive_file_id, drive_file_url, drive_file_name",
         )
         .eq("id", debtorId)
         .eq("user_id", userId) // garante que o devedor pertence ao usuário
@@ -288,6 +289,22 @@ Deno.serve(async (request: Request) => {
       }
 
       const dr = debtorRow as Record<string, unknown>;
+
+      // a.1 NUNCA cobrar liquidados (já pagos) — trava de segurança no servidor
+      if (dr.category === "liquidado" || dr.status === "liquidado") {
+        results.push({
+          debtorId,
+          clientName:  String(dr.client_name ?? ""),
+          phone:       "",
+          status:      "bloqueado_liquidado",
+          messageId:   null,
+          logId:       null,
+          error:       "Cliente liquidado (já pago) — cobrança bloqueada.",
+          sentWithPdf: false,
+        });
+        continue;
+      }
+
       const clientName    = String(dr.client_name   ?? "");
       const documentNumber= String(dr.document_number ?? "");
       const rawPhone      = String(dr.phone          ?? "");

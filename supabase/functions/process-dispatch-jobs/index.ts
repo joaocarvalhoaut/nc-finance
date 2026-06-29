@@ -181,7 +181,7 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     // ── 6. Busca devedor ──────────────────────────────────────────────────
     const { data: debtorRow } = await admin
       .from("user_registros_financeiros")
-      .select("id, client_name, document_number, due_date, amount, updated_value, phone, drive_file_url, drive_file_name")
+      .select("id, client_name, document_number, due_date, amount, updated_value, phone, category, status, drive_file_url, drive_file_name")
       .eq("id", debtorId)
       .eq("user_id", userId)
       .maybeSingle();
@@ -192,6 +192,13 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     }
 
     const dr = debtorRow as Record<string, unknown>;
+
+    // NUNCA cobrar liquidados (já pagos) — pega jobs enfileirados antes do fix
+    if (dr.category === "liquidado" || dr.status === "liquidado") {
+      await markJob("skipped", { last_error: "Cliente liquidado (ja pago) — cobranca bloqueada." });
+      return;
+    }
+
     const clientName    = String(dr.client_name    ?? "");
     const documentNumber= String(dr.document_number?? "");
     const rawPhone      = String(dr.phone          ?? "");
