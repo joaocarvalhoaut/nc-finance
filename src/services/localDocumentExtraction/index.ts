@@ -67,6 +67,18 @@ export interface LocalExtractionResult {
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
+/**
+ * Normaliza uma data BR para DD/MM/YYYY.
+ * "15/06/26" → "15/06/2026"; "15/06/2026" inalterado; vazio/inesperado retorna como veio.
+ */
+function normalizeBrDate(raw: string): string {
+  const m = raw.trim().match(/^(\d{2})\/(\d{2})\/(\d{2}|\d{4})$/);
+  if (!m) return raw;
+  const [, dd, mm, yy] = m;
+  const year = yy.length === 2 ? `20${yy}` : yy;
+  return `${dd}/${mm}/${year}`;
+}
+
 function candidateToRecord(
   c: RecordCandidate,
   idx: number,
@@ -85,8 +97,9 @@ function candidateToRecord(
   const usedPlaceholder = !rawDoc;
   const document = rawDoc || `DOC-${idx + 1}`;
 
-  // Campos ausentes ficam vazios para o operador preencher manualmente
-  const dueDate = c.dueDate ?? "";
+  // Campos ausentes ficam vazios para o operador preencher manualmente.
+  // Normaliza DD/MM/YY → DD/MM/YYYY (relatórios/ERP usam ano de 2 dígitos).
+  const dueDate = normalizeBrDate(c.dueDate ?? "");
   const value = (c.value != null && c.value >= 0) ? c.value : 0;
 
   return {

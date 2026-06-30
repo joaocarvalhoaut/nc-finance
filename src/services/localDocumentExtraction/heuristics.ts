@@ -184,6 +184,15 @@ export function extractBank(raw: string): { cleanClient: string; bank: string } 
   };
 }
 
+/**
+ * Tokens de ruído comuns em relatórios de títulos (tipo de documento e a coluna
+ * "Devolvido?") que aparecem junto ao nome e não fazem parte dele.
+ */
+const REPORT_NOISE_TOKENS = new Set([
+  "DUP", "DUPLICATA", "DM", "NP", "BOL", "BOLETO", "CH", "CHEQUE", "NF", "NFE",
+  "SIM", "NAO", "NÃO", "S", "N",
+]);
+
 /** Remove all header-like words from a candidate name string */
 function cleanName(raw: string): string {
   return raw
@@ -191,6 +200,9 @@ function cleanName(raw: string): string {
     .filter((t) => {
       if (t.length <= 1) return false;
       if (isHeaderWord(t)) return false;
+      // Tokens de ruído de relatório (DUP, Não, NF…)
+      const upper = t.toUpperCase().replace(/[^A-ZÁÉÍÓÚÂÊÎÔÛÃÕÀÜÇ]/gi, "");
+      if (REPORT_NOISE_TOKENS.has(upper)) return false;
       // Remove pure numbers
       if (/^\d+$/.test(t)) return false;
       // Remove document-number tokens like "1227/3", "1244/002", "CH01-3", "NF2024/01"
@@ -294,8 +306,8 @@ export function parseErpFormat(text: string): RecordCandidate[] {
         /\b([A-Z]{1,4}\d[\d-]{0,15}(?:\/\d{1,6})?|\d{3,}[-/]\d{1,}(?:[-/]\d{1,})?)\b/gi;
       for (const m of afterPhone.matchAll(docFallbackRe)) {
         const candidate = m[1];
-        // Skip if it looks like DD/MM/YYYY or DD/MM
-        if (/^\d{2}\/\d{2}(\/\d{4})?$/.test(candidate)) continue;
+        // Skip if it looks like DD/MM/YYYY, DD/MM/YY ou DD/MM
+        if (/^\d{2}\/\d{2}(\/\d{2,4})?$/.test(candidate)) continue;
         // Skip pure short numbers (less than 3 chars — too ambiguous)
         if (candidate.replace(/\D/g, "").length < 2) continue;
         docNumber = candidate;
@@ -359,10 +371,17 @@ export function parseLineByLine(text: string): RecordCandidate[] {
 
     const phone = findFirstPhone(line);
     const statusMatch = line.match(new RegExp(STATUS_RE.source, "i"));
-    const docMatch = line.match(/\b([A-Z]{0,3}\d[\d-]{1,10}(?:\/\d{1,6})?)\b/i);
 
     // Client = longest run of words before the first date
     const beforeDate = line.slice(0, line.indexOf(dates[0]));
+
+    // Documento = número do título (coluna "Número"), que fica logo ANTES da
+    // data de vencimento. Em relatórios o código do cedente (ex: "1127 -") vem
+    // antes do nome; pegar o ÚLTIMO código antes da data evita confundi-los.
+    const docTokens = [...beforeDate.matchAll(/\b([A-Z]{0,3}\d[\d-]{1,10}(?:\/\d{1,6})?)\b/gi)]
+      .map((m) => m[1])
+      .filter((t) => t.replace(/\D/g, "").length >= 2);
+    const docMatch = docTokens.length ? [null, docTokens[docTokens.length - 1]] : null;
     const { cleanClient: cleanLine, bank: bankLine } = extractBank(cleanName(beforeDate));
     const client = cleanLine.slice(0, 120) || null;
     const bank = bankLine || null;

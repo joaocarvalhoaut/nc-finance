@@ -32,11 +32,17 @@ export const PHONE_FORMATTED_RE =
  */
 export const PHONE_PARENS_RE = /\(\d{2}\)[\s-]?\d{8,9}/g;
 
-/** DD/MM/YYYY */
-export const DATE_RE = /\b\d{2}\/\d{2}\/\d{4}\b/g;
+/** DD/MM/YYYY ou DD/MM/YY (relatórios/ERP usam ano de 2 dígitos) */
+export const DATE_RE = /\b\d{2}\/\d{2}\/\d{2,4}\b/g;
 
 /** R$ 1.234,56  or  R$1234.56 */
 export const CURRENCY_RE = /R\$\s*([\d.,]+)/gi;
+
+/**
+ * Valor monetário em formato brasileiro SEM o símbolo R$ (ex.: "4.512,80").
+ * Exige os centavos (",dd") para não capturar dias/quantidades inteiras.
+ */
+export const CURRENCY_BARE_RE = /\b\d{1,3}(?:\.\d{3})*,\d{2}\b/g;
 
 /** Brazilian document types */
 export const DOC_TYPE_RE =
@@ -70,8 +76,14 @@ export function findAllDates(text: string): string[] {
  * Returns NaN entries filtered out.
  */
 export function findAllCurrencies(text: string): number[] {
-  return [...text.matchAll(new RegExp(CURRENCY_RE.source, "gi"))]
+  const withSymbol = [...text.matchAll(new RegExp(CURRENCY_RE.source, "gi"))]
     .map((m) => parseBRLAmount(m[1]))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (withSymbol.length > 0) return withSymbol;
+
+  // Fallback: valores em formato BR sem o símbolo R$ (relatórios/ERP/boletos).
+  return [...text.matchAll(new RegExp(CURRENCY_BARE_RE.source, "g"))]
+    .map((m) => parseBRLAmount(m[0]))
     .filter((n) => Number.isFinite(n) && n > 0);
 }
 
