@@ -14,7 +14,7 @@ import {
   parseDelimitedFormat,
   parseLineByLine,
   RecordCandidate,
-  BANK_KEYWORDS,
+  BANK_INSTITUTION_KEYWORDS,
 } from "./heuristics";
 import { extractOCRFromPdfFile } from "./ocrFallback";
 import { maskName } from "./piiUtils";
@@ -30,7 +30,7 @@ function extractBankFromFilename(filename: string): string {
   // Tokeniza por espaço, underscore, hífen, ponto
   const tokens = stem.split(/[\s_\-\.]+/).map((t) => t.toUpperCase().replace(/[^A-ZÁÉÍÓÚÂÊÎÔÛÃÕÀÇ]/gi, ""));
   for (const token of tokens) {
-    if (token.length >= 2 && BANK_KEYWORDS.has(token)) {
+    if (token.length >= 2 && BANK_INSTITUTION_KEYWORDS.has(token)) {
       return token;
     }
   }

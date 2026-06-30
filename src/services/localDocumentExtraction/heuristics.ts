@@ -140,6 +140,27 @@ export const BANK_KEYWORDS = new Set([
 ]);
 
 /**
+ * Subconjunto de BANK_KEYWORDS restrito a instituições financeiras de verdade —
+ * exclui bandeiras de cartão (VISA, MASTER...) e categorias/produtos genéricos
+ * de cartão (PLATINUM, GOLD, BLACK, CLASSIC, STANDARD...), que não identificam
+ * um banco e geram falsos positivos ao detectar o banco pelo nome do arquivo
+ * (ex: "RELATORIO_PLATINUM_ABRIL.pdf" não significa banco = "PLATINUM").
+ */
+const NON_BANK_CARD_WORDS = new Set([
+  "VISA","MASTER","MASTERCARD","ELO","AMEX","AMERICANEXPRESS",
+  "HIPERCARD","DINERS","DINERSCLUB","CABAL","SOROCRED",
+  "BANRICOMPRAS","CREDSYSTEM","TICKET","ALELO","SODEXO","VR",
+  "IFOOD","CAJU","FLASH","SWILE","PLUXEE","BENEFLEX","GREENCARD",
+  "PLATINUM","GOLD","BLACK","CLASSIC","STANDARD","PREMIUM",
+  "INFINITE","SIGNATURE","INTERNATIONAL","TITANIUM",
+  "ELECTRON","DEBIT","DEBITO","CREDITO","CRÉDITO","PREPAID","PRE-PAGO",
+]);
+
+export const BANK_INSTITUTION_KEYWORDS = new Set(
+  [...BANK_KEYWORDS].filter((k) => !NON_BANK_CARD_WORDS.has(k)),
+);
+
+/**
  * Extrai palavras que parecem banco/produto de cartão do final do nome.
  * Retorna { cleanClient, bank }.
  */

@@ -1,1 +1,11 @@
-version:0.0.1 configurations:[name:nc-finance-dev] configurations:[runtimeExecutable:npm] configurations:[runtimeArgs:[run] configurations:[dev]] configurations:[port:5173]
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "nc-finance-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
+    }
+  ]
+}
