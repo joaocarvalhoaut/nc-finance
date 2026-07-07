@@ -355,6 +355,17 @@ Deno.serve(async (request: Request) => {
   try {
     const now = new Date().toISOString();
 
+    // ── Reaper: recupera jobs presos em "processing" ─────────────────────────
+    // Se um tick anterior morreu no meio (timeout/erro/Z-API travada), o job
+    // fica preso em "processing" e nunca seria reprocessado — o devedor não
+    // recebe. Aqui devolvemos para a fila jobs "processing" parados há > 10 min.
+    const staleThreshold = new Date(Date.now() - 10 * 60 * 1_000).toISOString();
+    await admin
+      .from("user_dispatch_jobs")
+      .update({ status: "queued", updated_at: now, last_error: "Reprocessado (job travado em processing)." })
+      .eq("status", "processing")
+      .lt("updated_at", staleThreshold);
+
     // Busca jobs elegíveis (queued ou retrying com scheduled_for vencido)
     const { data: jobs, error } = await admin
       .from("user_dispatch_jobs")
