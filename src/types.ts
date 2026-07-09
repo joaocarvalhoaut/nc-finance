@@ -12,7 +12,7 @@ export interface Debtor {
   dueDate: string; // Format DD/MM/YYYY
   value: number; // Base imported value
   phone: string;
-  category: "vencidos" | "a_vencer" | "liquidado";
+  category: "vencidos" | "a_vencer" | "liquidado" | "desabilitado";
   interestApplied?: number; // % rate
   fineApplied?: number; // % rate
   updatedValue?: number; // calculated full value

@@ -193,9 +193,13 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
 
     const dr = debtorRow as Record<string, unknown>;
 
-    // NUNCA cobrar liquidados (já pagos) — pega jobs enfileirados antes do fix
-    if (dr.category === "liquidado" || dr.status === "liquidado") {
-      await markJob("skipped", { last_error: "Cliente liquidado (ja pago) — cobranca bloqueada." });
+    // NUNCA cobrar liquidados (já pagos) nem clientes desabilitados
+    if (dr.category === "liquidado" || dr.status === "liquidado" || dr.category === "desabilitado") {
+      await markJob("skipped", {
+        last_error: dr.category === "desabilitado"
+          ? "Cliente desabilitado — cobranca bloqueada."
+          : "Cliente liquidado (ja pago) — cobranca bloqueada.",
+      });
       return;
     }
 

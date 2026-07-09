@@ -290,8 +290,8 @@ Deno.serve(async (request: Request) => {
 
       const dr = debtorRow as Record<string, unknown>;
 
-      // a.1 NUNCA cobrar liquidados (já pagos) — trava de segurança no servidor
-      if (dr.category === "liquidado" || dr.status === "liquidado") {
+      // a.1 NUNCA cobrar liquidados (já pagos) nem desabilitados — trava no servidor
+      if (dr.category === "liquidado" || dr.status === "liquidado" || dr.category === "desabilitado") {
         results.push({
           debtorId,
           clientName:  String(dr.client_name ?? ""),
@@ -299,7 +299,9 @@ Deno.serve(async (request: Request) => {
           status:      "bloqueado_liquidado",
           messageId:   null,
           logId:       null,
-          error:       "Cliente liquidado (já pago) — cobrança bloqueada.",
+          error:       dr.category === "desabilitado"
+            ? "Cliente desabilitado — cobrança bloqueada."
+            : "Cliente liquidado (já pago) — cobrança bloqueada.",
           sentWithPdf: false,
         });
         continue;

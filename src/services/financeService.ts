@@ -1,7 +1,7 @@
 import type { Debtor } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
 
-type FinancialCategory = "vencidos" | "a_vencer" | "liquidado";
+type FinancialCategory = "vencidos" | "a_vencer" | "liquidado" | "desabilitado";
 type FinancialStatus = "pending" | "sent" | "failed";
 
 interface FinancialRecordRow {

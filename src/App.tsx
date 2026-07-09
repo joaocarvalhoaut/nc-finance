@@ -43,7 +43,8 @@ import {
   Users, 
   UserPlus, 
   FileCheck2, 
-  Trash2, 
+  Trash2,
+  Ban, 
   FileSpreadsheet,
   Download,
   Upload,
@@ -642,8 +643,8 @@ export default function App() {
     today.setHours(0, 0, 0, 0);
 
     const updated = debtors.map(d => {
-      // Liquidado: mantém valor original sem encargos
-      if (d.category === "liquidado") {
+      // Liquidado / Desabilitado: mantém valor original sem encargos
+      if (d.category === "liquidado" || d.category === "desabilitado") {
         return { ...d, interestApplied: 0, fineApplied: 0, updatedValue: d.value };
       }
 
@@ -885,10 +886,10 @@ export default function App() {
   const handleBatchSend = async () => {
     if (selectedDebtorIds.size === 0 || isBatchSending) return;
 
-    // Nunca envia cobranças para títulos liquidados
+    // Nunca envia cobranças para títulos liquidados ou clientes desabilitados
     const cobráveis: string[] = Array.from(selectedDebtorIds).filter((id): id is string => {
       const d = debtors.find(x => x.id === id);
-      return Boolean(d && d.category !== "liquidado");
+      return Boolean(d && d.category !== "liquidado" && d.category !== "desabilitado");
     });
 
     if (cobráveis.length === 0) {
@@ -1296,17 +1297,43 @@ export default function App() {
   };
 
   // Bulk delete selected debtors in Visão Geral
-  const handleBulkDelete = async () => {
+  // Desabilita os devedores selecionados (não exclui): marca category="desabilitado"
+  // com o motivo obrigatório salvo em notes. Desabilitados nunca são cobrados.
+  const handleBulkDisable = async () => {
     if (selectedDebtorIds.size === 0 || !currentOwnerUserId) return;
-    const idsToDelete: string[] = Array.from(selectedDebtorIds) as string[];
-    setDebtors(prev => prev.filter(d => !selectedDebtorIds.has(d.id)));
+
+    const motivo = window.prompt(
+      `Desabilitar ${selectedDebtorIds.size} cliente(s) selecionado(s).\n\nDigite o MOTIVO da desabilitação (obrigatório):`,
+    );
+    if (motivo === null) return;              // cancelou
+    const reason = motivo.trim();
+    if (!reason) {
+      window.alert("É obrigatório informar o motivo para desabilitar o cliente.");
+      return;
+    }
+
+    const ids = new Set(selectedDebtorIds);
+    const ownerUid = currentOwnerUserId as string;
+    const stamp = new Date().toISOString().slice(0, 10);
+    const noteText = `Desabilitado em ${stamp}: ${reason}`;
+
+    // Atualiza estado local
+    const toUpdate: Debtor[] = [];
+    setDebtors(prev =>
+      prev.map(d => {
+        if (!ids.has(d.id)) return d;
+        const updated: Debtor = { ...d, category: "desabilitado", notes: noteText };
+        toUpdate.push(updated);
+        return updated;
+      }),
+    );
     setSelectedDebtorIds(new Set());
     setBatchSendResult(null);
-    const ownerUid = currentOwnerUserId as string;
+
     try {
-      await Promise.all(idsToDelete.map(id => financeService.remove(ownerUid, id)));
+      await Promise.all(toUpdate.map(d => financeService.update(ownerUid, d)));
     } catch (error) {
-      console.error('[workspace]', error instanceof Error ? error.message : 'Erro ao excluir selecionados.');
+      console.error('[workspace]', error instanceof Error ? error.message : 'Erro ao desabilitar selecionados.');
     }
   };
 
@@ -1667,11 +1694,13 @@ export default function App() {
   const handleSendMessage = async () => {
     if (!selectedDebtorForMessage) return;
 
-    // Liquidados nunca devem receber cobrança
-    if (selectedDebtorForMessage.category === "liquidado") {
+    // Liquidados / desabilitados nunca devem receber cobrança
+    if (selectedDebtorForMessage.category === "liquidado" || selectedDebtorForMessage.category === "desabilitado") {
       setMessageFeedback({
         success: false,
-        text: "Este título está marcado como liquidado. Cobranças não são enviadas para títulos pagos.",
+        text: selectedDebtorForMessage.category === "desabilitado"
+          ? "Este cliente está desabilitado. Cobranças não são enviadas para clientes desabilitados."
+          : "Este título está marcado como liquidado. Cobranças não são enviadas para títulos pagos.",
       });
       return;
     }
@@ -1762,7 +1791,7 @@ export default function App() {
   // Metrics calculators for beautiful custom interactive Dashboard
   // Em aberto: exclui liquidados (já pagos) — só o que ainda está pendente
   const totalOriginalVolumeStatus = debtors
-    .filter(d => d.category !== "liquidado")
+    .filter(d => d.category !== "liquidado" && d.category !== "desabilitado")
     .reduce((acc, d) => acc + d.value, 0);
   const totalUpdatedVolumeStatus = debtors.reduce((acc, d) => acc + (d.updatedValue || d.value), 0);
   
@@ -2239,11 +2268,12 @@ export default function App() {
                                       </div>
                                       <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
                                         <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                                          d.category === "vencidos"  ? "bg-rose-500/10 text-rose-400"   :
-                                          d.category === "a_vencer"  ? "bg-amber-500/10 text-amber-400" :
+                                          d.category === "vencidos"     ? "bg-rose-500/10 text-rose-400"   :
+                                          d.category === "a_vencer"     ? "bg-amber-500/10 text-amber-400" :
+                                          d.category === "desabilitado" ? "bg-zinc-600/20 text-zinc-400"   :
                                           "bg-emerald-500/10 text-emerald-400"
                                         }`}>
-                                          {d.category === "vencidos" ? "Vencido" : d.category === "a_vencer" ? "A vencer" : "Liquidado"}
+                                          {d.category === "vencidos" ? "Vencido" : d.category === "a_vencer" ? "A vencer" : d.category === "desabilitado" ? "Desabilitado" : "Liquidado"}
                                         </span>
                                         <span className="text-[10px] font-mono text-zinc-400">
                                           {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(d.updatedValue || d.value)}
@@ -3094,16 +3124,13 @@ export default function App() {
 
                         <button
                           type="button"
-                          onClick={() => {
-                            if (window.confirm(`Excluir ${selectedDebtorIds.size} devedor(es) selecionado(s)? Esta ação não pode ser desfeita.`)) {
-                              void handleBulkDelete();
-                            }
-                          }}
+                          onClick={() => void handleBulkDisable()}
                           disabled={isBatchSending}
-                          className="px-4 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 text-xs font-bold rounded-xl transition-all disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
+                          title="Desabilitar cliente(s) — não serão mais cobrados"
+                          className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 text-xs font-bold rounded-xl transition-all disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Excluir selecionados ({selectedDebtorIds.size})
+                          <Ban className="w-3.5 h-3.5" />
+                          Desabilitar selecionados ({selectedDebtorIds.size})
                         </button>
                       </div>
                     </div>
@@ -3323,6 +3350,7 @@ export default function App() {
                                     <option value="vencidos">Vencidos</option>
                                     <option value="a_vencer">A vencer</option>
                                     <option value="liquidado">Liquidado</option>
+                                    <option value="desabilitado">Desabilitados</option>
                                   </select>
                                 </div>
                               </div>
@@ -3463,19 +3491,24 @@ export default function App() {
                                     <span 
                                       onClick={() => {
                                         const cats: ("vencidos"| "a_vencer" | "liquidado")[] = ["vencidos", "a_vencer", "liquidado"];
-                                        const currentIdx = cats.indexOf(d.category);
+                                        const currentIdx = cats.indexOf(d.category as "vencidos"| "a_vencer" | "liquidado");
+                                        // Desabilitado não cicla ao clicar (mude pela lista de desabilitados)
+                                        if (currentIdx === -1) return;
                                         const nextCat = cats[(currentIdx + 1) % cats.length];
                                         updateGeneralDebtorField(d.id, "category", nextCat);
                                       }}
-                                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase cursor-pointer select-none transition-all
+                                      title={d.category === "desabilitado" && d.notes ? d.notes : undefined}
+                                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase select-none transition-all ${d.category === "desabilitado" ? "cursor-default" : "cursor-pointer"}
                                         ${d.category === "vencidos" && "bg-rose-500/10 text-rose-400 border border-rose-500/20"}
                                         ${d.category === "a_vencer" && "bg-amber-500/10 text-amber-400 border border-amber-500/20"}
                                         ${d.category === "liquidado" && "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"}
+                                        ${d.category === "desabilitado" && "bg-zinc-600/20 text-zinc-400 border border-zinc-600/30"}
                                       `}
                                     >
                                       {d.category === "vencidos" && "Vencido"}
                                       {d.category === "a_vencer" && "A vencer"}
                                       {d.category === "liquidado" && "Liquidado"}
+                                      {d.category === "desabilitado" && "Desabilitado"}
                                     </span>
                                   </td>
                                   <td className="px-4 py-4">

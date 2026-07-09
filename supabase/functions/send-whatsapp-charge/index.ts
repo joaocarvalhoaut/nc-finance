@@ -192,9 +192,11 @@ Deno.serve(async (request: Request) => {
         .eq("user_id", userId)
         .maybeSingle();
       const chk = debtorChk as { category?: string; status?: string } | null;
-      if (chk && (chk.category === "liquidado" || chk.status === "liquidado")) {
+      if (chk && (chk.category === "liquidado" || chk.status === "liquidado" || chk.category === "desabilitado")) {
         return errResponse(409, {
-          error:  "Cliente liquidado (já pago) — cobrança bloqueada.",
+          error:  chk.category === "desabilitado"
+            ? "Cliente desabilitado — cobrança bloqueada."
+            : "Cliente liquidado (já pago) — cobrança bloqueada.",
           status: "bloqueado_liquidado",
         });
       }

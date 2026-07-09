@@ -6,7 +6,8 @@ import { createServer as createViteServer } from "vite";
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+// Respeita a porta atribuída pelo ambiente (preview/host); 3000 como padrão local.
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json({ limit: "10mb" }));
 
