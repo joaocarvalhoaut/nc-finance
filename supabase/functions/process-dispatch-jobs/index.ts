@@ -81,11 +81,25 @@ const hashKey = async (raw: string): Promise<string> => {
 
 // ─── Process one job ──────────────────────────────────────────────────────────
 
+/**
+ * Incremento defensivo do contador da execução (Enviados/Erros no histórico de
+ * automações). No-op se o job não tem run ou se a migração/RPC ainda não existe.
+ */
+const bumpRun = async (rid: string | null, sent: number, failed: number): Promise<void> => {
+  if (!rid) return;
+  try {
+    await admin.rpc("increment_automation_run_counter", { p_run_id: rid, p_sent: sent, p_failed: failed });
+  } catch {
+    /* migração pendente / RPC ausente — ignora, não bloqueia o envio */
+  }
+};
+
 const processJob = async (job: Record<string, unknown>): Promise<void> => {
   const jobId    = String(job.id);
   const userId   = String(job.user_id);
   const debtorId = String(job.debtor_id);
   const ruleId   = (job.automation_rule_id as string | null) ?? null;
+  const runId    = (job.automation_run_id as string | null) ?? null;
   const attempts = Number(job.attempts ?? 0);
   const maxAttempts = Number(job.max_attempts ?? 3);
   const meta     = (job.metadata as Record<string, unknown>) ?? {};
@@ -292,6 +306,7 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
         provider_message_id: zapiResult.messageId,
         attempts: attempts + 1,
       });
+      await bumpRun(runId, 1, 0);   // contabiliza "Enviados" na execução
     } else {
       // ── 13. Retry ou falha definitiva ─────────────────────────────────
       const newAttempts = attempts + 1;
@@ -300,6 +315,7 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
           last_error: zapiResult.error ?? "Max tentativas atingido.",
           attempts:   newAttempts,
         });
+        await bumpRun(runId, 0, 1);   // contabiliza "Erros" na execução
       } else {
         const delayMin = RETRY_DELAYS_MIN[newAttempts - 1] ?? 60;
         const nextScheduled = new Date(Date.now() + delayMin * 60 * 1_000).toISOString();
@@ -324,6 +340,7 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
         last_error: err instanceof Error ? err.message.slice(0, 500) : "Erro desconhecido.",
         attempts:   newAttempts,
       });
+      await bumpRun(runId, 0, 1);   // contabiliza "Erros" na execução
     } else {
       const delayMin = RETRY_DELAYS_MIN[newAttempts - 1] ?? 60;
       await admin

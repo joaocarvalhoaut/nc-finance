@@ -174,7 +174,7 @@ const processRule = async (rule: RuleRow): Promise<void> => {
 
     // ── 6. Cria jobs ────────────────────────────────────────────────────────
     const schedFor = scheduledFor(winStart);
-    const jobRows = limited.map((d: DebtorRow) => ({
+    const jobRowsBase = limited.map((d: DebtorRow) => ({
       user_id:            userId,
       automation_rule_id: ruleId,
       debtor_id:          String(d.id),
@@ -190,9 +190,15 @@ const processRule = async (rule: RuleRow): Promise<void> => {
         plan:            sub.plan,
       },
     }));
+    // Liga cada job à execução (run) para o worker contabilizar "Enviados".
+    const jobRows = jobRowsBase.map((r) => ({ ...r, automation_run_id: runId }));
 
     if (jobRows.length > 0) {
-      await admin.from("user_dispatch_jobs").insert(jobRows);
+      const { error: insErr } = await admin.from("user_dispatch_jobs").insert(jobRows);
+      if (insErr) {
+        // Fallback: coluna automation_run_id ainda não existe (migração pendente)
+        await admin.from("user_dispatch_jobs").insert(jobRowsBase);
+      }
       jobsCreated = jobRows.length;
     }
 
