@@ -150,14 +150,16 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     }
 
     // ── 4. Verifica janela de envio (se regra tiver configuração) ─────────
+    let jobRuleType: string | null = null;
     if (ruleId) {
       const { data: rule } = await admin
         .from("user_automation_rules")
-        .select("send_window_start, send_window_end, enabled")
+        .select("send_window_start, send_window_end, enabled, rule_type")
         .eq("id", ruleId)
         .maybeSingle();
 
       const r = rule as Record<string, unknown> | null;
+      jobRuleType = (r?.rule_type as string | null) ?? null;
       if (r && r.enabled === false) {
         await markJob("skipped", { last_error: "Regra desativada." });
         return;
@@ -215,6 +217,20 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
           : "Cliente liquidado (ja pago) — cobranca bloqueada.",
       });
       return;
+    }
+
+    // Re-checa se a categoria do cliente ainda corresponde ao tipo da regra —
+    // cobre a janela entre criar o job e enviá-lo (se o usuário mudou o tipo).
+    if (jobRuleType) {
+      const cat = dr.category;
+      const okOverdue = jobRuleType === "overdue" && cat === "vencidos";
+      const okAvencer = (jobRuleType === "due_today" || jobRuleType === "due_in_days") && cat === "a_vencer";
+      if (!okOverdue && !okAvencer) {
+        await markJob("skipped", {
+          last_error: `Categoria do cliente (${String(cat)}) nao corresponde a regra (${jobRuleType}).`,
+        });
+        return;
+      }
     }
 
     const clientName    = String(dr.client_name    ?? "");
