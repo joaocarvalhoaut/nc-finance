@@ -4778,7 +4778,7 @@ export default function App() {
                               }).length;
                             } else if (ruleType === "due_today") {
                               const todayStr = new Date().toLocaleDateString("pt-BR");
-                              matchCount = debtors.filter(d => d.dueDate === todayStr && d.category !== "liquidado").length;
+                              matchCount = debtors.filter(d => d.category === "a_vencer" && d.dueDate === todayStr).length;
                             }
 
                             return (

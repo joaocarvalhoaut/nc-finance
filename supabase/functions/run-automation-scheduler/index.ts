@@ -120,16 +120,22 @@ const processRule = async (rule: RuleRow): Promise<void> => {
       .or("category.is.null,category.not.in.(liquidado,desabilitado)")
       .neq("status", "liquidado");      // rede de segurança caso o status marque liquidação
 
+    // A regra segue a CATEGORIA (tipo) do devedor, não só a data. Assim, se o
+    // usuário move um cliente para "vencidos", as regras de "a vencer" deixam
+    // de cobrá-lo (e vice-versa) — respeitando o tipo atual do cliente.
     if (ruleType === "overdue") {
-      debtorQuery = debtorQuery.lt("due_date", today);
+      // Vencidos: todos os devedores marcados como vencidos
+      debtorQuery = debtorQuery.eq("category", "vencidos");
     } else if (ruleType === "due_today") {
-      debtorQuery = debtorQuery.eq("due_date", today);
+      // Vencem hoje: a_vencer com vencimento = hoje
+      debtorQuery = debtorQuery.eq("category", "a_vencer").eq("due_date", today);
     } else if (ruleType === "due_in_days") {
+      // Vencem em X dias: a_vencer com vencimento = hoje + X
       const daysBefore = Number(rule.days_before_due ?? 1);
       const targetDate = new Date();
       targetDate.setUTCDate(targetDate.getUTCDate() + daysBefore);
       const target = targetDate.toISOString().slice(0, 10);
-      debtorQuery = debtorQuery.eq("due_date", target);
+      debtorQuery = debtorQuery.eq("category", "a_vencer").eq("due_date", target);
     } else {
       runStatus = "error";
       await finalizeRun(runId, runStatus, 0, 0, 0, { reason: "unknown_rule_type", ruleType });
