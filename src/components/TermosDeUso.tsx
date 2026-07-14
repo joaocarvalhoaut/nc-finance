@@ -16,7 +16,7 @@ export default function TermosDeUso({ onClose }: Props) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 flex-shrink-0">
           <div>
             <h2 className="text-white font-bold text-lg">Termos de Uso</h2>
-            <p className="text-zinc-500 text-xs mt-0.5">NC Finance — Última atualização: maio/2026</p>
+            <p className="text-zinc-500 text-xs mt-0.5">NC Finance — Última atualização: julho/2026</p>
           </div>
           <button
             onClick={onClose}
