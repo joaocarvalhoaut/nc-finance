@@ -16,7 +16,7 @@ export default function PoliticaPrivacidade({ onClose }: Props) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 flex-shrink-0">
           <div>
             <h2 className="text-white font-bold text-lg">Política de Privacidade</h2>
-            <p className="text-zinc-500 text-xs mt-0.5">NC Finance — Última atualização: maio/2026 · Em conformidade com a LGPD (Lei 13.709/2018)</p>
+            <p className="text-zinc-500 text-xs mt-0.5">NC Finance — Última atualização: julho/2026 · Em conformidade com a LGPD (Lei 13.709/2018)</p>
           </div>
           <button
             onClick={onClose}
@@ -108,6 +108,8 @@ export default function PoliticaPrivacidade({ onClose }: Props) {
               <li><strong className="text-zinc-300">Stripe</strong> — processamento de pagamentos (dados de cobrança do usuário — não de devedores)</li>
               <li><strong className="text-zinc-300">Z-API</strong> — gateway de envio de mensagens WhatsApp (recebe apenas o número de telefone e o texto da mensagem)</li>
               <li><strong className="text-zinc-300">Google Cloud</strong> — integração com Google Sheets e Drive (apenas quando habilitado pelo usuário)</li>
+              <li><strong className="text-zinc-300">Resend</strong> — envio de e-mails do serviço, como recuperação de senha (recebe apenas o e-mail do usuário)</li>
+              <li><strong className="text-zinc-300">Short.io</strong> — encurtamento do link do boleto incluído nas mensagens</li>
               <li><strong className="text-zinc-300">Vercel</strong> — hospedagem da aplicação web</li>
             </ul>
             <p className="mt-2">
