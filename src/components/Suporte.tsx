@@ -26,7 +26,12 @@ const FAQS: FAQ[] = [
   {
     category: "Primeiros Passos",
     question: "Qual é o período de avaliação gratuita?",
-    answer: "Novos usuários têm acesso a um período de trial gratuito ao se cadastrar. Durante o trial você tem acesso completo às funcionalidades do plano escolhido. Ao término, a cobrança é iniciada automaticamente — você pode cancelar antes do fim do trial sem custo.",
+    answer: "Novos usuários têm um trial gratuito de 7 dias ao se cadastrar. Durante o trial você tem acesso completo às funcionalidades do plano escolhido. Ao término, a cobrança é iniciada automaticamente — você pode cancelar antes do fim do trial sem custo.",
+  },
+  {
+    category: "Primeiros Passos",
+    question: "Esqueci minha senha. Como recupero?",
+    answer: "Na tela de login, clique em 'Esqueci minha senha' e informe o e-mail da sua conta. Enviaremos um link para você criar uma nova senha — verifique sua caixa de entrada e também a pasta de spam.",
   },
 
   // WhatsApp
@@ -54,6 +59,16 @@ const FAQS: FAQ[] = [
     category: "WhatsApp e Cobranças",
     question: "O que são os 4 tons de mensagem?",
     answer: "O NC Finance oferece 4 estilos de cobrança adaptáveis ao perfil de cada devedor:\n• Amigável: tom cordial e informal\n• Neutro: objetivo e profissional\n• Firme: direto com urgência\n• Jurídico: linguagem formal com aviso de encaminhamento",
+  },
+  {
+    category: "WhatsApp e Cobranças",
+    question: "Como anexar automaticamente o boleto de cada cliente?",
+    answer: "Nos planos Pro e Premium, conecte uma pasta do Google Drive com os boletos em PDF. Compartilhe a pasta com o e-mail da service account (mostrado no card 'Boletos do Google Drive', no ícone de ajuda '?') como Leitor, cole a URL da pasta e clique em 'Buscar boletos no Drive'. O sistema anexa o boleto ao cliente certo quando o número do documento aparece no nome do arquivo (ex: 'BOLETO 1382-005 CLIENTE.pdf') OU quando o valor e o vencimento de dentro do PDF batem com o título. Só sugere quando há correspondência segura — se não encontrar, mostra 'Sem boleto' (para nunca anexar o boleto errado).",
+  },
+  {
+    category: "WhatsApp e Cobranças",
+    question: "As cobranças automáticas seguem o tipo do cliente?",
+    answer: "Sim. Cada regra de automação respeita a categoria atual do cliente: a regra 'Vencidos' só cobra quem está como Vencido; as regras 'Vencem hoje' e 'Vencem em X dias' só cobram quem está como 'A vencer'. Se você mudar o tipo de um cliente, a automação passa a seguir o novo tipo. Clientes Liquidados e Desabilitados nunca são cobrados por nenhuma regra.",
   },
 
   // Importação
@@ -98,6 +113,11 @@ const FAQS: FAQ[] = [
     category: "Visão Geral",
     question: "Como adicionar observações a um registro?",
     answer: "Na coluna 'Obs.' da tabela, clique no ícone de balão de texto. Um campo de texto abrirá para digitar sua observação. Clique em 'Salvar' para confirmar. Registros com observação exibem um ponto âmbar de indicação na linha.",
+  },
+  {
+    category: "Visão Geral",
+    question: "Como impedir que um cliente seja cobrado (desabilitar)?",
+    answer: "Na Visão Geral, marque o(s) cliente(s) na tabela e clique em 'Desabilitar selecionados'. É obrigatório informar um motivo — ele fica salvo nas observações do cliente. O cliente passa para a categoria 'Desabilitado' e não recebe mais nenhuma cobrança (nem manual, nem automática). Para vê-los, use o filtro 'Desabilitados' na coluna Tipo. Clientes 'Liquidados' (já pagos) também nunca são cobrados.",
   },
   {
     category: "Visão Geral",
