@@ -1869,7 +1869,7 @@ export default function App() {
       <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
         <div className="text-center space-y-3">
           <div className="w-12 h-12 mx-auto rounded-full border-2 border-emerald-500/30 border-t-emerald-400 animate-spin" />
-          <p className="text-sm font-semibold text-white">Validando sessao Supabase...</p>
+          <p className="text-sm font-semibold text-white">Validando sua sessão...</p>
           <p className="text-xs text-zinc-500">Preparando o acesso seguro ao painel NC Finance.</p>
         </div>
       </div>
@@ -2010,7 +2010,7 @@ export default function App() {
                 <div className="space-y-2">
                   {isWorkspaceLoading && (
                     <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
-                      Carregando seus dados persistidos no Supabase...
+                      Carregando seus dados...
                     </div>
                   )}
                   {isSavingConfig && !isWorkspaceLoading && (
