@@ -976,7 +976,7 @@ export default function LandingPage({
                   }
                 </div>
                 {ownNumber.pro && <p className="text-[10px] text-zinc-600 font-mono mt-1">R$97 + R$150 (nº próprio)</p>}
-                <p className="text-zinc-400 text-sm mt-3 leading-relaxed">Automação completa para times que precisam escalar sem adicionar headcount.</p>
+                <p className="text-zinc-400 text-sm mt-3 leading-relaxed">Automação completa para empresas que querem crescer sem precisar contratar mais gente.</p>
               </div>
 
               <hr className="border-emerald-500/20 mb-6" />
