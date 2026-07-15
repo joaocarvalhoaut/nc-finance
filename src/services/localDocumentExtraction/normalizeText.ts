@@ -65,7 +65,10 @@ export function assessTextQuality(
  */
 export function looksLikeDelimited(text: string): boolean {
   const firstLines = text.split("\n").slice(0, 6);
-  const hasDelimiter = firstLines.some((l) => /[;\t|]/.test(l));
+  // Vírgula incluída (CSV padrão), mas só quando NÃO é vírgula decimal
+  // ("4.512,80" em relatórios de texto não pode disparar o modo tabela).
+  // O portão abaixo ainda exige 2+ palavras de cabeçalho financeiras.
+  const hasDelimiter = firstLines.some((l) => /[;\t|]/.test(l) || /(?<!\d),(?!\d)/.test(l));
   if (!hasDelimiter) return false;
   const headerKeywords = [
     "vencimento",

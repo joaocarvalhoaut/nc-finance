@@ -32,8 +32,15 @@ export const PHONE_FORMATTED_RE =
  */
 export const PHONE_PARENS_RE = /\(\d{2}\)[\s-]?\d{8,9}/g;
 
-/** DD/MM/YYYY ou DD/MM/YY (relatórios/ERP usam ano de 2 dígitos) */
-export const DATE_RE = /\b\d{2}\/\d{2}\/\d{2,4}\b/g;
+/**
+ * Datas em formatos comuns de relatórios brasileiros e exportações de sistema:
+ *   DD/MM/YYYY · DD/MM/YY · DD-MM-YYYY · DD-MM-YY · DD.MM.YYYY · DD.MM.YY ·
+ *   YYYY-MM-DD (ISO, comum em CSV exportado por sistemas)
+ * A alternativa ISO vem primeiro para vencer no início de "2026-06-15"
+ * (a partir do meio da string, \b entre dígitos impede falso match).
+ */
+export const DATE_RE =
+  /\b(?:\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{2,4}|\d{2}-\d{2}-\d{4}|\d{2}-\d{2}-\d{2}(?!\d)|\d{2}\.\d{2}\.\d{4}|\d{2}\.\d{2}\.\d{2}(?!\d))\b/g;
 
 /** R$ 1.234,56  or  R$1234.56 */
 export const CURRENCY_RE = /R\$\s*([\d.,]+)/gi;
@@ -143,11 +150,25 @@ export function findFirstPhone(text: string): string | null {
  */
 export function parseBRLAmount(raw: string): number {
   const s = raw.trim().replace(/R\$\s*/gi, "");
-  if (s.includes(",")) {
-    // pt-BR: dot = thousands, comma = decimal
-    return parseFloat(s.replace(/\./g, "").replace(",", "."));
+  const lastComma = s.lastIndexOf(",");
+  const lastDot = s.lastIndexOf(".");
+
+  if (lastComma >= 0 && lastDot >= 0) {
+    // Ambos presentes: o separador que aparece POR ÚLTIMO é o decimal.
+    // "1.234,56" (BR) → 1234.56 · "1,234.56" (US) → 1234.56
+    return lastComma > lastDot
+      ? parseFloat(s.replace(/\./g, "").replace(",", "."))
+      : parseFloat(s.replace(/,/g, ""));
   }
-  // Already decimal
+  if (lastComma >= 0) {
+    // Só vírgula: decimal pt-BR ("1234,56")
+    return parseFloat(s.replace(",", "."));
+  }
+  // Só ponto (ou nenhum): "1.234" com grupos de 3 é milhar pt-BR (→ 1234);
+  // caso contrário é decimal ("1234.5" vindo de célula numérica de Excel).
+  if (/^\d{1,3}(?:\.\d{3})+$/.test(s)) {
+    return parseFloat(s.replace(/\./g, ""));
+  }
   return parseFloat(s);
 }
 

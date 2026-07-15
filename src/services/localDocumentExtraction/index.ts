@@ -68,13 +68,21 @@ export interface LocalExtractionResult {
 // ── Private helpers ───────────────────────────────────────────────────────────
 
 /**
- * Normaliza uma data BR para DD/MM/YYYY.
- * "15/06/26" → "15/06/2026"; "15/06/2026" inalterado; vazio/inesperado retorna como veio.
+ * Normaliza uma data para DD/MM/YYYY a partir dos formatos aceitos na extração:
+ * "15/06/26", "15-06-2026", "15.06.26" → "15/06/2026"; ISO "2026-06-15" →
+ * "15/06/2026". Vazio/inesperado retorna como veio (operador revisa na tabela).
  */
 function normalizeBrDate(raw: string): string {
-  const m = raw.trim().match(/^(\d{2})\/(\d{2})\/(\d{2}|\d{4})$/);
-  if (!m) return raw;
-  const [, dd, mm, yy] = m;
+  const s = raw.trim();
+
+  // ISO YYYY-MM-DD (exportações de sistema)
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+
+  // DD/MM/YY(YY) com separador barra, hífen ou ponto
+  const br = s.match(/^(\d{2})[/\-.](\d{2})[/\-.](\d{2}|\d{4})$/);
+  if (!br) return raw;
+  const [, dd, mm, yy] = br;
   const year = yy.length === 2 ? `20${yy}` : yy;
   return `${dd}/${mm}/${year}`;
 }
