@@ -308,27 +308,40 @@ export function extractBoletoMetadata(text: string): BoletoMetadata {
 
   // ── 4. Valor ─────────────────────────────────────────────────────────────
   let valor: number | null = null;
-  // Patterns: "R$ 1.234,56" or "VALOR: 1.234,56" or raw "1234,56"
+  const toAmount = (raw: string): number | null => {
+    const v = parseFloat(raw.replace(/\./g, "").replace(",", "."));
+    return !isNaN(v) && v > 0 && v < 10_000_000 ? Math.round(v * 100) / 100 : null;
+  };
+  // Rótulo padrão de boleto: "Valor do Documento   1.686,00" — permite palavras
+  // entre o rótulo e o número (até 25 chars não-dígito), além de "R$ 1.234,56".
   const valorMatch = t.match(
-    /(?:valor|R\$|vl\.?)\s*:?\s*([\d\.]{1,12},\d{2})/i,
+    /(?:\bvalor\b(?:\s+do)?(?:\s+documento|\s+cobrado|\s+total)?|R\$|\bvl\b\.?)[^\d]{0,25}([\d.]{1,12},\d{2})\b/i,
   );
-  if (valorMatch) {
-    const raw = valorMatch[1].replace(/\./g, "").replace(",", ".");
-    const v = parseFloat(raw);
-    if (!isNaN(v) && v > 0 && v < 10_000_000) valor = Math.round(v * 100) / 100;
+  if (valorMatch) valor = toAmount(valorMatch[1]);
+  if (valor === null) {
+    // Fallback: maior valor em formato BR no documento (num boleto, o valor do
+    // documento é normalmente o maior montante presente).
+    const all = [...t.matchAll(/\b\d{1,3}(?:\.\d{3})*,\d{2}\b/g)]
+      .map((m) => toAmount(m[0]))
+      .filter((v): v is number => v !== null && v >= 1);
+    if (all.length > 0) valor = Math.max(...all);
   }
 
   // ── 5. Vencimento ────────────────────────────────────────────────────────
   let vencimento: string | null = null;
-  // Patterns: "vencimento: 31/12/2026" or "31/12/2026" near keyword
-  const vencMatch = t.match(
-    /(?:vencimento|venc\.?|validade|expira[çc][aã]o)[\s:]*(\d{2}\/\d{2}\/\d{4})/i,
-  );
-  const dateMatch = !vencMatch ? t.match(/\b(\d{2}\/\d{2}\/202[4-9])\b/) : null;
+  // "Data de Vencimento" com texto/espachamento de coluna entre rótulo e data;
+  // aceita separador / - . e ano de 2 ou 4 dígitos.
+  const DATE_PART = "(\\d{2}[\\/\\-.]\\d{2}[\\/\\-.]\\d{2,4})";
+  const vencMatch =
+    t.match(new RegExp(`(?:data\\s+de\\s+)?vencimento[^0-9]{0,30}${DATE_PART}`, "i")) ||
+    t.match(new RegExp(`\\bvenc\\.?[^0-9]{0,20}${DATE_PART}`, "i")) ||
+    t.match(new RegExp(`(?:validade|expira[çc][aã]o)[^0-9]{0,20}${DATE_PART}`, "i"));
+  const dateMatch = !vencMatch ? t.match(/\b(\d{2}\/\d{2}\/20\d{2})\b/) : null;
   const rawDate   = vencMatch ? vencMatch[1] : dateMatch?.[1] ?? null;
   if (rawDate) {
-    const [d, m, y] = rawDate.split("/");
-    const iso = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    const [d, m, y] = rawDate.split(/[\/\-.]/);
+    const year = y.length === 2 ? `20${y}` : y;
+    const iso = `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
     const parsed = new Date(iso);
     if (!isNaN(parsed.getTime())) vencimento = iso;
   }
@@ -421,10 +434,19 @@ export function scoreRow(
     }
   }
 
-  if (row.file_name_normalized) {
-    const fn = row.file_name_normalized.trim();
-    const fileDigits = digits(fn);
-    const fileAlpha  = fn.replace(/\s/g, "");
+  // Tokens numéricos do filename: cada grupo de dígitos (separadores internos
+  // - / . permitidos) vira um token; "1382-005" → "1382005". Bigramas cobrem
+  // "1382 005" (espaço). Evita a "sopa" concatenada, que casava números de
+  // tokens vizinhos por engano ("F3 1-4 2024" continha "42024" etc.).
+  const fn = row.file_name_normalized?.trim() ?? "";
+  const fileNumTokens = [...fn.matchAll(/\d(?:[\d\/\-.]*\d)?/g)].map((m) => digits(m[0]));
+  const fileNumBigrams = fileNumTokens.slice(0, -1).map((tk, i) => tk + fileNumTokens[i + 1]);
+  const docTokenMatch = (dd: string): boolean =>
+    fileNumTokens.some((tk) => tk === dd || (dd.length >= 4 && tk.includes(dd))) ||
+    fileNumBigrams.some((bg) => bg === dd);
+
+  if (fn) {
+    const fileAlpha = fn.replace(/\s/g, "");
 
     // 1d. Número curto (2–3 chars): requer igualdade exata com o filename
     if (!docScore && docDigits.length >= 2 && docDigits.length <= 3) {
@@ -433,13 +455,15 @@ export function scoreRow(
       }
     }
 
-    // 1e. Número longo (≥ 4 dígitos): substring no filename
-    if (!docScore && docDigits.length >= 4 && fileDigits.includes(docDigits)) {
+    // 1e. Número (≥ 4 dígitos): token do filename igual ou contendo o documento
+    if (!docScore && docDigits.length >= 4 && docTokenMatch(docDigits)) {
       docScore = 0.85; docReason = "document_digits_filename";
     }
 
-    // 1f. Alfanumérico (ex: "NF2024001") no filename
-    if (!docScore && docAlpha.length >= 4 && fileAlpha.includes(docAlpha)) {
+    // 1f. Alfanumérico (ex: "NF2024001") no filename — só quando o documento
+    // tem letra; docs puramente numéricos passam pelo caminho de tokens (1e),
+    // senão a comparação sem espaços recriaria a "sopa" de dígitos.
+    if (!docScore && docAlpha.length >= 4 && /[a-z]/i.test(docAlpha) && fileAlpha.includes(docAlpha)) {
       docScore = 0.85; docReason = "document_alpha_filename";
     }
   }
@@ -454,17 +478,15 @@ export function scoreRow(
   const nameReason = "name_similarity";
 
   // ── Sinal 3: conflito de número ───────────────────────────────────────────
-  // Se o filename tem um número (≥3 díg.) e ele NÃO bate com o documento do
-  // devedor (nenhum contém o outro), é provável que seja o boleto de OUTRO
-  // título do MESMO cliente. Nesse caso, nome igual NÃO é suficiente para
-  // sugerir — penaliza o match por nome para baixo do limiar.
-  const fnDigits = row.file_name_normalized ? digits(row.file_name_normalized) : "";
+  // Se o filename tem um número (≥3 díg.) e NENHUM token bate com o documento
+  // do devedor, é provável que seja o boleto de OUTRO título do MESMO cliente.
+  // Nesse caso, nome igual NÃO é suficiente para sugerir.
   const fileHasConflictingNumber =
     docScore === 0 &&
-    fnDigits.length >= 3 &&
     docDigits.length >= 3 &&
-    !fnDigits.includes(docDigits) &&
-    !docDigits.includes(fnDigits);
+    fileNumTokens.some((tk) => tk.length >= 3) &&
+    !docTokenMatch(docDigits) &&
+    !fileNumTokens.some((tk) => tk.length >= 3 && docDigits.includes(tk));
 
   // ── Sinal 4: valor + vencimento (extraídos do conteúdo do PDF) ────────────
   // É o sinal que DESEMPATA múltiplos boletos do mesmo cliente, já que o número
