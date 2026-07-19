@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
 import LandingPage from "./components/LandingPage";
@@ -679,7 +679,10 @@ export default function App() {
     });
 
     // Evita loop infinito — só atualiza se houver diferença real
-    const hasChanged = JSON.stringify(updated.map(u => u.updatedValue)) !== JSON.stringify(debtors.map(u => u.updatedValue));
+    // Comparação direta (sem serializar a lista inteira em JSON duas vezes)
+    const hasChanged =
+      updated.length !== debtors.length ||
+      updated.some((u, i) => u.updatedValue !== debtors[i].updatedValue);
     if (hasChanged) {
       setDebtors(updated);
     }
@@ -1025,9 +1028,12 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (currentTab === "dashboard" && isLoggedIn && !operationalMetrics && !isLoadingMetrics) {
+    // Recarrega SEMPRE que a aba Dashboard é aberta — senão "Envios este mês"
+    // ficava congelado no primeiro load e divergia do card de assinatura.
+    if (currentTab === "dashboard" && isLoggedIn && !isLoadingMetrics) {
       void loadOperationalMetrics();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTab, isLoggedIn]);
 
   // Helper routine to format raw currency values in Brazil standards
@@ -1788,40 +1794,72 @@ export default function App() {
   };
 
 
-  // Metrics calculators for beautiful custom interactive Dashboard
-  // Em aberto: exclui liquidados (já pagos) — só o que ainda está pendente
-  const totalOriginalVolumeStatus = debtors
-    .filter(d => d.category !== "liquidado" && d.category !== "desabilitado")
-    .reduce((acc, d) => acc + d.value, 0);
-  const totalUpdatedVolumeStatus = debtors.reduce((acc, d) => acc + (d.updatedValue || d.value), 0);
-  
-  const vencidosCount = debtors.filter(d => d.category === "vencidos").length;
-  const aVencerCount = debtors.filter(d => d.category === "a_vencer").length;
-  const liquidadoCount = debtors.filter(d => d.category === "liquidado").length;
+  // Metrics calculators do Dashboard — memoizados: antes rodavam ~8 varreduras
+  // O(n) sobre os devedores a CADA render do App (digitar num campo, abrir um
+  // modal…), mesmo fora do Dashboard. Agora só recalculam quando os insumos mudam.
+  const {
+    totalOriginalVolumeStatus,
+    totalUpdatedVolumeStatus,
+    vencidosCount,
+    aVencerCount,
+    liquidadoCount,
+    desabilitadoCount,
+    vencidosValue,
+    aVencerValue,
+    criticalDebtors,
+    criticalValue,
+    liquidadoValue,
+  } = useMemo(() => {
+    // Em aberto: exclui liquidados (já pagos) e desabilitados
+    const totalOriginalVolumeStatus = debtors
+      .filter(d => d.category !== "liquidado" && d.category !== "desabilitado")
+      .reduce((acc, d) => acc + d.value, 0);
+    const totalUpdatedVolumeStatus = debtors.reduce((acc, d) => acc + (d.updatedValue || d.value), 0);
 
-  const vencidosValue = debtors.filter(d => d.category === "vencidos").reduce((acc, d) => acc + (d.updatedValue || d.value), 0);
-  const aVencerValue = debtors.filter(d => d.category === "a_vencer").reduce((acc, d) => acc + (d.updatedValue || d.value), 0);
+    let vencidosCount = 0, aVencerCount = 0, liquidadoCount = 0, desabilitadoCount = 0;
+    let vencidosValue = 0, aVencerValue = 0, liquidadoValue = 0;
+    for (const d of debtors) {
+      const v = d.updatedValue || d.value;
+      if (d.category === "vencidos")          { vencidosCount++;     vencidosValue += v; }
+      else if (d.category === "a_vencer")     { aVencerCount++;      aVencerValue += v; }
+      else if (d.category === "liquidado")    { liquidadoCount++;    liquidadoValue += d.value; }
+      else if (d.category === "desabilitado") { desabilitadoCount++; }
+    }
 
-  // Pendência Crítica: vencidos debtors delayed at least criticalDays
-  const criticalDebtors = debtors.filter(d => {
-    if (d.category !== "vencidos") return false;
-    if (!d.dueDate) return false;
-    const [dd, mm, yyyy] = d.dueDate.split("/");
-    if (!dd || !mm || !yyyy) return false;
-    const due = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+    // Pendência Crítica: vencidos com atraso ≥ criticalDays
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const delayDays = Math.floor((today.getTime() - due.getTime()) / 86_400_000);
-    return delayDays >= criticalDays;
-  });
-  const criticalValue = criticalDebtors.reduce((acc, d) => {
-    // c/ juros: valor + multa + juros (updatedValue)
-    if (criticalWithInterest) return acc + (d.updatedValue || d.value);
-    // s/ juros: valor + multa, sem os juros diários
-    const semJuros = Math.round((d.value * (1 + globalFinePct / 100)) * 100) / 100;
-    return acc + semJuros;
-  }, 0);
-  const liquidadoValue = debtors.filter(d => d.category === "liquidado").reduce((acc, d) => acc + d.value, 0);
+    const criticalDebtors = debtors.filter(d => {
+      if (d.category !== "vencidos") return false;
+      if (!d.dueDate) return false;
+      const [dd, mm, yyyy] = d.dueDate.split("/");
+      if (!dd || !mm || !yyyy) return false;
+      const due = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+      const delayDays = Math.floor((today.getTime() - due.getTime()) / 86_400_000);
+      return delayDays >= criticalDays;
+    });
+    const criticalValue = criticalDebtors.reduce((acc, d) => {
+      // c/ juros: valor + multa + juros (updatedValue)
+      if (criticalWithInterest) return acc + (d.updatedValue || d.value);
+      // s/ juros: valor + multa, sem os juros diários
+      const semJuros = Math.round((d.value * (1 + globalFinePct / 100)) * 100) / 100;
+      return acc + semJuros;
+    }, 0);
+
+    return {
+      totalOriginalVolumeStatus,
+      totalUpdatedVolumeStatus,
+      vencidosCount,
+      aVencerCount,
+      liquidadoCount,
+      desabilitadoCount,
+      vencidosValue,
+      aVencerValue,
+      criticalDebtors,
+      criticalValue,
+      liquidadoValue,
+    };
+  }, [debtors, criticalDays, criticalWithInterest, globalFinePct]);
 
   // Apply filters to display debtors lists
   const filteredDebtors = (() => {
@@ -2218,7 +2256,12 @@ export default function App() {
                       </div>
 
                       <div className="pt-4 flex flex-col sm:flex-row justify-between text-xs text-zinc-400 gap-2">
-                        <span>Total Geral em Monitoria: <span className="text-white font-mono font-bold">{debtors.length} clientes</span></span>
+                        <span>
+                          Total Geral em Monitoria: <span className="text-white font-mono font-bold">{vencidosCount + aVencerCount + liquidadoCount} clientes</span>
+                          {desabilitadoCount > 0 && (
+                            <span className="text-zinc-500"> · {desabilitadoCount} desabilitado{desabilitadoCount !== 1 ? "s" : ""}</span>
+                          )}
+                        </span>
                         <span>Média por Boleto: <span className="text-emerald-400 font-mono font-bold">{formatBRL(debtors.length > 0 ? totalUpdatedVolumeStatus / debtors.length : 0)}</span></span>
                       </div>
                     </div>
@@ -2381,7 +2424,7 @@ export default function App() {
                         className="text-xs text-zinc-500 hover:text-emerald-400 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-40"
                       >
                         <RefreshCw className={`w-3 h-3 ${isLoadingMetrics ? "animate-spin" : ""}`} />
-                        {operationalMetrics ? new Date(operationalMetrics.loadedAt).toLocaleTimeString("pt-BR") : "Carregar"}
+                        {operationalMetrics ? `Atualizar · ${new Date(operationalMetrics.loadedAt).toLocaleTimeString("pt-BR")}` : "Carregar"}
                       </button>
                     </div>
 
@@ -2402,7 +2445,7 @@ export default function App() {
                       <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-1">
                         <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Taxa de sucesso</p>
                         <p className={`text-xl font-extrabold font-mono ${(operationalMetrics?.successRateThisMonth ?? 100) >= 80 ? "text-emerald-400" : "text-amber-400"}`}>
-                          {isLoadingMetrics ? "?" : `${operationalMetrics?.successRateThisMonth ?? 100}%`}
+                          {isLoadingMetrics || !operationalMetrics ? "—" : `${operationalMetrics.successRateThisMonth}%`}
                         </p>
                       </div>
                       <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-1">
