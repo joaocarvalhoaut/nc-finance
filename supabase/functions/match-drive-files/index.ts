@@ -29,6 +29,7 @@ import {
   type DebtorMatchInput,
 } from "../_shared/googleDrive.ts";
 import { batchMatchDebtors, getDriveAccessToken } from "../_shared/driveFolderIndex.ts";
+import { checkRateLimit, tooManyRequests } from "../_shared/rateLimit.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -81,6 +82,10 @@ Deno.serve(async (request: Request) => {
       return errResponse(401, { error: "Sessao invalida.", status: "nao_autenticado" });
     }
     const userId = user.id;
+
+    // Rate limit: operação cara (varre índice + Drive). 6/min por usuário.
+    const rl = await checkRateLimit(admin, `match-drive:${userId}`, 6, 60);
+    if (!rl.allowed) return tooManyRequests(rl.retryAfter, corsHeaders);
 
     // ── 2. Valida assinatura ───────────────────────────────────────────────────
     const { data: subscription } = await admin

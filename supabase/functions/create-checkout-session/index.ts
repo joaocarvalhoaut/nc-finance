@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
 import { getAppBaseUrl, getStripeClient, resolvePlanPriceId, type PlanId } from "../_shared/stripe.ts";
+import { checkRateLimit, tooManyRequests } from "../_shared/rateLimit.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -36,6 +37,10 @@ Deno.serve(async (request) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Rate limit: evita abuso na criação de sessões de checkout. 10/min por usuário.
+    const rl = await checkRateLimit(admin, `checkout:${user.id}`, 10, 60);
+    if (!rl.allowed) return tooManyRequests(rl.retryAfter, corsHeaders);
 
     const { planId } = (await request.json()) as { planId?: PlanId };
     if (!planId || !["basic", "pro", "premium"].includes(planId)) {

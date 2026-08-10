@@ -25,6 +25,7 @@ import { downloadDriveFile, getDriveAccessToken } from "../_shared/driveFolderIn
 import { loadZApiCredentialsForUser } from "../_shared/platformIntegrations.ts";
 import { maskPhone, messagePreview, sanitizeError } from "../_shared/sanitize.ts";
 import { checkPilotGuard, incrementPilotDailyCount } from "../_shared/pilotGuard.ts";
+import { checkRateLimit, tooManyRequests } from "../_shared/rateLimit.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -120,6 +121,12 @@ Deno.serve(async (request: Request) => {
       return errResponse(401, { error: "Sessao invalida.", status: "sessao_invalida" });
     }
     const userId = user.id;
+
+    // ── 1b. Rate limit: protege contra rajadas de spam/abuso ───────────────────
+    // 60 envios/min por usuário — muito acima do uso normal manual, mas corta
+    // rajadas automatizadas. O limite mensal do plano (mais abaixo) é separado.
+    const rl = await checkRateLimit(admin, `send-charge:${userId}`, 60, 60);
+    if (!rl.allowed) return tooManyRequests(rl.retryAfter, corsHeaders);
 
     // ── 2. Parse e validação básica do payload ─────────────────────────────────
     let body: {
