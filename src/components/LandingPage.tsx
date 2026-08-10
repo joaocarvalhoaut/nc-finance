@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import TermosDeUso from "./TermosDeUso";
 import PoliticaPrivacidade from "./PoliticaPrivacidade";
+import AcordoTratamentoDados from "./AcordoTratamentoDados";
 import Suporte from "./Suporte";
 import { motion } from "motion/react";
 import PhoneDispatchSimulation from "./PhoneDispatchSimulation";
@@ -63,6 +64,7 @@ export default function LandingPage({
   const [isAuthSuccess, setIsAuthSuccess] = useState(false);
   const [showTermos, setShowTermos] = useState(false);
   const [showPrivacidade, setShowPrivacidade] = useState(false);
+  const [showAcordo, setShowAcordo] = useState(false);
   const [showSuporte, setShowSuporte] = useState(false);
 
   // Live Phone billing demo simulation state
@@ -1299,6 +1301,10 @@ export default function LandingPage({
                     <button type="button" onClick={() => setShowPrivacidade(true)} className="text-emerald-400 hover:underline font-semibold">
                       Política de Privacidade
                     </button>
+                    {", "}incluindo o{" "}
+                    <button type="button" onClick={() => setShowAcordo(true)} className="text-emerald-400 hover:underline font-semibold">
+                      Acordo de Tratamento de Dados
+                    </button>
                     {" "}da NC Finance.
                   </p>
                 </div>
@@ -1378,6 +1384,7 @@ export default function LandingPage({
       </footer>
 
       {showTermos && <TermosDeUso onClose={() => setShowTermos(false)} />}
+      {showAcordo && <AcordoTratamentoDados onClose={() => setShowAcordo(false)} />}
       {showPrivacidade && <PoliticaPrivacidade onClose={() => setShowPrivacidade(false)} />}
       {showSuporte && <Suporte onClose={() => setShowSuporte(false)} />}
     </div>
