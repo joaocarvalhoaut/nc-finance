@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
 import DeleteAccountModal from "./components/DeleteAccountModal";
 import { exportMyData } from "./services/accountService";
+import { addOptOuts } from "./services/optOutService";
 import LandingPage from "./components/LandingPage";
 import SubscriptionGate from "./components/SubscriptionGate";
 import SubscriptionStatusCard from "./components/SubscriptionStatusCard";
@@ -46,7 +47,8 @@ import {
   UserPlus, 
   FileCheck2, 
   Trash2,
-  Ban, 
+  Ban,
+  PhoneOff,
   FileSpreadsheet,
   Download,
   Upload,
@@ -1356,6 +1358,31 @@ export default function App() {
       await Promise.all(toUpdate.map(d => financeService.update(ownerUid, d)));
     } catch (error) {
       console.error('[workspace]', error instanceof Error ? error.message : 'Erro ao desabilitar selecionados.');
+    }
+  };
+
+  const handleBulkOptOut = async () => {
+    if (selectedDebtorIds.size === 0 || !currentOwnerUserId) return;
+
+    const selected = debtors.filter(d => selectedDebtorIds.has(d.id) && (d.phone || "").replace(/\D/g, "").length >= 8);
+    if (selected.length === 0) {
+      window.alert("Nenhum dos selecionados tem telefone válido para adicionar à lista de não-contatar.");
+      return;
+    }
+    if (!window.confirm(
+      `Adicionar ${selected.length} contato(s) à lista de NÃO CONTATAR?\n\n` +
+      `Eles não receberão mais nenhuma cobrança (manual ou automática) enquanto estiverem na lista.`,
+    )) return;
+
+    try {
+      const added = await addOptOuts(
+        currentOwnerUserId as string,
+        selected.map(d => ({ phone: d.phone, reason: `Não contatar — ${d.client}` })),
+      );
+      setSelectedDebtorIds(new Set());
+      window.alert(`${added} contato(s) adicionados à lista de não-contatar.`);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Erro ao adicionar à lista de não-contatar.");
     }
   };
 
@@ -3192,6 +3219,17 @@ export default function App() {
                         >
                           <Ban className="w-3.5 h-3.5" />
                           Desabilitar selecionados ({selectedDebtorIds.size})
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void handleBulkOptOut()}
+                          disabled={isBatchSending}
+                          title="Não contatar — adiciona à lista de opt-out (protege o número/LGPD)"
+                          className="px-4 py-2 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 text-xs font-bold rounded-xl transition-all disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <PhoneOff className="w-3.5 h-3.5" />
+                          Não contatar ({selectedDebtorIds.size})
                         </button>
                       </div>
                     </div>
