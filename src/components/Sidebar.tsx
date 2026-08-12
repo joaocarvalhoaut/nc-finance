@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Zap,
   HelpCircle,
+  Trash2,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -20,6 +21,7 @@ interface SidebarProps {
   onLogout: () => void;
   onLoginClick: () => void;
   onSupportClick?: () => void;
+  onDeleteAccount?: () => void;
   userLabel?: string;
   userEmail?: string;
 }
@@ -31,6 +33,7 @@ export default function Sidebar({
   onLogout,
   onLoginClick,
   onSupportClick,
+  onDeleteAccount,
   userLabel = "Conta autenticada",
   userEmail = ""
 }: SidebarProps) {
@@ -186,6 +189,16 @@ export default function Sidebar({
                   </span>
                 )}
               </button>
+
+              {onDeleteAccount && isExpanded && (
+                <button
+                  onClick={onDeleteAccount}
+                  className="w-full flex items-center justify-start gap-3.5 p-2 rounded-lg text-zinc-600 hover:text-rose-400 hover:bg-rose-500/5 transition-all truncate cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs">Excluir conta</span>
+                </button>
+              )}
             </div>
           ) : (
             <button

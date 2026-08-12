@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
+import DeleteAccountModal from "./components/DeleteAccountModal";
 import LandingPage from "./components/LandingPage";
 import SubscriptionGate from "./components/SubscriptionGate";
 import SubscriptionStatusCard from "./components/SubscriptionStatusCard";
@@ -206,6 +207,7 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<string>("inicio"); // Defaults to apresentacao so user can read landing page
   const isLoggedIn = Boolean(session);
   const [showSuporte, setShowSuporte] = useState(false);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [subscriptionGateError, setSubscriptionGateError] = useState("");
 
   // Temporary seed data is now persisted by user_id on first authenticated access.
@@ -2023,6 +2025,7 @@ export default function App() {
               setCurrentTab("dashboard");
             }}
             onSupportClick={() => setShowSuporte(true)}
+            onDeleteAccount={() => setShowDeleteAccount(true)}
             userLabel={account?.displayName || "Conta autenticada"}
             userEmail={account?.email || user?.email || ""}
           />
@@ -5265,6 +5268,12 @@ export default function App() {
           )}
 
           {showSuporte && <Suporte onClose={() => setShowSuporte(false)} />}
+          {showDeleteAccount && (
+            <DeleteAccountModal
+              onClose={() => setShowDeleteAccount(false)}
+              onDeleted={() => { setShowDeleteAccount(false); void handleSignOut(); }}
+            />
+          )}
 
           {/* Modal: visualização do PDF do boleto (revisão) — isolado, ver PdfPreviewModal */}
           <PdfPreviewModal />

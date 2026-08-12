@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 import type { AccountProfile } from "../types";
+import { getSupabaseClient } from "./supabaseClient";
 
 const buildDisplayName = (user: User | null) => {
   if (!user) {
@@ -30,3 +31,19 @@ export const getAccountProfile = (user: User | null): AccountProfile | null => {
     displayName: buildDisplayName(user)
   };
 };
+
+/**
+ * Exclusão de conta (LGPD — direito de eliminação). Chama a Edge Function
+ * delete-account, que apaga Storage + todas as tabelas (via cascade) + a conta
+ * de auth. Irreversível.
+ */
+export async function deleteMyAccount(): Promise<{ success: boolean; filesRemoved?: number }> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.functions.invoke<{ success: boolean; filesRemoved?: number; error?: string }>(
+    "delete-account",
+    { method: "POST" },
+  );
+  if (error) throw new Error(error.message || "Falha ao excluir a conta.");
+  if (!data?.success) throw new Error(data?.error || "Falha ao excluir a conta.");
+  return { success: true, filesRemoved: data.filesRemoved };
+}
