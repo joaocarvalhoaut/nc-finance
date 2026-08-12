@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
 import DeleteAccountModal from "./components/DeleteAccountModal";
+import { exportMyData } from "./services/accountService";
 import LandingPage from "./components/LandingPage";
 import SubscriptionGate from "./components/SubscriptionGate";
 import SubscriptionStatusCard from "./components/SubscriptionStatusCard";
@@ -441,6 +442,19 @@ export default function App() {
   const handleSignOut = async () => {
     await signOut();
     setCurrentTab("inicio");
+  };
+
+  const [isExporting, setIsExporting] = useState(false);
+  const handleExportData = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      await exportMyData();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Falha ao exportar os dados. Tente novamente.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Detec??o de retorno do Stripe Checkout
@@ -2026,6 +2040,7 @@ export default function App() {
             }}
             onSupportClick={() => setShowSuporte(true)}
             onDeleteAccount={() => setShowDeleteAccount(true)}
+            onExportData={handleExportData}
             userLabel={account?.displayName || "Conta autenticada"}
             userEmail={account?.email || user?.email || ""}
           />

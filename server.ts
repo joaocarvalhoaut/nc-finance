@@ -21,7 +21,7 @@ const CSP = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: https:",
-  "connect-src 'self' https://hiabmnyyxbedtkigcjdx.supabase.co wss://hiabmnyyxbedtkigcjdx.supabase.co https://viacep.com.br",
+  "connect-src 'self' https://hiabmnyyxbedtkigcjdx.supabase.co wss://hiabmnyyxbedtkigcjdx.supabase.co https://viacep.com.br https://*.sentry.io",
   "frame-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",

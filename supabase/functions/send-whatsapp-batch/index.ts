@@ -42,6 +42,11 @@ import { buildMessage }                    from "../_shared/messageBuilder.ts";
 import { loadZApiCredentialsForUser }       from "../_shared/platformIntegrations.ts";
 import { sanitizeError }                   from "../_shared/sanitize.ts";
 import { checkPilotGuard, incrementPilotDailyCount } from "../_shared/pilotGuard.ts";
+import { fetchOptOutSet } from "../_shared/optOut.ts";
+
+// Ritmo anti-ban no lote síncrono (leve, para não estourar o timeout).
+const BATCH_SPACING_MIN_MS    = 600;
+const BATCH_SPACING_JITTER_MS = 900;
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -261,7 +266,11 @@ Deno.serve(async (request: Request) => {
     // Non-blocking: if token unavailable, batch continues without attachments
     const driveAccessToken = await getDriveAccessToken().catch(() => null);
 
+    // Lista não-contatar (opt-out) buscada uma vez — checagem O(1) por devedor.
+    const optOutSet = await fetchOptOutSet(admin, userId);
+
     // ── 7. Loop de envio ──────────────────────────────────────────────────────
+    let sentInLoop = 0;
     for (const debtorId of idsToProcess) {
       // a. Busca devedor — filtrado pelo userId (user_id = auth.uid() derivado)
       const { data: debtorRow } = await admin
@@ -341,6 +350,21 @@ Deno.serve(async (request: Request) => {
           sentWithPdf: false,
         });
         invalidPhone++;
+        continue;
+      }
+
+      // b2. Opt-out: pula quem está na lista de não-contatar (protege o número).
+      if (optOutSet.has(normalizedPhone.replace(/\D/g, ""))) {
+        const logId = await insertBillingLog(admin, {
+          userId, clientName, documentNumber, phone: rawPhone, amount, tone,
+          message: "N/A", status: "nao_contatar", type: "lote", provider: PROVIDER,
+          errorMessage: "Devedor na lista de não-contatar (opt-out).", debtorId,
+        });
+        results.push({
+          debtorId, clientName, phone: rawPhone,
+          status: "nao_contatar", messageId: null, logId,
+          error: "Contato em opt-out (não contatar).", sentWithPdf: false,
+        });
         continue;
       }
 
@@ -471,6 +495,13 @@ Deno.serve(async (request: Request) => {
         successCount++;
       } else {
         failedCount++;
+      }
+
+      // Ritmo anti-ban: pequena pausa entre envios reais (não simula no dryRun).
+      // Leve (0.6–1.5s) por ser síncrono — o worker de automação usa pausa maior.
+      if (!dryRun && zapiResult.success) {
+        sentInLoop++;
+        await new Promise((r) => setTimeout(r, BATCH_SPACING_MIN_MS + Math.random() * BATCH_SPACING_JITTER_MS));
       }
     }
 

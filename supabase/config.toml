@@ -109,6 +109,10 @@ verify_jwt = false
 [functions.sync-whatsapp-status]
 verify_jwt = false
 
+# Z-API envia mensagens recebidas sem JWT — auth via ?secret=WHATSAPP_INBOUND_SECRET
+[functions.whatsapp-inbound]
+verify_jwt = false
+
 # Auto-continuação em background se re-invoca com AUTOMATION_CRON_SECRET.
 # A função valida auth internamente (getUser p/ usuário, cron-secret p/ "continue").
 [functions.drive-index-folder]

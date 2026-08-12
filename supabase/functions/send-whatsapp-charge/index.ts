@@ -26,6 +26,7 @@ import { loadZApiCredentialsForUser } from "../_shared/platformIntegrations.ts";
 import { maskPhone, messagePreview, sanitizeError } from "../_shared/sanitize.ts";
 import { checkPilotGuard, incrementPilotDailyCount } from "../_shared/pilotGuard.ts";
 import { checkRateLimit, tooManyRequests } from "../_shared/rateLimit.ts";
+import { isOptedOut } from "../_shared/optOut.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -279,6 +280,28 @@ Deno.serve(async (request: Request) => {
       return errResponse(400, {
         error: "Telefone invalido. Use o formato com DDI+DDD+numero (ex: 5577999887720).",
         status: "telefone_invalido",
+      });
+    }
+
+    // ── 6b. Opt-out: nunca contatar quem pediu "PARE" (protege o número) ───────
+    if (await isOptedOut(admin, userId, normalizedPhone)) {
+      await admin.from("user_logs_cobranca").insert({
+        user_id: userId,
+        client_name: (body.clientName || "Desconhecido").slice(0, 255),
+        document_number: (body.documentNumber || "").slice(0, 100),
+        phone: maskPhone(body.phone),
+        amount: Number(body.amount || 0),
+        tone: body.tone || "neutro",
+        message: messagePreview(body.message, 100),
+        status: "nao_contatar",
+        type: "manual",
+        provider: "zapi",
+        error_message: "Devedor na lista de não-contatar (opt-out).",
+        debtor_id: body.debtorId || null,
+      });
+      return errResponse(409, {
+        error: "Este contato está na lista de não-contatar e não pode ser cobrado.",
+        status: "nao_contatar",
       });
     }
 

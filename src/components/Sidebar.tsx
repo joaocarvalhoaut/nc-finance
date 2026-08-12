@@ -12,6 +12,7 @@ import {
   Zap,
   HelpCircle,
   Trash2,
+  Download,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -22,6 +23,7 @@ interface SidebarProps {
   onLoginClick: () => void;
   onSupportClick?: () => void;
   onDeleteAccount?: () => void;
+  onExportData?: () => void;
   userLabel?: string;
   userEmail?: string;
 }
@@ -34,6 +36,7 @@ export default function Sidebar({
   onLoginClick,
   onSupportClick,
   onDeleteAccount,
+  onExportData,
   userLabel = "Conta autenticada",
   userEmail = ""
 }: SidebarProps) {
@@ -189,6 +192,16 @@ export default function Sidebar({
                   </span>
                 )}
               </button>
+
+              {onExportData && isExpanded && (
+                <button
+                  onClick={onExportData}
+                  className="w-full flex items-center justify-start gap-3.5 p-2 rounded-lg text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/5 transition-all truncate cursor-pointer"
+                >
+                  <Download className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs">Exportar meus dados</span>
+                </button>
+              )}
 
               {onDeleteAccount && isExpanded && (
                 <button

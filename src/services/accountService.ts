@@ -47,3 +47,23 @@ export async function deleteMyAccount(): Promise<{ success: boolean; filesRemove
   if (!data?.success) throw new Error(data?.error || "Falha ao excluir a conta.");
   return { success: true, filesRemoved: data.filesRemoved };
 }
+
+/**
+ * Exportação de dados (LGPD — portabilidade). Baixa um JSON com todos os dados
+ * do usuário. Dispara o download no navegador.
+ */
+export async function exportMyData(): Promise<void> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.functions.invoke("export-user-data", { method: "POST" });
+  if (error) throw new Error(error.message || "Falha ao exportar os dados.");
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `nc-finance-dados-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

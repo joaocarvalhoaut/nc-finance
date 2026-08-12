@@ -32,6 +32,7 @@ import { insertBillingLog }                      from "../_shared/billingLog.ts"
 import { buildMessage }                          from "../_shared/messageBuilder.ts";
 import { loadZApiCredentialsForUser }             from "../_shared/platformIntegrations.ts";
 import { sanitizeError }                         from "../_shared/sanitize.ts";
+import { isOptedOut }                            from "../_shared/optOut.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -63,7 +64,12 @@ const shortenUrl = async (url: string): Promise<string> => {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const JOBS_PER_TICK        = 50;          // jobs processados por invocação
+// Lote reduzido de 50→25: com o espaçamento anti-ban abaixo, 25 × ~4s ≈ 100s,
+// dentro do timeout da edge function. O worker roda a cada 5 min, então a vazão
+// (~25/tick) segue alta o suficiente e distribuída — que é o objetivo.
+const JOBS_PER_TICK        = 25;          // jobs processados por invocação
+const SEND_SPACING_MIN_MS    = 1500;      // pausa mínima entre mensagens (anti-ban)
+const SEND_SPACING_JITTER_MS = 2500;      // + aleatório 0–2.5s (parecer humano)
 const RETRY_DELAYS_MIN     = [5, 15, 60]; // backoff em minutos por tentativa
 const AUTOMATION_PLANS     = ["pro", "premium"];
 const PROVIDER             = "zapi";
@@ -216,6 +222,12 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
           ? "Cliente desabilitado — cobranca bloqueada."
           : "Cliente liquidado (ja pago) — cobranca bloqueada.",
       });
+      return;
+    }
+
+    // Opt-out: devedor pediu para não ser contatado (protege o número/LGPD).
+    if (await isOptedOut(admin, userId, String(dr.phone ?? ""))) {
+      await markJob("skipped", { last_error: "Devedor na lista de não-contatar (opt-out)." });
       return;
     }
 
@@ -420,6 +432,12 @@ Deno.serve(async (request: Request) => {
     for (const job of jobList) {
       await processJob(job);
       processed++;
+      // Ritmo: espaçamento aleatório entre mensagens (~2–5s) para não disparar
+      // em rajada — padrão que os detectores de spam do WhatsApp penalizam.
+      // Só pausa entre envios reais, nunca após o último.
+      if (processed < jobList.length) {
+        await new Promise((r) => setTimeout(r, SEND_SPACING_MIN_MS + Math.random() * SEND_SPACING_JITTER_MS));
+      }
     }
 
     // Atualiza sent/failed em user_automation_runs para runs em andamento
