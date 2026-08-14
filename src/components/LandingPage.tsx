@@ -7,6 +7,7 @@ import { motion } from "motion/react";
 import PhoneDispatchSimulation from "./PhoneDispatchSimulation";
 import {
   CheckCircle2,
+  Lock,
   Sparkles,
   MessageSquare,
   ShieldCheck,
@@ -1086,8 +1087,21 @@ export default function LandingPage({
 
           </div>
 
+          {/* Garantia + métodos de pagamento — reduz atrito na assinatura */}
+          <div className="mt-10 flex flex-col items-center gap-4">
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+              <span className="flex items-center gap-1.5 text-zinc-300"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Comece grátis</span>
+              <span className="flex items-center gap-1.5 text-zinc-300"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Cancele quando quiser</span>
+              <span className="flex items-center gap-1.5 text-zinc-300"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Sem multa, sem fidelidade</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-zinc-500">
+              <Lock className="w-3.5 h-3.5" />
+              Pagamento seguro processado pela <span className="text-zinc-400 font-semibold">Stripe</span> · Cartão de crédito
+            </div>
+          </div>
+
           {/* Rodapé da seção */}
-          <p className="text-center text-xs text-zinc-600 mt-10">
+          <p className="text-center text-xs text-zinc-600 mt-6">
             Todos os planos incluem número compartilhado NC Finance. Add-on de número próprio disponível em qualquer plano.
           </p>
 

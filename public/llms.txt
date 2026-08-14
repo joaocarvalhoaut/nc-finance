@@ -1,0 +1,31 @@
+# NC Finance
+
+> SaaS brasileiro de cobrança automatizada por WhatsApp. Importa devedores de
+> planilhas e relatórios, calcula juros e multa, e dispara notificações de
+> cobrança por WhatsApp — manualmente ou por regras de automação.
+
+## O que é
+NC Finance ajuda empresas a recuperar valores em atraso. O usuário importa uma
+lista de devedores (Excel, CSV, PDF ou TXT), o sistema extrai e organiza as
+parcelas localmente, aplica juros/multa configuráveis e envia mensagens de
+cobrança via WhatsApp com tons ajustáveis (amigável a jurídico).
+
+## Principais recursos
+- Importação de relatórios em múltiplos formatos (extração 100% local)
+- Cálculo automático de juros e multa
+- Envio de cobranças por WhatsApp (individual e em lote)
+- Automações agendadas por regras (vencidos, a vencer)
+- Conciliação de boletos do Google Drive
+- Dashboard de métricas e histórico
+- Conformidade com a LGPD (consentimento, exclusão, exportação, opt-out)
+
+## Planos
+Assinatura mensal por volume de cobranças. Comece grátis, sem fidelidade.
+Pagamento seguro via Stripe.
+
+## Links
+- Site: https://ncfinance.com.br
+- Política de Privacidade e Termos de Uso: disponíveis no aplicativo
+
+## Contato
+Suporte via WhatsApp e e-mail (dentro do aplicativo).
