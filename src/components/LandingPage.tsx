@@ -1088,15 +1088,32 @@ export default function LandingPage({
           </div>
 
           {/* Garantia + métodos de pagamento — reduz atrito na assinatura */}
-          <div className="mt-10 flex flex-col items-center gap-4">
-            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
-              <span className="flex items-center gap-1.5 text-zinc-300"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Comece grátis</span>
-              <span className="flex items-center gap-1.5 text-zinc-300"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Cancele quando quiser</span>
-              <span className="flex items-center gap-1.5 text-zinc-300"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Sem multa, sem fidelidade</span>
+          <div className="mt-12 flex flex-col items-center gap-5">
+            <div className="flex flex-wrap items-center justify-center gap-2.5">
+              {["Comece grátis", "Cancele quando quiser", "Sem multa, sem fidelidade"].map((t) => (
+                <span key={t} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-semibold">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> {t}
+                </span>
+              ))}
             </div>
-            <div className="flex items-center gap-2 text-xs text-zinc-500">
-              <Lock className="w-3.5 h-3.5" />
-              Pagamento seguro processado pela <span className="text-zinc-400 font-semibold">Stripe</span> · Cartão de crédito
+
+            <div className="flex flex-wrap items-center justify-center gap-x-3.5 gap-y-2.5 px-4 py-2.5 rounded-2xl bg-zinc-900/50 border border-zinc-800">
+              <span className="flex items-center gap-1.5 text-xs text-zinc-400">
+                <Lock className="w-3.5 h-3.5 text-emerald-400" /> Pagamento seguro via <b className="text-zinc-200 font-semibold">Stripe</b>
+              </span>
+              <span className="hidden sm:block w-px h-4 bg-zinc-700" />
+              <div className="flex items-center gap-1.5" aria-label="Bandeiras aceitas: Visa, Mastercard, Elo">
+                <span className="h-[22px] px-1.5 flex items-center rounded-[4px] bg-white text-[#1434cb] text-[10px] font-black italic tracking-tighter">VISA</span>
+                <span className="h-[22px] w-[30px] flex items-center justify-center rounded-[4px] bg-white">
+                  <svg viewBox="0 0 32 20" className="h-3.5" aria-hidden="true">
+                    <circle cx="13" cy="10" r="7" fill="#EB001B" />
+                    <circle cx="19" cy="10" r="7" fill="#F79E1B" fillOpacity="0.9" />
+                  </svg>
+                </span>
+                <span className="h-[22px] px-1.5 flex items-center rounded-[4px] bg-black border border-zinc-600 text-[10px] font-extrabold lowercase tracking-tight">
+                  <span style={{ color: "#FFCB05" }}>e</span><span style={{ color: "#EF4123" }}>l</span><span style={{ color: "#00A4E0" }}>o</span>
+                </span>
+              </div>
             </div>
           </div>
 
