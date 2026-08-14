@@ -1387,6 +1387,16 @@ export default function LandingPage({
       {showAcordo && <AcordoTratamentoDados onClose={() => setShowAcordo(false)} />}
       {showPrivacidade && <PoliticaPrivacidade onClose={() => setShowPrivacidade(false)} />}
       {showSuporte && <Suporte onClose={() => setShowSuporte(false)} />}
+
+      {/* Sticky CTA — só no mobile, sempre visível para maximizar conversão */}
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 p-3 bg-zinc-950/90 backdrop-blur border-t border-zinc-800">
+        <a
+          href="#auth-panel"
+          className="w-full px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(16,185,129,0.3)] transition-all text-sm"
+        >
+          Comece agora de graça <ArrowRight className="w-4 h-4" />
+        </a>
+      </div>
     </div>
   );
 }
