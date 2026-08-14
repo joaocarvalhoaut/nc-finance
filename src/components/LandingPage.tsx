@@ -7,7 +7,6 @@ import { motion } from "motion/react";
 import PhoneDispatchSimulation from "./PhoneDispatchSimulation";
 import {
   CheckCircle2,
-  Lock,
   Sparkles,
   MessageSquare,
   ShieldCheck,
@@ -1093,11 +1092,7 @@ export default function LandingPage({
               <span className="text-white font-semibold">Comece grátis.</span> Cancele quando quiser, sem multa e sem fidelidade.
             </p>
 
-            <div className="flex flex-wrap items-center justify-center gap-x-3.5 gap-y-2.5 px-4 py-2.5 rounded-2xl bg-zinc-900/50 border border-zinc-800">
-              <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <Lock className="w-3.5 h-3.5 text-emerald-400" /> Pagamento seguro via <b className="text-zinc-200 font-semibold">Stripe</b>
-              </span>
-              <span className="hidden sm:block w-px h-4 bg-zinc-700" />
+            <div className="flex flex-col items-center gap-2.5">
               <div className="flex items-center gap-1.5" aria-label="Bandeiras aceitas: Visa, Mastercard, Elo">
                 <span className="h-[22px] px-1.5 flex items-center rounded-[4px] bg-white text-[#1434cb] text-[10px] font-black italic tracking-tighter">VISA</span>
                 <span className="h-[22px] w-[30px] flex items-center justify-center rounded-[4px] bg-white">
@@ -1110,6 +1105,7 @@ export default function LandingPage({
                   <span style={{ color: "#FFCB05" }}>e</span><span style={{ color: "#EF4123" }}>l</span><span style={{ color: "#00A4E0" }}>o</span>
                 </span>
               </div>
+              <p className="text-xs text-zinc-500">Pagamento processado com segurança pela Stripe.</p>
             </div>
           </div>
 
