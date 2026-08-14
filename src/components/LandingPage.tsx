@@ -1089,13 +1089,9 @@ export default function LandingPage({
 
           {/* Garantia + métodos de pagamento — reduz atrito na assinatura */}
           <div className="mt-12 flex flex-col items-center gap-5">
-            <div className="flex flex-wrap items-center justify-center gap-2.5">
-              {["Comece grátis", "Cancele quando quiser", "Sem multa, sem fidelidade"].map((t) => (
-                <span key={t} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-semibold">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> {t}
-                </span>
-              ))}
-            </div>
+            <p className="text-center text-[15px] text-zinc-400 max-w-md leading-relaxed">
+              <span className="text-white font-semibold">Comece grátis.</span> Cancele quando quiser, sem multa e sem fidelidade.
+            </p>
 
             <div className="flex flex-wrap items-center justify-center gap-x-3.5 gap-y-2.5 px-4 py-2.5 rounded-2xl bg-zinc-900/50 border border-zinc-800">
               <span className="flex items-center gap-1.5 text-xs text-zinc-400">
