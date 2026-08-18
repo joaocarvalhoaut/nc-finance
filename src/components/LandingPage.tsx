@@ -357,7 +357,7 @@ export default function LandingPage({
           <div className="flex items-center gap-3">
             <a 
               href="#auth-panel" 
-              className="text-xs sm:text-sm font-medium text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 px-4 py-2 rounded-xl bg-emerald-500/5 hover:bg-emerald-500/10 transition-all hover:border-emerald-500/40"
+              className="text-xs sm:text-sm font-medium text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 px-4 py-2 rounded-none bg-emerald-500/5 hover:bg-emerald-500/10 transition-all hover:border-emerald-500/40"
             >
               Entrar ou Cadastrar
             </a>
@@ -386,13 +386,13 @@ export default function LandingPage({
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start pt-4">
                 <a
                   href="#auth-panel"
-                  className="px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_20px_rgba(16,185,129,0.3)] hover:-translate-y-0.5 transition-all text-sm sm:text-base"
+                  className="px-6 py-3.5 rounded-none bg-emerald-500 hover:bg-emerald-400 text-black font-bold flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_20px_rgba(16,185,129,0.3)] hover:-translate-y-0.5 transition-all text-sm sm:text-base"
                 >
                   Comece agora de graça <ArrowRight className="w-4 h-4" />
                 </a>
                 <a
                   href="#demo-celular"
-                  className="px-6 py-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 font-medium flex items-center justify-center gap-2 transition-all text-sm sm:text-base"
+                  className="px-6 py-3.5 rounded-none bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 font-medium flex items-center justify-center gap-2 transition-all text-sm sm:text-base"
                 >
                   Ver simulação ao vivo
                 </a>
@@ -427,7 +427,7 @@ export default function LandingPage({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* Pilar 1 */}
             <motion.div
-              className="relative rounded-2xl border border-zinc-800/60 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
+              className="relative rounded-none border border-zinc-800/60 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.3 }}
@@ -445,7 +445,7 @@ export default function LandingPage({
 
             {/* Pilar 2 */}
             <motion.div
-              className="relative rounded-2xl border border-zinc-800/60 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
+              className="relative rounded-none border border-zinc-800/60 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.3 }}
@@ -463,7 +463,7 @@ export default function LandingPage({
 
             {/* Pilar 3 */}
             <motion.div
-              className="relative rounded-2xl border border-zinc-800/60 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
+              className="relative rounded-none border border-zinc-800/60 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.3 }}
@@ -543,7 +543,7 @@ export default function LandingPage({
                 >
                   {/* Número + ícone */}
                   <div className="relative">
-                    <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.08)]">
+                    <div className="w-16 h-16 rounded-none bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.08)]">
                       {icon}
                     </div>
                     <div className="absolute -top-3 -right-3 w-6 h-6 rounded-full bg-emerald-500 text-black text-[10px] font-black flex items-center justify-center shadow-md">
@@ -582,14 +582,14 @@ export default function LandingPage({
 
           {/* Browser frame */}
           <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-emerald-300/10 to-emerald-500/20 rounded-2xl blur opacity-40 group-hover:opacity-60 transition duration-1000" />
-            <div className="relative rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden">
+            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-emerald-300/10 to-emerald-500/20 rounded-none blur opacity-40 group-hover:opacity-60 transition duration-1000" />
+            <div className="relative rounded-none border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden">
               {/* Browser top bar */}
               <div className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 border-b border-zinc-800">
                 <span className="w-2.5 h-2.5 rounded-full bg-zinc-700" />
                 <span className="w-2.5 h-2.5 rounded-full bg-zinc-700" />
                 <span className="w-2.5 h-2.5 rounded-full bg-zinc-700" />
-                <div className="ml-3 flex-1 max-w-sm rounded-md bg-zinc-950 border border-zinc-800 px-3 py-1 text-[10px] text-zinc-500 font-mono truncate">
+                <div className="ml-3 flex-1 max-w-sm rounded-none bg-zinc-950 border border-zinc-800 px-3 py-1 text-[10px] text-zinc-500 font-mono truncate">
                   app.ncfinance.com.br/dashboard
                 </div>
               </div>
@@ -604,7 +604,7 @@ export default function LandingPage({
                     { label: "VENCIDOS (30+ DIAS)", value: "R$ 9.417,55", accent: "text-rose-400" },
                     { label: "RECUPERADO NO MÊS", value: "R$ 12.730,80", accent: "text-emerald-300" },
                   ].map((kpi) => (
-                    <div key={kpi.label} className="rounded-xl border border-zinc-900 bg-zinc-900/50 p-3 sm:p-4">
+                    <div key={kpi.label} className="rounded-none border border-zinc-900 bg-zinc-900/50 p-3 sm:p-4">
                       <div className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-zinc-500">{kpi.label}</div>
                       <div className={`mt-1.5 text-sm sm:text-lg font-extrabold font-mono ${kpi.accent}`}>{kpi.value}</div>
                     </div>
@@ -613,7 +613,7 @@ export default function LandingPage({
 
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
                   {/* Bar chart mock */}
-                  <div className="lg:col-span-3 rounded-xl border border-zinc-900 bg-zinc-900/50 p-4">
+                  <div className="lg:col-span-3 rounded-none border border-zinc-900 bg-zinc-900/50 p-4">
                     <div className="text-[10px] font-bold text-white mb-3">Fluxo Projetado de Recuperação</div>
                     <div className="flex items-end gap-2 h-28">
                       {[42, 65, 38, 80, 55, 92, 70, 60, 85, 48, 74, 95].map((h, i) => (
@@ -626,14 +626,14 @@ export default function LandingPage({
                   </div>
 
                   {/* Dispatch feed mock */}
-                  <div className="lg:col-span-2 rounded-xl border border-zinc-900 bg-zinc-900/50 p-4 space-y-2.5">
+                  <div className="lg:col-span-2 rounded-none border border-zinc-900 bg-zinc-900/50 p-4 space-y-2.5">
                     <div className="text-[10px] font-bold text-white mb-1">Disparos recentes</div>
                     {[
                       { name: "Carlos Mendes", value: "R$ 715,66" },
                       { name: "Distrib. Alfa LTDA", value: "R$ 1.240,00" },
                       { name: "Menezes & Batista", value: "R$ 982,40" },
                     ].map((row) => (
-                      <div key={row.name} className="flex items-center justify-between rounded-lg bg-zinc-950/60 border border-zinc-900 px-3 py-2">
+                      <div key={row.name} className="flex items-center justify-between rounded-none bg-zinc-950/60 border border-zinc-900 px-3 py-2">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
                           <span className="text-[10px] text-zinc-300 truncate">{row.name}</span>
@@ -679,8 +679,8 @@ export default function LandingPage({
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Box 1: File Extractor */}
-            <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-xl">
+            <div className="bg-zinc-950 border border-zinc-900 rounded-none p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-none">
                 <FileCheck className="w-6 h-6" />
               </div>
               <h4 className="text-lg font-bold text-white">Importação Inteligente (IA)</h4>
@@ -690,8 +690,8 @@ export default function LandingPage({
             </div>
 
             {/* Box 2: Calculating Engine */}
-            <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-xl">
+            <div className="bg-zinc-950 border border-zinc-900 rounded-none p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-none">
                 <Terminal className="w-6 h-6" />
               </div>
               <h4 className="text-lg font-bold text-white">Atualização de Juros e Multas</h4>
@@ -701,8 +701,8 @@ export default function LandingPage({
             </div>
 
             {/* Box 3: WhatsApp Dispatchers */}
-            <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-xl">
+            <div className="bg-zinc-950 border border-zinc-900 rounded-none p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-none">
                 <MessageSquare className="w-6 h-6" />
               </div>
               <h4 className="text-lg font-bold text-white">Escala de 4 Tons de Abordagem</h4>
@@ -712,8 +712,8 @@ export default function LandingPage({
             </div>
 
             {/* Box 4: Google Workspace */}
-            <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-xl">
+            <div className="bg-zinc-950 border border-zinc-900 rounded-none p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-none">
                 <FileSpreadsheet className="w-6 h-6" />
               </div>
               <h4 className="text-lg font-bold text-white">Conexão com Google Sheets</h4>
@@ -723,8 +723,8 @@ export default function LandingPage({
             </div>
 
             {/* Box 5: Auto-schedulers */}
-            <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-xl">
+            <div className="bg-zinc-950 border border-zinc-900 rounded-none p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-none">
                 <Clock className="w-6 h-6" />
               </div>
               <h4 className="text-lg font-bold text-white">Agendamento de Disparos</h4>
@@ -734,8 +734,8 @@ export default function LandingPage({
             </div>
 
             {/* Box 6: Z-API Integration */}
-            <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-xl">
+            <div className="bg-zinc-950 border border-zinc-900 rounded-none p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-none">
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <h4 className="text-lg font-bold text-white">Escolha o Número dos Disparos</h4>
@@ -770,24 +770,24 @@ export default function LandingPage({
               </p>
 
               {/* Interaction controllers */}
-              <div className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4">
+              <div className="p-5 rounded-none bg-zinc-900 border border-zinc-800 space-y-4">
                 <label className="text-xs font-bold uppercase tracking-widest text-zinc-500">Preset do Devedor:</label>
                 <div className="flex flex-wrap gap-2">
                   <button 
                     onClick={() => handleDemoPreset("Carlos Eduardo", "1.849,90")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${demoPhoneName === "Carlos Eduardo" ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-850 hover:bg-zinc-800 text-zinc-300"}`}
+                    className={`px-3 py-1.5 rounded-none text-xs font-semibold transition-all cursor-pointer ${demoPhoneName === "Carlos Eduardo" ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-850 hover:bg-zinc-800 text-zinc-300"}`}
                   >
                     Carlos (Vencido há 5 dias - R$ 1.849,90)
                   </button>
                   <button 
                     onClick={() => handleDemoPreset("Mariana Silva", "425,00")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${demoPhoneName === "Mariana Silva" ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-850 hover:bg-zinc-800 text-zinc-300"}`}
+                    className={`px-3 py-1.5 rounded-none text-xs font-semibold transition-all cursor-pointer ${demoPhoneName === "Mariana Silva" ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-850 hover:bg-zinc-800 text-zinc-300"}`}
                   >
                     Mariana (A vencer amanhã - R$ 425,00)
                   </button>
                   <button 
                     onClick={() => handleDemoPreset("Empresa Souza S/A", "14.220,00")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${demoPhoneName === "Empresa Souza S/A" ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-850 hover:bg-zinc-800 text-zinc-300"}`}
+                    className={`px-3 py-1.5 rounded-none text-xs font-semibold transition-all cursor-pointer ${demoPhoneName === "Empresa Souza S/A" ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-850 hover:bg-zinc-800 text-zinc-300"}`}
                   >
                     Souza S/A (R$ 14.220,00)
                   </button>
@@ -800,7 +800,7 @@ export default function LandingPage({
                       <button
                         key={tone}
                         onClick={() => setDemoTone(tone)}
-                        className={`py-2 rounded-lg text-xs capitalize font-bold transition-all cursor-pointer border ${demoTone === tone ? "bg-emerald-500/15 text-emerald-400 border-emerald-500" : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"}`}
+                        className={`py-2 rounded-none text-xs capitalize font-bold transition-all cursor-pointer border ${demoTone === tone ? "bg-emerald-500/15 text-emerald-400 border-emerald-500" : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"}`}
                       >
                         {tone}
                       </button>
@@ -837,12 +837,12 @@ export default function LandingPage({
                   {/* Bubble Space */}
                   <div className="flex-1 p-3 flex flex-col justify-end space-y-3 bg-[#e5ddd5] overflow-y-auto">
                     {/* Incoming customer response balloon */}
-                    <div className="self-start max-w-[85%] bg-white text-zinc-800 p-2.5 rounded-lg rounded-tl-none shadow-sm text-xs">
+                    <div className="self-start max-w-[85%] bg-white text-zinc-800 p-2.5 rounded-none rounded-tl-none shadow-sm text-xs">
                       Bom dia, qual o status da minha fatura de boleto em aberto? Consigo o link do boleto?
                     </div>
 
                     {/* Automatic Reply Balloon */}
-                    <div className="self-end max-w-[85%] bg-[#dcf8c6] text-zinc-800 p-2.5 rounded-lg rounded-tr-none shadow-sm text-xs flex flex-col gap-1.5 border border-emerald-900/10">
+                    <div className="self-end max-w-[85%] bg-[#dcf8c6] text-zinc-800 p-2.5 rounded-none rounded-tr-none shadow-sm text-xs flex flex-col gap-1.5 border border-emerald-900/10">
                       <p className="whitespace-pre-wrap">{getDemoMessage()}</p>
                       <div className="p-1.5 rounded bg-black/5 border border-black/10 flex items-center gap-1.5">
                         <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
@@ -895,7 +895,7 @@ export default function LandingPage({
 
             {/* Starter */}
             <motion.div
-              className="relative bg-zinc-950 border border-zinc-800 rounded-2xl p-8 flex flex-col hover:border-zinc-700 transition-all"
+              className="relative bg-zinc-950 border border-zinc-800 rounded-none p-8 flex flex-col hover:border-zinc-700 transition-all"
               initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.2 }}
               transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0 }}
@@ -935,7 +935,7 @@ export default function LandingPage({
                 ))}
               </ul>
 
-              <div className={`mt-6 rounded-xl border p-3 cursor-pointer transition-all ${ownNumber.lite ? "border-amber-500/40 bg-amber-500/5" : "border-zinc-800 hover:border-zinc-700"}`}
+              <div className={`mt-6 rounded-none border p-3 cursor-pointer transition-all ${ownNumber.lite ? "border-amber-500/40 bg-amber-500/5" : "border-zinc-800 hover:border-zinc-700"}`}
                 onClick={() => setOwnNumber(p => ({ lite: !p.lite, pro: false, premium: false }))}>
                 <div className="flex items-center gap-2.5">
                   <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-all ${ownNumber.lite ? "bg-amber-500 border-amber-500" : "border-zinc-600"}`}>
@@ -949,10 +949,10 @@ export default function LandingPage({
 
               {ownNumber.lite
                 ? <a href={SUPPORT_WHATSAPP} target="_blank" rel="noopener noreferrer"
-                    className="mt-5 px-4 py-2.5 rounded-xl border border-amber-500/40 text-amber-400 bg-amber-500/5 hover:bg-amber-500/10 transition-all text-center flex items-center justify-center gap-2 text-sm font-semibold">
+                    className="mt-5 px-4 py-2.5 rounded-none border border-amber-500/40 text-amber-400 bg-amber-500/5 hover:bg-amber-500/10 transition-all text-center flex items-center justify-center gap-2 text-sm font-semibold">
                     <PhoneCall className="w-4 h-4" /> Falar com Suporte
                   </a>
-                : <a href="#auth-panel" className="mt-5 px-4 py-2.5 rounded-xl border border-zinc-700 text-zinc-300 font-semibold hover:bg-zinc-900 hover:border-zinc-600 transition-all text-center block text-sm">
+                : <a href="#auth-panel" className="mt-5 px-4 py-2.5 rounded-none border border-zinc-700 text-zinc-300 font-semibold hover:bg-zinc-900 hover:border-zinc-600 transition-all text-center block text-sm">
                     Começar no Starter
                   </a>
               }
@@ -960,7 +960,7 @@ export default function LandingPage({
 
             {/* Professional — destaque */}
             <motion.div
-              className="relative bg-zinc-950 border-2 border-emerald-500 rounded-2xl p-8 flex flex-col shadow-[0_0_40px_rgba(16,185,129,0.12)] md:-translate-y-3"
+              className="relative bg-zinc-950 border-2 border-emerald-500 rounded-none p-8 flex flex-col shadow-[0_0_40px_rgba(16,185,129,0.12)] md:-translate-y-3"
               initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.2 }}
               transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0.1 }}
@@ -1005,7 +1005,7 @@ export default function LandingPage({
                 ))}
               </ul>
 
-              <div className={`mt-6 rounded-xl border p-3 cursor-pointer transition-all ${ownNumber.pro ? "border-amber-500/40 bg-amber-500/5" : "border-emerald-500/10 hover:border-amber-500/30"}`}
+              <div className={`mt-6 rounded-none border p-3 cursor-pointer transition-all ${ownNumber.pro ? "border-amber-500/40 bg-amber-500/5" : "border-emerald-500/10 hover:border-amber-500/30"}`}
                 onClick={() => setOwnNumber(p => ({ lite: false, pro: !p.pro, premium: false }))}>
                 <div className="flex items-center gap-2.5">
                   <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-all ${ownNumber.pro ? "bg-amber-500 border-amber-500" : "border-zinc-500"}`}>
@@ -1017,10 +1017,10 @@ export default function LandingPage({
 
               {ownNumber.pro
                 ? <a href={SUPPORT_WHATSAPP} target="_blank" rel="noopener noreferrer"
-                    className="mt-5 px-4 py-3 rounded-xl border border-amber-500/60 text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-all text-center flex items-center justify-center gap-2 text-sm font-extrabold">
+                    className="mt-5 px-4 py-3 rounded-none border border-amber-500/60 text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-all text-center flex items-center justify-center gap-2 text-sm font-extrabold">
                     <PhoneCall className="w-4 h-4" /> Falar com Suporte
                   </a>
-                : <a href="#auth-panel" className="mt-5 px-4 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold shadow-[0_4px_20px_rgba(16,185,129,0.3)] transition-all text-center block text-sm">
+                : <a href="#auth-panel" className="mt-5 px-4 py-3 rounded-none bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold shadow-[0_4px_20px_rgba(16,185,129,0.3)] transition-all text-center block text-sm">
                     Assinar Professional
                   </a>
               }
@@ -1028,7 +1028,7 @@ export default function LandingPage({
 
             {/* Enterprise */}
             <motion.div
-              className="relative bg-zinc-950 border border-zinc-800 rounded-2xl p-8 flex flex-col hover:border-zinc-700 transition-all"
+              className="relative bg-zinc-950 border border-zinc-800 rounded-none p-8 flex flex-col hover:border-zinc-700 transition-all"
               initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.2 }}
               transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0.2 }}
@@ -1063,7 +1063,7 @@ export default function LandingPage({
                 ))}
               </ul>
 
-              <div className={`mt-6 rounded-xl border p-3 cursor-pointer transition-all ${ownNumber.premium ? "border-amber-500/40 bg-amber-500/5" : "border-zinc-800 hover:border-zinc-700"}`}
+              <div className={`mt-6 rounded-none border p-3 cursor-pointer transition-all ${ownNumber.premium ? "border-amber-500/40 bg-amber-500/5" : "border-zinc-800 hover:border-zinc-700"}`}
                 onClick={() => setOwnNumber(p => ({ lite: false, pro: false, premium: !p.premium }))}>
                 <div className="flex items-center gap-2.5">
                   <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-all ${ownNumber.premium ? "bg-amber-500 border-amber-500" : "border-zinc-600"}`}>
@@ -1075,10 +1075,10 @@ export default function LandingPage({
 
               {ownNumber.premium
                 ? <a href={SUPPORT_WHATSAPP} target="_blank" rel="noopener noreferrer"
-                    className="mt-5 px-4 py-2.5 rounded-xl border border-amber-500/40 text-amber-400 bg-amber-500/5 hover:bg-amber-500/10 transition-all text-center flex items-center justify-center gap-2 text-sm font-semibold">
+                    className="mt-5 px-4 py-2.5 rounded-none border border-amber-500/40 text-amber-400 bg-amber-500/5 hover:bg-amber-500/10 transition-all text-center flex items-center justify-center gap-2 text-sm font-semibold">
                     <PhoneCall className="w-4 h-4" /> Falar com Suporte
                   </a>
-                : <a href="#auth-panel" className="mt-5 px-4 py-2.5 rounded-xl border border-emerald-500/20 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-all text-center block text-sm font-semibold">
+                : <a href="#auth-panel" className="mt-5 px-4 py-2.5 rounded-none border border-emerald-500/20 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-all text-center block text-sm font-semibold">
                     Assinar Enterprise
                   </a>
               }
@@ -1120,7 +1120,7 @@ export default function LandingPage({
       {/* AUTHENTICATION CONTROL CORE PANEL */}
       <section id="auth-panel" className="py-20 border-t border-zinc-900/60 bg-zinc-950/40">
         <div className="max-w-md mx-auto px-4">
-          <div className="bg-zinc-950 border border-zinc-900 p-6 sm:p-8 rounded-3xl shadow-2xl relative overflow-hidden">
+          <div className="bg-zinc-950 border border-zinc-900 p-6 sm:p-8 rounded-none shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-300" />
             
             <div className="text-center mb-8">
@@ -1133,19 +1133,19 @@ export default function LandingPage({
             </div>
 
             {authError && (
-              <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl text-center">
+              <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-none text-center">
                 {authError}
               </div>
             )}
 
             {authInfo && (
-              <div className="mb-4 p-3 bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs rounded-xl text-center">
+              <div className="mb-4 p-3 bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs rounded-none text-center">
                 {authInfo}
               </div>
             )}
 
             {isAuthSuccess && (
-              <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-xl text-center font-bold">
+              <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-none text-center font-bold">
                 ✓ Autenticacao validada. Redirecionando para o painel...
               </div>
             )}
@@ -1162,7 +1162,7 @@ export default function LandingPage({
                       setAuthName(e.target.value);
                       setAuthError("");
                     }}
-                    className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light"
+                    className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light"
                     placeholder="NC Empreendimentos"
                   />
                 </div>
@@ -1178,7 +1178,7 @@ export default function LandingPage({
                     setAuthEmail(e.target.value);
                     setAuthError("");
                   }}
-                  className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light"
+                  className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light"
                   placeholder="admin@ncfinance.com.br"
                 />
               </div>
@@ -1194,7 +1194,7 @@ export default function LandingPage({
                       setAuthPassword(e.target.value);
                       setAuthError("");
                     }}
-                    className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light font-mono"
+                    className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light font-mono"
                     placeholder="••••••••"
                   />
                   {!isRegisterMode && (
@@ -1235,7 +1235,7 @@ export default function LandingPage({
                         }
                         setAuthError("");
                       }}
-                      className={`w-full bg-zinc-900/80 border rounded-xl px-4 py-3 text-sm text-white focus:outline-none transition-all font-mono ${cpfError ? "border-rose-500 focus:border-rose-500" : "border-zinc-800 focus:border-emerald-500"}`}
+                      className={`w-full bg-zinc-900/80 border rounded-none px-4 py-3 text-sm text-white focus:outline-none transition-all font-mono ${cpfError ? "border-rose-500 focus:border-rose-500" : "border-zinc-800 focus:border-emerald-500"}`}
                       placeholder="000.000.000-00"
                     />
                     {cpfError && <p className="text-rose-400 text-[11px] mt-1">{cpfError}</p>}
@@ -1249,7 +1249,7 @@ export default function LandingPage({
                       required
                       value={authPhone}
                       onChange={(e) => { setAuthPhone(formatPhone(e.target.value)); setAuthError(""); }}
-                      className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-mono"
+                      className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-mono"
                       placeholder="(00) 00000-0000"
                     />
                   </div>
@@ -1265,7 +1265,7 @@ export default function LandingPage({
                         required
                         value={authCEP}
                         onChange={(e) => { void handleCEPChange(e.target.value); setAuthError(""); }}
-                        className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-mono"
+                        className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-mono"
                         placeholder="00000-000"
                       />
                     </div>
@@ -1275,7 +1275,7 @@ export default function LandingPage({
                         type="text"
                         value={authState}
                         onChange={(e) => setAuthState(e.target.value.toUpperCase().slice(0,2))}
-                        className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-mono uppercase"
+                        className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-mono uppercase"
                         placeholder="SP"
                         maxLength={2}
                       />
@@ -1288,7 +1288,7 @@ export default function LandingPage({
                       required
                       value={authAddress}
                       onChange={(e) => { setAuthAddress(e.target.value); setAuthError(""); }}
-                      className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light"
+                      className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light"
                       placeholder="Rua, número, bairro"
                     />
                   </div>
@@ -1299,7 +1299,7 @@ export default function LandingPage({
                       required
                       value={authCity}
                       onChange={(e) => { setAuthCity(e.target.value); setAuthError(""); }}
-                      className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light"
+                      className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light"
                       placeholder="São Paulo"
                     />
                   </div>
@@ -1336,7 +1336,7 @@ export default function LandingPage({
               <button
                 type="submit"
                 disabled={isAuthLoading || isAuthSuccess || Boolean(authConfigError) || (isRegisterMode && !acceptedTerms)}
-                className={`w-full py-3.5 rounded-xl font-extrabold shadow-[0_4px_15px_rgba(16,185,129,0.3)] transition-all text-sm mt-2 ${
+                className={`w-full py-3.5 rounded-none font-extrabold shadow-[0_4px_15px_rgba(16,185,129,0.3)] transition-all text-sm mt-2 ${
                   isRegisterMode && !acceptedTerms
                     ? "bg-zinc-700 text-zinc-500 cursor-not-allowed"
                     : "bg-emerald-500 hover:bg-emerald-400 text-black hover:-translate-y-0.5 cursor-pointer"
@@ -1415,7 +1415,7 @@ export default function LandingPage({
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 p-3 bg-zinc-950/90 backdrop-blur border-t border-zinc-800">
         <a
           href="#auth-panel"
-          className="w-full px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(16,185,129,0.3)] transition-all text-sm"
+          className="w-full px-6 py-3.5 rounded-none bg-emerald-500 hover:bg-emerald-400 text-black font-bold flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(16,185,129,0.3)] transition-all text-sm"
         >
           Comece agora de graça <ArrowRight className="w-4 h-4" />
         </a>
