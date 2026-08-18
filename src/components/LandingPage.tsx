@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import CountUp from "./CountUp";
 import TermosDeUso from "./TermosDeUso";
 import PoliticaPrivacidade from "./PoliticaPrivacidade";
 import AcordoTratamentoDados from "./AcordoTratamentoDados";
@@ -599,14 +600,16 @@ export default function LandingPage({
                 {/* KPI row */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   {[
-                    { label: "FATURAMENTO BASE", value: "R$ 48.230,00", accent: "text-white" },
-                    { label: "FATURAMENTO CORRIGIDO", value: "R$ 51.984,12", accent: "text-emerald-400" },
-                    { label: "VENCIDOS (30+ DIAS)", value: "R$ 9.417,55", accent: "text-rose-400" },
-                    { label: "RECUPERADO NO MÊS", value: "R$ 12.730,80", accent: "text-emerald-300" },
+                    { label: "FATURAMENTO BASE", value: 48230.00, accent: "text-white" },
+                    { label: "FATURAMENTO CORRIGIDO", value: 51984.12, accent: "text-emerald-400" },
+                    { label: "VENCIDOS (30+ DIAS)", value: 9417.55, accent: "text-rose-400" },
+                    { label: "RECUPERADO NO MÊS", value: 12730.80, accent: "text-emerald-300" },
                   ].map((kpi) => (
                     <div key={kpi.label} className="rounded-none border border-zinc-900 bg-zinc-900/50 p-3 sm:p-4">
                       <div className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-zinc-500">{kpi.label}</div>
-                      <div className={`mt-1.5 text-sm sm:text-lg font-extrabold font-mono ${kpi.accent}`}>{kpi.value}</div>
+                      <div className={`mt-1.5 text-sm sm:text-lg font-extrabold font-mono ${kpi.accent}`}>
+                        <CountUp to={kpi.value} decimals={2} prefix="R$ " />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -617,7 +620,15 @@ export default function LandingPage({
                     <div className="text-[10px] font-bold text-white mb-3">Fluxo Projetado de Recuperação</div>
                     <div className="flex items-end gap-2 h-28">
                       {[42, 65, 38, 80, 55, 92, 70, 60, 85, 48, 74, 95].map((h, i) => (
-                        <div key={i} className="flex-1 rounded-t-sm bg-gradient-to-t from-emerald-600/40 to-emerald-400/80" style={{ height: `${h}%` }} />
+                        <motion.div
+                          key={i}
+                          className="flex-1 rounded-t-sm bg-gradient-to-t from-emerald-600/40 to-emerald-400/80 origin-bottom"
+                          initial={{ scaleY: 0 }}
+                          whileInView={{ scaleY: 1 }}
+                          viewport={{ once: true, amount: 0.4 }}
+                          transition={{ duration: 0.6, delay: i * 0.05, ease: "easeOut" }}
+                          style={{ height: `${h}%` }}
+                        />
                       ))}
                     </div>
                     <div className="flex justify-between mt-2 text-[8px] font-mono text-zinc-600">
