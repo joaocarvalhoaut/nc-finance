@@ -4651,7 +4651,7 @@ export default function App() {
                   {automationError && (
                     <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-3 text-sm text-rose-200 flex items-center justify-between gap-3">
                       <span>{automationError}</span>
-                      <button onClick={() => setAutomationError("")} className="text-rose-400 hover:text-rose-200 text-xs cursor-pointer">✕</button>
+                      <button onClick={() => setAutomationError("")} className="text-rose-400 hover:text-rose-200 cursor-pointer"><X className="w-3.5 h-3.5" /></button>
                     </div>
                   )}
 
