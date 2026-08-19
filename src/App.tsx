@@ -2444,17 +2444,17 @@ export default function App() {
                   <div className="p-6 rounded-3xl bg-zinc-900/60 border border-zinc-900">
                     <h4 className="text-sm font-bold text-white mb-4">Fluxo Operacional de Cobranças da NC Finance</h4>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-                      <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-850 flex flex-col gap-2">
+                      <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col gap-2">
                         <span className="font-mono text-emerald-400 font-bold">Passo 1</span>
                         <h5 className="font-bold text-white">Importação e Extração</h5>
                         <p className="text-zinc-500 font-light">Cole o relatório bruto ou insira as parcelas para que o extrator local estruture os vencimentos.</p>
                       </div>
-                      <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-850 flex flex-col gap-2">
+                      <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col gap-2">
                         <span className="font-mono text-emerald-400 font-bold">Passo 2</span>
                         <h5 className="font-bold text-white">Correção de Valores</h5>
                         <p className="text-zinc-500 font-light">Defina os juros diários e a multa de atraso. O sistema atualiza os valores finais imediatamente.</p>
                       </div>
-                      <div className="p-4 rounded-xl bg-zinc-300/5 border border-zinc-850 flex flex-col gap-2">
+                      <div className="p-4 rounded-xl bg-zinc-300/5 border border-zinc-800 flex flex-col gap-2">
                         <span className="font-mono text-emerald-400 font-bold">Passo 3</span>
                         <h5 className="font-mono text-zinc-400">Seleção do Tom</h5>
                         <p className="text-zinc-500 font-light">Escolha entre Amigável, Neutro, Firme ou de Notificação Jurídica de acordo com o atraso.</p>
@@ -2776,7 +2776,7 @@ export default function App() {
 
                       <div className="flex-1 min-h-[300px] overflow-y-auto max-h-[420px] pr-1 space-y-4">
                         {extractedDebtors.length === 0 ? (
-                          <div className="h-full flex flex-col items-center justify-center text-center p-8 border border-zinc-850 border-dashed rounded-2xl text-zinc-500">
+                          <div className="h-full flex flex-col items-center justify-center text-center p-8 border border-zinc-800 border-dashed rounded-2xl text-zinc-500">
                             <SlidersHorizontal className="w-10 h-10 text-zinc-700 animate-pulse mb-2" />
                             <p className="text-xs font-semibold">Nenhuma informação estruturada pendente</p>
                             <p className="text-[10px] text-zinc-600 max-w-sm mt-1">Cole as faturas e clique no botão verde para ver os campos extraídos estruturados em tabela editável.</p>
@@ -2815,7 +2815,7 @@ export default function App() {
                             </div>
 
                             {extractedDebtors.map((item, index) => (
-                              <div key={item.id} id={`extracted-card-${item.id}`} className={`p-3 bg-zinc-950 border rounded-xl space-y-2 relative group transition-all duration-300 ${extractedSelectedIds.has(item.id) ? "border-emerald-500/50" : flashedLowConfId === item.id ? "border-amber-400 bg-amber-500/15 shadow-[0_0_12px_rgba(251,191,36,0.3)]" : lowConfidenceIds.has(item.id) ? "border-amber-500/50 bg-amber-500/5" : "border-zinc-850"}`}>
+                              <div key={item.id} id={`extracted-card-${item.id}`} className={`p-3 bg-zinc-950 border rounded-xl space-y-2 relative group transition-all duration-300 ${extractedSelectedIds.has(item.id) ? "border-emerald-500/50" : flashedLowConfId === item.id ? "border-amber-400 bg-amber-500/15 shadow-[0_0_12px_rgba(251,191,36,0.3)]" : lowConfidenceIds.has(item.id) ? "border-amber-500/50 bg-amber-500/5" : "border-zinc-800"}`}>
                                 <div className="flex items-center gap-2 absolute top-2.5 left-2.5">
                                   <button
                                     type="button"
@@ -2998,7 +2998,7 @@ export default function App() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                           <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Multa Geral (%)</label>
-                          <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-905 p-2 rounded-xl">
+                          <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-900 p-2 rounded-xl">
                             <input
                               type="text"
                               inputMode="decimal"
@@ -3018,7 +3018,7 @@ export default function App() {
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Juros / Dia (%)</label>
-                          <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-905 p-2 rounded-xl">
+                          <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-900 p-2 rounded-xl">
                             <input
                               type="text"
                               inputMode="decimal"
@@ -3058,7 +3058,7 @@ export default function App() {
                               value={newRepName}
                               onChange={(e) => setNewRepName(e.target.value)}
                               placeholder="Felipe Amorim"
-                              className="w-full bg-zinc-950 border border-zinc-805 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
                             />
                           </div>
                           <div className="space-y-1">
@@ -3068,7 +3068,7 @@ export default function App() {
                               value={newRepPhone}
                               onChange={(e) => setNewRepPhone(e.target.value)}
                               placeholder="5577999881111"
-                              className="w-full bg-zinc-950 border border-zinc-805 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none font-mono"
+                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none font-mono"
                             />
                           </div>
                         </div>
@@ -3080,7 +3080,7 @@ export default function App() {
                               value={newRepRole}
                               onChange={(e) => setNewRepRole(e.target.value)}
                               placeholder="Responsável Financeiro"
-                              className="w-full bg-zinc-950 border border-zinc-805 rounded-xl px-2.5 py-1.5 text-xs text-white"
+                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs text-white"
                             />
                           </div>
                           <button
@@ -3097,7 +3097,7 @@ export default function App() {
                   </div>
 
                   <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-900 flex flex-wrap gap-4 items-center justify-between">
-                    <div className="flex items-center gap-2 bg-zinc-950 p-2 rounded-xl border border-zinc-805 flex-1 min-w-[200px] max-w-sm">
+                    <div className="flex items-center gap-2 bg-zinc-950 p-2 rounded-xl border border-zinc-800 flex-1 min-w-[200px] max-w-sm">
                       <Search className="w-4 h-4 text-zinc-500" />
                       <input
                         type="text"
@@ -3623,7 +3623,7 @@ export default function App() {
                                     <select
                                       value={d.representativeId || ""}
                                       onChange={(e) => updateGeneralDebtorField(d.id, "representativeId", e.target.value || undefined)}
-                                      className="bg-zinc-950 border border-zinc-805 text-[11px] text-zinc-300 rounded px-2 py-1 max-w-[140px] truncate focus:outline-none"
+                                      className="bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-300 rounded px-2 py-1 max-w-[140px] truncate focus:outline-none"
                                     >
                                       <option value="">Não Atribuído</option>
                                       {representatives.map(r => (
@@ -4358,7 +4358,7 @@ export default function App() {
                                     className={`py-2 px-1 rounded-xl text-[11px] font-bold text-center capitalize transition-all border cursor-pointer
                                       ${isToneSelected 
                                         ? "bg-emerald-500 text-black border-emerald-500 hover:bg-emerald-400" 
-                                        : "bg-zinc-950 border-zinc-850 text-zinc-400 hover:text-white"
+                                        : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
                                       }
                                     `}
                                   >
@@ -4379,7 +4379,7 @@ export default function App() {
                               rows={10}
                               value={customMessageDraft}
                               onChange={(e) => setCustomMessageDraft(e.target.value)}
-                              className="w-full bg-zinc-950 border border-zinc-850 rounded-2xl p-4 text-xs text-zinc-100 focus:outline-none focus:border-emerald-500 transition-all font-mono leading-relaxed"
+                              className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 text-xs text-zinc-100 focus:outline-none focus:border-emerald-500 transition-all font-mono leading-relaxed"
                             />
                           </div>
 
@@ -4570,7 +4570,7 @@ export default function App() {
                                           onClick={() => {
                                             setSelectedLogDetail(selectedLogDetail?.id === log.id ? null : log);
                                           }}
-                                          className="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all text-[11px] font-semibold border border-zinc-805"
+                                          className="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all text-[11px] font-semibold border border-zinc-800"
                                         >
                                           {selectedLogDetail?.id === log.id ? "Ocultar" : "Ver Mensagem"}
                                         </button>

@@ -785,19 +785,19 @@ export default function LandingPage({
                 <div className="flex flex-wrap gap-2">
                   <button 
                     onClick={() => handleDemoPreset("Carlos Eduardo", "1.849,90")}
-                    className={`px-3 py-1.5 rounded-none text-xs font-semibold transition-all cursor-pointer ${demoPhoneName === "Carlos Eduardo" ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-850 hover:bg-zinc-800 text-zinc-300"}`}
+                    className={`px-3 py-1.5 rounded-none text-xs font-semibold transition-all cursor-pointer ${demoPhoneName === "Carlos Eduardo" ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300"}`}
                   >
                     Carlos (Vencido há 5 dias - R$ 1.849,90)
                   </button>
                   <button 
                     onClick={() => handleDemoPreset("Mariana Silva", "425,00")}
-                    className={`px-3 py-1.5 rounded-none text-xs font-semibold transition-all cursor-pointer ${demoPhoneName === "Mariana Silva" ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-850 hover:bg-zinc-800 text-zinc-300"}`}
+                    className={`px-3 py-1.5 rounded-none text-xs font-semibold transition-all cursor-pointer ${demoPhoneName === "Mariana Silva" ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300"}`}
                   >
                     Mariana (A vencer amanhã - R$ 425,00)
                   </button>
                   <button 
                     onClick={() => handleDemoPreset("Empresa Souza S/A", "14.220,00")}
-                    className={`px-3 py-1.5 rounded-none text-xs font-semibold transition-all cursor-pointer ${demoPhoneName === "Empresa Souza S/A" ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-850 hover:bg-zinc-800 text-zinc-300"}`}
+                    className={`px-3 py-1.5 rounded-none text-xs font-semibold transition-all cursor-pointer ${demoPhoneName === "Empresa Souza S/A" ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300"}`}
                   >
                     Souza S/A (R$ 14.220,00)
                   </button>
