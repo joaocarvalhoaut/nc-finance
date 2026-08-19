@@ -8,7 +8,7 @@ import { motion } from "motion/react";
 import PhoneDispatchSimulation from "./PhoneDispatchSimulation";
 import {
   CheckCircle2,
-  Sparkles,
+  ListChecks,
   MessageSquare,
   ShieldCheck,
   Clock,
@@ -515,7 +515,7 @@ export default function LandingPage({
                 },
                 {
                   step: "02",
-                  icon: <Sparkles className="w-6 h-6" />,
+                  icon: <ListChecks className="w-6 h-6" />,
                   title: "Organização automática",
                   desc: "Nome do cliente, documento, vencimento e valor são extraídos automaticamente. Juros e multas calculados em tempo real.",
                   delay: 0.12,

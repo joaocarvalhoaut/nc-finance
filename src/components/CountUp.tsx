@@ -67,5 +67,13 @@ export default function CountUp({ to, duration = 1800, decimals = 0, prefix = ""
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [to]);
 
-  return <span ref={ref} className={className}>{fmt(val)}</span>;
+  // Reserva a largura do valor FINAL (span invisível como "molde") e sobrepõe o
+  // valor animado por cima — assim a largura não muda a cada frame e o layout
+  // não treme. tabular-nums mantém os dígitos com largura igual.
+  return (
+    <span ref={ref} className={`relative inline-block whitespace-nowrap tabular-nums ${className}`}>
+      <span aria-hidden="true" className="invisible">{fmt(to)}</span>
+      <span className="absolute left-0 top-0">{fmt(val)}</span>
+    </span>
+  );
 }
