@@ -9,6 +9,7 @@ import PhoneDispatchSimulation from "./PhoneDispatchSimulation";
 import {
   CheckCircle2,
   ListChecks,
+  Activity,
   MessageSquare,
   ShieldCheck,
   Clock,
@@ -529,7 +530,7 @@ export default function LandingPage({
                 },
                 {
                   step: "04",
-                  icon: <CheckCircle2 className="w-6 h-6" />,
+                  icon: <Activity className="w-6 h-6" />,
                   title: "Acompanhe em tempo real",
                   desc: "Cada mensagem enviada fica registrada com status, data e dados do cliente. Histórico completo para auditoria.",
                   delay: 0.36,
