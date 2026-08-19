@@ -4171,7 +4171,7 @@ export default function App() {
                                   className="w-full flex items-center justify-between cursor-pointer"
                                 >
                                   <div className="space-y-1 select-none text-left">
-                                    <div className="text-xs font-pro font-black text-white">{d.client}</div>
+                                    <div className="text-xs font-black text-white">{d.client}</div>
                                     <div className="text-[10px] text-zinc-400 font-light font-mono flex items-center gap-1">
                                       <span>Doc: {d.document}</span> · <span>{d.dueDate}</span>
                                     </div>
@@ -4191,7 +4191,7 @@ export default function App() {
 
                                     {d.status === "sent" ? (
                                       <span className="text-[9px] text-emerald-400 flex items-center gap-1">
-                                        ✓ Enviado
+                                        <Check className="w-2.5 h-2.5" strokeWidth={3} /> Enviado
                                       </span>
                                     ) : (
                                       <span className="text-[9px] text-zinc-500 font-light">Pendente</span>
@@ -4222,9 +4222,9 @@ export default function App() {
                                       <button
                                         type="button"
                                         onClick={() => setEditingPhoneDebtorId(null)}
-                                        className="text-zinc-500 hover:text-zinc-300 text-[10px] px-1 transition-colors"
+                                        className="text-zinc-500 hover:text-zinc-300 px-1 transition-colors"
                                       >
-                                        ✕
+                                        <X className="w-3 h-3" />
                                       </button>
                                     </>
                                   ) : (
