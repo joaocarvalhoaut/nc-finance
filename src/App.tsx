@@ -2144,22 +2144,6 @@ export default function App() {
               )}
 
               {currentTab === "dashboard" && (
-              <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-950 border border-emerald-500/10 p-4 sm:p-5 rounded-3xl relative overflow-hidden shadow-xl">
-                <div className="absolute top-0 right-0 w-[200px] h-full bg-[radial-gradient(circle_at_right_top,rgba(16,185,129,0.06),transparent)]" />
-                <div className="flex flex-col gap-4">
-                  <div>
-                    <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                      <Zap className="w-5 h-5 text-emerald-400 animate-pulse" /> Sistema Moderno NC Finance
-                    </h3>
-                    <p className="text-xs sm:text-sm text-zinc-400 font-light mt-1">
-                      Gerencie faturamentos, extraia devedores com o pipeline local de análise de documentos e envie notificações automáticas de cobrança.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              )}
-
-              {currentTab === "dashboard" && (
                 <div className="space-y-8">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     
@@ -2169,7 +2153,7 @@ export default function App() {
                         <DollarSign className="w-4 h-4 text-zinc-500" />
                       </div>
                       <div className="mt-3">
-                        <span className="text-2xl sm:text-3xl font-extrabold text-white font-mono">{formatBRL(totalOriginalVolumeStatus)}</span>
+                        <span className="text-2xl sm:text-3xl font-extrabold text-white font-mono"><CountUp to={totalOriginalVolumeStatus} prefix="R$ " decimals={2} /></span>
                       </div>
                       <div className="text-[10px] text-zinc-500 mt-2">
                         Valor original em aberto (não inclui liquidados).
@@ -2183,7 +2167,7 @@ export default function App() {
                         <TrendingUp className="w-4 h-4 text-emerald-400" />
                       </div>
                       <div className="mt-3">
-                        <span className="text-2xl sm:text-3xl font-extrabold text-emerald-300 font-mono">{formatBRL(vencidosValue)}</span>
+                        <span className="text-2xl sm:text-3xl font-extrabold text-emerald-300 font-mono"><CountUp to={vencidosValue} prefix="R$ " decimals={2} /></span>
                       </div>
                       <div className="text-[10px] text-emerald-400/60 mt-2">
                         Total dos vencidos com {globalFinePct}% de multa + {globalInterestDayPct}% de juros diários.
@@ -2202,7 +2186,7 @@ export default function App() {
 
                       {/* Value + count */}
                       <div className="mt-2 flex items-end justify-between gap-2">
-                        <span className="text-2xl sm:text-3xl font-extrabold text-rose-400 font-mono leading-none">{formatBRL(criticalValue)}</span>
+                        <span className="text-2xl sm:text-3xl font-extrabold text-rose-400 font-mono leading-none"><CountUp to={criticalValue} prefix="R$ " decimals={2} /></span>
                         <span className="text-[11px] text-rose-400/50 font-mono mb-0.5 shrink-0">{criticalDebtors.length} títulos</span>
                       </div>
 
@@ -2252,7 +2236,7 @@ export default function App() {
                         <CheckCircle className="w-4 h-4 text-emerald-400" />
                       </div>
                       <div className="mt-2 flex items-baseline justify-between">
-                        <span className="text-2xl sm:text-3xl font-extrabold text-white font-mono">{formatBRL(liquidadoValue)}</span>
+                        <span className="text-2xl sm:text-3xl font-extrabold text-white font-mono"><CountUp to={liquidadoValue} prefix="R$ " decimals={2} /></span>
                       </div>
                       <div className="text-[10px] text-zinc-500 mt-2">
                         Faturas baixadas e confirmadas em sistema.
