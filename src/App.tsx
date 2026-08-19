@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
+import CountUp from "./components/CountUp";
 import DeleteAccountModal from "./components/DeleteAccountModal";
 import { exportMyData } from "./services/accountService";
 import { addOptOuts } from "./services/optOutService";
@@ -2278,25 +2279,49 @@ export default function App() {
                       <div className="relative w-full h-[240px] border-b border-l border-zinc-800 pt-4 px-2">
                         <svg className="w-full h-full" viewBox="0 0 600 200" preserveAspectRatio="none">
                           <defs>
-                            <linearGradient id="chartGlow" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
-                              <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                            <linearGradient id="gVenc" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#fb7185" stopOpacity="0.95" />
+                              <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.28" />
+                            </linearGradient>
+                            <linearGradient id="gAvenc" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.95" />
+                              <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.28" />
+                            </linearGradient>
+                            <linearGradient id="gLiq" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#34d399" stopOpacity="1" />
+                              <stop offset="100%" stopColor="#10b981" stopOpacity="0.32" />
                             </linearGradient>
                           </defs>
 
-                          <line x1="0" y1="50" x2="600" y2="50" stroke="#27272a" strokeDasharray="4 4" strokeWidth="1" />
-                          <line x1="0" y1="100" x2="600" y2="100" stroke="#27272a" strokeDasharray="4 4" strokeWidth="1" />
-                          <line x1="0" y1="150" x2="600" y2="150" stroke="#27272a" strokeDasharray="4 4" strokeWidth="1" />
+                          <line x1="0" y1="50" x2="600" y2="50" stroke="#27272a" strokeDasharray="3 6" strokeWidth="1" />
+                          <line x1="0" y1="100" x2="600" y2="100" stroke="#27272a" strokeDasharray="3 6" strokeWidth="1" />
+                          <line x1="0" y1="150" x2="600" y2="150" stroke="#27272a" strokeDasharray="3 6" strokeWidth="1" />
 
-                          <rect x="50" y={200 - Math.min(180, (vencidosValue / (totalUpdatedVolumeStatus || 1)) * 180)} width="65" height={Math.min(180, (vencidosValue / (totalUpdatedVolumeStatus || 1)) * 180)} rx="8" fill="#f43f5e" opacity="0.85" />
-                          <rect x="250" y={200 - Math.min(180, (aVencerValue / (totalUpdatedVolumeStatus || 1)) * 180)} width="65" height={Math.min(180, (aVencerValue / (totalUpdatedVolumeStatus || 1)) * 180)} rx="8" fill="#f59e0b" opacity="0.85" />
-                          <rect x="450" y={200 - Math.min(180, (liquidadoValue / (totalUpdatedVolumeStatus || 1)) * 180)} width="65" height={Math.min(180, (liquidadoValue / (totalUpdatedVolumeStatus || 1)) * 180)} rx="8" fill="#10b981" opacity="0.95" />
+                          {[
+                            { v: vencidosValue, x: 82,  fill: "url(#gVenc)" },
+                            { v: aVencerValue,  x: 255, fill: "url(#gAvenc)" },
+                            { v: liquidadoValue, x: 428, fill: "url(#gLiq)" },
+                          ].map((b, i) => {
+                            const h = Math.max(2, Math.min(190, (b.v / (totalUpdatedVolumeStatus || 1)) * 190));
+                            return (
+                              <rect
+                                key={i}
+                                className="dash-bar"
+                                style={{ animationDelay: `${i * 110}ms` }}
+                                x={b.x}
+                                y={200 - h}
+                                width={90}
+                                height={h}
+                                fill={b.fill}
+                              />
+                            );
+                          })}
                         </svg>
 
                         <div className="absolute left-0 right-0 -bottom-6 flex justify-around text-[10px] text-zinc-500 font-mono">
-                          <span className="text-rose-400 font-bold">Vencidos ({formatBRL(vencidosValue)})</span>
-                          <span className="text-amber-400 font-bold">A Vencer ({formatBRL(aVencerValue)})</span>
-                          <span className="text-emerald-400 font-bold">Liquidado ({formatBRL(liquidadoValue)})</span>
+                          <span className="text-rose-400 font-bold">Vencidos (<CountUp to={vencidosValue} prefix="R$ " decimals={2} />)</span>
+                          <span className="text-amber-400 font-bold">A Vencer (<CountUp to={aVencerValue} prefix="R$ " decimals={2} />)</span>
+                          <span className="text-emerald-400 font-bold">Liquidado (<CountUp to={liquidadoValue} prefix="R$ " decimals={2} />)</span>
                         </div>
                       </div>
 

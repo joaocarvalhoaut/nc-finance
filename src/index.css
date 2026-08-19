@@ -54,3 +54,15 @@
 }
 .btn-shine:hover::after { left: 130%; }
 @media (prefers-reduced-motion: reduce) { .btn-shine::after { transition: none; } }
+
+/* ── Barras do gráfico do dashboard crescendo (mesma ideia da landing) ──── */
+.dash-bar {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: dash-grow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes dash-grow {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) { .dash-bar { animation: none; } }
