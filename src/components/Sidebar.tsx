@@ -11,8 +11,7 @@ import {
   MessageSquare,
   Zap,
   HelpCircle,
-  Trash2,
-  Download,
+  UserCog,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -22,8 +21,6 @@ interface SidebarProps {
   onLogout: () => void;
   onLoginClick: () => void;
   onSupportClick?: () => void;
-  onDeleteAccount?: () => void;
-  onExportData?: () => void;
   userLabel?: string;
   userEmail?: string;
 }
@@ -35,8 +32,6 @@ export default function Sidebar({
   onLogout,
   onLoginClick,
   onSupportClick,
-  onDeleteAccount,
-  onExportData,
   userLabel = "Conta autenticada",
   userEmail = ""
 }: SidebarProps) {
@@ -55,6 +50,8 @@ export default function Sidebar({
     { id: "cobranca",    label: "Cobrança",     icon: MessageSquare,   section: "internal" },
     { id: "historico",   label: "Histórico",    icon: History,         section: "internal" },
     { id: "automacoes",  label: "Automações",   icon: Zap,             section: "internal" },
+    { id: "separator2",  label: "",             icon: null,            section: "divider" },
+    { id: "minha_conta", label: "Minha Conta",  icon: UserCog,         section: "internal" },
   ] : [
     { id: "inicio", label: "Apresentação", icon: Info, section: "public" }
   ];
@@ -192,26 +189,6 @@ export default function Sidebar({
                   </span>
                 )}
               </button>
-
-              {onExportData && isExpanded && (
-                <button
-                  onClick={onExportData}
-                  className="w-full flex items-center justify-start gap-3.5 p-2 rounded-lg text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/5 transition-all truncate cursor-pointer"
-                >
-                  <Download className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs">Exportar meus dados</span>
-                </button>
-              )}
-
-              {onDeleteAccount && isExpanded && (
-                <button
-                  onClick={onDeleteAccount}
-                  className="w-full flex items-center justify-start gap-3.5 p-2 rounded-lg text-zinc-600 hover:text-rose-400 hover:bg-rose-500/5 transition-all truncate cursor-pointer"
-                >
-                  <Trash2 className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs">Excluir conta</span>
-                </button>
-              )}
             </div>
           ) : (
             <button

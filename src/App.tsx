@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from "react";
 import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
 import CountUp from "./components/CountUp";
+import MinhaConta from "./components/MinhaConta";
 import DeleteAccountModal from "./components/DeleteAccountModal";
-import { exportMyData } from "./services/accountService";
 import { addOptOuts } from "./services/optOutService";
 import LandingPage from "./components/LandingPage";
 import SubscriptionGate from "./components/SubscriptionGate";
@@ -445,19 +445,6 @@ export default function App() {
   const handleSignOut = async () => {
     await signOut();
     setCurrentTab("inicio");
-  };
-
-  const [isExporting, setIsExporting] = useState(false);
-  const handleExportData = async () => {
-    if (isExporting) return;
-    setIsExporting(true);
-    try {
-      await exportMyData();
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Falha ao exportar os dados. Tente novamente.");
-    } finally {
-      setIsExporting(false);
-    }
   };
 
   // Detec??o de retorno do Stripe Checkout
@@ -2067,8 +2054,6 @@ export default function App() {
               setCurrentTab("dashboard");
             }}
             onSupportClick={() => setShowSuporte(true)}
-            onDeleteAccount={() => setShowDeleteAccount(true)}
-            onExportData={handleExportData}
             userLabel={account?.displayName || "Conta autenticada"}
             userEmail={account?.email || user?.email || ""}
           />
@@ -2085,6 +2070,7 @@ export default function App() {
                   {currentTab === "cobranca"   && "Cobrança — WhatsApp"}
                   {currentTab === "historico"  && "Histórico de Cobrança"}
                   {currentTab === "automacoes" && "Automações de Cobrança"}
+                  {currentTab === "minha_conta"&& "Minha Conta"}
                 </h2>
               </div>
             </div>
@@ -2107,6 +2093,20 @@ export default function App() {
             )}
 
             <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-8">
+
+              {/* ── Tab: Minha Conta ───────────────────────────────────────── */}
+              {currentTab === "minha_conta" && userId && (
+                <MinhaConta
+                  userId={userId}
+                  email={account?.email || user?.email || ""}
+                  displayName={account?.displayName || "Conta autenticada"}
+                  plan={plan}
+                  subscriptionStatus={subscription?.status ?? null}
+                  chargesSent={usage?.chargesSent ?? 0}
+                  onManageSubscription={() => void handleOpenBillingPortal()}
+                  onDeleteAccount={() => setShowDeleteAccount(true)}
+                />
+              )}
 
               {/* ── Tab: Cobrar (novo fluxo simplificado) ──────────────────── */}
               {currentTab === "cobrar" && userId && (

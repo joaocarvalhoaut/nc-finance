@@ -2,6 +2,29 @@ import type { User } from "@supabase/supabase-js";
 import type { AccountProfile } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
 
+export interface UserProfileData {
+  full_name: string;
+  cpf: string;
+  phone: string;
+  cep: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  created_at?: string;
+}
+
+/** Busca o perfil (KYC) do usuário logado — dados cadastrais. */
+export async function getMyProfile(userId: string): Promise<UserProfileData | null> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .select("full_name, cpf, phone, cep, address, city, state, created_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) return null;
+  return (data as UserProfileData) ?? null;
+}
+
 const buildDisplayName = (user: User | null) => {
   if (!user) {
     return "";
