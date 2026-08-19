@@ -17,3 +17,6 @@ scripts/
 e2e-report.json
 hardening-report.json
 *-report.json
+
+# Skills de design instaladas via 'skills add' (ferramenta de dev, não é código do app)
+.agents/
