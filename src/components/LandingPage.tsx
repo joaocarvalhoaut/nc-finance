@@ -381,7 +381,7 @@ export default function LandingPage({
               </h1>
 
               <p className="text-zinc-400 text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed font-light">
-                Importe relatórios de clientes em atraso ou faturas pendentes. Nossa Inteligência Artificial extrai e organiza as parcelas, calcula juros e multas atualizados, e dispara notificações nos tons ideais de abordagem.
+                Importe relatórios de clientes em atraso ou faturas pendentes. A NC Finance extrai e organiza as parcelas automaticamente, calcula juros e multas atualizados, e dispara notificações nos tons ideais de abordagem.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start pt-4">
@@ -389,7 +389,7 @@ export default function LandingPage({
                   href="#auth-panel"
                   className="px-6 py-3.5 rounded-none bg-emerald-500 hover:bg-emerald-400 text-black font-bold flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_20px_rgba(16,185,129,0.3)] hover:-translate-y-0.5 transition-all text-sm sm:text-base"
                 >
-                  Comece agora de graça <ArrowRight className="w-4 h-4" />
+                  Comece grátis <ArrowRight className="w-4 h-4" />
                 </a>
                 <a
                   href="#demo-celular"
@@ -516,7 +516,7 @@ export default function LandingPage({
                 {
                   step: "02",
                   icon: <Sparkles className="w-6 h-6" />,
-                  title: "A IA organiza tudo",
+                  title: "Organização automática",
                   desc: "Nome do cliente, documento, vencimento e valor são extraídos automaticamente. Juros e multas calculados em tempo real.",
                   delay: 0.12,
                 },
@@ -693,7 +693,7 @@ export default function LandingPage({
               <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-none">
                 <FileCheck className="w-6 h-6" />
               </div>
-              <h4 className="text-lg font-bold text-white">Importação Inteligente (IA)</h4>
+              <h4 className="text-lg font-bold text-white">Importação Inteligente</h4>
               <p className="text-zinc-400 text-sm font-light leading-relaxed">
                 Envie relatórios bagunçados, PDFs, txt, boletos brutos ou extratos. Nossa engenharia extrai o nome do cliente, documento, vencimento e valores automaticamente — sem nenhum cadastro manual prévio.
               </p>
@@ -1426,7 +1426,7 @@ export default function LandingPage({
           href="#auth-panel"
           className="w-full px-6 py-3.5 rounded-none bg-emerald-500 hover:bg-emerald-400 text-black font-bold flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(16,185,129,0.3)] transition-all text-sm"
         >
-          Comece agora de graça <ArrowRight className="w-4 h-4" />
+          Comece grátis <ArrowRight className="w-4 h-4" />
         </a>
       </div>
     </div>
