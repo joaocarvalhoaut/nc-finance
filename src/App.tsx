@@ -2635,7 +2635,7 @@ export default function App() {
                     <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl">
                       <div className="space-y-1">
                         <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
-                          <Download className="w-4 h-4 text-emerald-400" /> Upload ou Texto de Cobrança
+                          <Upload className="w-4 h-4 text-emerald-400" /> Upload ou Texto de Cobrança
                         </h4>
                         <p className="text-xs text-zinc-500 font-light">
                           Cole faturas, relatórios de ERP ou selecione presets abaixo. O extrator local identifica clientes, vencimentos, valores e documentos automaticamente.
