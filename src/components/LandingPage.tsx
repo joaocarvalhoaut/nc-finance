@@ -398,13 +398,6 @@ export default function LandingPage({
                   Ver simulação ao vivo
                 </a>
               </div>
-
-              {/* Trust micro-signals (metrics live in the results strip below) */}
-              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-x-5 gap-y-2 pt-8 border-t border-zinc-900 text-xs text-zinc-400">
-                <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Conforme a LGPD</span>
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Sem contrato de fidelidade</span>
-                <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-emerald-400" /> Configuração em 10 minutos</span>
-              </div>
             </div>
 
             {/* Right Column: looping mass-dispatch simulation on a new-gen iPhone */}
@@ -415,6 +408,15 @@ export default function LandingPage({
           </div>
         </div>
       </section>
+
+      {/* Trust strip — logo abaixo do hero, fora do "momento" do hero */}
+      <div className="border-y border-zinc-900 bg-zinc-950/40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-xs text-zinc-400">
+          <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Conforme a LGPD</span>
+          <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Sem contrato de fidelidade</span>
+          <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-emerald-400" /> Configuração em 10 minutos</span>
+        </div>
+      </div>
 
       {/* RESULTS STRIP */}
       <motion.section
@@ -494,7 +496,6 @@ export default function LandingPage({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="text-center max-w-2xl mx-auto mb-20">
-            <p className="text-emerald-400 font-mono text-xs uppercase tracking-widest font-semibold mb-3">Simples do início ao fim</p>
             <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Como funciona</h2>
           </div>
 
@@ -574,7 +575,6 @@ export default function LandingPage({
       >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto space-y-4 mb-12">
-            <h2 className="text-emerald-400 font-mono text-sm uppercase tracking-widest font-semibold">Por dentro do painel</h2>
             <h3 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Tudo em uma tela só</h3>
             <p className="text-zinc-400 font-light">
               Faturamento, fluxo de recuperação e disparos automáticos — sem planilhas paralelas.
@@ -681,7 +681,6 @@ export default function LandingPage({
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto space-y-4 mb-16">
-            <h2 className="text-emerald-400 font-mono text-sm uppercase tracking-widest font-semibold">Tudo o que você precisa</h2>
             <h3 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Desenvolvido para times financeiros ágeis</h3>
             <p className="text-zinc-400 font-light">
               Esqueça tabelas bagunçadas e o envio manual e tenso de cobranças indesejadas pelo celular pessoal. Com a NC Finance, o processo é estruturado.
@@ -897,7 +896,6 @@ export default function LandingPage({
 
           {/* Header */}
           <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
-            <p className="text-emerald-400 font-mono text-xs uppercase tracking-widest font-semibold">Planos & Preços</p>
             <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Escolha o plano certo para o seu volume</h2>
             <p className="text-zinc-400 font-light text-sm">Sem taxa por boleto quitado. Sem surpresas na fatura.</p>
           </div>
@@ -976,7 +974,7 @@ export default function LandingPage({
               viewport={{ once: false, amount: 0.2 }}
               transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0.1 }}
             >
-              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-emerald-500 text-black px-4 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest shadow-md whitespace-nowrap">
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-emerald-500 text-black px-4 py-1 rounded-none text-[10px] font-extrabold uppercase tracking-widest shadow-md whitespace-nowrap">
                 Mais popular
               </div>
 
