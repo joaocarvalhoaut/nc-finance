@@ -4439,7 +4439,7 @@ export default function App() {
                     </div>
                     
                     <div className="bg-zinc-900/40 border border-zinc-900/80 p-5 rounded-2xl shadow-lg flex items-center gap-4">
-                      <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl">
+                      <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl">
                         <Users className="w-5 h-5" />
                       </div>
                       <div>
@@ -4451,7 +4451,7 @@ export default function App() {
                     </div>
 
                     <div className="bg-zinc-900/40 border border-zinc-900/80 p-5 rounded-2xl shadow-lg flex items-center gap-4">
-                      <div className="p-3 bg-amber-500/10 text-amber-400 rounded-xl">
+                      <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl">
                         <DollarSign className="w-5 h-5" />
                       </div>
                       <div>
@@ -4494,7 +4494,7 @@ export default function App() {
                     <div className="border border-zinc-900 rounded-2xl bg-zinc-950 overflow-hidden">
                       {billingLogs.length === 0 ? (
                         <div className="p-12 text-center text-zinc-500 space-y-2">
-                          <History className="w-10 h-10 text-zinc-800 mx-auto animate-spin" />
+                          <History className="w-10 h-10 text-zinc-800 mx-auto" />
                           <p className="font-semibold text-white text-sm">O histórico está vazio</p>
                           <p className="text-xs text-zinc-600 max-w-xs mx-auto">Nenhum faturamento foi notificado recentemente. Quando disparar cobranças na aba de Cobrança, elas serão listadas em tempo real aqui.</p>
                         </div>
@@ -4505,7 +4505,7 @@ export default function App() {
                               <tr className="border-b border-zinc-900 bg-zinc-900/30 text-[10px] uppercase font-mono text-zinc-500 tracking-wider">
                                 <th className="px-5 py-4">Data/Hora</th>
                                 <th className="px-5 py-4">Cliente</th>
-                                <th className="px-5 py-4 font-center">Canal / Tipo</th>
+                                <th className="px-5 py-4 text-center">Canal / Tipo</th>
                                 <th className="px-5 py-4 text-right">Valor Notificado</th>
                                 <th className="px-5 py-4 text-center">Status</th>
                                 <th className="px-5 py-4 text-right">Ações</th>
@@ -4540,7 +4540,7 @@ export default function App() {
                                     <td className="px-5 py-4 text-center">
                                       {(log.status === "sucesso" || log.status === "sent") ? (
                                         <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded font-mono font-semibold">
-                                          ✓ Sucesso
+                                          <Check className="w-3 h-3" strokeWidth={3} /> Sucesso
                                         </span>
                                       ) : log.status === "bloqueado_limite" ? (
                                         <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded font-mono font-semibold">
@@ -4560,7 +4560,7 @@ export default function App() {
                                         </span>
                                       ) : (
                                         <span className="inline-flex items-center gap-1 text-[10px] text-rose-400 bg-rose-400/10 px-2 py-0.5 rounded font-mono font-semibold">
-                                          ✗ Erro
+                                          <X className="w-3 h-3" /> Erro
                                         </span>
                                       )}
                                     </td>
