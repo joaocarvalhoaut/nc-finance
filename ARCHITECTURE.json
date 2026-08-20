@@ -1,0 +1,106 @@
+{
+  "app": "NC Finance",
+  "description": "SaaS de cobranca automatizada por WhatsApp: importa devedores, calcula juros/multa, envia notificacoes e concilia boletos do Drive.",
+  "generatedAt": "2026-08-13",
+  "stack": {
+    "frontend": "React 19 + Vite 6 + TypeScript",
+    "hosting": "Vercel (CDN estatico + preview por branch)",
+    "backend": "Supabase (Postgres + Auth + Edge Functions Deno + Storage)",
+    "payments": "Stripe",
+    "whatsapp": "Z-API (nao-oficial; migracao futura p/ WhatsApp Cloud API)",
+    "email": "Resend (SMTP do Supabase Auth)",
+    "outros": "Google Drive, Google Sheets, Short.io, ViaCEP, Sentry"
+  },
+  "stats": {
+    "edgeFunctions": 18,
+    "tabelas": 28,
+    "servicosFrontend": 21,
+    "componentes": 20,
+    "modulosCompartilhados": 17,
+    "politicasRLS": 57
+  },
+  "layers": {
+    "frontend": {
+      "framework": "React 19 + Vite 6 + TypeScript",
+      "entry": ["main.tsx", "App.tsx", "ErrorBoundary", "CookieConsent"],
+      "components": [
+        "LandingPage", "Sidebar", "ClientDashboard", "PdfPreviewModal", "BatchConfirmModal",
+        "DeleteAccountModal", "SubscriptionGate", "SubscriptionStatusCard", "WhatsappGatewayCard",
+        "PilotDashboard", "PilotModeBanner", "ManualFallbackModal", "DriveHelpPopover",
+        "PhoneDispatchSimulation", "Suporte", "TermosDeUso", "PoliticaPrivacidade",
+        "AcordoTratamentoDados", "CookieConsent", "ErrorBoundary"
+      ],
+      "services": [
+        "authService", "accountService", "subscriptionService", "financeService",
+        "metricsService", "automationService", "whatsappService", "whatsappBatchService",
+        "whatsappGatewayService", "optOutService", "contactsService", "representativesService",
+        "userConfigService", "billingLogsService", "pilotService", "googleDriveService",
+        "googleSheetsService", "exportRelatorio", "supabaseClient"
+      ],
+      "hooks": ["useSession", "useAccount", "useSubscription"],
+      "pipelines": [
+        "localDocumentExtraction (extracao 100% local: parse -> normalize -> estrategia -> parsers)",
+        "driveMatching (scoring de boletos por doc# / valor+vencimento)"
+      ],
+      "libs": ["monitoring (Sentry, no-op sem DSN)"]
+    },
+    "edgeFunctions": [
+      { "name": "create-checkout-session", "domain": "billing", "public": false, "purpose": "Cria sessao de checkout Stripe", "tables": ["user_subscriptions"], "integrations": ["Stripe"] },
+      { "name": "create-billing-portal-session", "domain": "billing", "public": false, "purpose": "Portal de gestao da assinatura", "tables": ["user_subscriptions"], "integrations": ["Stripe"] },
+      { "name": "stripe-webhook", "domain": "billing", "public": true, "purpose": "Recebe eventos Stripe (assinatura ativa/cancelada)", "tables": ["user_subscriptions", "stripe_webhook_events"], "integrations": ["Stripe"] },
+      { "name": "record-usage-event", "domain": "billing", "public": false, "purpose": "Registra uso mensal p/ limites de plano", "tables": ["user_usage_counters"], "integrations": [] },
+      { "name": "send-whatsapp-charge", "domain": "envio", "public": false, "purpose": "Envia 1 cobranca (rate limit, opt-out, idempotencia, guard liquidado)", "tables": ["user_logs_cobranca", "user_registros_financeiros", "user_do_not_contact", "rate_limit_hits"], "integrations": ["Z-API"] },
+      { "name": "send-whatsapp-batch", "domain": "envio", "public": false, "purpose": "Envio em lote com ritmo anti-ban e opt-out", "tables": ["user_logs_cobranca", "user_registros_financeiros", "user_do_not_contact", "user_usage_counters"], "integrations": ["Z-API"] },
+      { "name": "whatsapp-gateway", "domain": "envio", "public": false, "purpose": "Resolve credenciais Z-API (numero proprio vs plataforma)", "tables": ["user_zapi_config", "platform_integrations"], "integrations": ["Z-API"] },
+      { "name": "process-dispatch-jobs", "domain": "automacao", "public": true, "cron": "*/5 * * * *", "purpose": "Worker: processa fila de disparo (claim atomico, reaper, ritmo, opt-out)", "tables": ["user_dispatch_jobs", "user_logs_cobranca", "user_registros_financeiros", "user_do_not_contact"], "integrations": ["Z-API"] },
+      { "name": "run-automation-scheduler", "domain": "automacao", "public": true, "cron": "0 11 * * *", "purpose": "Cria jobs de disparo por regras (gate plano, categoria)", "tables": ["user_automation_rules", "user_automation_runs", "user_dispatch_jobs", "user_subscriptions"], "integrations": [] },
+      { "name": "sync-whatsapp-status", "domain": "envio", "public": true, "purpose": "Atualiza status de entrega (webhook Z-API)", "tables": ["user_logs_cobranca"], "integrations": ["Z-API"] },
+      { "name": "whatsapp-inbound", "domain": "envio", "public": true, "purpose": "Recebe respostas; auto opt-out em 'PARE/SAIR'", "tables": ["user_do_not_contact", "user_zapi_config", "user_registros_financeiros"], "integrations": ["Z-API"] },
+      { "name": "drive-index-folder", "domain": "drive", "public": true, "cron": "auto-continuacao", "purpose": "Indexa pasta do Drive (extrai metadados dos boletos)", "tables": ["user_drive_index", "user_drive_folders", "user_drive_index_log"], "integrations": ["Google Drive"] },
+      { "name": "match-drive-files", "domain": "drive", "public": false, "purpose": "Casa boletos com devedores (doc# / valor+vencimento)", "tables": ["user_drive_index", "user_registros_financeiros", "user_drive_match_logs", "user_subscriptions"], "integrations": ["Google Drive"] },
+      { "name": "drive-import-boleto", "domain": "drive", "public": false, "purpose": "Importa 1 boleto do Drive p/ o Storage", "tables": ["user_registros_financeiros"], "integrations": ["Google Drive", "Storage"] },
+      { "name": "import-google-sheets", "domain": "sheets", "public": false, "purpose": "Importa devedores de uma planilha", "tables": ["user_registros_financeiros", "user_import_logs", "user_google_sheets_config"], "integrations": ["Google Sheets"] },
+      { "name": "export-to-sheets", "domain": "sheets", "public": false, "purpose": "Exporta base p/ planilha", "tables": ["user_registros_financeiros"], "integrations": ["Google Sheets"] },
+      { "name": "delete-account", "domain": "conta-lgpd", "public": false, "purpose": "Exclusao de conta: Storage + cascade + auditoria", "tables": ["auth.users", "user_audit_log", "todas user_*"], "integrations": ["Storage"] },
+      { "name": "export-user-data", "domain": "conta-lgpd", "public": false, "purpose": "Portabilidade: baixa JSON de todos os dados", "tables": ["todas user_*", "user_audit_log"], "integrations": [] }
+    ],
+    "sharedModules": [
+      "cors", "zapi", "stripe", "googleDrive", "googleSheets", "driveFolderIndex", "nameMatch",
+      "messageBuilder", "platformIntegrations", "subscriptionGuard", "usageGuard", "pilotGuard",
+      "billingLog", "auditLog", "rateLimit", "optOut", "sanitize"
+    ],
+    "database": {
+      "groups": {
+        "Nucleo (cobranca)": ["user_registros_financeiros", "user_logs_cobranca", "user_contatos", "user_configuracoes", "user_representantes", "user_message_templates", "user_profiles"],
+        "Assinatura / uso": ["user_subscriptions", "user_usage_counters", "stripe_webhook_events"],
+        "Automacao": ["user_automation_rules", "user_automation_runs", "user_dispatch_jobs"],
+        "Drive / Sheets": ["user_drive_folders", "user_drive_index", "user_drive_index_log", "user_drive_match_logs", "user_google_sheets_config", "user_import_logs", "user_integrations", "user_zapi_config"],
+        "Compliance / infra": ["user_audit_log", "user_do_not_contact", "rate_limit_hits"],
+        "Piloto / plataforma": ["pilot_config", "pilot_daily_sends", "pilot_fallback_notes", "platform_integrations"]
+      }
+    },
+    "integrations": [
+      { "name": "Supabase", "purpose": "Auth, Postgres (RLS), Edge Functions, Storage" },
+      { "name": "Stripe", "purpose": "Assinaturas e cobranca do cliente" },
+      { "name": "Z-API", "purpose": "Gateway de WhatsApp (envio e recebimento)" },
+      { "name": "Resend", "purpose": "SMTP do Supabase Auth (recuperacao de senha)" },
+      { "name": "Google Drive", "purpose": "Boletos em PDF (indexacao e match)" },
+      { "name": "Google Sheets", "purpose": "Import/export de base" },
+      { "name": "Short.io", "purpose": "Encurtamento do link do boleto" },
+      { "name": "ViaCEP", "purpose": "Autocompletar endereco no cadastro" },
+      { "name": "Sentry", "purpose": "Monitoramento de erros (opcional via DSN)" }
+    ],
+    "cron": [
+      { "job": "run-automation-scheduler", "schedule": "0 11 * * * (08h Brasilia)", "purpose": "Gera jobs de cobranca do dia" },
+      { "job": "process-dispatch-jobs", "schedule": "*/5 * * * *", "purpose": "Processa a fila de disparo (25/tick, com ritmo)" }
+    ],
+    "crossCutting": [
+      { "name": "RLS", "detail": "57 politicas auth.uid()=user_id em todas as tabelas user_*" },
+      { "name": "Rate limiting", "detail": "check_rate_limit() por usuario/IP (send 60/min, drive 6/min, checkout 10/min)" },
+      { "name": "Seguranca HTTP", "detail": "CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy" },
+      { "name": "LGPD", "detail": "Acordo de tratamento no cadastro, exclusao, exportacao, auditoria, opt-out, aviso de cookies" },
+      { "name": "Anti-ban WhatsApp", "detail": "Ritmo entre envios + opt-out (auto por 'PARE' e manual)" },
+      { "name": "Idempotencia", "detail": "Hash SHA-256 (janela 5 min) evita cobranca duplicada" }
+    ]
+  }
+}

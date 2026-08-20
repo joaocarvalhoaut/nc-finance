@@ -1,0 +1,340 @@
+<title>NC Finance — Mapa de Arquitetura</title>
+<style>
+  :root {
+    --bg: #eef1ee;
+    --surface: #ffffff;
+    --surface-2: #f4f6f4;
+    --ink: #14201a;
+    --ink-soft: #4b5a52;
+    --ink-faint: #7b8a82;
+    --line: #dde3de;
+    --line-strong: #c8d1ca;
+    --accent: #0f9d63;
+    --accent-ink: #0a6f46;
+    /* dominios (categoricos, separados do accent) */
+    --d-billing: #7c5cff;
+    --d-envio: #0f9d63;
+    --d-auto: #c77d16;
+    --d-drive: #0e8fbf;
+    --d-lgpd: #d0455c;
+    --d-billing-wash: #efeaff;
+    --d-envio-wash: #e3f4ec;
+    --d-auto-wash: #f8efdd;
+    --d-drive-wash: #e2f2f8;
+    --d-lgpd-wash: #fbe8ec;
+    --lit: #0f9d63;
+    --lit-wash: #d8f0e4;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  :root:not([data-theme="light"]) {
+    --bg: #0b0e0c; --surface: #141815; --surface-2: #1a1f1b; --ink: #e7efe9;
+    --ink-soft: #a6b3aa; --ink-faint: #6d7b73; --line: #262d27; --line-strong: #333c35;
+    --accent: #34d399; --accent-ink: #6ee7b7;
+    --d-billing: #a892ff; --d-envio: #34d399; --d-auto: #e0a94b; --d-drive: #4bb8e0; --d-lgpd: #f4788c;
+    --d-billing-wash: #1b1633; --d-envio-wash: #0f2419; --d-auto-wash: #251c0d;
+    --d-drive-wash: #0c2430; --d-lgpd-wash: #2a1218;
+    --lit: #34d399; --lit-wash: #122c20;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b0e0c; --surface: #141815; --surface-2: #1a1f1b; --ink: #e7efe9;
+      --ink-soft: #a6b3aa; --ink-faint: #6d7b73; --line: #262d27; --line-strong: #333c35;
+      --accent: #34d399; --accent-ink: #6ee7b7;
+      --d-billing: #a892ff; --d-envio: #34d399; --d-auto: #e0a94b; --d-drive: #4bb8e0; --d-lgpd: #f4788c;
+      --d-billing-wash: #1b1633; --d-envio-wash: #0f2419; --d-auto-wash: #251c0d;
+      --d-drive-wash: #0c2430; --d-lgpd-wash: #2a1218;
+      --lit: #34d399; --lit-wash: #122c20;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e0c; --surface: #141815; --surface-2: #1a1f1b; --ink: #e7efe9;
+    --ink-soft: #a6b3aa; --ink-faint: #6d7b73; --line: #262d27; --line-strong: #333c35;
+    --accent: #34d399; --accent-ink: #6ee7b7;
+    --d-billing: #a892ff; --d-envio: #34d399; --d-auto: #e0a94b; --d-drive: #4bb8e0; --d-lgpd: #f4788c;
+    --d-billing-wash: #1b1633; --d-envio-wash: #0f2419; --d-auto-wash: #251c0d;
+    --d-drive-wash: #0c2430; --d-lgpd-wash: #2a1218;
+    --lit: #34d399; --lit-wash: #122c20;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: clamp(20px, 4vw, 44px) 20px 100px; }
+
+  header .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent-ink); margin: 0 0 10px; }
+  h1 { font-size: clamp(26px, 4vw, 38px); margin: 0 0 8px; letter-spacing: -0.02em; font-weight: 660; text-wrap: balance; }
+  .lede { color: var(--ink-soft); max-width: 68ch; margin: 0 0 22px; font-size: 15.5px; }
+
+  .stats { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 26px; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; min-width: 92px; }
+  .stat b { display: block; font-family: var(--mono); font-size: 21px; font-weight: 620; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .stat span { font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .06em; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 8px; font-size: 12.5px; color: var(--ink-soft); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .hint { font-size: 12.5px; color: var(--ink-faint); margin: 0 0 24px; font-style: italic; }
+
+  .band { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px 18px 20px; margin-bottom: 16px; position: relative; }
+  .band > h2 { font-size: 12px; font-family: var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 14px; display: flex; align-items: center; gap: 10px; }
+  .band > h2::before { content: ""; width: 20px; height: 2px; background: var(--accent); }
+  .flow { display: flex; justify-content: center; margin: -6px 0 6px; color: var(--line-strong); }
+  .flow svg { width: 22px; height: 22px; }
+
+  .group { margin-bottom: 14px; }
+  .group:last-child { margin-bottom: 0; }
+  .group h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); margin: 0 0 8px; font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip { font-family: var(--mono); font-size: 11.5px; padding: 4px 9px; border-radius: 7px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-soft); white-space: nowrap; transition: background .15s, border-color .15s, color .15s, transform .15s; }
+  .chip.table { cursor: default; }
+  .chip.table.lit { background: var(--lit-wash); border-color: var(--lit); color: var(--accent-ink); transform: translateY(-1px); font-weight: 600; }
+
+  /* Edge function cards */
+  .fn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 9px; }
+  .fn { text-align: left; cursor: pointer; background: var(--surface-2); border: 1px solid var(--line); border-left: 3px solid var(--dc, var(--accent)); border-radius: 11px; padding: 10px 12px; transition: border-color .15s, background .15s, box-shadow .15s, transform .12s; font: inherit; color: inherit; }
+  .fn:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+  .fn.active { background: var(--dcw, var(--surface)); border-color: var(--dc, var(--accent)); box-shadow: 0 0 0 1px var(--dc, var(--accent)); }
+  .fn .fn-name { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--ink); word-break: break-word; }
+  .fn .fn-purpose { font-size: 11.5px; color: var(--ink-soft); margin-top: 3px; line-height: 1.35; }
+  .fn .fn-badges { display: flex; gap: 5px; margin-top: 7px; flex-wrap: wrap; }
+  .badge { font-family: var(--mono); font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase; padding: 2px 6px; border-radius: 20px; font-weight: 600; }
+  .badge.pub { background: var(--d-lgpd-wash); color: var(--d-lgpd); }
+  .badge.cron { background: var(--d-auto-wash); color: var(--d-auto); }
+  .badge.dom { background: var(--dcw); color: var(--dc); }
+
+  .domain-block { margin-bottom: 16px; }
+  .domain-block:last-child { margin-bottom: 0; }
+  .domain-block > h3 { display: flex; align-items: center; gap: 7px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 860px) { .two-col { grid-template-columns: 1.55fr 1fr; } }
+
+  .intg { display: flex; flex-direction: column; gap: 7px; }
+  .intg-item { display: flex; gap: 10px; align-items: baseline; padding: 7px 10px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--line); transition: background .15s, border-color .15s; }
+  .intg-item.lit { background: var(--lit-wash); border-color: var(--lit); }
+  .intg-item b { font-family: var(--mono); font-size: 12px; color: var(--ink); flex: none; min-width: 96px; }
+  .intg-item span { font-size: 12px; color: var(--ink-soft); }
+
+  .cc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 9px; }
+  .cc { background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 11px 13px; }
+  .cc b { font-size: 12.5px; color: var(--ink); }
+  .cc p { margin: 4px 0 0; font-size: 12px; color: var(--ink-soft); line-height: 1.4; }
+  .cron-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cron { display: flex; align-items: center; gap: 8px; background: var(--d-auto-wash); border: 1px solid color-mix(in srgb, var(--d-auto) 30%, transparent); border-radius: 10px; padding: 8px 11px; }
+  .cron code { font-family: var(--mono); font-size: 11.5px; color: var(--d-auto); font-weight: 600; }
+  .cron span { font-size: 12px; color: var(--ink-soft); }
+
+  footer { margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 12px; color: var(--ink-faint); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  button.fn:focus-visible, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">NC Finance · Arquitetura</p>
+    <h1>Mapa da aplicação</h1>
+    <p class="lede">SaaS de cobrança automatizada por WhatsApp. As camadas fluem de cima para baixo: o cliente (React) chama as Edge Functions (Deno), que operam o banco (Postgres + RLS) e conversam com serviços externos. <strong>Clique numa Edge Function</strong> para acender as tabelas e integrações que ela usa.</p>
+    <div class="stats" id="stats"></div>
+    <div class="legend" id="legend"></div>
+    <p class="hint">Clique numa função para destacar suas dependências · clique de novo (ou no fundo) para limpar.</p>
+  </header>
+
+  <section class="band" id="band-frontend">
+    <h2>Camada 1 · Frontend — React 19 + Vite</h2>
+    <div id="frontend"></div>
+  </section>
+
+  <div class="flow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div>
+
+  <section class="band" id="band-fns">
+    <h2>Camada 2 · Edge Functions — Deno (18)</h2>
+    <div id="fns"></div>
+  </section>
+
+  <div class="flow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div>
+
+  <div class="two-col">
+    <section class="band" id="band-db">
+      <h2>Camada 3 · Banco — Postgres + RLS (28)</h2>
+      <div id="db"></div>
+    </section>
+    <section class="band" id="band-intg">
+      <h2>Serviços externos</h2>
+      <div class="intg" id="intg"></div>
+    </section>
+  </div>
+
+  <section class="band">
+    <h2>Agendamentos (cron)</h2>
+    <div class="cron-row" id="cron"></div>
+  </section>
+
+  <section class="band">
+    <h2>Preocupações transversais</h2>
+    <div class="cc-grid" id="cc"></div>
+  </section>
+
+  <footer>
+    <span id="foot-stack"></span>
+    <span>gerado em 2026-08-13</span>
+  </footer>
+</div>
+
+<script>
+const DATA = {
+  stats: { "Edge Functions": 18, "Tabelas": 28, "Serviços front": 21, "Componentes": 20, "Módulos edge": 17, "Políticas RLS": 57 },
+  domains: {
+    billing:  { label: "Billing / Stripe",  color: "--d-billing", wash: "--d-billing-wash" },
+    envio:    { label: "Envio / WhatsApp",   color: "--d-envio",   wash: "--d-envio-wash" },
+    automacao:{ label: "Automação",          color: "--d-auto",    wash: "--d-auto-wash" },
+    drive:    { label: "Drive / Sheets",     color: "--d-drive",   wash: "--d-drive-wash" },
+    "conta-lgpd": { label: "Conta / LGPD",   color: "--d-lgpd",    wash: "--d-lgpd-wash" }
+  },
+  frontend: {
+    "Componentes (20)": ["LandingPage","Sidebar","ClientDashboard","PdfPreviewModal","BatchConfirmModal","DeleteAccountModal","SubscriptionGate","SubscriptionStatusCard","WhatsappGatewayCard","PilotDashboard","PilotModeBanner","ManualFallbackModal","DriveHelpPopover","PhoneDispatchSimulation","Suporte","TermosDeUso","PoliticaPrivacidade","AcordoTratamentoDados","CookieConsent","ErrorBoundary"],
+    "Serviços (21)": ["authService","accountService","subscriptionService","financeService","metricsService","automationService","whatsappService","whatsappBatchService","whatsappGatewayService","optOutService","contactsService","representativesService","userConfigService","billingLogsService","pilotService","googleDriveService","googleSheetsService","exportRelatorio","supabaseClient","monitoring","driveMatching"],
+    "Hooks & pipelines": ["useSession","useAccount","useSubscription","localDocumentExtraction (extração 100% local)"]
+  },
+  fns: [
+    { n:"create-checkout-session", d:"billing", pub:false, p:"Cria sessão de checkout Stripe", t:["user_subscriptions"], i:["Stripe"] },
+    { n:"create-billing-portal-session", d:"billing", pub:false, p:"Portal de gestão da assinatura", t:["user_subscriptions"], i:["Stripe"] },
+    { n:"stripe-webhook", d:"billing", pub:true, p:"Recebe eventos Stripe (assinatura)", t:["user_subscriptions","stripe_webhook_events"], i:["Stripe"] },
+    { n:"record-usage-event", d:"billing", pub:false, p:"Registra uso mensal p/ limites", t:["user_usage_counters"], i:[] },
+    { n:"send-whatsapp-charge", d:"envio", pub:false, p:"Envia 1 cobrança (rate limit, opt-out, idempotência)", t:["user_logs_cobranca","user_registros_financeiros","user_do_not_contact","rate_limit_hits"], i:["Z-API"] },
+    { n:"send-whatsapp-batch", d:"envio", pub:false, p:"Lote com ritmo anti-ban + opt-out", t:["user_logs_cobranca","user_registros_financeiros","user_do_not_contact","user_usage_counters"], i:["Z-API"] },
+    { n:"whatsapp-gateway", d:"envio", pub:false, p:"Resolve credenciais Z-API (próprio vs plataforma)", t:["user_zapi_config","platform_integrations"], i:["Z-API"] },
+    { n:"process-dispatch-jobs", d:"automacao", pub:true, cron:"*/5 * * * *", p:"Worker: fila de disparo (claim atômico, reaper, ritmo)", t:["user_dispatch_jobs","user_logs_cobranca","user_registros_financeiros","user_do_not_contact"], i:["Z-API"] },
+    { n:"run-automation-scheduler", d:"automacao", pub:true, cron:"0 11 * * *", p:"Gera jobs por regras (gate plano, categoria)", t:["user_automation_rules","user_automation_runs","user_dispatch_jobs","user_subscriptions"], i:[] },
+    { n:"sync-whatsapp-status", d:"envio", pub:true, p:"Atualiza status de entrega", t:["user_logs_cobranca"], i:["Z-API"] },
+    { n:"whatsapp-inbound", d:"envio", pub:true, p:"Recebe respostas; auto opt-out 'PARE/SAIR'", t:["user_do_not_contact","user_zapi_config","user_registros_financeiros"], i:["Z-API"] },
+    { n:"drive-index-folder", d:"drive", pub:true, cron:"auto", p:"Indexa pasta do Drive (metadados de boleto)", t:["user_drive_index","user_drive_folders","user_drive_index_log"], i:["Google Drive"] },
+    { n:"match-drive-files", d:"drive", pub:false, p:"Casa boletos (doc# / valor+vencimento)", t:["user_drive_index","user_registros_financeiros","user_drive_match_logs","user_subscriptions"], i:["Google Drive"] },
+    { n:"drive-import-boleto", d:"drive", pub:false, p:"Importa 1 boleto p/ Storage", t:["user_registros_financeiros"], i:["Google Drive"] },
+    { n:"import-google-sheets", d:"drive", pub:false, p:"Importa devedores de planilha", t:["user_registros_financeiros","user_import_logs","user_google_sheets_config"], i:["Google Sheets"] },
+    { n:"export-to-sheets", d:"drive", pub:false, p:"Exporta base p/ planilha", t:["user_registros_financeiros"], i:["Google Sheets"] },
+    { n:"delete-account", d:"conta-lgpd", pub:false, p:"Exclusão: Storage + cascade + auditoria", t:["user_audit_log"], i:[] },
+    { n:"export-user-data", d:"conta-lgpd", pub:false, p:"Portabilidade: baixa JSON dos dados", t:["user_audit_log"], i:[] }
+  ],
+  db: {
+    "Núcleo (cobrança)": ["user_registros_financeiros","user_logs_cobranca","user_contatos","user_configuracoes","user_representantes","user_message_templates","user_profiles"],
+    "Assinatura / uso": ["user_subscriptions","user_usage_counters","stripe_webhook_events"],
+    "Automação": ["user_automation_rules","user_automation_runs","user_dispatch_jobs"],
+    "Drive / Sheets": ["user_drive_folders","user_drive_index","user_drive_index_log","user_drive_match_logs","user_google_sheets_config","user_import_logs","user_integrations","user_zapi_config"],
+    "Compliance / infra": ["user_audit_log","user_do_not_contact","rate_limit_hits"],
+    "Piloto / plataforma": ["pilot_config","pilot_daily_sends","pilot_fallback_notes","platform_integrations"]
+  },
+  intg: [
+    ["Supabase","Auth, Postgres (RLS), Edge Functions, Storage"],
+    ["Stripe","Assinaturas e cobrança do cliente"],
+    ["Z-API","Gateway de WhatsApp (envio e recebimento)"],
+    ["Resend","SMTP do Supabase Auth (recuperação de senha)"],
+    ["Google Drive","Boletos em PDF (indexação e match)"],
+    ["Google Sheets","Import/export de base"],
+    ["Short.io","Encurtamento do link do boleto"],
+    ["ViaCEP","Autocompletar endereço no cadastro"],
+    ["Sentry","Monitoramento de erros (opcional)"]
+  ],
+  cron: [
+    ["0 11 * * *","run-automation-scheduler — gera cobranças do dia (08h Brasília)"],
+    ["*/5 * * * *","process-dispatch-jobs — processa a fila (25/tick, com ritmo)"]
+  ],
+  cc: [
+    ["RLS","57 políticas auth.uid()=user_id em todas as tabelas user_*"],
+    ["Rate limiting","check_rate_limit() por usuário/IP (send 60/min, drive 6/min)"],
+    ["Segurança HTTP","CSP, HSTS, X-Frame-Options, Referrer/Permissions-Policy"],
+    ["LGPD","Consentimento, exclusão, exportação, auditoria, opt-out, cookies"],
+    ["Anti-ban WhatsApp","Ritmo entre envios + opt-out (auto 'PARE' e manual)"],
+    ["Idempotência","Hash SHA-256 (janela 5 min) evita cobrança duplicada"]
+  ]
+};
+
+const $ = (s) => document.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+
+// Stats
+DATA.stats && Object.entries(DATA.stats).forEach(([k, v]) => {
+  const s = el("div", "stat"); s.append(el("b", null, v), el("span", null, k)); $("#stats").append(s);
+});
+// Legend
+Object.values(DATA.domains).forEach((d) => {
+  const s = el("span"); const dot = el("span", "dot"); dot.style.background = `var(${d.color})`; s.append(dot, document.createTextNode(d.label)); $("#legend").append(s);
+});
+$("#foot-stack").textContent = "React 19 · Vite · Supabase · Deno · Stripe · Z-API";
+
+// Frontend groups
+Object.entries(DATA.frontend).forEach(([title, items]) => {
+  const g = el("div", "group"); g.append(el("h3", null, title));
+  const chips = el("div", "chips");
+  items.forEach((it) => chips.append(el("span", "chip", it)));
+  g.append(chips); $("#frontend").append(g);
+});
+
+// Edge functions grouped by domain
+const byDomain = {};
+DATA.fns.forEach((f) => (byDomain[f.d] = byDomain[f.d] || []).push(f));
+Object.entries(DATA.domains).forEach(([key, dom]) => {
+  const list = byDomain[key]; if (!list) return;
+  const block = el("div", "domain-block");
+  const h = el("h3"); const dot = el("span", "dot"); dot.style.background = `var(${dom.color})`;
+  h.append(dot, document.createTextNode(dom.label)); block.append(h);
+  const grid = el("div", "fn-grid");
+  list.forEach((f) => {
+    const card = el("button", "fn");
+    card.style.setProperty("--dc", `var(${dom.color})`);
+    card.style.setProperty("--dcw", `var(${dom.wash})`);
+    card.dataset.tables = JSON.stringify(f.t);
+    card.dataset.intg = JSON.stringify(f.i);
+    card.append(el("div", "fn-name", f.n));
+    card.append(el("div", "fn-purpose", f.p));
+    const badges = el("div", "fn-badges");
+    if (f.pub) badges.append(el("span", "badge pub", "público"));
+    if (f.cron) badges.append(el("span", "badge cron", "cron " + f.cron));
+    card.append(badges);
+    card.addEventListener("click", (ev) => { ev.stopPropagation(); toggleFn(card, f); });
+    grid.append(card);
+  });
+  block.append(grid); $("#fns").append(block);
+});
+
+// Database groups (chips carry data-table for highlighting)
+const tableChips = {};
+Object.entries(DATA.db).forEach(([title, tables]) => {
+  const g = el("div", "group"); g.append(el("h3", null, title));
+  const chips = el("div", "chips");
+  tables.forEach((t) => { const c = el("span", "chip table", t); c.dataset.table = t; chips.append(c); tableChips[t] = c; });
+  g.append(chips); $("#db").append(g);
+});
+
+// Integrations
+const intgItems = {};
+DATA.intg.forEach(([name, purpose]) => {
+  const row = el("div", "intg-item"); row.append(el("b", null, name), el("span", null, purpose));
+  row.dataset.intg = name; intgItems[name] = row; $("#intg").append(row);
+});
+
+// Cron & cross-cutting
+DATA.cron.forEach(([sched, desc]) => {
+  const c = el("div", "cron"); c.append(el("code", null, sched), el("span", null, desc)); $("#cron").append(c);
+});
+DATA.cc.forEach(([name, detail]) => {
+  const c = el("div", "cc"); c.append(el("b", null, name), el("p", null, detail)); $("#cc").append(c);
+});
+
+// Interactivity
+let activeCard = null;
+function clearHighlights() {
+  document.querySelectorAll(".fn.active").forEach((c) => c.classList.remove("active"));
+  document.querySelectorAll(".chip.table.lit").forEach((c) => c.classList.remove("lit"));
+  document.querySelectorAll(".intg-item.lit").forEach((c) => c.classList.remove("lit"));
+  activeCard = null;
+}
+function toggleFn(card, f) {
+  if (activeCard === card) { clearHighlights(); return; }
+  clearHighlights();
+  card.classList.add("active"); activeCard = card;
+  (f.t || []).forEach((t) => tableChips[t] && tableChips[t].classList.add("lit"));
+  (f.i || []).forEach((i) => intgItems[i] && intgItems[i].classList.add("lit"));
+}
+document.addEventListener("click", clearHighlights);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") clearHighlights(); });
+</script>
