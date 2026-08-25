@@ -113,6 +113,11 @@ verify_jwt = false
 [functions.whatsapp-inbound]
 verify_jwt = false
 
+# WhatsApp Cloud API (Meta) — webhook único (status + inbound). Sem JWT:
+# GET valida hub.verify_token; POST valida X-Hub-Signature-256 (HMAC app secret).
+[functions.whatsapp-cloud-webhook]
+verify_jwt = false
+
 # Auto-continuação em background se re-invoca com AUTOMATION_CRON_SECRET.
 # A função valida auth internamente (getUser p/ usuário, cron-secret p/ "continue").
 [functions.drive-index-folder]
