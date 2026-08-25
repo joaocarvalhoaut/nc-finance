@@ -7,6 +7,7 @@ import type { PlanId } from "../types";
 import { getPlanDefinition } from "../config/plans";
 import { getMyProfile, exportMyData, type UserProfileData } from "../services/accountService";
 import { updatePassword } from "../services/authService";
+import { getConsent, grantAnalyticsConsent, declineAnalyticsConsent } from "../lib/analytics";
 
 interface Props {
   userId: string;
@@ -67,6 +68,12 @@ export default function MinhaConta({
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [exporting, setExporting] = useState(false);
+  const [analyticsOn, setAnalyticsOn] = useState(() => getConsent()?.analytics === true);
+
+  const toggleAnalytics = () => {
+    if (analyticsOn) { declineAnalyticsConsent(); setAnalyticsOn(false); }
+    else { grantAnalyticsConsent(); setAnalyticsOn(true); }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -196,6 +203,28 @@ export default function MinhaConta({
         </div>
         <p className="text-xs text-zinc-600 mt-3">
           A exportação baixa um arquivo com todos os seus dados. A exclusão é permanente e apaga banco, arquivos e a conta de acesso.
+        </p>
+      </Card>
+
+      {/* Analytics — consentimento */}
+      <Card title="Métricas de uso" sub="Analytics de produto, anônimo e opcional">
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-sm text-zinc-400 max-w-md">
+            Ajuda a melhorar o app com métricas de uso <strong className="text-zinc-300">anônimas</strong> —
+            sem telefone, CPF, valor ou mensagem. Você pode desligar a qualquer momento sem perder nenhuma função.
+          </p>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={analyticsOn}
+            onClick={toggleAnalytics}
+            className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer ${analyticsOn ? "bg-emerald-500" : "bg-zinc-700"}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${analyticsOn ? "translate-x-6" : "translate-x-1"}`} />
+          </button>
+        </div>
+        <p className="text-xs text-zinc-600 mt-3">
+          {analyticsOn ? "Ativado — coletando apenas métricas anônimas de uso." : "Desativado — nenhuma métrica de uso é coletada."}
         </p>
       </Card>
 
