@@ -1,6 +1,7 @@
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import type { AuthCredentials, SignUpPayload } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
+import { identifyUser, resetAnalytics, track } from "../lib/analytics";
 
 export const getSession = async () => {
   const supabase = getSupabaseClient();
@@ -23,6 +24,9 @@ export const signIn = async ({ email, password }: AuthCredentials) => {
   if (error) {
     throw new Error(error.message || "Falha ao entrar com email e senha.");
   }
+
+  // Analytics (opt-in): vincula só o UUID e registra o login — sem e-mail/PII.
+  if (data.user) { identifyUser(data.user.id); track("logged_in"); }
 
   return data;
 };
@@ -80,6 +84,10 @@ export const signUp = async ({ email, password, name, cpf, phone, cep, address, 
     if (profileError && !profileError.message.includes("duplicate")) {
       console.error("[signUp] Erro ao salvar perfil KYC:", profileError.message);
     }
+
+    // Analytics (opt-in): identifica pelo UUID e marca o cadastro — sem PII.
+    identifyUser(data.user.id);
+    track("signed_up");
   }
 
   return data;
@@ -118,6 +126,9 @@ export const signOut = async () => {
   if (error) {
     throw new Error(error.message || "Falha ao encerrar a sessao.");
   }
+
+  // Encerra a associação de analytics para não misturar sessões.
+  resetAnalytics();
 };
 
 export const onAuthStateChange = (

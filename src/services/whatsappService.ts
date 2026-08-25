@@ -6,6 +6,7 @@
  */
 
 import { getSupabaseClient } from "./supabaseClient";
+import { track } from "../lib/analytics";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -122,6 +123,9 @@ export const whatsappService = {
         error: "Resposta inválida do servidor.",
       };
     }
+
+    // Analytics (opt-in): só o resultado/agregado — NUNCA telefone/nome/valor.
+    track("charge_sent", { status: data.status, success: data.success });
 
     return data;
   },

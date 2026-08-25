@@ -1,6 +1,7 @@
 import { getPlanDefinition, PLAN_DEFINITIONS, type PlanDefinition } from "../config/plans";
 import type { PlanId, UserSubscription, UserUsageCounter } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
+import { track } from "../lib/analytics";
 
 interface UserSubscriptionRow {
   id: string;
@@ -147,6 +148,9 @@ export const subscriptionService = {
     if (error) {
       throw new Error(error.message || "Falha ao criar sessão de checkout.");
     }
+
+    // Analytics (opt-in): só o plano escolhido — sem dados de pagamento/PII.
+    track("checkout_started", { plan: planId });
 
     return data as { checkout_url: string };
   },
