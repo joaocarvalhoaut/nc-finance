@@ -8,6 +8,9 @@ na Z-API até você virar a flag. Nada aqui altera o comportamento atual.
   (texto, **template**, documento, upload de mídia). Mesmo formato de retorno da Z-API.
 - [`_shared/whatsappProvider.ts`](supabase/functions/_shared/whatsappProvider.ts) — a "chave"
   `WHATSAPP_PROVIDER=zapi|cloud` + carregador de credenciais + config do template.
+- [`whatsapp-cloud-webhook`](supabase/functions/whatsapp-cloud-webhook/index.ts) — webhook único
+  da Meta (GET verificação + POST status/inbound com validação de assinatura HMAC). Registrada
+  no config.toml, ainda **não deployada** (precisa das secrets da conta Meta).
 
 ## O que falta (só quando a conta Meta estiver ativa)
 1. **Conta Meta** desbloqueada + app + WABA + número (ver `ROTACAO-SECRETS.md`? não — ver passo a passo no chat).
@@ -74,16 +77,20 @@ if (provider === "cloud") {
 > `provider` no log (`user_logs_cobranca.provider`) deve virar `"cloud"` nesse ramo.
 > A idempotência muda de "mensagem" p/ template — chave passa a incluir o nome do template.
 
-## 4) Webhook de status/inbound (formato Meta)
-A Meta manda **um único webhook** para status (sent/delivered/read/failed) e inbound.
-- **Verificação (GET):** responder o `hub.challenge` quando `hub.verify_token === WHATSAPP_VERIFY_TOKEN`.
-- **Eventos (POST):** validar assinatura `X-Hub-Signature-256` (HMAC-SHA256 com `WHATSAPP_APP_SECRET`).
-- Payload: `entry[].changes[].value.statuses[]` (status) e `.messages[]` (inbound/opt-out "PARE").
-- Mapear `wamid` (Cloud) ↔ `provider_message_id` salvo no envio.
+## 4) Webhook de status/inbound (JÁ PRONTO)
+A função [`whatsapp-cloud-webhook`](supabase/functions/whatsapp-cloud-webhook/index.ts) já faz tudo:
+- **GET:** responde `hub.challenge` quando `hub.verify_token === WHATSAPP_VERIFY_TOKEN`.
+- **POST:** valida `X-Hub-Signature-256` (HMAC do corpo cru com `WHATSAPP_APP_SECRET`),
+  atualiza status por `wamid` e trata opt-out ("PARE"/"SAIR").
 
-As funções [`sync-whatsapp-status`](supabase/functions/sync-whatsapp-status/index.ts) e
-[`whatsapp-inbound`](supabase/functions/whatsapp-inbound/index.ts) ganham um ramo `provider==="cloud"`
-que lê esse formato (hoje leem o formato Z-API).
+Falta só: **deployar** e **apontar** o webhook no painel da Meta:
+```bash
+npx supabase functions deploy whatsapp-cloud-webhook --project-ref hiabmnyyxbedtkigcjdx
+# URL p/ colar na Meta (WhatsApp > Configuration > Webhook):
+# https://hiabmnyyxbedtkigcjdx.supabase.co/functions/v1/whatsapp-cloud-webhook
+# Verify token: o valor de WHATSAPP_VERIFY_TOKEN
+# Assinar os campos: messages
+```
 
 ## 5) Rollback instantâneo
 Se algo falhar no cloud: `npx supabase secrets set WHATSAPP_PROVIDER="zapi"` e volta tudo
