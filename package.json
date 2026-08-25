@@ -14,7 +14,8 @@
     "e2e:whatsapp:report": "node scripts/e2e-whatsapp-zapi.js --report",
     "e2e:whatsapp:live": "LIVE_MODE=true node scripts/e2e-whatsapp-zapi.js --report",
     "test:parser": "npx tsx src/services/localDocumentExtraction/__tests__/normalizeText.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/tableParser.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/regexExtractors.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/heuristics.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/validation.test.ts",
-    "test:hardening": "node scripts/hardening.js --report"
+    "test:hardening": "node scripts/hardening.js --report",
+    "test:shared": "npx tsx supabase/functions/_shared/__tests__/format.test.ts"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

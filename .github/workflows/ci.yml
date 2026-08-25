@@ -42,6 +42,10 @@ jobs:
       - name: Unit tests (parser)
         run: npm run test:parser
 
+      # 2b. Testes de helpers compartilhados (formatBRL etc.).
+      - name: Unit tests (shared)
+        run: npm run test:shared
+
       # 3. Build — garante que o app realmente compila e empacota.
       - name: Build
         run: npm run build
