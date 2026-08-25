@@ -1,0 +1,47 @@
+name: CI — Quality Gate
+
+# Porteiro de qualidade: roda em todo push na main e em todo PR.
+# Se qualquer etapa falhar, o PR fica vermelho e o merge é barrado
+# (configure "Require status checks" nas branch protection rules do GitHub).
+# Como a produção (Vercel) sobe sozinha a cada push na main, este gate é a
+# rede de segurança que evita publicar algo quebrado.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancela execuções antigas do mesmo branch quando chega um push novo.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 1. Type-check — pega erros de tipo antes de irem pra produção.
+      - name: Type-check (tsc)
+        run: npm run lint
+
+      # 2. Testes unitários do parser de documentos (47 casos).
+      - name: Unit tests (parser)
+        run: npm run test:parser
+
+      # 3. Build — garante que o app realmente compila e empacota.
+      - name: Build
+        run: npm run build
