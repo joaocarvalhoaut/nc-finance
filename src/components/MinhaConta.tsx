@@ -8,6 +8,7 @@ import { getPlanDefinition } from "../config/plans";
 import { getMyProfile, exportMyData, type UserProfileData } from "../services/accountService";
 import { updatePassword } from "../services/authService";
 import { getConsent, grantAnalyticsConsent, declineAnalyticsConsent } from "../lib/analytics";
+import PasswordInput from "./PasswordInput";
 
 interface Props {
   userId: string;
@@ -160,11 +161,11 @@ export default function MinhaConta({
         <div className="space-y-3 max-w-md">
           <div>
             <label className="block text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1.5">Nova senha</label>
-            <input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setPwMsg(null); }} className={inputCls} placeholder="Mínimo 8 caracteres" autoComplete="new-password" />
+            <PasswordInput value={pw} onChange={(e) => { setPw(e.target.value); setPwMsg(null); }} className={inputCls} placeholder="Mínimo 8 caracteres" autoComplete="new-password" />
           </div>
           <div>
             <label className="block text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1.5">Confirmar nova senha</label>
-            <input type="password" value={pw2} onChange={(e) => { setPw2(e.target.value); setPwMsg(null); }} className={inputCls} placeholder="Repita a senha" autoComplete="new-password" />
+            <PasswordInput value={pw2} onChange={(e) => { setPw2(e.target.value); setPwMsg(null); }} className={inputCls} placeholder="Repita a senha" autoComplete="new-password" />
           </div>
           {pwMsg && (
             <p className={`text-sm flex items-center gap-1.5 ${pwMsg.ok ? "text-emerald-400" : "text-rose-400"}`}>

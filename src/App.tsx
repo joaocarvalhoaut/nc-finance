@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
 import CountUp from "./components/CountUp";
 import MinhaConta from "./components/MinhaConta";
+import PasswordInput from "./components/PasswordInput";
 import DeleteAccountModal from "./components/DeleteAccountModal";
 import { addOptOuts } from "./services/optOutService";
 import LandingPage from "./components/LandingPage";
@@ -1970,8 +1971,7 @@ export default function App() {
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1.5">Nova senha</label>
-                <input
-                  type="password"
+                <PasswordInput
                   value={newPwd}
                   onChange={(e) => { setNewPwd(e.target.value); setNewPwdError(""); }}
                   className="w-full rounded-xl border border-zinc-800 bg-zinc-900/80 px-4 py-3 text-sm text-white focus:border-emerald-500 focus:outline-none font-mono"
@@ -1981,8 +1981,7 @@ export default function App() {
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1.5">Confirmar senha</label>
-                <input
-                  type="password"
+                <PasswordInput
                   value={newPwdConfirm}
                   onChange={(e) => { setNewPwdConfirm(e.target.value); setNewPwdError(""); }}
                   className="w-full rounded-xl border border-zinc-800 bg-zinc-900/80 px-4 py-3 text-sm text-white focus:border-emerald-500 focus:outline-none font-mono"

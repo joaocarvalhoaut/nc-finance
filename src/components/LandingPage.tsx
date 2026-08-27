@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import CountUp from "./CountUp";
+import PasswordInput from "./PasswordInput";
 import TermosDeUso from "./TermosDeUso";
 import PoliticaPrivacidade from "./PoliticaPrivacidade";
 import AcordoTratamentoDados from "./AcordoTratamentoDados";
@@ -1196,8 +1197,7 @@ export default function LandingPage({
               {!isForgotMode && (
                 <div>
                   <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Senha de Acesso</label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     required={!isForgotMode}
                     value={authPassword}
                     onChange={(e) => {
