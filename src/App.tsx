@@ -4,6 +4,7 @@ import Sidebar from "./components/Sidebar";
 import CountUp from "./components/CountUp";
 import MinhaConta from "./components/MinhaConta";
 import PasswordInput from "./components/PasswordInput";
+import BoletoResponsibilityModal from "./components/BoletoResponsibilityModal";
 import DeleteAccountModal from "./components/DeleteAccountModal";
 import { addOptOuts } from "./services/optOutService";
 import LandingPage from "./components/LandingPage";
@@ -300,6 +301,8 @@ export default function App() {
 
   // PDF attachment in Cobrança tab
   const [uploadingPdfDebtorId, setUploadingPdfDebtorId] = useState<string | null>(null);
+  // Boleto pendente aguardando a confirmação de responsabilidade (1ª vez).
+  const [pendingBoletoPdf, setPendingBoletoPdf] = useState<{ debtorId: string; file: File } | null>(null);
 
   // Batch WhatsApp send state
   const [selectedDebtorIds, setSelectedDebtorIds] = useState<Set<string>>(new Set());
@@ -1395,7 +1398,16 @@ export default function App() {
   };
 
   // Upload / remove PDF attachment for a debtor in Cobrança tab
+  // Gate de responsabilidade: na 1ª vez que anexa um boleto, confirma que o
+  // pagamento vai para o beneficiário do boleto e que o cliente é o credor
+  // legítimo. Decisão fica salva no localStorage (não repete a cada anexo).
   const handlePdfUpload = async (debtorId: string, file: File) => {
+    const acked = (() => { try { return localStorage.getItem("ncf-boleto-ack-v1") === "1"; } catch { return false; } })();
+    if (!acked) { setPendingBoletoPdf({ debtorId, file }); return; }
+    await doPdfUpload(debtorId, file);
+  };
+
+  const doPdfUpload = async (debtorId: string, file: File) => {
     if (!currentOwnerUserId) return;
     setUploadingPdfDebtorId(debtorId);
     try {
@@ -1409,6 +1421,13 @@ export default function App() {
     } finally {
       setUploadingPdfDebtorId(null);
     }
+  };
+
+  const confirmBoletoAck = async () => {
+    try { localStorage.setItem("ncf-boleto-ack-v1", "1"); } catch { /* ignore */ }
+    const pending = pendingBoletoPdf;
+    setPendingBoletoPdf(null);
+    if (pending) await doPdfUpload(pending.debtorId, pending.file);
   };
 
   const handlePdfRemove = async (debtorId: string) => {
@@ -5358,6 +5377,13 @@ export default function App() {
 
           {/* Modal: visualização do PDF do boleto (revisão) — isolado, ver PdfPreviewModal */}
           <PdfPreviewModal />
+
+          {/* Aviso de responsabilidade ao anexar boleto (1ª vez) */}
+          <BoletoResponsibilityModal
+            open={!!pendingBoletoPdf}
+            onConfirm={confirmBoletoAck}
+            onClose={() => setPendingBoletoPdf(null)}
+          />
         </>
       )}
     </div>

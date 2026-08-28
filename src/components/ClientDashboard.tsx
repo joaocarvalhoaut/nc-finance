@@ -51,6 +51,7 @@ import { parseImportFile } from "../utils/importFileParser";
 import { extractDocumentLocally } from "../services/localDocumentExtraction";
 import { getMessageTemplate, fillMessageTemplate } from "../utils/messageTemplates";
 import BatchConfirmModal, { type BatchConfirmData } from "./BatchConfirmModal";
+import BoletoResponsibilityModal from "./BoletoResponsibilityModal";
 import type { Debtor, MessageTone } from "../types";
 
 // ─── Tone options ─────────────────────────────────────────────────────────────
@@ -152,6 +153,21 @@ export default function ClientDashboard({
   // ── PDF attachments (keyed by debtor document number) ────────────────────────
   // Stored locally before send; uploaded to Storage after createMany
   const [attachedPdfs,    setAttachedPdfs]    = useState<Map<string, File>>(new Map());
+  // Boleto aguardando confirmação de responsabilidade (1ª vez que anexa).
+  const [pendingBoletoAttach, setPendingBoletoAttach] = useState<{ docKey: string; file: File } | null>(null);
+
+  // Aplica o anexo depois de garantido o aviso de responsabilidade.
+  const attachBoleto = (docKey: string, file: File) => {
+    const acked = (() => { try { return localStorage.getItem("ncf-boleto-ack-v1") === "1"; } catch { return false; } })();
+    if (!acked) { setPendingBoletoAttach({ docKey, file }); return; }
+    setAttachedPdfs(prev => new Map(prev).set(docKey, file));
+  };
+  const confirmBoletoAck = () => {
+    try { localStorage.setItem("ncf-boleto-ack-v1", "1"); } catch { /* ignore */ }
+    const pending = pendingBoletoAttach;
+    setPendingBoletoAttach(null);
+    if (pending) setAttachedPdfs(prev => new Map(prev).set(pending.docKey, pending.file));
+  };
   const [uploadingPdfDoc, setUploadingPdfDoc] = useState<string | null>(null);
 
   // ── Import category ──────────────────────────────────────────────────────────
@@ -894,7 +910,7 @@ export default function ClientDashboard({
                                   className="hidden"
                                   onChange={e => {
                                     const f = e.target.files?.[0];
-                                    if (f) setAttachedPdfs(prev => new Map(prev).set(docKey, f));
+                                    if (f) attachBoleto(docKey, f);
                                     e.target.value = "";
                                   }}
                                 />
@@ -1204,6 +1220,13 @@ export default function ClientDashboard({
           onCancel={() => setConfirmData(null)}
         />
       )}
+
+      {/* Aviso de responsabilidade ao anexar boleto (1ª vez) */}
+      <BoletoResponsibilityModal
+        open={!!pendingBoletoAttach}
+        onConfirm={confirmBoletoAck}
+        onClose={() => setPendingBoletoAttach(null)}
+      />
     </div>
   );
 }
