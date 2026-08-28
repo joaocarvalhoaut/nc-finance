@@ -4594,12 +4594,17 @@ export default function App() {
                                     // do log. O banco guarda só um preview de 100 chars por privacidade
                                     // (LGPD); aqui remontamos localmente, sem armazenar o texto completo.
                                     const debtor = debtors.find(d => d.document === log.document);
-                                    const fullMessage = fillMessageTemplate(getMessageTemplate(log.tone), {
+                                    const rebuilt = fillMessageTemplate(getMessageTemplate(log.tone), {
                                       clientName:     log.client,
                                       documentNumber: log.document,
                                       dueDate:        debtor?.dueDate ?? "",
                                       amount:         Number(log.value) || 0,
                                     });
+                                    // Oculta valor e nº do documento com * (mantém a estrutura visível).
+                                    let fullMessage = rebuilt.replace(/R\$\s*[\d.,]+/g, (m) => m.replace(/\d/g, "*"));
+                                    if (log.document) {
+                                      fullMessage = fullMessage.split(log.document).join(log.document.replace(/[A-Za-z0-9]/g, "*"));
+                                    }
                                     return (
                                     <tr className="bg-zinc-950/50">
                                       <td colSpan={6} className="px-6 py-4 border-t border-zinc-900">
@@ -4620,7 +4625,7 @@ export default function App() {
                                             {fullMessage}
                                           </pre>
                                           <p className="text-[10px] text-zinc-600">
-                                            Mensagem reconstruída a partir do modelo e dos dados desta cobrança. Por privacidade, o texto completo não é armazenado — apenas um resumo.
+                                            Mensagem reconstruída a partir do modelo e dos dados desta cobrança. Por privacidade, o valor e o documento aparecem ocultos (*) e o texto completo não é armazenado.
                                           </p>
                                         </div>
                                       </td>
