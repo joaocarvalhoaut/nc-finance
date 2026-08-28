@@ -221,6 +221,47 @@ Deno.serve(async (request: Request) => {
       });
     }
 
+    // ── 4c. Anti-abuso: bloqueia conta com alto índice de reclamações ──────────
+    // Se ≥20% dos contatos pediram "PARE" (opt-out por RESPOSTA) e já houve ao
+    // menos 20 cobranças enviadas, a conta entra em revisão e o envio é bloqueado.
+    // Protege contra uso da plataforma para golpes/cobranças indevidas.
+    // Fail-open: qualquer erro de consulta nunca bloqueia um envio legítimo.
+    try {
+      const [{ count: replyOptOuts }, { count: sentCharges }] = await Promise.all([
+        admin.from("user_do_not_contact")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId).eq("source", "reply"),
+        admin.from("user_logs_cobranca")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .in("status", ["sucesso", "sent", "recebido", "entregue", "lido"]),
+      ]);
+      const sent = sentCharges ?? 0;
+      const complaints = replyOptOuts ?? 0;
+      if (sent >= 20 && complaints / sent >= 0.20) {
+        await admin.from("user_logs_cobranca").insert({
+          user_id: userId,
+          client_name: (body.clientName || "Desconhecido").slice(0, 255),
+          document_number: (body.documentNumber || "").slice(0, 100),
+          phone: maskPhone(body.phone),
+          amount: Number(body.amount || 0),
+          tone: body.tone || "neutro",
+          message: messagePreview(body.message, 100),
+          status: "conta_em_revisao",
+          type: "manual",
+          provider: "zapi",
+          error_message: `Conta em revisão: ${complaints}/${sent} opt-out por resposta (>=20%).`,
+          debtor_id: body.debtorId || null,
+        });
+        return errResponse(403, {
+          error: "Conta temporariamente em revisão por alto índice de solicitações de 'PARE'. Entre em contato com o suporte.",
+          status: "conta_em_revisao",
+        });
+      }
+    } catch (e) {
+      console.error("[send-whatsapp-charge] anti-abuse check failed (fail-open):", e instanceof Error ? e.message : String(e));
+    }
+
     // ── 5. Valida limite mensal do plano ───────────────────────────────────────
     const period = getPeriodKey();
     const { data: usageRow } = await admin

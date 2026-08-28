@@ -217,6 +217,31 @@ Deno.serve(async (request: Request) => {
     }
     const { subscription } = subResult;
 
+    // ── 4c. Anti-abuso: bloqueia conta com alto índice de reclamações ──────────
+    // ≥20% de opt-out por RESPOSTA com ≥20 cobranças enviadas → conta em revisão.
+    // Fail-open: erro de consulta nunca bloqueia envio legítimo.
+    try {
+      const [{ count: replyOptOuts }, { count: sentCharges }] = await Promise.all([
+        admin.from("user_do_not_contact")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId).eq("source", "reply"),
+        admin.from("user_logs_cobranca")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .in("status", ["sucesso", "sent", "recebido", "entregue", "lido"]),
+      ]);
+      const sent = sentCharges ?? 0;
+      const complaints = replyOptOuts ?? 0;
+      if (sent >= 20 && complaints / sent >= 0.20) {
+        return errResponse(403, {
+          error: "Conta temporariamente em revisão por alto índice de solicitações de 'PARE'. Entre em contato com o suporte.",
+          status: "conta_em_revisao",
+        });
+      }
+    } catch (e) {
+      console.error("[send-whatsapp-batch] anti-abuse check failed (fail-open):", e instanceof Error ? e.message : String(e));
+    }
+
     // ── 5. Verifica plano (Basic bloqueado para lote) ─────────────────────────
     if (!BATCH_ALLOWED_PLANS.includes(subscription.plan)) {
       return errResponse(403, {

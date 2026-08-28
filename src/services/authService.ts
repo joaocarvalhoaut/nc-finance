@@ -2,6 +2,7 @@ import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import type { AuthCredentials, SignUpPayload } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
 import { identifyUser, resetAnalytics, track } from "../lib/analytics";
+import { isValidCPF } from "../utils/cpf";
 
 export const getSession = async () => {
   const supabase = getSupabaseClient();
@@ -39,6 +40,11 @@ export const signUp = async ({ email, password, name, cpf, phone, cep, address, 
 
   // 1. Verificar se o CPF já está cadastrado
   const cleanCPF = normalizeCPF(cpf);
+
+  // 1a. KYC: rejeita CPF inválido (2ª barreira, caso o formulário seja burlado).
+  if (!isValidCPF(cleanCPF)) {
+    throw new Error("CPF inválido. Verifique o número informado.");
+  }
   const { data: existing, error: checkError } = await supabase
     .from("user_profiles")
     .select("user_id")
