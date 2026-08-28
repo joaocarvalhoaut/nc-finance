@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import CountUp from "./CountUp";
 import PasswordInput from "./PasswordInput";
 import TermosDeUso from "./TermosDeUso";
@@ -64,6 +64,15 @@ export default function LandingPage({
 
   const [authError, setAuthError] = useState("");
   const [authInfo, setAuthInfo] = useState("");
+
+  // Barra CTA fixa (mobile): só aparece depois de rolar além do hero.
+  const [showStickyCta, setShowStickyCta] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setShowStickyCta(window.scrollY > 500);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   const [isAuthSuccess, setIsAuthSuccess] = useState(false);
   const [showTermos, setShowTermos] = useState(false);
   const [showPrivacidade, setShowPrivacidade] = useState(false);
@@ -1421,11 +1430,16 @@ export default function LandingPage({
       {showPrivacidade && <PoliticaPrivacidade onClose={() => setShowPrivacidade(false)} />}
       {showSuporte && <Suporte onClose={() => setShowSuporte(false)} />}
 
-      {/* Sticky CTA — só no mobile, sempre visível para maximizar conversão */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 p-3 bg-zinc-950/90 backdrop-blur border-t border-zinc-800">
+      {/* Sticky CTA — só no mobile; aparece ao rolar além do hero (não fica fixo o tempo todo) */}
+      <div
+        className={`lg:hidden fixed bottom-0 inset-x-0 z-40 p-3 bg-zinc-950/90 backdrop-blur border-t border-zinc-800 transition-all duration-300
+          ${showStickyCta ? "opacity-100 translate-y-0" : "opacity-0 translate-y-full pointer-events-none"}`}
+        aria-hidden={!showStickyCta}
+      >
         <a
           href="#auth-panel"
           className="w-full px-6 py-3.5 rounded-none bg-emerald-500 hover:bg-emerald-400 text-black font-bold flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(16,185,129,0.3)] transition-all text-sm"
+          tabIndex={showStickyCta ? 0 : -1}
         >
           Comece grátis <ArrowRight className="w-4 h-4" />
         </a>
