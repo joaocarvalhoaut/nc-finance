@@ -26,7 +26,7 @@ import { driveFolderService, type DriveFolderStatus } from "./services/driveMatc
 import { whatsappBatchService, BATCH_TOP_STATUS_LABELS, type BatchChargeResult, type BatchTopStatus } from "./services/whatsappBatchService";
 import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type AutomationRule, type AutomationRun, type AutomationRuleCreate } from "./services/automationService";
 import { isBrazilHoliday, getBrazilHolidayName, isBusinessDay } from "./utils/brazilHolidays";
-import { getMessageTemplate } from "./utils/messageTemplates";
+import { getMessageTemplate, fillMessageTemplate } from "./utils/messageTemplates";
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
 import { parseImportFile } from "./utils/importFileParser";
 import { extractDocumentLocally, type LocalExtractionResult } from "./services/localDocumentExtraction";
@@ -4589,15 +4589,26 @@ export default function App() {
                                       </div>
                                     </td>
                                   </tr>
-                                  {selectedLogDetail?.id === log.id && (
+                                  {selectedLogDetail?.id === log.id && (() => {
+                                    // Reconstrói a mensagem completa a partir do template (tom) + dados
+                                    // do log. O banco guarda só um preview de 100 chars por privacidade
+                                    // (LGPD); aqui remontamos localmente, sem armazenar o texto completo.
+                                    const debtor = debtors.find(d => d.document === log.document);
+                                    const fullMessage = fillMessageTemplate(getMessageTemplate(log.tone), {
+                                      clientName:     log.client,
+                                      documentNumber: log.document,
+                                      dueDate:        debtor?.dueDate ?? "",
+                                      amount:         Number(log.value) || 0,
+                                    });
+                                    return (
                                     <tr className="bg-zinc-950/50">
                                       <td colSpan={6} className="px-6 py-4 border-t border-zinc-900">
                                         <div className="space-y-2 text-left">
                                           <div className="flex items-center justify-between text-[11px]">
                                             <span className="font-bold text-zinc-400">Conteúdo do Disparo (Tom: <span className="text-emerald-400 capitalize font-mono font-bold">{log.tone}</span>)</span>
-                                            <button 
+                                            <button
                                               onClick={() => {
-                                                navigator.clipboard.writeText(log.message);
+                                                navigator.clipboard.writeText(fullMessage);
                                                 alert("Mensagem copiada para a área de transferência!");
                                               }}
                                               className="text-emerald-400 hover:underline cursor-pointer text-[10px]"
@@ -4606,12 +4617,16 @@ export default function App() {
                                             </button>
                                           </div>
                                           <pre className="p-4 rounded-xl bg-zinc-950 border border-zinc-900 text-zinc-300 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
-                                            {log.message}
+                                            {fullMessage}
                                           </pre>
+                                          <p className="text-[10px] text-zinc-600">
+                                            Mensagem reconstruída a partir do modelo e dos dados desta cobrança. Por privacidade, o texto completo não é armazenado — apenas um resumo.
+                                          </p>
                                         </div>
                                       </td>
                                     </tr>
-                                  )}
+                                    );
+                                  })()}
                                 </React.Fragment>
                               ))}
                             </tbody>
