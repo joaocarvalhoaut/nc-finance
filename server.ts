@@ -23,11 +23,13 @@ const IS_DEV = process.env.NODE_ENV !== "production";
 
 const CSP = [
   "default-src 'self'",
-  IS_DEV ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",
+  IS_DEV
+    ? "script-src 'self' 'unsafe-inline' https://us-assets.i.posthog.com"
+    : "script-src 'self' https://us-assets.i.posthog.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: https:",
-  `connect-src 'self'${IS_DEV ? " ws:" : ""} https://hiabmnyyxbedtkigcjdx.supabase.co wss://hiabmnyyxbedtkigcjdx.supabase.co https://viacep.com.br https://*.sentry.io`,
+  `connect-src 'self'${IS_DEV ? " ws:" : ""} https://hiabmnyyxbedtkigcjdx.supabase.co wss://hiabmnyyxbedtkigcjdx.supabase.co https://viacep.com.br https://*.sentry.io https://us.i.posthog.com https://us-assets.i.posthog.com`,
   "frame-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
