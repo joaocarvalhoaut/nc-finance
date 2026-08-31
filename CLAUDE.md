@@ -39,4 +39,8 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
 ## Estado / pendências (ver memória do agente para datas)
 - Migração WhatsApp Cloud: motor + webhook prontos; falta conta Meta ativa + template + virar a flag.
 - Go-live billing: virar Stripe Test→Live.
-- PostHog: definir `VITE_POSTHOG_KEY` no Vercel para ativar.
+- PostHog: **ativo**. A `VITE_POSTHOG_KEY` esta no Vercel desde 25/08/2026, mas o CSP
+  nao liberava `us.i.posthog.com` — a lib inicializava e o navegador descartava todo
+  evento, em silencio. Corrigido no `vercel.json` e no `server.ts`. Ao mexer no CSP,
+  lembre que o session replay carrega o gravador de `us-assets.i.posthog.com`, entao
+  esse host precisa do `script-src` alem do `connect-src`.
