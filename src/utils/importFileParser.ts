@@ -7,11 +7,7 @@
  * string.
  */
 
-import { getDocument, GlobalWorkerOptions } from "pdfjs-dist/legacy/build/pdf.mjs";
-import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import * as XLSX from "xlsx";
-
-GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 /** Y-coordinate tolerance for grouping items on the same visual row (PDF units ≈ pt). */
 const Y_TOLERANCE = 4;
@@ -19,6 +15,16 @@ const Y_TOLERANCE = 4;
 // ── PDF ───────────────────────────────────────────────────────────────────────
 
 const parsePdfFile = async (file: File): Promise<string> => {
+  // Carregado sob demanda: mantem o pdfjs (~1,2 MB) fora do bundle inicial.
+  // Mesmo padrao de ocrFallback.ts — o import estatico aqui anulava o code-split.
+  const { getDocument, GlobalWorkerOptions } = await import(
+    "pdfjs-dist/legacy/build/pdf.mjs"
+  );
+  const { default: pdfWorkerSrc } = await import(
+    "pdfjs-dist/build/pdf.worker.min.mjs?url"
+  );
+  GlobalWorkerOptions.workerSrc = pdfWorkerSrc as string;
+
   const buffer = await file.arrayBuffer();
   const pdf = await getDocument({ data: new Uint8Array(buffer) }).promise;
   const pageLines: string[] = [];
