@@ -15,13 +15,19 @@ const PORT = Number(process.env.PORT) || 3000;
 //   style/font: Google Fonts (Inter)  ·  script: apenas 'self' (bundle Vite)
 // Stripe usa redirect de página (checkout/portal), não iframe nem fetch, então
 // não precisa de frame-src/connect-src próprios.
+// Em dev o Vite injeta um <script type="module"> inline (preamble do React
+// Refresh) e abre um WebSocket de HMR — ambos barrados por "script-src 'self'".
+// Relaxamos SOMENTE fora de producao: o bundle de prod nao tem script inline e
+// mantem a politica estrita, identica ao vercel.json.
+const IS_DEV = process.env.NODE_ENV !== "production";
+
 const CSP = [
   "default-src 'self'",
-  "script-src 'self'",
+  IS_DEV ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: https:",
-  "connect-src 'self' https://hiabmnyyxbedtkigcjdx.supabase.co wss://hiabmnyyxbedtkigcjdx.supabase.co https://viacep.com.br https://*.sentry.io",
+  `connect-src 'self'${IS_DEV ? " ws:" : ""} https://hiabmnyyxbedtkigcjdx.supabase.co wss://hiabmnyyxbedtkigcjdx.supabase.co https://viacep.com.br https://*.sentry.io`,
   "frame-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
@@ -56,7 +62,7 @@ app.use(express.json({ limit: "10mb" }));
 // O frontend NUNCA acessa credenciais Google diretamente.
 
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
+  if (IS_DEV) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
