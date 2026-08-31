@@ -144,7 +144,6 @@ export const userConfigService = {
   async upsertConfig(config: UserConfig) {
     const supabase = getSupabaseClient();
     const payload = mapUserConfigToRow(config);
-    console.log("[user_configuracoes.write]", payload);
 
     const { data, error } = await supabase
       .from(USER_CONFIG_TABLE)
