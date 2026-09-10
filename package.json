@@ -15,7 +15,9 @@
     "e2e:whatsapp:live": "LIVE_MODE=true node scripts/e2e-whatsapp-zapi.js --report",
     "test:parser": "npx tsx src/services/localDocumentExtraction/__tests__/normalizeText.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/tableParser.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/regexExtractors.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/heuristics.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/validation.test.ts",
     "test:hardening": "node scripts/hardening.js --report",
-    "test:shared": "npx tsx supabase/functions/_shared/__tests__/format.test.ts && npx tsx supabase/functions/_shared/__tests__/phone.test.ts && npx tsx supabase/functions/_shared/__tests__/optOut.test.ts && npx tsx supabase/functions/_shared/__tests__/sanitize.test.ts"
+    "test:shared": "npx tsx supabase/functions/_shared/__tests__/format.test.ts && npx tsx supabase/functions/_shared/__tests__/phone.test.ts && npx tsx supabase/functions/_shared/__tests__/optOut.test.ts && npx tsx supabase/functions/_shared/__tests__/sanitize.test.ts",
+    "test:security": "node tests/hardening.test.mjs",
+    "test:files": "node tests/import-files.test.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -48,5 +50,8 @@
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.3"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   }
 }

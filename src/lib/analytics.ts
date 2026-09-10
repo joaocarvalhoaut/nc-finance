@@ -8,8 +8,7 @@ import posthog from "posthog-js";
  *     Enquanto o usuário não aceitar, o PostHog nem é inicializado (nenhuma rede).
  *  2. autocapture DESLIGADO: não capturamos cliques/inputs automaticamente —
  *     só eventos manuais e nomeados (sem conteúdo sensível).
- *  3. Session replay TOTALMENTE mascarado: todo texto e todos os inputs viram
- *     blocos — nunca gravamos telefone, CPF, valor, nome ou mensagem.
+ *  3. Session replay desativado para não gravar telas financeiras.
  *  4. Rede anti-PII: qualquer propriedade que "cheire" a dado pessoal é redigida
  *     antes de sair do navegador (sanitize_properties).
  *  5. person_profiles = identified_only: anônimos não geram perfil.
@@ -57,6 +56,8 @@ const EMAIL_LIKE = /[^\s@]+@[^\s@]+\.[^\s@]+/;
 
 const redactValue = (v: unknown): unknown => {
   if (typeof v === "string" && (CPF_LIKE.test(v) || PHONE_LIKE.test(v) || EMAIL_LIKE.test(v))) return "[redacted]";
+  if (Array.isArray(v)) return v.map(redactValue);
+  if (v && typeof v === "object") return sanitizeProperties(v as Record<string, unknown>);
   return v;
 };
 
@@ -64,10 +65,11 @@ const redactValue = (v: unknown): unknown => {
 const sanitizeProperties = (properties: Record<string, unknown>): Record<string, unknown> => {
   const clean: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(properties ?? {})) {
+    if (/pathname|hash|path$/i.test(k)) { clean[k] = "[redacted]"; continue; }
     if (PII_KEY.test(k)) { clean[k] = "[redacted]"; continue; }
     // Remove query string de URLs (pode conter tokens/PII).
     if (typeof v === "string" && (k === "$current_url" || k === "$referrer" || k.includes("url"))) {
-      clean[k] = v.split("?")[0];
+      try { clean[k] = new URL(v).origin; } catch { clean[k] = "[redacted]"; }
       continue;
     }
     clean[k] = redactValue(v);
@@ -88,7 +90,7 @@ const initPostHog = () => {
     person_profiles: "identified_only", // anônimo não vira perfil
     respect_dnt: true,                  // honra Do Not Track
     sanitize_properties: sanitizeProperties,
-    disable_session_recording: false,   // replay LIGADO, porém 100% mascarado abaixo
+    disable_session_recording: true,   // Sem replay de telas financeiras.
     session_recording: {
       maskAllInputs: true,              // mascara TODOS os inputs
       maskTextSelector: "*",            // mascara TODO texto visível
@@ -111,6 +113,7 @@ export const bootstrapAnalytics = () => {
 export const grantAnalyticsConsent = () => {
   persistConsent(true);
   initPostHog();
+  if (initialized) posthog.opt_in_capturing();
 };
 
 /** Usuário recusou analytics (só essenciais) → persiste e garante desligado. */
@@ -125,16 +128,16 @@ export const declineAnalyticsConsent = () => {
 
 /** Evento nomeado. No-op sem consentimento. NUNCA passe PII em `props`. */
 export const track = (event: string, props?: Record<string, unknown>) => {
-  if (!initialized) return;
+  if (!initialized || !hasAnalyticsConsent()) return;
   try { posthog.capture(event, props); } catch { /* ignore */ }
 };
 
 /**
  * Vincula os eventos ao usuário — SOMENTE o UUID do Supabase (sem e-mail, nome,
- * CPF etc.). O ID já é opaco e não-PII por si só.
+ * CPF etc.). O UUID é pseudônimo e ainda requer proteção.
  */
 export const identifyUser = (userId: string) => {
-  if (!initialized || !userId) return;
+  if (!initialized || !hasAnalyticsConsent() || !userId) return;
   try { posthog.identify(userId); } catch { /* ignore */ }
 };
 

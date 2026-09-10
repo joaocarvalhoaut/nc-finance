@@ -630,6 +630,7 @@ export default function ClientDashboard({
 
 
       {/* ── Step: Upload ───────────────────────────────────────────────────── */}
+      <ol aria-label="Etapas da cobrança" className="flex flex-wrap gap-3 text-sm text-zinc-300 mb-4">{[["upload", "1. Importar"], ["preview", "2. Revisar e confirmar"], ["sending", "3. Enviar"], ["done", "4. Acompanhar"]].map(([id, label]) => <li key={id} aria-current={step === id ? "step" : undefined} className={step === id ? "text-emerald-400 font-semibold" : ""}>{label}</li>)}</ol>
       {step === "upload" && (
         <div className="space-y-4">
 

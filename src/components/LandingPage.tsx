@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { lazy, useState, useEffect } from "react";
 import CountUp from "./CountUp";
 import PasswordInput from "./PasswordInput";
 import TermosDeUso from "./TermosDeUso";
 import PoliticaPrivacidade from "./PoliticaPrivacidade";
 import AcordoTratamentoDados from "./AcordoTratamentoDados";
-import Suporte from "./Suporte";
+const Suporte = lazy(() => import("./Suporte"));
 import { motion } from "motion/react";
 import PhoneDispatchSimulation from "./PhoneDispatchSimulation";
 import {
@@ -425,7 +425,7 @@ export default function LandingPage({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-xs text-zinc-400">
           <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Conforme a LGPD</span>
           <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Sem contrato de fidelidade</span>
-          <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-emerald-400" /> Configuração em 10 minutos</span>
+          <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-emerald-400" /> Importação com revisão</span>
         </div>
       </div>
 
@@ -449,7 +449,7 @@ export default function LandingPage({
             >
               <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-emerald-500/60 to-transparent" />
               <div>
-                <div className="text-4xl font-black text-white tracking-tight">-80%</div>
+                <div className="text-4xl font-black text-white tracking-tight">Menos tarefas</div>
                 <div className="text-emerald-400 font-bold text-sm mt-1">menos tempo operacional em cobranças</div>
               </div>
               <p className="text-zinc-400 text-sm font-light leading-relaxed">
@@ -467,11 +467,11 @@ export default function LandingPage({
             >
               <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-emerald-500/60 to-transparent" />
               <div>
-                <div className="text-4xl font-black text-white tracking-tight">+30%</div>
-                <div className="text-emerald-400 font-bold text-sm mt-1">a mais em receita recuperada</div>
+                <div className="text-4xl font-black text-white tracking-tight">Mais controle</div>
+                <div className="text-emerald-400 font-bold text-sm mt-1">da carteira e dos recebimentos</div>
               </div>
               <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                Empresas que cobram nos primeiros dias de atraso recuperam significativamente mais. A NC Finance dispara na hora certa, antes que a dívida esfrie.
+                Organize vencimentos, acompanhe os envios e registre os pagamentos. Os resultados dependem da sua carteira e da sua operação.
               </p>
             </motion.div>
 
@@ -485,7 +485,7 @@ export default function LandingPage({
             >
               <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-emerald-500/60 to-transparent" />
               <div>
-                <div className="text-4xl font-black text-white tracking-tight">10 min</div>
+                <div className="text-4xl font-black text-white tracking-tight">Passo a passo</div>
                 <div className="text-emerald-400 font-bold text-sm mt-1">da importação ao primeiro disparo</div>
               </div>
               <p className="text-zinc-400 text-sm font-light leading-relaxed">
@@ -676,7 +676,7 @@ export default function LandingPage({
           <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs text-zinc-400">
             <span className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-400" /> Dados protegidos conforme a LGPD</span>
             <span className="flex items-center gap-2"><FileCheck className="w-4 h-4 text-emerald-400" /> Criptografia em trânsito e em repouso</span>
-            <span className="flex items-center gap-2"><Smartphone className="w-4 h-4 text-emerald-400" /> Envio via infraestrutura oficial WhatsApp</span>
+            <span className="flex items-center gap-2"><Smartphone className="w-4 h-4 text-emerald-400" /> Envio por integração com WhatsApp</span>
           </div>
         </div>
       </motion.section>
@@ -787,7 +787,7 @@ export default function LandingPage({
               </div>
               <h3 className="text-3xl sm:text-4xl font-black text-white">Visualize como o seu cliente irá receber</h3>
               <p className="text-zinc-400 font-light leading-relaxed">
-                Escolha o tom desejado e veja como a mensagem se adapta dinamicamente com os dados reais do devedor: nome, valor atualizado, vencimento e documento.
+                Escolha o tom desejado e veja como a mensagem se adapta dinamicamente com os dados fictícios de exemplo: nome, valor atualizado, vencimento e documento.
               </p>
 
               {/* Interaction controllers */}

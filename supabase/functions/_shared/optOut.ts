@@ -20,8 +20,7 @@ export async function isOptedOut(admin: any, userId: string, phone: string): Pro
     .eq("phone", p)
     .maybeSingle();
   if (error) {
-    console.warn(`[optOut] fail-open (${error.message})`);
-    return false; // fail-open: não bloqueia envio por erro de consulta
+    throw new Error("Não foi possível verificar a lista de não contatar. Envio pausado; tente novamente.");
   }
   return Boolean(data);
 }
@@ -33,7 +32,7 @@ export async function fetchOptOutSet(admin: any, userId: string): Promise<Set<st
     .from("user_do_not_contact")
     .select("phone")
     .eq("user_id", userId);
-  if (error) { console.warn(`[optOut] fetchSet fail-open (${error.message})`); return set; }
+  if (error) throw new Error("Não foi possível verificar a lista de não contatar. Envio pausado; tente novamente.");
   for (const r of data ?? []) set.add(onlyDigits(r.phone));
   return set;
 }
@@ -48,9 +47,10 @@ export async function addOptOut(
 ): Promise<void> {
   const p = onlyDigits(phone);
   if (!p) return;
-  await admin
+  const { error } = await admin
     .from("user_do_not_contact")
     .upsert({ user_id: userId, phone: p, reason, source }, { onConflict: "user_id,phone", ignoreDuplicates: true });
+  if (error) throw new Error("Não foi possível registrar o bloqueio de contato. Tente novamente.");
 }
 
 /**

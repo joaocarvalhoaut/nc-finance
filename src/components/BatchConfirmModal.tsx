@@ -145,6 +145,7 @@ export default function BatchConfirmModal({
             </div>
           )}
 
+          <p className="text-sm text-zinc-300">Confira destinatários, valores, vencimentos e o boleto de cada cliente na revisão. Contatos bloqueados e limites serão verificados novamente pelo servidor. Mensagem enviada não significa pagamento recebido.</p>
           {/* Summary */}
           <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-3 space-y-2">
             <h3 className="text-sm font-medium text-zinc-400">Resumo do lote</h3>

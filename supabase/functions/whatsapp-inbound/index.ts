@@ -6,8 +6,7 @@
  *
  * Segurança: público (verify_jwt=false — o Z-API não manda JWT). Se o secret
  * WHATSAPP_INBOUND_SECRET estiver configurado, exige `?secret=` na URL do
- * webhook (configurada no painel Z-API). Sem secret, funciona mas registra
- * aviso. O pior caso de abuso é marcar um número como não-contatar (bloqueia
+ * webhook (configurada no painel Z-API). Sem secret, recusa o processamento. O pior caso de abuso é marcar um número como não-contatar (bloqueia
  * envio) — sem exposição de dados.
  *
  * Mapeamento do destinatário:
@@ -40,7 +39,7 @@ Deno.serve(async (request: Request) => {
       return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
   } else {
-    console.warn("[whatsapp-inbound] WHATSAPP_INBOUND_SECRET não configurado — endpoint aberto.");
+    return new Response(JSON.stringify({ error: "Webhook temporariamente indisponível." }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   let payload: Record<string, any>;

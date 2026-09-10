@@ -1,16 +1,16 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, lazy } from "react";
 import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
 import CountUp from "./components/CountUp";
-import MinhaConta from "./components/MinhaConta";
+const MinhaConta = lazy(() => import("./components/MinhaConta"));
 import PasswordInput from "./components/PasswordInput";
 import BoletoResponsibilityModal from "./components/BoletoResponsibilityModal";
-import DeleteAccountModal from "./components/DeleteAccountModal";
+const DeleteAccountModal = lazy(() => import("./components/DeleteAccountModal"));
 import { addOptOuts } from "./services/optOutService";
 import LandingPage from "./components/LandingPage";
 import SubscriptionGate from "./components/SubscriptionGate";
 import SubscriptionStatusCard from "./components/SubscriptionStatusCard";
-import ClientDashboard from "./components/ClientDashboard";
+const ClientDashboard = lazy(() => import("./components/ClientDashboard"));
 import { PLAN_LIST, getPlanDefinition } from "./config/plans";
 import { useAccount } from "./hooks/useAccount";
 import { useSubscription } from "./hooks/useSubscription";
@@ -32,7 +32,7 @@ import { metricsService, type OperationalMetrics } from "./services/metricsServi
 import { parseImportFile } from "./utils/importFileParser";
 import { extractDocumentLocally, type LocalExtractionResult } from "./services/localDocumentExtraction";
 import { exportRelatorio } from "./services/exportRelatorio";
-import Suporte from "./components/Suporte";
+const Suporte = lazy(() => import("./components/Suporte"));
 import { PdfPreviewModal, openPdfPreview } from "./components/PdfPreviewModal";
 import DriveHelpPopover from "./components/DriveHelpPopover";
 import { 
