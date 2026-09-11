@@ -20,9 +20,11 @@
 
 ## Limitações ainda abertas
 - Sem autenticação administrativa Supabase nesta sessão: migration, RLS real, MFA e configurações de nuvem não verificados.
-- Teste SQL executado com sucesso em PostgreSQL em memória (PGlite), com schema base, nova migration e duas contas fictícias. Auth é uma fixture; isso não valida todas as migrations nem a configuração de produção. Docker ainda indisponível: stack Supabase completa e corrida entre conexões permanecem pendentes. Instruções em tools/local-lab/README.md.
+- Teste SQL executado com sucesso em PostgreSQL em memória (PGlite), com schema base, nova migration e duas contas fictícias. Auth é uma fixture; isso não valida todas as migrations nem a configuração de produção. Docker ainda indisponível: stack Supabase completa permanece pendente. A corrida entre conexões passou no CI. Instruções em tools/local-lab/README.md.
 - qs fixado em 6.16.0 por override, após teste HTTP do parsing do Express, JSON válido/inválido e regressões das vulnerabilidades. npm install retornou zero vulnerabilidades. Revisar a necessidade do override quando Express incorporar a versão corrigida.
-- Teste de concorrência preparado no CI com PostgreSQL 15 descartável: comprova disputa de lock entre duas conexões e exige um único vencedor para reserva nova e expirada. Consultar o resultado do CI antes de considerar a validação concluída.
+- CI do commit e6cf4c1 aprovado, incluindo concorrência em PostgreSQL 15 descartável: disputa real de lock entre duas conexões e um único vencedor para reserva nova e expirada. Execução: https://github.com/joaocarvalhoaut/nc-finance/actions/runs/34552447833
+- Navegação da fixture sem backend verificada no navegador: expansão, seleção de Carteira/Importar carteira e recolhimento; também em viewport 390x844. Não equivale a revisão de todas as telas autenticadas.
+- Auditoria de nuvem preparada em supabase/tests/cloud-security-audit.sql: somente leitura de RLS, políticas, configuração do bucket e permissões dos RPCs, sem ler registros de clientes ou secrets. Ainda não executada na nuvem.
 - Reserva usa a chave e janela existentes: não garante exactly-once após timeout prolongado, nem corrige diferenças de geração de chave entre caminhos. Exige reconciliação com o provedor antes de evoluir retries.
 - Reserva retém linhas expiradas; planejar limpeza periódica após prazo de investigação aprovado.
 - A navegação foi melhorada preservando áreas; o menu agora tem cinco áreas principais e subopções contextuais. A decomposição completa do App.tsx ainda requer uma etapa maior com testes autenticados.

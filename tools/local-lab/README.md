@@ -17,6 +17,10 @@ Cobre reserva nova e expirada, sem acessar o Supabase de produção.
 ## Supabase completo (requer Docker)
 
 O Docker não estava instalado quando este ambiente foi preparado.
+O dispositivo tem virtualização habilitada no firmware, mas o hipervisor não
+estava ativo e `wsl --version` não retornou uma versão moderna. A instalação ou
+atualização do WSL pode exigir reinicialização. Não reiniciar durante uso do
+servidor. Consulte https://docs.docker.com/desktop/setup/install/windows-install/.
 Após instalar e iniciar Docker Desktop, executar:
 
 1. `npm run lab:prepare`
