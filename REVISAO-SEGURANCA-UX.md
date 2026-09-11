@@ -20,7 +20,8 @@
 
 ## Limitações ainda abertas
 - Sem autenticação administrativa Supabase nesta sessão: migration, RLS real, MFA e configurações de nuvem não verificados.
-- Sem PostgreSQL/Docker local disponível: teste SQL e corrida concorrente não executados.
+- Teste SQL executado com sucesso em PostgreSQL em memória (PGlite), com schema base, nova migration e duas contas fictícias. Auth é uma fixture; isso não valida todas as migrations nem a configuração de produção. Docker ainda indisponível: stack Supabase completa e corrida entre conexões permanecem pendentes. Instruções em tools/local-lab/README.md.
+- Atualizações compatíveis reduziram a auditoria npm de cinco alertas para um moderado: qs transitivo do Express, cuja faixa ~6.14.0 impede a versão corrigida 6.16.0. npm audit fix não resolveu; não foi forçada uma troca de versão fora dessa faixa.
 - Reserva usa a chave e janela existentes: não garante exactly-once após timeout prolongado, nem corrige diferenças de geração de chave entre caminhos. Exige reconciliação com o provedor antes de evoluir retries.
 - Reserva retém linhas expiradas; planejar limpeza periódica após prazo de investigação aprovado.
 - A navegação foi melhorada preservando áreas; o menu agora tem cinco áreas principais e subopções contextuais. A decomposição completa do App.tsx ainda requer uma etapa maior com testes autenticados.

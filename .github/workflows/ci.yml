@@ -53,5 +53,8 @@ jobs:
       - name: Real file import tests
         run: npm run test:files
 
+      - name: Isolated PostgreSQL regression tests
+        run: npm run test:local-db
+
       - name: Build
         run: npm run build

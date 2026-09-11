@@ -17,7 +17,9 @@
     "test:hardening": "node scripts/hardening.js --report",
     "test:shared": "npx tsx supabase/functions/_shared/__tests__/format.test.ts && npx tsx supabase/functions/_shared/__tests__/phone.test.ts && npx tsx supabase/functions/_shared/__tests__/optOut.test.ts && npx tsx supabase/functions/_shared/__tests__/sanitize.test.ts",
     "test:security": "node tests/hardening.test.mjs",
-    "test:files": "node tests/import-files.test.mjs"
+    "test:files": "node tests/import-files.test.mjs",
+    "test:local-db": "node tests/local-db.test.mjs",
+    "lab:prepare": "node tools/local-lab/prepare.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -40,6 +42,7 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/react": "^19.2.17",
