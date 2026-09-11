@@ -21,7 +21,8 @@
 ## Limitações ainda abertas
 - Sem autenticação administrativa Supabase nesta sessão: migration, RLS real, MFA e configurações de nuvem não verificados.
 - Teste SQL executado com sucesso em PostgreSQL em memória (PGlite), com schema base, nova migration e duas contas fictícias. Auth é uma fixture; isso não valida todas as migrations nem a configuração de produção. Docker ainda indisponível: stack Supabase completa e corrida entre conexões permanecem pendentes. Instruções em tools/local-lab/README.md.
-- Atualizações compatíveis reduziram a auditoria npm de cinco alertas para um moderado: qs transitivo do Express, cuja faixa ~6.14.0 impede a versão corrigida 6.16.0. npm audit fix não resolveu; não foi forçada uma troca de versão fora dessa faixa.
+- qs fixado em 6.16.0 por override, após teste HTTP do parsing do Express, JSON válido/inválido e regressões das vulnerabilidades. npm install retornou zero vulnerabilidades. Revisar a necessidade do override quando Express incorporar a versão corrigida.
+- Teste de concorrência preparado no CI com PostgreSQL 15 descartável: comprova disputa de lock entre duas conexões e exige um único vencedor para reserva nova e expirada. Consultar o resultado do CI antes de considerar a validação concluída.
 - Reserva usa a chave e janela existentes: não garante exactly-once após timeout prolongado, nem corrige diferenças de geração de chave entre caminhos. Exige reconciliação com o provedor antes de evoluir retries.
 - Reserva retém linhas expiradas; planejar limpeza periódica após prazo de investigação aprovado.
 - A navegação foi melhorada preservando áreas; o menu agora tem cinco áreas principais e subopções contextuais. A decomposição completa do App.tsx ainda requer uma etapa maior com testes autenticados.

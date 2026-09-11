@@ -9,6 +9,11 @@ contas fictícias e encerra o banco ao terminar. Não lê `.env` ou acessa a nuv
 Este teste não reproduz todo o Supabase: `auth.users` e `auth.uid()` são fixtures.
 Não comprova concorrência entre conexões, nem todas as migrations posteriores.
 
+O CI executa `tests/postgres-concurrency.test.mjs` em um serviço PostgreSQL 15
+descartável. O teste observa o bloqueio real entre duas conexões antes de liberar
+a primeira transação e verificar que a segunda não adquire a mesma reserva.
+Cobre reserva nova e expirada, sem acessar o Supabase de produção.
+
 ## Supabase completo (requer Docker)
 
 O Docker não estava instalado quando este ambiente foi preparado.
