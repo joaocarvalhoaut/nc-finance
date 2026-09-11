@@ -24,7 +24,11 @@ servidor. Consulte https://docs.docker.com/desktop/setup/install/windows-install
 Após instalar e iniciar Docker Desktop, executar:
 
 1. `npm run lab:prepare`
-2. Dentro de `.local/ncfinance-lab`, executar `npx supabase start`.
+2. Dentro de `.local/ncfinance-lab`, executar `npx supabase@2.117.0 start`.
+
+CLI 2.117.0 preparado e configuração lida nesta máquina. WSL e
+VirtualMachinePlatform habilitados em 10/09/2026, com reinicialização pendente.
+A stack só pode ser validada após o Docker estar em execução.
 
 O projeto gerado não contém `.env`, credenciais, funções, cron jobs ou vínculo
 com produção. Contém apenas migrations selecionadas para os testes de segurança.
