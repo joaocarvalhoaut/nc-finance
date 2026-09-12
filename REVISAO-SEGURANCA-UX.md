@@ -19,8 +19,8 @@
 6. Publicar frontend somente após validação visual desktop/mobile e fluxos autenticados em staging. Não usar cobrança real como teste.
 
 ## Limitações ainda abertas
-- Sem autenticação administrativa Supabase nesta sessão: migration, RLS real, MFA e configurações de nuvem não verificados.
-- Teste SQL executado com sucesso em PostgreSQL em memória (PGlite), com schema base, nova migration e duas contas fictícias. Auth é uma fixture; isso não valida todas as migrations nem a configuração de produção. Docker ainda indisponível: stack Supabase completa permanece pendente. A corrida entre conexões passou no CI. Instruções em tools/local-lab/README.md.
+- Sem autenticação administrativa do Supabase de produção: migrations aplicadas, RLS, MFA e configurações de nuvem não verificados.
+- Em 12/09/2026, Supabase local iniciado com PostgreSQL 15, Auth e REST reais. Testes de duas contas fictícias passaram: login, leitura isolada, bloqueio de atualização/inserção em nome da outra conta e restrição do RPC administrativo. Teste SQL também passou com rollback; limpeza conferida com zero contas/registros de teste restantes. O laboratório cobre schema base + nova migration, não todas as migrations, telas ou integrações. A corrida entre conexões passou no CI. Instruções em tools/local-lab/README.md.
 - qs fixado em 6.16.0 por override, após teste HTTP do parsing do Express, JSON válido/inválido e regressões das vulnerabilidades. npm install retornou zero vulnerabilidades. Revisar a necessidade do override quando Express incorporar a versão corrigida.
 - CI do commit e6cf4c1 aprovado, incluindo concorrência em PostgreSQL 15 descartável: disputa real de lock entre duas conexões e um único vencedor para reserva nova e expirada. Execução: https://github.com/joaocarvalhoaut/nc-finance/actions/runs/34552447833
 - Navegação da fixture sem backend verificada no navegador: expansão, seleção de Carteira/Importar carteira e recolhimento; também em viewport 390x844. Não equivale a revisão de todas as telas autenticadas.

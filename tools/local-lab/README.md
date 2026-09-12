@@ -14,23 +14,40 @@ descartável. O teste observa o bloqueio real entre duas conexões antes de libe
 a primeira transação e verificar que a segunda não adquire a mesma reserva.
 Cobre reserva nova e expirada, sem acessar o Supabase de produção.
 
-## Supabase completo (requer Docker)
+## Stack Supabase local (schema selecionado)
 
-O Docker não estava instalado quando este ambiente foi preparado.
-O dispositivo tem virtualização habilitada no firmware, mas o hipervisor não
-estava ativo e `wsl --version` não retornou uma versão moderna. A instalação ou
-atualização do WSL pode exigir reinicialização. Não reiniciar durante uso do
-servidor. Consulte https://docs.docker.com/desktop/setup/install/windows-install/.
-Após instalar e iniciar Docker Desktop, executar:
+Validada em 12/09/2026 com Docker Desktop, Docker Engine 29.7.2, WSL 2.7.13
+e CLI Supabase 2.117.0. Banco, Auth, API, Storage, Realtime, e-mail local e Studio
+iniciaram. Funções e analytics permanecem desativados.
+Após iniciar Docker Desktop, executar:
 
 1. `npm run lab:prepare`
-2. Dentro de `.local/ncfinance-lab`, executar `npx supabase@2.117.0 start`.
+2. Dentro de `.local/ncfinance-lab`, executar `npx supabase@2.117.0 start --network-id ncfinance-local-loopback`.
 
-CLI 2.117.0 preparado e configuração lida nesta máquina. WSL e
-VirtualMachinePlatform habilitados em 10/09/2026, com reinicialização pendente.
-A stack só pode ser validada após o Docker estar em execução.
+A rede dedicada foi criada com `docker network create --driver bridge --opt
+com.docker.network.bridge.host_binding_ipv4=127.0.0.1 ncfinance-local-loopback`.
+Nesta instalação o Docker ainda publicou as portas em todas as interfaces.
+Por isso o Windows Firewall contém a regra `NCFinance-LocalLab-BlockRemote`,
+bloqueando entrada TCP não-loopback nas portas 55321–55324, em todos os perfis.
+Os três perfis de firewall estavam ativos na validação. Em outro dispositivo,
+configure a proteção local antes de iniciar; a opção da rede não basta aqui.
 
-O projeto gerado não contém `.env`, credenciais, funções, cron jobs ou vínculo
+Studio: http://127.0.0.1:55323 · API: http://127.0.0.1:55321.
+
+## Teste de Auth e REST com duas contas fictícias
+
+Após iniciar a stack, salve a saída JSON de `supabase status -o json` do
+laboratório em `.local/ncfinance-lab/status.json`, codificação UTF-8. Este arquivo
+contém apenas as credenciais locais e fica ignorado pelo Git. Nunca use a saída
+de um projeto remoto. Execute `npm run test:local-auth` na raiz do repositório.
+
+O teste aceita apenas a origem `http://127.0.0.1:55321`, recusa redirects,
+cria duas contas fictícias e valida login, leitura, atualização, tentativa de
+inserção em nome de outra conta e acesso ao RPC administrativo. Ao terminar,
+remove somente as contas criadas naquela execução e seus registros associados.
+Não testa envio a provedores nem substitui a revisão visual autenticada.
+
+O projeto gerado não contém `.env`, credenciais de produção, funções, cron jobs ou vínculo
 com produção. Contém apenas migrations selecionadas para os testes de segurança.
 Não é ainda um espelho funcional completo do NC Finance. Não execute `link`,
 `db push` ou comandos com o Project Ref de produção neste laboratório.

@@ -19,6 +19,7 @@
     "test:security": "node tests/hardening.test.mjs",
     "test:files": "node tests/import-files.test.mjs",
     "test:local-db": "node tests/local-db.test.mjs",
+    "test:local-auth": "node tests/local-auth.test.mjs",
     "lab:prepare": "node tools/local-lab/prepare.mjs"
   },
   "dependencies": {
