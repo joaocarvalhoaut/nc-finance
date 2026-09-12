@@ -1,6 +1,7 @@
 import { mkdir, writeFile, readFile, copyFile, readdir, access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const target = path.join(root, '.local', 'ncfinance-lab', 'supabase');
@@ -40,7 +41,16 @@ enabled = false
 [edge_runtime]
 enabled = false
 `);
-for (const name of ['20260520193000_account_based_phase3.sql', '20260910120000_atomic_send_reservation.sql']) {
+const reviewed = process.argv.includes('--full-schema')
+  ? JSON.parse(await readFile(new URL('./reviewed-migrations.json', import.meta.url), 'utf8'))
+  : null;
+const migrationNames = reviewed ? Object.keys(reviewed) : ['20260520193000_account_based_phase3.sql', '20260910120000_atomic_send_reservation.sql'];
+for (const name of migrationNames) {
+  if (!/^\d{14}_[a-z0-9_]+\.sql$/.test(name)) throw new Error('Nome de migration inválido.');
+  if (reviewed) {
+    const hash = createHash('sha256').update((await readFile(path.join(root, 'supabase', 'migrations', name), 'utf8')).replaceAll('\r\n', '\n')).digest('hex');
+    if (hash !== reviewed[name]) throw new Error(`Migration alterada desde a revisão: ${name}`);
+  }
   await copyFile(path.join(root, 'supabase', 'migrations', name), path.join(target, 'migrations', name));
 }
 await copyFile(path.join(root, 'supabase', 'tests', 'security-isolation.sql'), path.join(target, 'security-isolation.sql'));

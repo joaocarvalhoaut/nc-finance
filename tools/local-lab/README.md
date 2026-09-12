@@ -14,14 +14,14 @@ descartável. O teste observa o bloqueio real entre duas conexões antes de libe
 a primeira transação e verificar que a segunda não adquire a mesma reserva.
 Cobre reserva nova e expirada, sem acessar o Supabase de produção.
 
-## Stack Supabase local (schema selecionado)
+## Stack Supabase local
 
 Validada em 12/09/2026 com Docker Desktop, Docker Engine 29.7.2, WSL 2.7.13
 e CLI Supabase 2.117.0. Banco, Auth, API, Storage, Realtime, e-mail local e Studio
 iniciaram. Funções e analytics permanecem desativados.
 Após iniciar Docker Desktop, executar:
 
-1. `npm run lab:prepare`
+1. `npm run lab:prepare -- --full-schema`
 2. Dentro de `.local/ncfinance-lab`, executar `npx supabase@2.117.0 start --network-id ncfinance-local-loopback`.
 
 A rede dedicada foi criada com `docker network create --driver bridge --opt
@@ -48,7 +48,7 @@ remove somente as contas criadas naquela execução e seus registros associados.
 Não testa envio a provedores nem substitui a revisão visual autenticada.
 
 O projeto gerado não contém `.env`, credenciais de produção, funções, cron jobs ou vínculo
-com produção. Contém apenas migrations selecionadas para os testes de segurança.
+com produção. Com --full-schema, contém as 31 migrations revisadas, conferidas pelo manifesto de hashes. Sem essa opção, copia apenas duas migrations e não remove as anteriores.
 Não é ainda um espelho funcional completo do NC Finance. Não execute `link`,
 `db push` ou comandos com o Project Ref de produção neste laboratório.
 
@@ -56,6 +56,12 @@ O frontend habitual ainda pode usar o `.env` de produção. Não use `npm run de
 para testes de escrita enquanto ele não estiver explicitamente configurado para
 o backend local. A fixture `tests/ui-preview.html` não acessa backend.
 
-Antes de ampliar este laboratório para todas as migrations e funções, revisar
+Antes de ampliar este laboratório para funções e novas migrations, revisar
 se há chamadas externas, jobs agendados e integrações reais. As configurações
 locais não devem ser copiadas para produção.
+
+## Frontend isolado
+
+Execute `npm run lab:dev` e abra http://127.0.0.1:5300. Usa somente URL e chave pública do status local, sem carregar `.env` ou a configuração Vite habitual. A CSP bloqueia conexões externas, inclusive fontes e integrações. Arquivos `.env`, `.local` e `.git` são negados por HTTP.
+
+Para atualizar a stack existente, execute `npx supabase@2.117.0 migration up --local --include-all` dentro de `.local/ncfinance-lab`. As 31 migrations foram aplicadas localmente em 12/09/2026; Auth/REST com duas contas e permissões administrativas passaram. As funções Edge permanecem desativadas. Isso não comprova o estado da nuvem nem valida provedores.

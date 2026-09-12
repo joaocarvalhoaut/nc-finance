@@ -11,16 +11,16 @@
 - Testes de regressão de proteções e leitura de arquivos PDF/XLSX gerados em memória.
 
 ## Sequência obrigatória de implantação
-1. Aplicar migrations em ambiente de teste. A nova migration é aditiva e não modifica registros financeiros existentes.
+1. Aplicar migrations em ambiente de teste. As migrations novas criam a reserva e restringem quatro RPCs administrativos a service_role, sem modificar registros financeiros existentes.
 2. Executar supabase/tests/security-isolation.sql no banco de teste com psql -v ON_ERROR_STOP=1. Validar também duas sessões concorrentes reservando a mesma chave: somente uma deve retornar true. O teste SQL entregue cobre isolamento e repetição, não simula concorrência real.
 3. Conferir existência do RPC check_rate_limit e WHATSAPP_INBOUND_SECRET na nuvem e a configuração correspondente no provedor. Sem esses pré-requisitos as proteções bloqueiam operações.
 4. Conferir MFA, confirmação de e-mail, recuperação de conta e URLs de redirecionamento no painel Supabase. Não ativar MFA obrigatório sem fluxo de cadastro e recuperação testado. O config.toml local não comprova estado de produção.
-5. Revisar PR e CI. Aplicar a migration em produção antes de publicar send-whatsapp-charge, send-whatsapp-batch e process-dispatch-jobs. Publicar também whatsapp-inbound e os consumidores de rateLimit alterado (create-checkout-session e match-drive-files).
+5. Revisar PR e CI. Aplicar as migrations de reserva e de permissões administrativas em produção antes de publicar send-whatsapp-charge, send-whatsapp-batch e process-dispatch-jobs. Publicar também whatsapp-inbound e os consumidores de rateLimit alterado (create-checkout-session e match-drive-files).
 6. Publicar frontend somente após validação visual desktop/mobile e fluxos autenticados em staging. Não usar cobrança real como teste.
 
 ## Limitações ainda abertas
 - Sem autenticação administrativa do Supabase de produção: migrations aplicadas, RLS, MFA e configurações de nuvem não verificados.
-- Em 12/09/2026, Supabase local iniciado com PostgreSQL 15, Auth e REST reais. Testes de duas contas fictícias passaram: login, leitura isolada, bloqueio de atualização/inserção em nome da outra conta e restrição do RPC administrativo. Teste SQL também passou com rollback; limpeza conferida com zero contas/registros de teste restantes. O laboratório cobre schema base + nova migration, não todas as migrations, telas ou integrações. A corrida entre conexões passou no CI. Instruções em tools/local-lab/README.md.
+- Em 12/09/2026, Supabase local iniciado com PostgreSQL 15, Auth e REST reais. Testes de duas contas fictícias passaram: login, leitura isolada, bloqueio de atualização/inserção em nome da outra conta e restrição do RPC administrativo. Teste SQL também passou com rollback; limpeza conferida com zero contas/registros de teste restantes. As 31 migrations revisadas foram aplicadas localmente; não estão cobertas todas as telas ou integrações. A corrida entre conexões passou no CI. Instruções em tools/local-lab/README.md.
 - qs fixado em 6.16.0 por override, após teste HTTP do parsing do Express, JSON válido/inválido e regressões das vulnerabilidades. npm install retornou zero vulnerabilidades. Revisar a necessidade do override quando Express incorporar a versão corrigida.
 - CI do commit e6cf4c1 aprovado, incluindo concorrência em PostgreSQL 15 descartável: disputa real de lock entre duas conexões e um único vencedor para reserva nova e expirada. Execução: https://github.com/joaocarvalhoaut/nc-finance/actions/runs/34552447833
 - Navegação da fixture sem backend verificada no navegador: expansão, seleção de Carteira/Importar carteira e recolhimento; também em viewport 390x844. Não equivale a revisão de todas as telas autenticadas.
@@ -36,3 +36,8 @@ Reverter o frontend ao deploy anterior se necessário. Para funções, restaurar
 
 ## Runtime
 O pdfjs-dist instalado exige Node >=22.13. O CI anterior usava Node 20; atualizado para Node 24, usado também na validação local. Conferir runtime do build na Vercel antes de publicar.
+
+## Validação adicional — 12/09/2026
+- Quatro RPCs SECURITY DEFINER herdavam execução por anon/authenticated no schema local. A migration 20260912120000 restringe execução a service_role. Não foi aplicada em produção.
+- Teste transacional verifica a negação aos clientes e executa as quatro operações como service_role, conferindo seus resultados antes do rollback.
+- Frontend isolado disponível via `npm run lab:dev`; HTTP confirmou bloqueio 403 de `.env`, `.local`, `.git` e caminho codificado. CSP restringe conexões ao laboratório. Revisão autenticada completa ainda pendente.
