@@ -61,3 +61,9 @@ O pdfjs-dist instalado exige Node >=22.13. O CI anterior usava Node 20; atualiza
 - Texto digitado separado do valor persistido; centavos não são reinterpretados a cada tecla. Formato brasileiro validado ao sair do campo, passando o valor explicitamente à gravação.
 - Nome acessível no campo de valor; aviso visível para valor/data inválidos e falhas de gravação.
 - TypeScript e testes de datas/valores passaram. Fluxo interativo desta alteração ainda requer teste no navegador.
+
+## Edição monetária validada no navegador
+- Digitação de 1234,56 na carteira e saída com Tab: banco local confirmou 1234.56.
+- Texto abc recusado com alerta em português; valor persistido permaneceu 1234.56. Conta fictícia removida ao terminar.
+- Ambiente recuperou PostgreSQL após desligamento incompleto. Erro JWT issued at future deixou de ocorrer após reiniciar somente REST local e atualizar assinatura. Não alteradas validações de segurança.
+- CI de 43e78c0 aprovado. Permanecem pendentes outros formulários e integrações, conforme seções anteriores.
