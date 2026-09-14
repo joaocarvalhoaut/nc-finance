@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import {createRequire} from 'node:module';
+import {pathToFileURL} from 'node:url';
+const require=createRequire(import.meta.url);
+const canvas=require('@napi-rs/canvas');
+Object.assign(globalThis,{DOMMatrix:canvas.DOMMatrix,ImageData:canvas.ImageData,Path2D:canvas.Path2D});
+const r=await build({entryPoints:['src/utils/importFileParser.ts'],bundle:true,write:false,platform:'node',format:'cjs',plugins:[{name:'node-pdf-worker',setup(b){
+b.onResolve({filter:/pdfjs-dist.*\?url$/},()=>({path:'worker',namespace:'worker'}));
+b.onLoad({filter:/.*/,namespace:'worker'},()=>({contents:'export default '+JSON.stringify(pathToFileURL(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href),loader:'js'}));
+b.onResolve({filter:/^pdfjs-dist\/legacy\/build\/pdf.mjs$/},args=>({path:pathToFileURL(require.resolve(args.path)).href,external:true}));
+}}]});
+const m={exports:{}};new Function('module','exports','require',r.outputFiles[0].text)(m,m.exports,require);
+const parse=m.exports.parseImportFile;
+const XLSX=require('xlsx');
+const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([['Cliente','Valor','Vencimento'],['Cliente Ficticio',123.45,'10/09/2026']]),'Teste');
+const bytes=XLSX.write(book,{type:'buffer',bookType:'xlsx'});
+const spreadsheet=await parse(new File([bytes],'teste.xlsx'));
+assert.match(spreadsheet,/Cliente Ficticio/);assert.match(spreadsheet,/123.45/);assert.match(spreadsheet,/10\/09\/2026/);
+const {jsPDF}=require('jspdf');const pdf=new jsPDF();pdf.text('Cliente Ficticio 123.45 10/09/2026',10,20);pdf.text('Segundo Cliente 987.65 11/09/2026',10,30);
+const text=await parse(new File([pdf.output('arraybuffer')],'teste.pdf'));
+assert.match(text,/Cliente Ficticio 123.45 10\/09\/2026/);assert.match(text,/Segundo Cliente 987.65 11\/09\/2026/);assert.equal(text.split('\n').length,2);
+await assert.rejects(()=>parse(new File(['invalid'],'arquivo.exe')));
+console.log('PDF e XLSX reais: leitura de valores, datas e separação de linhas validada.');

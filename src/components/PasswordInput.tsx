@@ -23,7 +23,6 @@ export default function PasswordInput({ className = "", ...props }: Props) {
         aria-label={show ? "Ocultar senha" : "Mostrar senha"}
         title={show ? "Ocultar senha" : "Mostrar senha"}
         className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
-        tabIndex={-1}
       >
         {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
       </button>

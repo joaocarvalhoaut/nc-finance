@@ -47,8 +47,7 @@ export default function CookieConsent() {
           <p className="text-xs text-zinc-400 leading-relaxed mt-1">
             Usamos cookies <strong className="text-zinc-300">essenciais</strong> para manter você
             conectado com segurança. Com sua permissão, usamos também
-            <strong className="text-zinc-300"> analytics de produto</strong> (anônimo e sem dados
-            sensíveis) para melhorar o app. Você pode recusar sem perder nenhuma função.
+            <strong className="text-zinc-300"> analytics de produto</strong> (com minimização de dados) para melhorar o app. Você pode recusar sem perder nenhuma função.
             Detalhes na Política de Privacidade.
           </p>
           <div className="flex flex-wrap items-center gap-2 mt-3">

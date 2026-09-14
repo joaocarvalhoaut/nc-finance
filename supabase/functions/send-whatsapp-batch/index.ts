@@ -1,3 +1,4 @@
+import { reserveChargeSend } from "../_shared/sendReservation.ts";
 /**
  * send-whatsapp-batch — Edge Function para envio em lote de cobranças via Z-API global.
  *
@@ -414,12 +415,21 @@ Deno.serve(async (request: Request) => {
         .gte("created_at", fiveMinutesAgo)
         .maybeSingle();
 
-      if (dupRow) {
+      let reserved = true;
+      if (!dupRow && !dryRun) {
+        try { reserved = await reserveChargeSend(admin, userId, idempotencyHash); }
+        catch {
+          results.push({ debtorId, clientName, phone: normalizedPhone, status: "erro", messageId: null, logId: null, error: "Envio pausado: proteção indisponível. Tente novamente mais tarde.", sentWithPdf: false });
+          failedCount++;
+          continue;
+        }
+      }
+      if (dupRow || !reserved) {
         results.push({
           debtorId, clientName, phone: normalizedPhone,
           status:      "duplicado",
           messageId:   null,
-          logId:       (dupRow as { id: string }).id,
+          logId:       (dupRow as { id: string } | null)?.id ?? null,
           error:       "Envio duplicado detectado (janela de 5 min).",
           sentWithPdf: false,
         });
@@ -451,8 +461,7 @@ Deno.serve(async (request: Request) => {
         const shortUrl = await shortenUrl(publicPdfUrl);
         finalMessage = `${message}\n\n📎 Boleto: ${shortUrl}`;
         sentWithPdf = true; // link is included — recipient can access the PDF
-        console.log(`[batch] PDF link appended for debtorId=${debtorId} short=${shortUrl}`);
-      } else if (driveFileId && driveFileId !== "uploaded" && driveAccessToken) {
+              } else if (driveFileId && driveFileId !== "uploaded" && driveAccessToken) {
         // Legacy: Drive-matched PDF — no public URL, skip link but still try document send
         const pdfBytes = await downloadDriveFile(driveFileId, driveAccessToken).catch(() => null);
         if (pdfBytes && pdfBytes.length > 0 && !dryRun) {

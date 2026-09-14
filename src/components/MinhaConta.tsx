@@ -161,11 +161,11 @@ export default function MinhaConta({
         <div className="space-y-3 max-w-md">
           <div>
             <label className="block text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1.5">Nova senha</label>
-            <PasswordInput value={pw} onChange={(e) => { setPw(e.target.value); setPwMsg(null); }} className={inputCls} placeholder="Mínimo 8 caracteres" autoComplete="new-password" />
+            <PasswordInput aria-label="Nova senha" value={pw} onChange={(e) => { setPw(e.target.value); setPwMsg(null); }} className={inputCls} placeholder="Mínimo 8 caracteres" autoComplete="new-password" />
           </div>
           <div>
             <label className="block text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1.5">Confirmar nova senha</label>
-            <PasswordInput value={pw2} onChange={(e) => { setPw2(e.target.value); setPwMsg(null); }} className={inputCls} placeholder="Repita a senha" autoComplete="new-password" />
+            <PasswordInput aria-label="Confirmar nova senha" value={pw2} onChange={(e) => { setPw2(e.target.value); setPwMsg(null); }} className={inputCls} placeholder="Repita a senha" autoComplete="new-password" />
           </div>
           {pwMsg && (
             <p className={`text-sm flex items-center gap-1.5 ${pwMsg.ok ? "text-emerald-400" : "text-rose-400"}`}>

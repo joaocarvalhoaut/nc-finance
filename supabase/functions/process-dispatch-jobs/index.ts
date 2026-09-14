@@ -1,3 +1,4 @@
+import { reserveChargeSend } from "../_shared/sendReservation.ts";
 /**
  * process-dispatch-jobs — worker que processa a fila de jobs de disparo.
  *
@@ -262,10 +263,10 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
         phone: rawPhone || "sem_telefone",
         amount, tone, message: "N/A",
         status: "telefone_invalido", type: "lote", provider: PROVIDER,
-        errorMessage: `Tel invalido: "${rawPhone}"`, debtorId,
+        errorMessage: "Telefone inválido.", debtorId,
       });
       await markJob("failed", {
-        last_error: `Telefone invalido: ${rawPhone}`,
+        last_error: "Telefone inválido.",
         provider_message_id: logId,
         attempts: attempts + 1,
       });
@@ -282,8 +283,7 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     if (driveFileUrl) {
       const shortPdfUrl = await shortenUrl(driveFileUrl);
       message = `${message}\n\n📎 Boleto: ${shortPdfUrl}`;
-      console.log(`[dispatch] PDF link appended for debtorId=${debtorId} url=${shortPdfUrl}`);
-    }
+          }
 
     // ── 9. Idempotência (5 min) ───────────────────────────────────────────
     const today = new Date().toISOString().slice(0, 10);
@@ -306,6 +306,7 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     }
 
     // ── 10. Envia via Z-API (credenciais de platform_integrations) ───────────
+    if (!(await reserveChargeSend(admin, userId, idemHash))) throw new Error("Envio reservado em outra execução. Aguardando nova tentativa.");
     const zapiResult = await sendTextMessage({
       instanceId:  zapiCreds.instanceId,
       token:       zapiCreds.token,
