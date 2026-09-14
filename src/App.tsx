@@ -299,6 +299,8 @@ export default function App() {
   const [editingPhoneValue, setEditingPhoneValue] = useState<string>("");
   // Inline value editing — tracks which row's Valor Base is being typed
   const [editingValueDebtorId, setEditingValueDebtorId] = useState<string | null>(null);
+  const [editingValueText, setEditingValueText] = useState("");
+  const [debtorSaveError, setDebtorSaveError] = useState("");
 
   // PDF attachment in Cobrança tab
   const [uploadingPdfDebtorId, setUploadingPdfDebtorId] = useState<string | null>(null);
@@ -1275,9 +1277,15 @@ export default function App() {
   };
 
   // ── Persist to DB (called on onBlur) ─────────────────────────────────────────
-  const saveDebtorFieldToDB = async (id: string) => {
-    const currentDebtor = debtors.find((debtor) => debtor.id === id);
+  const saveDebtorFieldToDB = async (id: string, amount?: number) => {
+    const existing = debtors.find((debtor) => debtor.id === id);
+    const currentDebtor = existing && amount !== undefined ? { ...existing, value: amount } : existing;
     if (!currentDebtor || !currentOwnerUserId) return;
+    if (!isValidDueDate(currentDebtor.dueDate)) {
+      setDebtorSaveError("Alteração não salva: informe um vencimento válido no formato DD/MM/AAAA.");
+      return;
+    }
+    setDebtorSaveError("");
     try {
       const savedDebtor = await financeService.update(currentOwnerUserId, currentDebtor);
       setDebtors((prev) => prev.map((debtor) => (debtor.id === id ? savedDebtor : debtor)));
@@ -1285,6 +1293,7 @@ export default function App() {
         setSelectedDebtorForMessage(savedDebtor);
       }
     } catch (error) {
+      setDebtorSaveError("Não foi possível salvar a alteração. Confira sua conexão e tente novamente.");
       console.error('[workspace]', error instanceof Error ? error.message : 'Falha ao salvar alteração do devedor.');
     }
   };
@@ -3011,7 +3020,8 @@ export default function App() {
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     
                     <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-md">
-                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      {debtorSaveError && <p role="alert" className="text-sm text-rose-400 mb-3">{debtorSaveError}</p>}
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
                         <Percent className="w-4 h-4 text-emerald-400" /> Parâmetros de Encargos Globais
                       </h4>
                       <p className="text-xs text-zinc-500 font-light leading-relaxed">
@@ -3597,19 +3607,25 @@ export default function App() {
                                   <td className="px-4 py-4 text-right font-mono">
                                     <div className="inline-flex items-center justify-end">
                                       <span className="text-zinc-500 text-xs mr-px">R$</span>
-                                      <input
+                                      <input aria-label={`Valor do registro ${d.document || d.client}`}
                                         type="text"
                                         inputMode="decimal"
                                         value={editingValueDebtorId === d.id
-                                          ? String(d.value)
+                                          ? editingValueText
                                           : d.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        onFocus={() => setEditingValueDebtorId(d.id)}
+                                        onFocus={() => { setEditingValueDebtorId(d.id); setEditingValueText(d.value.toLocaleString("pt-BR", { useGrouping: false, minimumFractionDigits: 2, maximumFractionDigits: 2 })); }}
                                         onChange={(e) => {
-                                          const raw = e.target.value.replace(/[^\d,]/g, "").replace(",", ".");
-                                          const num = parseFloat(raw);
-                                          updateDebtorFieldLocal(d.id, "value", isNaN(num) ? 0 : num);
+                                          setEditingValueText(e.target.value);
                                         }}
-                                        onBlur={() => { setEditingValueDebtorId(null); saveDebtorFieldToDB(d.id); }}
+                                        onBlur={() => {
+                                          setEditingValueDebtorId(null);
+                                          const amount = parseManualAmount(editingValueText);
+                                          if (Number.isNaN(amount)) {
+                                            setDebtorSaveError("Valor não salvo: use um valor positivo no formato 1.250,00.");
+                                            return;
+                                          }
+                                          void saveDebtorFieldToDB(d.id, amount);
+                                        }}
                                         onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
                                         className="w-24 text-right bg-transparent focus:bg-zinc-950 rounded p-1 font-mono text-xs"
                                       />

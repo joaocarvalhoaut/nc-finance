@@ -56,3 +56,8 @@ O pdfjs-dist instalado exige Node >=22.13. O CI anterior usava Node 20; atualiza
 - Corrigido parse de 1.250,00 no cadastro manual: antes parseFloat produzia 1.25; agora grava 1250. Formato brasileiro validado estritamente.
 - Cadastro válido e edição do nome executados pela interface e conferidos no banco local. Conta fictícia removida ao terminar. Testes de datas e valores adicionados ao CI.
 - Isso não encerra a revisão de todos os formulários, recuperação de senha, cadastro de conta ou integrações.
+
+## Edição de valores na carteira
+- Texto digitado separado do valor persistido; centavos não são reinterpretados a cada tecla. Formato brasileiro validado ao sair do campo, passando o valor explicitamente à gravação.
+- Nome acessível no campo de valor; aviso visível para valor/data inválidos e falhas de gravação.
+- TypeScript e testes de datas/valores passaram. Fluxo interativo desta alteração ainda requer teste no navegador.
