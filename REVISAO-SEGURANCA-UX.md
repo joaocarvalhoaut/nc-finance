@@ -49,3 +49,10 @@ O pdfjs-dist instalado exige Node >=22.13. O CI anterior usava Node 20; atualiza
 - Importação e carteira inspecionadas em viewport 390x844; tabela com rolagem horizontal. Menu abriu com Enter. Rótulos do login aparecem na árvore de acessibilidade; outros campos internos ainda sem nomes acessíveis.
 - Conta fictícia e registro financeiro removidos ao encerrar. Não houve cobrança, alteração de produção ou teste real de Stripe/WhatsApp.
 - Ainda pendentes: revisão de todas as ações/formulários, acessibilidade dos campos internos, demais telas mobile, fluxos de recuperação/cadastro e integrações em staging.
+
+## Cadastro manual e acessibilidade — validação local
+- Rótulos da carteira, cadastro manual e senha confirmados na árvore de acessibilidade. Cadastro vazio bloqueado pelo navegador.
+- Data impossível antes chegava ao banco; agora é recusada antes do envio com mensagem em português.
+- Corrigido parse de 1.250,00 no cadastro manual: antes parseFloat produzia 1.25; agora grava 1250. Formato brasileiro validado estritamente.
+- Cadastro válido e edição do nome executados pela interface e conferidos no banco local. Conta fictícia removida ao terminar. Testes de datas e valores adicionados ao CI.
+- Isso não encerra a revisão de todos os formulários, recuperação de senha, cadastro de conta ou integrações.

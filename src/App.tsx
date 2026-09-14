@@ -1,3 +1,4 @@
+import { isValidDueDate, parseManualAmount } from "./utils/manualDebtorValidation";
 import React, { useState, useEffect, useMemo, lazy } from "react";
 import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
@@ -1474,9 +1475,13 @@ export default function App() {
   const handleAddDebtorManually = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentOwnerUserId) return;
-    const val = parseFloat(addDebtorForm.value.replace(",", "."));
+    const val = parseManualAmount(addDebtorForm.value);
     if (!addDebtorForm.client.trim() || !addDebtorForm.dueDate.trim() || isNaN(val) || val <= 0) {
       setAddDebtorError("Preencha ao menos: Nome, Vencimento e Valor.");
+      return;
+    }
+    if (!isValidDueDate(addDebtorForm.dueDate)) {
+      setAddDebtorError("Informe um vencimento válido no formato DD/MM/AAAA.");
       return;
     }
     setAddDebtorSaving(true);

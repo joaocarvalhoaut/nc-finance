@@ -69,6 +69,9 @@ jobs:
       - name: Isolated PostgreSQL regression tests
         run: npm run test:local-db
 
+      - name: Form validation tests
+        run: npm run test:forms
+
       - name: Build
         run: npm run build
 
