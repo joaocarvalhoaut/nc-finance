@@ -1173,8 +1173,10 @@ export default function LandingPage({
             <form onSubmit={handleAuthenticationSubmit} className="space-y-4">
               {isRegisterMode && (
                 <div>
-                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Nome Completo</label>
+                  <label htmlFor="auth-name" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Nome Completo</label>
                   <input
+                    id="auth-name"
+                    autoComplete="name"
                     type="text"
                     required
                     value={authName}
@@ -1189,8 +1191,10 @@ export default function LandingPage({
               )}
 
               <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">E-mail Corporativo</label>
+                <label htmlFor="auth-email" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">E-mail Corporativo</label>
                 <input
+                  id="auth-email"
+                  autoComplete="email"
                   type="email"
                   required
                   value={authEmail}
@@ -1205,8 +1209,10 @@ export default function LandingPage({
 
               {!isForgotMode && (
                 <div>
-                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Senha de Acesso</label>
+                  <label htmlFor="auth-password" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Senha de Acesso</label>
                   <PasswordInput
+                    id="auth-password"
+                    autoComplete={isRegisterMode ? "new-password" : "current-password"}
                     required={!isForgotMode}
                     value={authPassword}
                     onChange={(e) => {
@@ -1238,8 +1244,9 @@ export default function LandingPage({
                 <>
                   {/* CPF */}
                   <div>
-                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">CPF</label>
+                    <label htmlFor="auth-cpf" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">CPF</label>
                     <input
+                      id="auth-cpf"
                       type="text"
                       required
                       value={authCPF}
@@ -1262,8 +1269,10 @@ export default function LandingPage({
 
                   {/* Telefone */}
                   <div>
-                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Telefone / WhatsApp</label>
+                    <label htmlFor="auth-phone" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Telefone / WhatsApp</label>
                     <input
+                      id="auth-phone"
+                      autoComplete="tel"
                       type="text"
                       required
                       value={authPhone}
@@ -1276,10 +1285,12 @@ export default function LandingPage({
                   {/* CEP + endereço */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">
+                      <label htmlFor="auth-cep" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">
                         CEP {cepLoading && <span className="text-emerald-400 font-normal normal-case">buscando...</span>}
                       </label>
                       <input
+                        id="auth-cep"
+                        autoComplete="postal-code"
                         type="text"
                         required
                         value={authCEP}
@@ -1289,8 +1300,10 @@ export default function LandingPage({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Estado</label>
+                      <label htmlFor="auth-state" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Estado</label>
                       <input
+                        id="auth-state"
+                        autoComplete="address-level1"
                         type="text"
                         value={authState}
                         onChange={(e) => setAuthState(e.target.value.toUpperCase().slice(0,2))}
@@ -1301,8 +1314,10 @@ export default function LandingPage({
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Endereço</label>
+                    <label htmlFor="auth-address" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Endereço</label>
                     <input
+                      id="auth-address"
+                      autoComplete="street-address"
                       type="text"
                       required
                       value={authAddress}
@@ -1312,8 +1327,10 @@ export default function LandingPage({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Cidade</label>
+                    <label htmlFor="auth-city" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Cidade</label>
                     <input
+                      id="auth-city"
+                      autoComplete="address-level2"
                       type="text"
                       required
                       value={authCity}
