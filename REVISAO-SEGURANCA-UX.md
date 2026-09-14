@@ -41,3 +41,11 @@ O pdfjs-dist instalado exige Node >=22.13. O CI anterior usava Node 20; atualiza
 - Quatro RPCs SECURITY DEFINER herdavam execução por anon/authenticated no schema local. A migration 20260912120000 restringe execução a service_role. Não foi aplicada em produção.
 - Teste transacional verifica a negação aos clientes e executa as quatro operações como service_role, conferindo seus resultados antes do rollback.
 - Frontend isolado disponível via `npm run lab:dev`; HTTP confirmou bloqueio 403 de `.env`, `.local`, `.git` e caminho codificado. CSP restringe conexões ao laboratório. Revisão autenticada completa ainda pendente.
+
+## Teste autenticado de interface — 14/09/2026
+- Sessão antiga apresentou JWT issued at future após retomada; logout/login local resolveu. Causa exata não determinada.
+- Carteira, configurações, automações, cobranças, preparação e histórico abriram com a conta fictícia. Integrações Edge desativadas; canal indisponível esperado.
+- Texto livre de quatro linhas foi recusado com mensagem. Texto tabular com cabeçalho gerou um registro revisável e foi salvo pela interface; leitura no banco confirmou R$ 100,00. Isso não valida todos os formatos anunciados.
+- Importação e carteira inspecionadas em viewport 390x844; tabela com rolagem horizontal. Menu abriu com Enter. Rótulos do login aparecem na árvore de acessibilidade; outros campos internos ainda sem nomes acessíveis.
+- Conta fictícia e registro financeiro removidos ao encerrar. Não houve cobrança, alteração de produção ou teste real de Stripe/WhatsApp.
+- Ainda pendentes: revisão de todas as ações/formulários, acessibilidade dos campos internos, demais telas mobile, fluxos de recuperação/cadastro e integrações em staging.
