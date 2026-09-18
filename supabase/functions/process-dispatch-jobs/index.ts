@@ -1,4 +1,4 @@
-import { automationTime, nextAutomationStart } from "../_shared/automationClock.ts";
+import { deferredAutomationStart } from "../_shared/automationClock.ts";
 import { reserveChargeSend } from "../_shared/sendReservation.ts";
 /**
  * process-dispatch-jobs — worker que processa a fila de jobs de disparo.
@@ -175,12 +175,11 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
 
       if (r?.send_window_start && r?.send_window_end) {
         const now = new Date();
-        const hhmm = automationTime(now);
         const start = String(r.send_window_start).slice(0, 5);
         const end   = String(r.send_window_end).slice(0, 5);
-        if (hhmm < start || hhmm > end) {
+        const nextWindow = deferredAutomationStart(start, end, now);
+        if (nextWindow) {
           // Fora da janela: recoloca em queued com próximo scheduled_for no início da janela
-          const nextWindow = nextAutomationStart(start, now);
           await admin
             .from("user_dispatch_jobs")
             .update({ status: "queued", scheduled_for: nextWindow.toISOString(), updated_at: new Date().toISOString() })

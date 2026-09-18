@@ -78,3 +78,8 @@ O pdfjs-dist instalado exige Node >=22.13. O CI anterior usava Node 20; atualiza
 - Testes de início futuro/passado, meia-noite UTC e virada do ano passaram, junto com TypeScript e regressões de segurança/compilação das funções.
 - Antes do deploy, revisar regras existentes: valores podem ter sido ajustados por operadores para compensar a interpretação anterior em UTC. Publicar scheduler e processador na mesma etapa controlada, com fila e regras revisadas. Não houve deploy nem alteração dos horários no banco.
 - Offset fixo segue contrato atual da aplicação; mudanças futuras de política de fuso exigem revisão. Testes reais do scheduler/provedor e demais datas de negócio seguem pendentes.
+
+## Decisão de reagendamento — 18/09/2026
+- Função de decisão usada pelo worker testada antes, durante e após a janela, incluindo formato SQL HH:MM:SS, fim inclusivo por minuto e madrugada UTC. Próximo início calculado é aceito pela mesma função.
+- TypeScript e regressões de segurança/compilação passaram. Teste é de lógica local; não comprova envio real nem execução completa da fila.
+- Auditoria somente leitura preparada em supabase/tests/automation-window-audit.sql, com horários das regras e resumo dos jobs pendentes. Ainda não executada na nuvem; acesso autenticado continua necessário.

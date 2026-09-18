@@ -17,3 +17,10 @@ export function scheduledAutomationStart(time: string | null, now: Date): string
   const start = automationStart(time, now);
   return (start < now ? now : start).toISOString();
 }
+
+/** Retorna o próximo início se estiver fora da janela; fim inclusivo por minuto. */
+export function deferredAutomationStart(start: string, end: string, now: Date): Date | null {
+  const current = automationTime(now);
+  return current < start.slice(0, 5) || current > end.slice(0, 5)
+    ? nextAutomationStart(start, now) : null;
+}
