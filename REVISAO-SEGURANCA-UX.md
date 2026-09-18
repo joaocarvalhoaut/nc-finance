@@ -67,3 +67,8 @@ O pdfjs-dist instalado exige Node >=22.13. O CI anterior usava Node 20; atualiza
 - Texto abc recusado com alerta em português; valor persistido permaneceu 1234.56. Conta fictícia removida ao terminar.
 - Ambiente recuperou PostgreSQL após desligamento incompleto. Erro JWT issued at future deixou de ocorrer após reiniciar somente REST local e atualizar assinatura. Não alteradas validações de segurança.
 - CI de 43e78c0 aprovado. Permanecem pendentes outros formulários e integrações, conforme seções anteriores.
+
+## Criação de automações — 18/09/2026
+- Validação no serviço frontend antes do insert: nome obrigatório, dias inteiros não negativos, limite inteiro de 1 a 500 e janela completa com início anterior ao fim. Sem janela continua permitido.
+- TypeScript e testes de formulários passaram. Não modifica regras existentes nem substitui validação no backend/RLS. Teste interativo do formulário ainda pendente.
+- Atenção antes da publicação: process-dispatch-jobs compara send_window_start/end em UTC; conferir consistência com horário exibido e scheduler em ambiente de teste. Nenhum envio real executado.

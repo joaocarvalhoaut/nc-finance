@@ -22,7 +22,7 @@
     "test:local-auth": "node tests/local-auth.test.mjs",
     "lab:prepare": "node tools/local-lab/prepare.mjs",
     "lab:dev": "node tools/local-lab/serve.mjs",
-    "test:forms": "tsx tests/manual-debtor.test.ts"
+    "test:forms": "tsx tests/manual-debtor.test.ts && tsx tests/automation-validation.test.ts"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
