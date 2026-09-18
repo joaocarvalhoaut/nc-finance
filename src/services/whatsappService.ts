@@ -55,7 +55,7 @@ export interface SendChargeResult {
 // ─── Mensagens amigáveis por status ──────────────────────────────────────────
 
 export const SEND_STATUS_LABELS: Record<SendChargeStatus, string> = {
-  sucesso:               "Mensagem enviada com sucesso via WhatsApp!",
+  sucesso:               "Mensagem aceita pelo provedor. Confira a entrega no histórico.",
   erro:                  "Falha temporária ao enviar. Tente novamente.",
   bloqueado_limite:      "Limite mensal de envios atingido. Faça upgrade do seu plano.",
   bloqueado_assinatura:  "Assinatura necessária. Verifique seu plano.",

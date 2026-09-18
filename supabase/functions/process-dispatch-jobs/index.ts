@@ -1,3 +1,5 @@
+import { deferredAutomationStart } from "../_shared/automationClock.ts";
+import { reserveChargeSend } from "../_shared/sendReservation.ts";
 /**
  * process-dispatch-jobs — worker que processa a fila de jobs de disparo.
  *
@@ -173,15 +175,11 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
 
       if (r?.send_window_start && r?.send_window_end) {
         const now = new Date();
-        const hhmm = `${String(now.getUTCHours()).padStart(2, "0")}:${String(now.getUTCMinutes()).padStart(2, "0")}`;
         const start = String(r.send_window_start).slice(0, 5);
         const end   = String(r.send_window_end).slice(0, 5);
-        if (hhmm < start || hhmm > end) {
+        const nextWindow = deferredAutomationStart(start, end, now);
+        if (nextWindow) {
           // Fora da janela: recoloca em queued com próximo scheduled_for no início da janela
-          const [sh, sm] = start.split(":").map(Number);
-          const nextWindow = new Date();
-          nextWindow.setUTCHours(sh, sm ?? 0, 0, 0);
-          if (nextWindow <= new Date()) nextWindow.setUTCDate(nextWindow.getUTCDate() + 1);
           await admin
             .from("user_dispatch_jobs")
             .update({ status: "queued", scheduled_for: nextWindow.toISOString(), updated_at: new Date().toISOString() })
@@ -262,10 +260,10 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
         phone: rawPhone || "sem_telefone",
         amount, tone, message: "N/A",
         status: "telefone_invalido", type: "lote", provider: PROVIDER,
-        errorMessage: `Tel invalido: "${rawPhone}"`, debtorId,
+        errorMessage: "Telefone inválido.", debtorId,
       });
       await markJob("failed", {
-        last_error: `Telefone invalido: ${rawPhone}`,
+        last_error: "Telefone inválido.",
         provider_message_id: logId,
         attempts: attempts + 1,
       });
@@ -282,8 +280,7 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     if (driveFileUrl) {
       const shortPdfUrl = await shortenUrl(driveFileUrl);
       message = `${message}\n\n📎 Boleto: ${shortPdfUrl}`;
-      console.log(`[dispatch] PDF link appended for debtorId=${debtorId} url=${shortPdfUrl}`);
-    }
+          }
 
     // ── 9. Idempotência (5 min) ───────────────────────────────────────────
     const today = new Date().toISOString().slice(0, 10);
@@ -306,6 +303,7 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     }
 
     // ── 10. Envia via Z-API (credenciais de platform_integrations) ───────────
+    if (!(await reserveChargeSend(admin, userId, idemHash))) throw new Error("Envio reservado em outra execução. Aguardando nova tentativa.");
     const zapiResult = await sendTextMessage({
       instanceId:  zapiCreds.instanceId,
       token:       zapiCreds.token,

@@ -36,48 +36,39 @@ export default function Sidebar({
   userEmail = ""
 }: SidebarProps) {
   const [isPinned, setIsPinned] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
 
   // ── Menu definition ────────────────────────────────────────────────────────
   // "cobrar" = fluxo simplificado para o cliente (Upload → Prévia → Envio)
   // Demais tabs = pipeline operacional interno completo
   const menuItems = isLoggedIn ? [
-    { id: "cobrar",      label: "Cobrar",       icon: SendHorizontal, section: "client" },
-    { id: "separator1",  label: "",             icon: null,            section: "divider" },
-    { id: "dashboard",   label: "Dashboard",    icon: LayoutDashboard, section: "internal" },
-    { id: "importar",    label: "Importar",     icon: Upload,          section: "internal" },
-    { id: "visao_geral", label: "Visão Geral",  icon: Eye,             section: "internal" },
-    { id: "cobranca",    label: "Cobrança",     icon: MessageSquare,   section: "internal" },
-    { id: "historico",   label: "Histórico",    icon: History,         section: "internal" },
-    { id: "automacoes",  label: "Automações",   icon: Zap,             section: "internal" },
-    { id: "separator2",  label: "",             icon: null,            section: "divider" },
-    { id: "minha_conta", label: "Minha Conta",  icon: UserCog,         section: "internal" },
-  ] : [
-    { id: "inicio", label: "Apresentação", icon: Info, section: "public" }
-  ];
+    { id: "dashboard", label: "Resumo", icon: LayoutDashboard, section: "internal" },
+    { id: "visao_geral", label: "Carteira", icon: Eye, section: "internal" },
+    ...(["visao_geral", "importar"].includes(currentTab) ? [
+      { id: "importar", label: "Importar carteira", icon: Upload, section: "subitem" },
+    ] : []),
+    { id: "cobrar", label: "Cobranças", icon: SendHorizontal, section: "client" },
+    ...(["cobrar", "cobranca", "historico"].includes(currentTab) ? [
+      { id: "cobranca", label: "Preparar envios", icon: MessageSquare, section: "subitem" },
+      { id: "historico", label: "Histórico de envios", icon: History, section: "subitem" },
+    ] : []),
+    { id: "automacoes", label: "Automações", icon: Zap, section: "internal" },
+    { id: "minha_conta", label: "Configurações", icon: UserCog, section: "internal" },
+  ] : [{ id: "inicio", label: "Apresentação", icon: Info, section: "public" }];
 
   const handleItemClick = (id: string) => {
     if (id.startsWith("separator")) return;
     onTabChange(id);
   };
 
-  const isExpanded = isPinned || isHovered;
+  const isExpanded = isPinned;
 
   return (
     <>
-      {/* Edge hover trigger */}
-      <div
-        className="fixed top-0 left-0 h-full w-3 z-50 bg-gradient-to-r from-emerald-500/20 to-transparent cursor-pointer transition-opacity duration-300 md:block hidden"
-        onMouseEnter={() => setIsHovered(true)}
-      />
-
       {/* Main Container */}
       <aside
         id="sidebar"
         className={`fixed top-0 left-0 h-full z-40 bg-zinc-950 border-r border-emerald-500/20 text-white flex flex-col justify-between shadow-[4px_0_24px_rgba(0,0,0,0.8)] transition-all duration-300`}
         style={{ width: isExpanded ? "240px" : "56px" }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
       >
         {/* Brand */}
         <div className="flex flex-col min-h-0 overflow-y-auto">
@@ -91,8 +82,9 @@ export default function Sidebar({
             </div>
           </div>
 
+          <button type="button" aria-expanded={isExpanded} aria-controls="nc-navigation" aria-label={isExpanded ? "Recolher menu" : "Expandir menu"} onClick={() => setIsPinned(!isPinned)} className="min-h-11 m-1 border border-zinc-700 rounded text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">{isExpanded ? "Recolher menu" : "☰"}</button>
           {/* Navigation */}
-          <nav className="p-2.5 space-y-1 flex-1">
+          <nav id="nc-navigation" aria-label="Navegação principal" className="p-2.5 space-y-1 flex-1">
             {menuItems.map((item) => {
               // Divider
               if (item.section === "divider") {
@@ -108,6 +100,8 @@ export default function Sidebar({
               return (
                 <button
                   key={item.id}
+                  aria-label={item.label}
+                  aria-current={isActive ? "page" : undefined}
                   onClick={() => handleItemClick(item.id)}
                   className={`w-full flex items-center rounded-xl transition-all duration-250 cursor-pointer group relative
                     ${isExpanded ? "justify-start gap-3.5 p-3" : "justify-center px-2 py-3"}
@@ -158,6 +152,7 @@ export default function Sidebar({
                 </div>
               )}
               <button
+                aria-label="Suporte"
                 onClick={onSupportClick}
                 className={`w-full flex items-center rounded-lg text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all truncate cursor-pointer group relative
                   ${isExpanded ? "justify-start gap-3.5 p-2" : "justify-center p-2"}
@@ -177,6 +172,7 @@ export default function Sidebar({
               </button>
 
               <button
+                aria-label="Desconectar"
                 onClick={onLogout}
                 className={`w-full flex items-center rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-all truncate cursor-pointer
                   ${isExpanded ? "justify-start gap-3.5 p-2" : "justify-center p-2"}
@@ -192,6 +188,7 @@ export default function Sidebar({
             </div>
           ) : (
             <button
+              aria-label="Entrar"
               onClick={onLoginClick}
               className={`w-full flex items-center rounded-lg text-emerald-400 hover:text-black hover:bg-emerald-500 transition-all cursor-pointer
                 ${isExpanded ? "justify-start gap-3.5 p-2.5" : "justify-center p-1.5 py-2.5"}
@@ -209,10 +206,10 @@ export default function Sidebar({
       </aside>
 
       {/* Mobile overlay */}
-      {isExpanded && !isPinned && (
+      {isExpanded && (
         <div
           className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-30 transition-opacity md:hidden"
-          onClick={() => setIsHovered(false)}
+          onClick={() => setIsPinned(false)}
         />
       )}
     </>

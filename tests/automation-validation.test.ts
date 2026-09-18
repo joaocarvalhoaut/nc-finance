@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { validateNewAutomationRule as validate } from '../src/utils/automationValidation';
+const base = {name:'Teste',ruleType:'overdue' as const};
+assert.equal(validate(base),null);
+assert.equal(validate({...base,sendWindowStart:'08:00',sendWindowEnd:'18:00',maxDailySends:500}),null);
+for(const window of [{sendWindowStart:'08:00'},{sendWindowEnd:'18:00'},{sendWindowStart:'18:00',sendWindowEnd:'08:00'},{sendWindowStart:'08:00',sendWindowEnd:'08:00'},{sendWindowStart:'25:00',sendWindowEnd:'26:00'}]) assert.ok(validate({...base,...window}));
+for(const maxDailySends of [0,-1,1.5,501,NaN,Infinity]) assert.ok(validate({...base,maxDailySends}));
+for(const daysBefore of [-1,1.5,NaN,null]) assert.ok(validate({...base,ruleType:'due_in_days',daysBefore}));
+assert.equal(validate({...base,ruleType:'due_in_days',daysBefore:0}),null);
+assert.ok(validate({...base,name:' '}));
+console.log('PASS: criação de regras recusa janelas incompletas e limites inválidos.');

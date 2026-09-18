@@ -20,3 +20,6 @@ hardening-report.json
 
 # Skills de design instaladas via 'skills add' (ferramenta de dev, não é código do app)
 .agents/
+
+# Ambiente de teste gerado, nunca publicar
+.local/

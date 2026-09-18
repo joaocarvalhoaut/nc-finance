@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { isValidDueDate, parseManualAmount } from "./utils/manualDebtorValidation";
+import React, { useState, useEffect, useMemo, lazy } from "react";
 import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
 import CountUp from "./components/CountUp";
-import MinhaConta from "./components/MinhaConta";
+const MinhaConta = lazy(() => import("./components/MinhaConta"));
 import PasswordInput from "./components/PasswordInput";
 import BoletoResponsibilityModal from "./components/BoletoResponsibilityModal";
-import DeleteAccountModal from "./components/DeleteAccountModal";
+const DeleteAccountModal = lazy(() => import("./components/DeleteAccountModal"));
 import { addOptOuts } from "./services/optOutService";
 import LandingPage from "./components/LandingPage";
 import SubscriptionGate from "./components/SubscriptionGate";
 import SubscriptionStatusCard from "./components/SubscriptionStatusCard";
-import ClientDashboard from "./components/ClientDashboard";
+const ClientDashboard = lazy(() => import("./components/ClientDashboard"));
 import { PLAN_LIST, getPlanDefinition } from "./config/plans";
 import { useAccount } from "./hooks/useAccount";
 import { useSubscription } from "./hooks/useSubscription";
@@ -32,7 +33,7 @@ import { metricsService, type OperationalMetrics } from "./services/metricsServi
 import { parseImportFile } from "./utils/importFileParser";
 import { extractDocumentLocally, type LocalExtractionResult } from "./services/localDocumentExtraction";
 import { exportRelatorio } from "./services/exportRelatorio";
-import Suporte from "./components/Suporte";
+const Suporte = lazy(() => import("./components/Suporte"));
 import { PdfPreviewModal, openPdfPreview } from "./components/PdfPreviewModal";
 import DriveHelpPopover from "./components/DriveHelpPopover";
 import { 
@@ -298,6 +299,8 @@ export default function App() {
   const [editingPhoneValue, setEditingPhoneValue] = useState<string>("");
   // Inline value editing — tracks which row's Valor Base is being typed
   const [editingValueDebtorId, setEditingValueDebtorId] = useState<string | null>(null);
+  const [editingValueText, setEditingValueText] = useState("");
+  const [debtorSaveError, setDebtorSaveError] = useState("");
 
   // PDF attachment in Cobrança tab
   const [uploadingPdfDebtorId, setUploadingPdfDebtorId] = useState<string | null>(null);
@@ -1274,9 +1277,15 @@ export default function App() {
   };
 
   // ── Persist to DB (called on onBlur) ─────────────────────────────────────────
-  const saveDebtorFieldToDB = async (id: string) => {
-    const currentDebtor = debtors.find((debtor) => debtor.id === id);
+  const saveDebtorFieldToDB = async (id: string, amount?: number) => {
+    const existing = debtors.find((debtor) => debtor.id === id);
+    const currentDebtor = existing && amount !== undefined ? { ...existing, value: amount } : existing;
     if (!currentDebtor || !currentOwnerUserId) return;
+    if (!isValidDueDate(currentDebtor.dueDate)) {
+      setDebtorSaveError("Alteração não salva: informe um vencimento válido no formato DD/MM/AAAA.");
+      return;
+    }
+    setDebtorSaveError("");
     try {
       const savedDebtor = await financeService.update(currentOwnerUserId, currentDebtor);
       setDebtors((prev) => prev.map((debtor) => (debtor.id === id ? savedDebtor : debtor)));
@@ -1284,6 +1293,7 @@ export default function App() {
         setSelectedDebtorForMessage(savedDebtor);
       }
     } catch (error) {
+      setDebtorSaveError("Não foi possível salvar a alteração. Confira sua conexão e tente novamente.");
       console.error('[workspace]', error instanceof Error ? error.message : 'Falha ao salvar alteração do devedor.');
     }
   };
@@ -1474,9 +1484,13 @@ export default function App() {
   const handleAddDebtorManually = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentOwnerUserId) return;
-    const val = parseFloat(addDebtorForm.value.replace(",", "."));
+    const val = parseManualAmount(addDebtorForm.value);
     if (!addDebtorForm.client.trim() || !addDebtorForm.dueDate.trim() || isNaN(val) || val <= 0) {
       setAddDebtorError("Preencha ao menos: Nome, Vencimento e Valor.");
+      return;
+    }
+    if (!isValidDueDate(addDebtorForm.dueDate)) {
+      setAddDebtorError("Informe um vencimento válido no formato DD/MM/AAAA.");
       return;
     }
     setAddDebtorSaving(true);
@@ -1990,7 +2004,7 @@ export default function App() {
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1.5">Nova senha</label>
-                <PasswordInput
+                <PasswordInput aria-label="Nova senha"
                   value={newPwd}
                   onChange={(e) => { setNewPwd(e.target.value); setNewPwdError(""); }}
                   className="w-full rounded-xl border border-zinc-800 bg-zinc-900/80 px-4 py-3 text-sm text-white focus:border-emerald-500 focus:outline-none font-mono"
@@ -2000,7 +2014,7 @@ export default function App() {
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1.5">Confirmar senha</label>
-                <PasswordInput
+                <PasswordInput aria-label="Confirmar senha"
                   value={newPwdConfirm}
                   onChange={(e) => { setNewPwdConfirm(e.target.value); setNewPwdError(""); }}
                   className="w-full rounded-xl border border-zinc-800 bg-zinc-900/80 px-4 py-3 text-sm text-white focus:border-emerald-500 focus:outline-none font-mono"
@@ -2713,7 +2727,7 @@ export default function App() {
 
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block">Dados textuais para OCR / Extração:</label>
-                        <textarea
+                        <textarea aria-label="Dados textuais para OCR / Extração:"
                           rows={6}
                           value={importText}
                           onChange={(e) => setImportText(e.target.value)}
@@ -2868,7 +2882,7 @@ export default function App() {
                                 <div className="text-xs pt-5">
                                   <div>
                                     <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Cliente</label>
-                                    <input
+                                    <input aria-label="Cliente"
                                       type="text"
                                       value={item.client}
                                       onChange={(e) => updateExtractedField(item.id, "client", e.target.value)}
@@ -2880,7 +2894,7 @@ export default function App() {
                                 <div className="grid grid-cols-4 gap-2 text-[11px]">
                                   <div>
                                     <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Documento</label>
-                                    <input
+                                    <input aria-label="Documento"
                                       type="text"
                                       value={item.document}
                                       onChange={(e) => updateExtractedField(item.id, "document", e.target.value)}
@@ -2889,7 +2903,7 @@ export default function App() {
                                   </div>
                                   <div>
                                     <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Vencimento</label>
-                                    <input
+                                    <input aria-label="Vencimento"
                                       type="text"
                                       value={item.dueDate}
                                       onChange={(e) => updateExtractedField(item.id, "dueDate", e.target.value)}
@@ -2898,7 +2912,7 @@ export default function App() {
                                   </div>
                                   <div>
                                     <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Valor (R$)</label>
-                                    <input
+                                    <input aria-label="Valor (R$)"
                                       type="number"
                                       value={item.value}
                                       onChange={(e) => updateExtractedField(item.id, "value", Number(e.target.value))}
@@ -2907,7 +2921,7 @@ export default function App() {
                                   </div>
                                   <div>
                                     <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Celular (WhatsApp)</label>
-                                    <input
+                                    <input aria-label="Celular (WhatsApp)"
                                       type="text"
                                       value={item.phone}
                                       onChange={(e) => updateExtractedField(item.id, "phone", e.target.value)}
@@ -2916,7 +2930,7 @@ export default function App() {
                                   </div>
                                   <div>
                                     <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Banco</label>
-                                    <input
+                                    <input aria-label="Banco"
                                       type="text"
                                       value={item.bank || ""}
                                       onChange={(e) => updateExtractedField(item.id, "bank", e.target.value)}
@@ -3006,7 +3020,8 @@ export default function App() {
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     
                     <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-md">
-                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      {debtorSaveError && <p role="alert" className="text-sm text-rose-400 mb-3">{debtorSaveError}</p>}
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
                         <Percent className="w-4 h-4 text-emerald-400" /> Parâmetros de Encargos Globais
                       </h4>
                       <p className="text-xs text-zinc-500 font-light leading-relaxed">
@@ -3017,7 +3032,7 @@ export default function App() {
                         <div className="space-y-1.5">
                           <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Multa Geral (%)</label>
                           <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-900 p-2 rounded-xl">
-                            <input
+                            <input aria-label="Multa Geral (%)"
                               type="text"
                               inputMode="decimal"
                               value={globalFinePctStr}
@@ -3037,7 +3052,7 @@ export default function App() {
                         <div className="space-y-1.5">
                           <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Juros / Dia (%)</label>
                           <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-900 p-2 rounded-xl">
-                            <input
+                            <input aria-label="Juros / Dia (%)"
                               type="text"
                               inputMode="decimal"
                               value={globalInterestDayPctStr}
@@ -3070,7 +3085,7 @@ export default function App() {
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <label className="text-[11px] text-zinc-400">Nome</label>
-                            <input
+                            <input aria-label="Nome"
                               type="text"
                               required
                               value={newRepName}
@@ -3081,7 +3096,7 @@ export default function App() {
                           </div>
                           <div className="space-y-1">
                             <label className="text-[11px] text-zinc-400">Telefone</label>
-                            <input
+                            <input aria-label="Telefone"
                               type="text"
                               value={newRepPhone}
                               onChange={(e) => setNewRepPhone(e.target.value)}
@@ -3093,7 +3108,7 @@ export default function App() {
                         <div className="grid grid-cols-2 gap-3 items-end">
                           <div className="space-y-1">
                             <label className="text-[11px] text-zinc-400">Papel / Cargo</label>
-                            <input
+                            <input aria-label="Papel / Cargo"
                               type="text"
                               value={newRepRole}
                               onChange={(e) => setNewRepRole(e.target.value)}
@@ -3117,7 +3132,7 @@ export default function App() {
                   <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-900 flex flex-wrap gap-4 items-center justify-between">
                     <div className="flex items-center gap-2 bg-zinc-950 p-2 rounded-xl border border-zinc-800 flex-1 min-w-[200px] max-w-sm">
                       <Search className="w-4 h-4 text-zinc-500" />
-                      <input
+                      <input aria-label="Filtrar por nome do cliente ou documento"
                         type="text"
                         value={searchFilter}
                         onChange={(e) => setSearchFilter(e.target.value)}
@@ -3538,7 +3553,7 @@ export default function App() {
                                     </button>
                                   </td>
                                   <td className={`px-5 py-4 font-bold text-white min-w-[160px] sticky left-8 z-[5] ${selectedDebtorIds.has(d.id) ? "bg-emerald-950/60" : "bg-zinc-950"} backdrop-blur-sm shadow-[2px_0_8px_rgba(0,0,0,0.4)]`}>
-                                    <input
+                                    <input aria-label={`Cliente do registro ${d.document || d.client}`}
                                       type="text"
                                       value={d.client}
                                       onChange={(e) => updateDebtorFieldLocal(d.id, "client", e.target.value)}
@@ -3548,7 +3563,7 @@ export default function App() {
                                     />
                                   </td>
                                   <td className="px-4 py-4 text-center font-mono text-zinc-400">
-                                    <input
+                                    <input aria-label={`Documento do registro ${d.document || d.client}`}
                                       type="text"
                                       value={d.document}
                                       onChange={(e) => updateDebtorFieldLocal(d.id, "document", e.target.value)}
@@ -3558,7 +3573,7 @@ export default function App() {
                                     />
                                   </td>
                                   <td className="px-4 py-4 min-w-[90px]">
-                                    <input
+                                    <input aria-label={`Banco do registro ${d.document || d.client}`}
                                       type="text"
                                       value={d.bank || ""}
                                       onChange={(e) => updateDebtorFieldLocal(d.id, "bank", e.target.value)}
@@ -3569,7 +3584,7 @@ export default function App() {
                                     />
                                   </td>
                                   <td className="px-4 py-4 text-center font-mono">
-                                    <input
+                                    <input aria-label={`Vencimento do registro ${d.document || d.client}`}
                                       type="text"
                                       value={d.dueDate}
                                       onChange={(e) => updateDebtorFieldLocal(d.id, "dueDate", e.target.value)}
@@ -3579,7 +3594,7 @@ export default function App() {
                                     />
                                   </td>
                                   <td className="px-4 py-4 text-center font-mono">
-                                    <input
+                                    <input aria-label={`Telefone WhatsApp do registro ${d.document || d.client}`}
                                       type="text"
                                       value={d.phone || ""}
                                       onChange={(e) => updateDebtorFieldLocal(d.id, "phone", e.target.value)}
@@ -3592,19 +3607,25 @@ export default function App() {
                                   <td className="px-4 py-4 text-right font-mono">
                                     <div className="inline-flex items-center justify-end">
                                       <span className="text-zinc-500 text-xs mr-px">R$</span>
-                                      <input
+                                      <input aria-label={`Valor do registro ${d.document || d.client}`}
                                         type="text"
                                         inputMode="decimal"
                                         value={editingValueDebtorId === d.id
-                                          ? String(d.value)
+                                          ? editingValueText
                                           : d.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        onFocus={() => setEditingValueDebtorId(d.id)}
+                                        onFocus={() => { setEditingValueDebtorId(d.id); setEditingValueText(d.value.toLocaleString("pt-BR", { useGrouping: false, minimumFractionDigits: 2, maximumFractionDigits: 2 })); }}
                                         onChange={(e) => {
-                                          const raw = e.target.value.replace(/[^\d,]/g, "").replace(",", ".");
-                                          const num = parseFloat(raw);
-                                          updateDebtorFieldLocal(d.id, "value", isNaN(num) ? 0 : num);
+                                          setEditingValueText(e.target.value);
                                         }}
-                                        onBlur={() => { setEditingValueDebtorId(null); saveDebtorFieldToDB(d.id); }}
+                                        onBlur={() => {
+                                          setEditingValueDebtorId(null);
+                                          const amount = parseManualAmount(editingValueText);
+                                          if (Number.isNaN(amount)) {
+                                            setDebtorSaveError("Valor não salvo: use um valor positivo no formato 1.250,00.");
+                                            return;
+                                          }
+                                          void saveDebtorFieldToDB(d.id, amount);
+                                        }}
                                         onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
                                         className="w-24 text-right bg-transparent focus:bg-zinc-950 rounded p-1 font-mono text-xs"
                                       />
@@ -3788,7 +3809,7 @@ export default function App() {
                         <div className="space-y-3">
                           <div>
                             <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block mb-1">URL da Planilha *</label>
-                            <input
+                            <input aria-label="URL da Planilha *"
                               type="text"
                               value={exportSheetUrl}
                               onChange={(e) => { setExportSheetUrl(e.target.value); if (sheetsExportResult?.status === "payload_invalido") setSheetsExportResult(null); }}
@@ -3806,7 +3827,7 @@ export default function App() {
                           </div>
                           <div>
                             <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block mb-1">Nome da Aba</label>
-                            <input
+                            <input aria-label="Nome da Aba"
                               type="text"
                               value={exportSheetName}
                               onChange={(e) => setExportSheetName(e.target.value)}
@@ -3911,7 +3932,7 @@ export default function App() {
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Nome do Cliente *</label>
-                            <input
+                            <input aria-label="Nome do Cliente *"
                               type="text"
                               required
                               value={addDebtorForm.client}
@@ -3922,7 +3943,7 @@ export default function App() {
                           </div>
                           <div className="space-y-1">
                             <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Fornecedor / S.A.</label>
-                            <input
+                            <input aria-label="Fornecedor / S.A."
                               type="text"
                               value={addDebtorForm.supplier}
                               onChange={e => setAddDebtorForm(f => ({ ...f, supplier: e.target.value }))}
@@ -3936,7 +3957,7 @@ export default function App() {
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Nº Documento</label>
-                            <input
+                            <input aria-label="Nº Documento"
                               type="text"
                               value={addDebtorForm.document}
                               onChange={e => setAddDebtorForm(f => ({ ...f, document: e.target.value }))}
@@ -3946,7 +3967,7 @@ export default function App() {
                           </div>
                           <div className="space-y-1">
                             <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Vencimento * (DD/MM/AAAA)</label>
-                            <input
+                            <input aria-label="Vencimento * (DD/MM/AAAA)"
                               type="text"
                               required
                               value={addDebtorForm.dueDate}
@@ -3961,7 +3982,7 @@ export default function App() {
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Valor (R$) *</label>
-                            <input
+                            <input aria-label="Valor (R$) *"
                               type="text"
                               required
                               value={addDebtorForm.value}
@@ -3972,7 +3993,7 @@ export default function App() {
                           </div>
                           <div className="space-y-1">
                             <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Telefone WhatsApp</label>
-                            <input
+                            <input aria-label="Telefone WhatsApp"
                               type="text"
                               value={addDebtorForm.phone}
                               onChange={e => setAddDebtorForm(f => ({ ...f, phone: e.target.value }))}
@@ -4393,7 +4414,7 @@ export default function App() {
 
                           <div className="space-y-1.5 flex-1 flex flex-col">
                             <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block">Esboço Final da Mensagem (Editável):</label>
-                            <textarea
+                            <textarea aria-label="Esboço Final da Mensagem (Editável):"
                               rows={10}
                               value={customMessageDraft}
                               onChange={(e) => setCustomMessageDraft(e.target.value)}
@@ -4734,7 +4755,7 @@ export default function App() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="sm:col-span-2">
                           <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">Nome da Regra *</label>
-                          <input
+                          <input aria-label="Nome da Regra *"
                             type="text"
                             required
                             value={newRuleForm.name ?? ""}
@@ -4746,7 +4767,7 @@ export default function App() {
 
                         <div>
                           <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">Tipo de Regra *</label>
-                          <select
+                          <select aria-label="Tipo de Regra *"
                             value={newRuleForm.ruleType ?? "overdue"}
                             onChange={(e) => setNewRuleForm((p) => ({ ...p, ruleType: e.target.value as AutomationRuleCreate["ruleType"] }))}
                             className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
@@ -4760,7 +4781,7 @@ export default function App() {
                         {newRuleForm.ruleType === "due_in_days" && (
                           <div>
                             <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">Dias antes do vencimento</label>
-                            <input
+                            <input aria-label="Dias antes do vencimento"
                               type="number"
                               min={1}
                               max={30}
@@ -4773,7 +4794,7 @@ export default function App() {
 
                         <div>
                           <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">Tom da Mensagem</label>
-                          <select
+                          <select aria-label="Tom da Mensagem"
                             value={newRuleForm.messageTone ?? "neutro"}
                             onChange={(e) => {
                               const tone = e.target.value as AutomationRuleCreate["messageTone"];
@@ -4792,7 +4813,7 @@ export default function App() {
                           <>
                             <div>
                               <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
-                                Janela de Envio — Início <span className="text-purple-400">(Premium)</span>
+                                Janela de Envio — Início (UTC−3) <span className="text-purple-400">(Premium)</span>
                               </label>
                               <input
                                 type="time"
@@ -4803,7 +4824,7 @@ export default function App() {
                             </div>
                             <div>
                               <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
-                                Janela de Envio — Fim <span className="text-purple-400">(Premium)</span>
+                                Janela de Envio — Fim (UTC−3) <span className="text-purple-400">(Premium)</span>
                               </label>
                               <input
                                 type="time"
@@ -5020,7 +5041,7 @@ export default function App() {
                               <span>{rule.scheduleMode === "weekdays" ? "Seg–Sex" : "Todo dia"}</span>
                               {rule.skipHolidays && <span>Pula feriados</span>}
                               {rule.sendWindowStart && rule.sendWindowEnd && (
-                                <span>Janela: {rule.sendWindowStart}–{rule.sendWindowEnd}</span>
+                                <span>Janela (UTC−3): {rule.sendWindowStart}–{rule.sendWindowEnd}</span>
                               )}
                               {rule.maxDailySends != null && (
                                 <span>Limite: máx {rule.maxDailySends}/dia</span>
@@ -5322,7 +5343,7 @@ export default function App() {
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Nome *</label>
-                      <input
+                      <input aria-label="Nome *"
                         type="text"
                         value={repModalForm.name}
                         onChange={(e) => setRepModalForm((f) => ({ ...f, name: e.target.value }))}
@@ -5332,7 +5353,7 @@ export default function App() {
                     </div>
                     <div>
                       <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Cargo</label>
-                      <input
+                      <input aria-label="Cargo"
                         type="text"
                         value={repModalForm.role}
                         onChange={(e) => setRepModalForm((f) => ({ ...f, role: e.target.value }))}
@@ -5343,7 +5364,7 @@ export default function App() {
                   </div>
                   <div>
                     <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Telefone WhatsApp</label>
-                    <input
+                    <input aria-label="Telefone WhatsApp"
                       type="text"
                       value={repModalForm.phone}
                       onChange={(e) => setRepModalForm((f) => ({ ...f, phone: e.target.value }))}

@@ -21,6 +21,19 @@ jobs:
   quality-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: ncfinance_test
+          POSTGRES_PASSWORD: local-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ncfinance_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,7 +41,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -47,5 +60,23 @@ jobs:
         run: npm run test:shared
 
       # 3. Build — garante que o app realmente compila e empacota.
+      - name: Security regression tests
+        run: npm run test:security
+
+      - name: Real file import tests
+        run: npm run test:files
+
+      - name: Isolated PostgreSQL regression tests
+        run: npm run test:local-db
+
+      - name: Form validation tests
+        run: npm run test:forms
+
       - name: Build
         run: npm run build
+
+      - name: HTTP parser regression tests
+        run: node tests/http-parser.test.mjs
+
+      - name: Concurrent reservation tests (PostgreSQL)
+        run: node tests/postgres-concurrency.test.mjs

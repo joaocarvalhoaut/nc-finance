@@ -3,10 +3,8 @@
  * Rate limiting compartilhado para Edge Functions.
  *
  * Usa a função Postgres `check_rate_limit` (janela fixa atômica) — ver migration
- * 20260810211000_rate_limiting.sql. Projetado com política FAIL-OPEN: se o
- * limiter em si falhar (RPC ausente, erro de rede, timeout), a requisição é
- * PERMITIDA. Rate limit é uma proteção, não deve ser um ponto único de falha
- * capaz de derrubar o serviço inteiro.
+ * 20260810211000_rate_limiting.sql. Se o limitador falhar, a operação aguarda uma nova tentativa.
+ * Falhas de infraestrutura nunca autorizam consumo ilimitado.
  */
 
 export interface RateLimitResult {
@@ -36,14 +34,14 @@ export async function checkRateLimit(
       p_window_seconds: windowSeconds,
     });
     if (error) {
-      console.warn(`[rateLimit] fail-open (${key}): ${error.message}`);
-      return { allowed: true, retryAfter: 0 };
+      console.warn("[rateLimit] indisponível; operação temporariamente bloqueada.");
+      return { allowed: false, retryAfter: Math.max(1, windowSeconds) };
     }
     const allowed = data === true;
     return { allowed, retryAfter: allowed ? 0 : windowSeconds };
   } catch (e) {
-    console.warn(`[rateLimit] fail-open (${key}): ${e instanceof Error ? e.message : String(e)}`);
-    return { allowed: true, retryAfter: 0 };
+    console.warn("[rateLimit] indisponível; operação temporariamente bloqueada.");
+    return { allowed: false, retryAfter: Math.max(1, windowSeconds) };
   }
 }
 

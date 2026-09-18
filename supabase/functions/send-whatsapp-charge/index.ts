@@ -1,3 +1,4 @@
+import { reserveChargeSend } from "../_shared/sendReservation.ts";
 /**
  * send-whatsapp-charge — Edge Function segura para envio real via Z-API global.
  *
@@ -361,11 +362,11 @@ Deno.serve(async (request: Request) => {
       .gte("created_at", fiveMinutesAgo)
       .maybeSingle();
 
-    if (recentDuplicate) {
+    if (recentDuplicate || !(await reserveChargeSend(admin, userId, idempotencyHash))) {
       return errResponse(409, {
         error: "Envio duplicado detectado. Aguarde 5 minutos antes de reenviar a mesma mensagem.",
         status: "duplicado",
-        duplicateLogId: recentDuplicate.id,
+        duplicateLogId: recentDuplicate?.id ?? null,
       });
     }
 
@@ -408,8 +409,7 @@ Deno.serve(async (request: Request) => {
       const shortUrl = await shortenUrl(publicPdfUrl);
       finalMessage = `${body.message}\n\n📎 Boleto: ${shortUrl}`;
       sentWithPdf = true;
-      console.log(`[charge] PDF link appended for debtorId=${body.debtorId} short=${shortUrl}`);
-    } else if (debtorDriveFileId && debtorDriveFileId !== "uploaded") {
+          } else if (debtorDriveFileId && debtorDriveFileId !== "uploaded") {
       // Legacy: Drive-matched PDF — no public URL, attempt document send as bytes
       const driveToken = await getDriveAccessToken().catch(() => null);
       if (driveToken) {
@@ -510,7 +510,7 @@ Deno.serve(async (request: Request) => {
 
   } catch (err) {
     // Erro interno inesperado — nunca vaza stack/credenciais
-    console.error("[send-whatsapp-charge] unhandled error:", err);
+    console.error("[send-whatsapp-charge] falha interna no envio.");
     return errResponse(500, {
       error: "Erro interno. Tente novamente ou contate o suporte.",
       status: "erro_interno",

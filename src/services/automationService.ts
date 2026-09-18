@@ -1,3 +1,4 @@
+import { validateNewAutomationRule } from "../utils/automationValidation";
 /**
  * automationService — CRUD de regras de automação e leitura de histórico.
  * Frontend-safe: sem credenciais. RLS garante isolamento por user_id.
@@ -144,6 +145,8 @@ export const automationService = {
   },
 
   async createRule(payload: AutomationRuleCreate): Promise<AutomationRule> {
+    const validationError = validateNewAutomationRule(payload);
+    if (validationError) throw new Error(validationError);
     const supabase = getSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase
