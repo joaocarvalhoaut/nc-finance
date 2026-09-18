@@ -72,3 +72,9 @@ O pdfjs-dist instalado exige Node >=22.13. O CI anterior usava Node 20; atualiza
 - Validação no serviço frontend antes do insert: nome obrigatório, dias inteiros não negativos, limite inteiro de 1 a 500 e janela completa com início anterior ao fim. Sem janela continua permitido.
 - TypeScript e testes de formulários passaram. Não modifica regras existentes nem substitui validação no backend/RLS. Teste interativo do formulário ainda pendente.
 - Atenção antes da publicação: process-dispatch-jobs compara send_window_start/end em UTC; conferir consistência com horário exibido e scheduler em ambiente de teste. Nenhum envio real executado.
+
+## Fuso das janelas de automação — 18/09/2026
+- Scheduler e processador agora usam o contrato UTC-3 da migration do cron; próxima execução às 08h corresponde a 11h UTC. Rótulos da janela explicitam UTC-3.
+- Testes de início futuro/passado, meia-noite UTC e virada do ano passaram, junto com TypeScript e regressões de segurança/compilação das funções.
+- Antes do deploy, revisar regras existentes: valores podem ter sido ajustados por operadores para compensar a interpretação anterior em UTC. Publicar scheduler e processador na mesma etapa controlada, com fila e regras revisadas. Não houve deploy nem alteração dos horários no banco.
+- Offset fixo segue contrato atual da aplicação; mudanças futuras de política de fuso exigem revisão. Testes reais do scheduler/provedor e demais datas de negócio seguem pendentes.

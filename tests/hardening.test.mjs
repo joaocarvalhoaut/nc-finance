@@ -35,5 +35,5 @@ const React=require('react');const {renderToStaticMarkup}=require('react-dom/ser
 const Sidebar=(await load('src/components/Sidebar.tsx')).default;
 const html=renderToStaticMarkup(React.createElement(Sidebar,{currentTab:'dashboard',onTabChange(){},isLoggedIn:true,onLogout(){},onLoginClick(){}}));
 for(const label of ['Resumo','Carteira','Cobranças','Automações','Configurações','Expandir menu']) assert.ok(html.includes('aria-label="'+label+'"'),label);
-for(const entry of ['send-whatsapp-charge','send-whatsapp-batch','process-dispatch-jobs','whatsapp-inbound']) await build({entryPoints:['supabase/functions/'+entry+'/index.ts'],bundle:true,write:false,platform:'neutral',packages:'external',format:'esm'});
+for(const entry of ['send-whatsapp-charge','send-whatsapp-batch','process-dispatch-jobs','run-automation-scheduler','whatsapp-inbound']) await build({entryPoints:['supabase/functions/'+entry+'/index.ts'],bundle:true,write:false,platform:'neutral',packages:'external',format:'esm'});
 console.log('Navegação acessível e sintaxe das funções alteradas verificadas.');

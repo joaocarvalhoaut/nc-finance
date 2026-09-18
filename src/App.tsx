@@ -4813,7 +4813,7 @@ export default function App() {
                           <>
                             <div>
                               <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
-                                Janela de Envio — Início <span className="text-purple-400">(Premium)</span>
+                                Janela de Envio — Início (UTC−3) <span className="text-purple-400">(Premium)</span>
                               </label>
                               <input
                                 type="time"
@@ -4824,7 +4824,7 @@ export default function App() {
                             </div>
                             <div>
                               <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
-                                Janela de Envio — Fim <span className="text-purple-400">(Premium)</span>
+                                Janela de Envio — Fim (UTC−3) <span className="text-purple-400">(Premium)</span>
                               </label>
                               <input
                                 type="time"
@@ -5041,7 +5041,7 @@ export default function App() {
                               <span>{rule.scheduleMode === "weekdays" ? "Seg–Sex" : "Todo dia"}</span>
                               {rule.skipHolidays && <span>Pula feriados</span>}
                               {rule.sendWindowStart && rule.sendWindowEnd && (
-                                <span>Janela: {rule.sendWindowStart}–{rule.sendWindowEnd}</span>
+                                <span>Janela (UTC−3): {rule.sendWindowStart}–{rule.sendWindowEnd}</span>
                               )}
                               {rule.maxDailySends != null && (
                                 <span>Limite: máx {rule.maxDailySends}/dia</span>

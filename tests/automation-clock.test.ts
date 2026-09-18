@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { automationTime, nextAutomationStart, scheduledAutomationStart } from '../supabase/functions/_shared/automationClock';
+assert.equal(automationTime(new Date('2026-09-18T11:00:00Z')),'08:00');
+assert.equal(automationTime(new Date('2026-09-18T01:00:00Z')),'22:00');
+assert.equal(scheduledAutomationStart('08:00',new Date('2026-09-18T10:00:00Z')),'2026-09-18T11:00:00.000Z');
+assert.equal(scheduledAutomationStart('08:00',new Date('2026-09-18T12:00:00Z')),'2026-09-18T12:00:00.000Z');
+assert.equal(nextAutomationStart('08:00',new Date('2026-09-18T22:00:00Z')).toISOString(),'2026-09-19T11:00:00.000Z');
+assert.equal(nextAutomationStart('08:00',new Date('2026-09-18T01:00:00Z')).toISOString(),'2026-09-18T11:00:00.000Z');
+assert.equal(nextAutomationStart('08:00',new Date('2026-12-31T23:00:00Z')).toISOString(),'2027-01-01T11:00:00.000Z');
+console.log('PASS: UTC-3, meia-noite e virada do ano nas automações.');

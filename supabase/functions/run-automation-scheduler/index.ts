@@ -1,7 +1,8 @@
+import { nextAutomationStart, scheduledAutomationStart } from "../_shared/automationClock.ts";
 /**
  * run-automation-scheduler — cria jobs de disparo a partir das regras ativas.
  *
- * Chamada pelo pg_cron uma vez por dia (ex: 08:00 UTC).
+ * Chamada pelo pg_cron uma vez por dia (08:00 UTC-3 / 11:00 UTC).
  * Protegida por AUTOMATION_CRON_SECRET — não acessível publicamente.
  *
  * Fluxo por regra:
@@ -39,24 +40,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 type RuleRow = Record<string, unknown>;
 type DebtorRow = Record<string, unknown>;
 
-/** Calcula next_run_at: amanhã às 08:00 UTC */
-const nextRunAt = (): string => {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + 1);
-  d.setUTCHours(8, 0, 0, 0);
-  return d.toISOString();
-};
-
-/** scheduled_for: respeita send_window_start ou usa now() */
-const scheduledFor = (sendWindowStart: string | null): string => {
-  if (!sendWindowStart) return new Date().toISOString();
-  const [h, m] = sendWindowStart.split(":").map(Number);
-  const d = new Date();
-  d.setUTCHours(h, m ?? 0, 0, 0);
-  // Se já passou, agenda para agora mesmo
-  if (d < new Date()) return new Date().toISOString();
-  return d.toISOString();
-};
+/** Próxima execução diária às 08:00 no fuso das automações. */
+const nextRunAt = (): string => nextAutomationStart('08:00', new Date()).toISOString();
+const scheduledFor = (start: string | null): string => scheduledAutomationStart(start, new Date());
 
 // ─── Process one rule ─────────────────────────────────────────────────────────
 
