@@ -12,6 +12,8 @@ import {
   Zap,
   HelpCircle,
   UserCog,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -40,19 +42,18 @@ export default function Sidebar({
   // ── Menu definition ────────────────────────────────────────────────────────
   // "cobrar" = fluxo simplificado para o cliente (Upload → Prévia → Envio)
   // Demais tabs = pipeline operacional interno completo
+  // Subitens ficam SEMPRE visiveis. Antes apareciam e sumiam conforme a aba
+  // atual: a lista mudava de tamanho e cada item trocava de posicao durante a
+  // navegacao, o que impedia memorizar onde as coisas ficam.
   const menuItems = isLoggedIn ? [
-    { id: "dashboard", label: "Resumo", icon: LayoutDashboard, section: "internal" },
-    { id: "visao_geral", label: "Carteira", icon: Eye, section: "internal" },
-    ...(["visao_geral", "importar"].includes(currentTab) ? [
-      { id: "importar", label: "Importar carteira", icon: Upload, section: "subitem" },
-    ] : []),
-    { id: "cobrar", label: "Cobranças", icon: SendHorizontal, section: "client" },
-    ...(["cobrar", "cobranca", "historico"].includes(currentTab) ? [
-      { id: "cobranca", label: "Preparar envios", icon: MessageSquare, section: "subitem" },
-      { id: "historico", label: "Histórico de envios", icon: History, section: "subitem" },
-    ] : []),
-    { id: "automacoes", label: "Automações", icon: Zap, section: "internal" },
-    { id: "minha_conta", label: "Configurações", icon: UserCog, section: "internal" },
+    { id: "dashboard",   label: "Resumo",              icon: LayoutDashboard, section: "internal" },
+    { id: "visao_geral", label: "Carteira",            icon: Eye,             section: "internal" },
+    { id: "importar",    label: "Importar carteira",   icon: Upload,          section: "subitem" },
+    { id: "cobrar",      label: "Cobranças",           icon: SendHorizontal,  section: "internal" },
+    { id: "cobranca",    label: "Preparar envios",     icon: MessageSquare,   section: "subitem" },
+    { id: "historico",   label: "Histórico de envios", icon: History,         section: "subitem" },
+    { id: "automacoes",  label: "Automações",          icon: Zap,             section: "internal" },
+    { id: "minha_conta", label: "Configurações",       icon: UserCog,         section: "internal" },
   ] : [{ id: "inicio", label: "Apresentação", icon: Info, section: "public" }];
 
   const handleItemClick = (id: string) => {
@@ -80,9 +81,34 @@ export default function Sidebar({
                 {isExpanded ? "NC Finance" : "NC"}
               </span>
             </div>
+            {/* Recolher: icone discreto no cabecalho. Como botao de largura
+                total com borda, pesava mais que a propria navegacao. */}
+            {isExpanded && (
+              <button
+                type="button"
+                aria-expanded={true}
+                aria-controls="nc-navigation"
+                aria-label="Recolher menu"
+                onClick={() => setIsPinned(false)}
+                className="w-11 h-11 -mr-2 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-900 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
-          <button type="button" aria-expanded={isExpanded} aria-controls="nc-navigation" aria-label={isExpanded ? "Recolher menu" : "Expandir menu"} onClick={() => setIsPinned(!isPinned)} className="min-h-11 m-1 border border-zinc-700 rounded text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">{isExpanded ? "Recolher menu" : "☰"}</button>
+          {!isExpanded && (
+            <button
+              type="button"
+              aria-expanded={false}
+              aria-controls="nc-navigation"
+              aria-label="Expandir menu"
+              onClick={() => setIsPinned(true)}
+              className="mx-auto mt-2 w-11 h-11 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-900 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+            >
+              <PanelLeftOpen className="w-4 h-4" />
+            </button>
+          )}
           {/* Navigation */}
           <nav id="nc-navigation" aria-label="Navegação principal" className="p-2.5 space-y-1 flex-1">
             {menuItems.map((item) => {
@@ -95,7 +121,9 @@ export default function Sidebar({
 
               const IconComponent = item.icon!;
               const isActive = currentTab === item.id;
-              const isClient = item.section === "client";
+              // Subitem e filho do item acima. Antes renderizava no mesmo recuo
+              // dos demais, entao a hierarquia era invisivel.
+              const isSub = item.section === "subitem";
 
               return (
                 <button
@@ -104,23 +132,26 @@ export default function Sidebar({
                   aria-current={isActive ? "page" : undefined}
                   onClick={() => handleItemClick(item.id)}
                   className={`w-full flex items-center rounded-xl transition-all duration-250 cursor-pointer group relative
-                    ${isExpanded ? "justify-start gap-3.5 p-3" : "justify-center px-2 py-3"}
+                    ${isExpanded
+                      ? isSub ? "justify-start gap-3 py-2 pl-9 pr-3" : "justify-start gap-3.5 p-3"
+                      : "justify-center px-2 py-3"}
                     ${isActive
-                      ? isClient
-                        ? "bg-emerald-500 text-black font-semibold shadow-[0_3px_15px_rgba(16,185,129,0.25)]"
-                        : "bg-zinc-800 text-white font-semibold"
-                      : isClient
-                        ? "text-emerald-400 hover:text-black hover:bg-emerald-500/80"
-                        : "text-zinc-400 hover:text-white hover:bg-zinc-900/80"
+                      ? "bg-emerald-500 text-black font-semibold shadow-[0_3px_15px_rgba(16,185,129,0.25)]"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-900/80"
                     }
                   `}
                 >
-                  <div className="flex items-center justify-center w-5 h-5 flex-shrink-0">
-                    <IconComponent className={`w-5 h-5 flex-shrink-0 transition-transform ${!isActive && "group-hover:scale-110"}`} />
+                  {/* Guia vertical do nivel filho */}
+                  {isExpanded && isSub && (
+                    <span aria-hidden="true" className="absolute left-4 top-0 bottom-0 w-px bg-zinc-800" />
+                  )}
+
+                  <div className={`flex items-center justify-center flex-shrink-0 ${isSub && isExpanded ? "w-4 h-4" : "w-5 h-5"}`}>
+                    <IconComponent className={`flex-shrink-0 transition-transform ${isSub && isExpanded ? "w-4 h-4" : "w-5 h-5"} ${!isActive && "group-hover:scale-110"}`} />
                   </div>
 
                   {isExpanded && (
-                    <span className="text-sm transition-all duration-200 truncate opacity-100">
+                    <span className={`transition-all duration-200 truncate opacity-100 ${isSub ? "text-[13px]" : "text-sm"}`}>
                       {item.label}
                     </span>
                   )}
