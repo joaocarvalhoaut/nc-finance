@@ -3022,7 +3022,6 @@ export default function App() {
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     
                     <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-md">
-                      {debtorSaveError && <p role="alert" className="text-sm text-rose-400 mb-3">{debtorSaveError}</p>}
                         <h4 className="text-sm font-bold text-white flex items-center gap-2">
                         <Percent className="w-4 h-4 text-emerald-400" /> Parâmetros de Encargos Globais
                       </h4>
@@ -3357,6 +3356,9 @@ export default function App() {
                     </div>
                   )}
 
+                  {debtorSaveError && (
+                    <p role="alert" className="text-sm text-rose-400 mb-3">{debtorSaveError}</p>
+                  )}
                   <div className="bg-zinc-900/40 border border-zinc-900 rounded-3xl overflow-hidden shadow-xl">
                     <div
                       ref={tableScrollRef}
@@ -3623,9 +3625,24 @@ export default function App() {
                                           setEditingValueDebtorId(null);
                                           const amount = parseManualAmount(editingValueText);
                                           if (Number.isNaN(amount)) {
-                                            setDebtorSaveError("Valor não salvo: use um valor positivo no formato 1.250,00.");
+                                            // Identifica a linha: sem isso o usuario nao descobre
+                                            // qual edicao foi descartada.
+                                            const alvo = d.client || d.document || "registro";
+                                            // Ponto no lugar da virgula e o erro mais comum (teclado
+                                            // numerico, colagem de planilha). O valor segue recusado,
+                                            // porque 1.25 e ambiguo com 1.250 — mas em vez de repetir
+                                            // a regra generica, mostramos a forma ja corrigida.
+                                            const bruto = editingValueText.trim();
+                                            const pontoDecimal = /^d+.d{1,2}$/.test(bruto);
+                                            setDebtorSaveError(
+                                              pontoDecimal
+                                                ? `Valor nao salvo em "${alvo}": use virgula para os centavos — ${bruto.replace(".", ",")}.`
+                                                : `Valor nao salvo em "${alvo}": use um valor positivo, como 1.250,00.`
+                                            );
                                             return;
                                           }
+                                          // Sem isto o alerta ficava na tela para sempre, ate recarregar.
+                                          setDebtorSaveError("");
                                           void saveDebtorFieldToDB(d.id, amount);
                                         }}
                                         onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
