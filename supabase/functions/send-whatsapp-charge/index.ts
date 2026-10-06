@@ -34,7 +34,7 @@ import { isOptedOut } from "../_shared/optOut.ts";
 const SUPABASE_URL       = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_ANON_KEY  = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const SERVICE_ROLE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-// Note: ZAPI_* env vars are read via loadZApiCredentials() — not hardcoded here
+// Credenciais Z-API vem de user_zapi_config da conta, via loadZApiCredentialsForUser().
 
 // ─── Plan limits (espelha src/config/plans.ts) ────────────────────────────────
 
@@ -156,8 +156,8 @@ Deno.serve(async (request: Request) => {
     const zapiCreds = await loadZApiCredentialsForUser(admin, userId);
     if (!zapiCreds) {
       return errResponse(503, {
-        error: "Z-API nao configurada na plataforma. Configure as credenciais no painel de integrações.",
-        status: "zapi_nao_configurada",
+        error: "Nenhum numero de WhatsApp conectado a esta conta. Conecte o numero em Configuracoes antes de enviar cobrancas.",
+        status: "numero_nao_conectado",
       });
     }
 

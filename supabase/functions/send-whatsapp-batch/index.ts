@@ -20,7 +20,7 @@ import { reserveChargeSend } from "../_shared/sendReservation.ts";
  *  9.  Retorna resumo sanitizado
  *
  * Segredos: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, AUTOMATION_CRON_SECRET
- * Z-API credentials lidas de platform_integrations via loadZApiCredentials() — não hardcoded
+ * Credenciais Z-API vem de user_zapi_config da conta, via loadZApiCredentialsForUser().
  *
  * Planos:
  *  - Basic   → bloqueado (403 plano_sem_recurso)
@@ -190,7 +190,7 @@ Deno.serve(async (request: Request) => {
     const zapiCreds = await loadZApiCredentialsForUser(admin, userId);
     if (!zapiCreds) {
       return errResponse(503, {
-        error: "Z-API nao configurada na plataforma. Configure as credenciais no painel de integrações.",
+        error: "Nenhum numero de WhatsApp conectado a esta conta. Conecte o numero em Configuracoes antes de enviar cobrancas.",
         status: "zapi_nao_configurada",
       });
     }
@@ -346,7 +346,8 @@ Deno.serve(async (request: Request) => {
       const documentNumber= String(dr.document_number ?? "");
       const rawPhone      = String(dr.phone          ?? "");
       const dueDate       = String(dr.due_date       ?? "");
-      const amount        = Number(dr.updated_value ?? dr.amount ?? 0);
+      // Cobranca usa o valor base (amount), nao o updated_value com multa e juros.
+      const amount        = Number(dr.amount ?? 0);
       const driveFileId   = (dr.drive_file_id   as string | null) ?? null;
       const driveFileUrl  = (dr.drive_file_url  as string | null) ?? null;
       const driveFileName = (dr.drive_file_name as string | null) ?? null;

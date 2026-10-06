@@ -62,7 +62,7 @@ const shortenUrl = async (url: string): Promise<string> => {
     return url;
   }
 };
-// Z-API credentials loaded dynamically via loadZApiCredentials() — not hardcoded
+// Credenciais Z-API vem de user_zapi_config da conta, via loadZApiCredentialsForUser().
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -139,7 +139,7 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     // Lookup: user_zapi_config → platform_integrations → env vars
     const zapiCreds = await loadZApiCredentialsForUser(admin, userId);
     if (!zapiCreds) {
-      await markJob("failed", { last_error: "Z-API nao configurada (platform_integrations ausente)." });
+      await markJob("failed", { last_error: "Nenhum numero de WhatsApp conectado a esta conta. Conecte o numero em Configuracoes antes de enviar cobrancas." });
       return;
     }
 
@@ -247,7 +247,8 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     const documentNumber= String(dr.document_number?? "");
     const rawPhone      = String(dr.phone          ?? "");
     const dueDate       = String(dr.due_date       ?? "");
-    const amount        = Number(dr.updated_value  ?? dr.amount ?? 0);
+    // Cobranca usa o valor base (amount), nao o updated_value com multa e juros.
+    const amount        = Number(dr.amount ?? 0);
     const driveFileUrl  = (dr.drive_file_url  as string | null) ?? null;
     const driveFileName = (dr.drive_file_name as string | null) ?? null;
     const customMsg     = (meta.custom_message as string | null) ?? null;

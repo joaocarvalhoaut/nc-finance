@@ -24,10 +24,10 @@
 import { createClient }           from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders }            from "../_shared/cors.ts";
 import {
-  loadZApiCredentials,
-  loadPlatformStatus,
-  updatePlatformStatus,
-  savePlatformCredentials,
+  loadZApiCredentialsForUser,
+  loadUserZApiStatus,
+  updateUserZApiStatus,
+  saveUserZApiCredentials,
 }                                 from "../_shared/platformIntegrations.ts";
 import { maskToken }              from "../_shared/sanitize.ts";
 
@@ -161,7 +161,7 @@ Deno.serve(async (req: Request) => {
 
   // ── GET ?action=status ─────────────────────────────────────────────────────
   if (req.method === "GET" && (action === "status" || action === "")) {
-    const status = await loadPlatformStatus(admin);
+    const status = await loadUserZApiStatus(admin, user.id);
     if (!status) {
       return ok({
         ok: true,
@@ -177,9 +177,9 @@ Deno.serve(async (req: Request) => {
 
   // ── GET ?action=qr ─────────────────────────────────────────────────────────
   if (req.method === "GET" && action === "qr") {
-    const creds = await loadZApiCredentials(admin);
+    const creds = await loadZApiCredentialsForUser(admin, user.id);
     if (!creds) {
-      return err(503, "Instância Z-API não configurada. Configure as credenciais primeiro.");
+      return err(503, "Nenhum número de WhatsApp conectado a esta conta. Fale com o suporte para provisionar a instância.");
     }
     const qrCode = await fetchZApiQR(creds.instanceId, creds.token, creds.clientToken);
     if (!qrCode) {
@@ -219,12 +219,18 @@ Deno.serve(async (req: Request) => {
     const instanceId  = String(body.instanceId  ?? "").trim();
     const token       = String(body.token        ?? "").trim();
     const clientToken = String(body.clientToken  ?? "").trim();
+    const label       = String(body.label        ?? "").trim();
+    // Conta destino: o suporte provisiona para um cliente informando targetUserId;
+    // sem ele, grava na propria conta de quem chamou.
+    const targetUserId = String(body.targetUserId ?? "").trim() || user.id;
 
     if (!instanceId || !token || !clientToken) {
       return err(400, "Campos obrigatórios: instanceId, token, clientToken.");
     }
 
-    await savePlatformCredentials(admin, { instanceId, token, clientToken });
+    await saveUserZApiCredentials(admin, targetUserId, {
+      instanceId, token, clientToken, label: label || undefined,
+    });
 
     // Safe log: mask token values
     console.log(`[whatsapp-gateway] credentials saved — instanceId=${maskToken(instanceId)} token=${maskToken(token)}`);
@@ -234,15 +240,15 @@ Deno.serve(async (req: Request) => {
 
   // ── POST { action: "validate" } ───────────────────────────────────────────
   if (postAction === "validate") {
-    const creds = await loadZApiCredentials(admin);
+    const creds = await loadZApiCredentialsForUser(admin, user.id);
     if (!creds) {
-      return err(503, "Instância Z-API não configurada. Configure as credenciais antes de validar.");
+      return err(503, "Nenhum número de WhatsApp conectado a esta conta. Fale com o suporte para provisionar a instância.");
     }
 
     const zapiStatus = await fetchZApiStatus(creds.instanceId, creds.token, creds.clientToken);
 
     if (!zapiStatus) {
-      await updatePlatformStatus(admin, {
+      await updateUserZApiStatus(admin, user.id, {
         status:    "error",
         connected: false,
         last_error: "Não foi possível contatar a Z-API. Verifique instanceId/token.",
@@ -260,7 +266,7 @@ Deno.serve(async (req: Request) => {
       rawPhone = (await fetchZApiPhone(creds.instanceId, creds.token, creds.clientToken)) ?? "";
     }
 
-    await updatePlatformStatus(admin, {
+    await updateUserZApiStatus(admin, user.id, {
       status:                  connected ? "active" : (pendingPhone ? "inactive" : "error"),
       connected,
       connected_pending_phone: pendingPhone,
@@ -268,7 +274,7 @@ Deno.serve(async (req: Request) => {
       last_error:              connected ? null : String(zapiStatus.message ?? zapiStatus.error ?? ""),
     });
 
-    const platformStatus = await loadPlatformStatus(admin);
+    const platformStatus = await loadUserZApiStatus(admin, user.id);
 
     return ok({
       ok: true,
@@ -302,10 +308,12 @@ Deno.serve(async (req: Request) => {
       return err(503, "Env vars ZAPI_INSTANCE_ID / ZAPI_TOKEN / ZAPI_CLIENT_TOKEN não configuradas nos secrets. Configure-as via Supabase Secrets antes de chamar init.");
     }
 
-    await savePlatformCredentials(admin, {
+    // Vincula o numero das env vars a ESTA conta (nao mais a uma instancia global).
+    await saveUserZApiCredentials(admin, user.id, {
       instanceId:  envInstanceId,
       token:       envToken,
       clientToken: envClientToken,
+      label:       "Numero vinculado via init",
     });
 
     // Safe log: never log the actual values

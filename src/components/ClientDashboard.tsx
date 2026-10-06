@@ -443,7 +443,7 @@ export default function ClientDashboard({
           clientName:     sampleDebtor.client,
           documentNumber: sampleDebtor.document,
           dueDate:        sampleDebtor.dueDate,
-          amount:         sampleDebtor.updatedValue ?? sampleDebtor.value,
+          amount:         sampleDebtor.value,
         })
       : template;
 

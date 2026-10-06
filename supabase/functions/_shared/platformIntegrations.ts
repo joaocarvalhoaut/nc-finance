@@ -92,7 +92,8 @@ export async function loadZApiCredentials(
 /**
  * Load Z-API credentials for a specific user.
  * Checks user_zapi_config first (own number add-on), then falls back
- * to the global platform credentials.
+ * Sem fallback global: cada conta envia exclusivamente pelo proprio numero.
+ * Devolve null quando a conta nao tem user_zapi_config ativa.
  *
  * Use this in send-whatsapp-charge and send-whatsapp-batch.
  */
@@ -122,11 +123,13 @@ export async function loadZApiCredentialsForUser(
       }
     }
   } catch {
-    // Table may not exist yet — fall through to global
+    // Tabela pode nao existir ainda — tratado como "sem numero conectado".
   }
 
-  // 2. Fall back to global platform credentials
-  return loadZApiCredentials(admin);
+  // Sem fallback global: cada conta envia pelo proprio numero. Uma conta sem
+  // user_zapi_config ativa nao envia — quem chama devolve 503 orientando a
+  // conectar o numero em Configuracoes.
+  return null;
 }
 
 // ── Read safe status (no credentials) ────────────────────────────────────────
@@ -212,5 +215,91 @@ export async function savePlatformCredentials(
         updated_at:   new Date().toISOString(),
       },
       { onConflict: "provider" },
+    );
+}
+
+// ── Status e credenciais por conta (numero proprio) ──────────────────────────
+
+/** Mascara telefone cru: mantem 4 primeiros e 3 ultimos digitos. */
+function maskPhoneDigits(rawPhone: string | null): string | null {
+  const digits = (rawPhone ?? "").replace(/D/g, "");
+  if (digits.length < 6) return null;
+  return digits.slice(0, 4) + "*".repeat(Math.max(0, digits.length - 7)) + digits.slice(-3);
+}
+
+/**
+ * Status seguro da instancia de UMA conta — nunca devolve token nem client_token.
+ * É o que o whatsapp-gateway pode repassar ao browser.
+ */
+export async function loadUserZApiStatus(
+  admin: AdminClient,
+  userId: string,
+): Promise<PlatformStatus | null> {
+  try {
+    const { data, error } = await admin
+      .from("user_zapi_config")
+      .select("status, connected, connected_pending_phone, phone_number, updated_at")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    const row = data as Record<string, unknown>;
+
+    return {
+      status:                  String(row.status ?? "inactive"),
+      connected:               Boolean(row.connected),
+      connected_pending_phone: Boolean(row.connected_pending_phone),
+      phone_number_masked:     maskPhoneDigits(row.phone_number as string | null),
+      updated_at:              (row.updated_at as string | null) ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Atualiza o status da instancia de UMA conta, apos teste de conexao. */
+export async function updateUserZApiStatus(
+  admin: AdminClient,
+  userId: string,
+  update: Partial<{
+    status:                  string;
+    connected:               boolean;
+    connected_pending_phone: boolean;
+    phone_number:            string | null;
+    last_error:              string | null;
+  }>,
+): Promise<void> {
+  await admin
+    .from("user_zapi_config")
+    .update({ ...update, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+}
+
+/**
+ * Grava as credenciais Z-API de UMA conta. Chamado pelo whatsapp-gateway na
+ * acao "save", que segue protegida por X-Admin-Token: quem provisiona a
+ * instancia Z-API e o suporte NC Finance, nao o cliente final.
+ */
+export async function saveUserZApiCredentials(
+  admin: AdminClient,
+  userId: string,
+  credentials: { instanceId: string; token: string; clientToken: string; label?: string },
+): Promise<void> {
+  await admin
+    .from("user_zapi_config")
+    .upsert(
+      {
+        user_id:      userId,
+        instance_id:  credentials.instanceId,
+        token:        credentials.token,
+        client_token: credentials.clientToken,
+        label:        credentials.label ?? null,
+        is_active:    true,
+        status:       "inactive",
+        connected:    false,
+        updated_at:   new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
     );
 }

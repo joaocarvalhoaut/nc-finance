@@ -9,6 +9,7 @@ import { getMyProfile, exportMyData, type UserProfileData } from "../services/ac
 import { updatePassword } from "../services/authService";
 import { getConsent, grantAnalyticsConsent, declineAnalyticsConsent } from "../lib/analytics";
 import PasswordInput from "./PasswordInput";
+import WhatsappGatewayCard from "./WhatsappGatewayCard";
 
 interface Props {
   userId: string;
@@ -155,6 +156,9 @@ export default function MinhaConta({
           </button>
         </div>
       </Card>
+
+      {/* Número de WhatsApp da conta — o card traz a propria moldura */}
+      <WhatsappGatewayCard />
 
       {/* Segurança — trocar senha */}
       <Card title="Segurança" sub="Altere sua senha de acesso">

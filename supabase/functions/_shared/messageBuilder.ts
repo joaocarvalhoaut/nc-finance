@@ -62,7 +62,7 @@ Equipe NC Finance.`,
 
   juridico: `Sr./Sra. {nome_cliente},
 
-Notificamos V.Sa. acerca do débito referente ao documento {documento}, com vencimento em {vencimento} e valor atualizado de R$ {valor_atualizado}, até o momento sem quitação em nosso sistema.
+Notificamos V.Sa. acerca do débito referente ao documento {documento}, com vencimento em {vencimento} e valor de R$ {valor_atualizado}, até o momento sem quitação em nosso sistema.
 
 Solicitamos manifestação no prazo de 48 horas para evitar medidas administrativas e jurídicas cabíveis.
 

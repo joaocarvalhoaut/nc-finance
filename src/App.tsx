@@ -1063,7 +1063,9 @@ export default function App() {
     if (!pat) return "";
 
     const daysAtraso = debtor.category === "vencidos" ? "12" : "0";
-    const valStr = debtor.updatedValue ? debtor.updatedValue.toFixed(2) : debtor.value.toFixed(2);
+    // Cobranca usa o valor base: multa e juros seguem calculados para gestao,
+    // mas nao entram no que e cobrado do devedor.
+    const valStr = debtor.value.toFixed(2);
     
     return pat.template
       .replace(/{nome_cliente}/g, debtor.client)
@@ -1796,7 +1798,7 @@ export default function App() {
         tone: selectedTone,
         clientName: selectedDebtorForMessage.client,
         documentNumber: selectedDebtorForMessage.document,
-        amount: selectedDebtorForMessage.updatedValue ?? selectedDebtorForMessage.value,
+        amount: selectedDebtorForMessage.value,
       });
 
       if (result.success) {
@@ -1812,7 +1814,7 @@ export default function App() {
           client: selectedDebtorForMessage.client,
           document: selectedDebtorForMessage.document,
           phone: selectedDebtorForMessage.phone,
-          value: selectedDebtorForMessage.updatedValue ?? selectedDebtorForMessage.value,
+          value: selectedDebtorForMessage.value,
           dateSent: new Date().toISOString(),
           tone: selectedTone,
           message: customMessageDraft,
