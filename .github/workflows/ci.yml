@@ -51,6 +51,19 @@ jobs:
       - name: Type-check (tsc)
         run: npm run lint
 
+      # 1b. Type-check das Edge Functions. O tsconfig.json exclui "supabase",
+      #     entao o passo acima NAO cobre o codigo que envia as cobrancas — era
+      #     o unico ponto do sistema onde um erro de tipo chegava em producao
+      #     sem nenhuma verificacao.
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Type-check (Edge Functions)
+        working-directory: supabase/functions
+        run: deno task check
+
       # 2. Testes unitários do parser de documentos (47 casos).
       - name: Unit tests (parser)
         run: npm run test:parser

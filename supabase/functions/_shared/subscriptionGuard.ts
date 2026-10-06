@@ -5,7 +5,13 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 
-type AdminClient = ReturnType<typeof createClient>;
+// Os genericos precisam ser explicitos: sem eles o ReturnType resolve para os
+// padroes da DECLARACAO (SupabaseClient<unknown, never, GenericSchema>), que nao
+// batem com o que uma chamada real de createClient(url, key) produz
+// (SupabaseClient<any, "public", any>). Sem isso o deno check acusa incompatibilidade
+// em toda funcao que passa o admin adiante.
+// deno-lint-ignore no-explicit-any
+type AdminClient = ReturnType<typeof createClient<any, any, any>>;
 
 export interface SubscriptionInfo {
   status: string;

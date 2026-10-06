@@ -18,7 +18,13 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { getGoogleAccessToken, listFilesInFolderDeep, type DriveFile } from "./googleDrive.ts";
 import { bestNameSimilarity, blockingKeys } from "./nameMatch.ts";
 
-type AdminClient = ReturnType<typeof createClient>;
+// Os genericos precisam ser explicitos: sem eles o ReturnType resolve para os
+// padroes da DECLARACAO (SupabaseClient<unknown, never, GenericSchema>), que nao
+// batem com o que uma chamada real de createClient(url, key) produz
+// (SupabaseClient<any, "public", any>). Sem isso o deno check acusa incompatibilidade
+// em toda funcao que passa o admin adiante.
+// deno-lint-ignore no-explicit-any
+type AdminClient = ReturnType<typeof createClient<any, any, any>>;
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -165,7 +171,9 @@ async function tryDeflate(data: Uint8Array): Promise<Uint8Array> {
     const reader = ds.readable.getReader();
     const chunks: Uint8Array[] = [];
 
-    const writing = writer.write(data).then(() => writer.close());
+    // TS 5.7 parametrizou Uint8Array pelo tipo de buffer; o cast reconcilia
+    // Uint8Array<ArrayBufferLike> com o BufferSource esperado pelo writer.
+    const writing = writer.write(data as Uint8Array<ArrayBuffer>).then(() => writer.close());
     const reading = (async () => {
       while (true) {
         const { done, value } = await reader.read();
@@ -983,7 +991,8 @@ export async function matchBoletoForDebtor(
 
   if (!rows || rows.length === 0) return null;
 
-  const indexRows = rows as IndexRow[];
+  // data do Supabase pode ser erro: converte via unknown, como o TS exige.
+  const indexRows = rows as unknown as IndexRow[];
   const best = bestMatchInIndex(debtor, indexRows, buildBlockIndex(indexRows), precomputeRowDocs(indexRows));
 
   if (best.score >= AUTO_ATTACH_THRESHOLD) {
@@ -1043,7 +1052,7 @@ export async function batchMatchDebtors(
 
   let matched = 0;
   const now = new Date().toISOString();
-  const rows = indexRows as IndexRow[];
+  const rows = indexRows as unknown as IndexRow[];
   const blockIndex = buildBlockIndex(rows);
   const rowDocs = precomputeRowDocs(rows);
 

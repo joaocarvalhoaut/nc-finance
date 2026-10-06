@@ -10,7 +10,11 @@ export const getStripeClient = () => {
   }
 
   return new Stripe(stripeSecretKey, {
-    apiVersion: "2025-04-30.basil",
+    // Versao fixada DE PROPOSITO. O SDK 18.2.1 so aceita no tipo a versao que
+    // ele declara como mais recente ("2025-05-28.basil"), mas subir o pin muda
+    // o formato das respostas da Stripe — e alteracao de comportamento no
+    // billing, nao correcao de tipo. O cast registra que o pin e intencional.
+    apiVersion: "2025-04-30.basil" as Stripe.LatestApiVersion,
   });
 };
 

@@ -71,6 +71,7 @@ type BatchItemStatus =
   | "telefone_invalido"
   | "bloqueado_limite"
   | "bloqueado_liquidado"
+  | "nao_contatar"
   | "devedor_nao_encontrado";
 
 interface BatchItemResult {
@@ -323,7 +324,7 @@ Deno.serve(async (request: Request) => {
         continue;
       }
 
-      const dr = debtorRow as Record<string, unknown>;
+      const dr = debtorRow as unknown as Record<string, unknown>;
 
       // a.1 NUNCA cobrar liquidados (já pagos) nem desabilitados — trava no servidor
       if (dr.category === "liquidado" || dr.status === "liquidado" || dr.category === "desabilitado") {
@@ -459,7 +460,10 @@ Deno.serve(async (request: Request) => {
       // because Z-API's send-document endpoint (URL or base64) does not deliver a
       // proper WhatsApp document on this plan/instance — it converts documents to a
       // plain-text reference instead.
-      let zapiResult = { success: false, messageId: null as string | null, zaapId: null as string | null, error: "dryRun" };
+      // error precisa ser string | null: o ZApiSendResult devolvido mais abaixo
+      // traz null quando o envio da certo, e a inferencia a partir de "dryRun"
+      // fixava o tipo em string.
+      let zapiResult = { success: false, messageId: null as string | null, zaapId: null as string | null, error: "dryRun" as string | null };
       let sentWithPdf = false;
 
       // ── Resolve PDF storage path + build message with link ────────────────────

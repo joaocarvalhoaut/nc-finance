@@ -27,7 +27,8 @@ const json = (status: number, body: Record<string, unknown>) =>
   });
 
 /** Remove recursivamente os arquivos do usuário no Storage (best-effort). */
-async function purgeStorage(admin: ReturnType<typeof createClient>, userId: string): Promise<number> {
+// deno-lint-ignore no-explicit-any
+async function purgeStorage(admin: ReturnType<typeof createClient<any, any, any>>, userId: string): Promise<number> {
   const store = admin.storage.from(BUCKET);
   const toRemove: string[] = [];
   try {

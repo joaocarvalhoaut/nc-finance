@@ -1,0 +1,23 @@
+{
+  "nodeModulesDir": "auto",
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.49.8",
+    "stripe": "npm:stripe@18.2.1"
+  },
+  "lint": {
+    "rules": {
+      "tags": [
+        "recommended"
+      ]
+    }
+  },
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 100,
+    "semiColons": true,
+    "singleQuote": false
+  },
+  "tasks": {
+    "check": "deno check */index.ts"
+  }
+}

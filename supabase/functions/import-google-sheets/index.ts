@@ -51,7 +51,8 @@ const errResponse = (status: number, body: Record<string, unknown>) =>
 // ─── Upsert single row ────────────────────────────────────────────────────────
 
 const upsertRow = async (
-  admin: ReturnType<typeof createClient>,
+  // deno-lint-ignore no-explicit-any
+  admin: ReturnType<typeof createClient<any, any, any>>,
   userId: string,
   row: SheetRow,
 ): Promise<"inserted" | "updated" | "skipped"> => {

@@ -118,10 +118,10 @@ const upsertSubscriptionFromStripe = async (params: {
   try {
     const { data, error, count } = await admin
       .from("user_subscriptions")
-      .upsert(payload, { onConflict: "user_id" })
-      .select("user_id, plan, status, stripe_subscription_id, trial_start, trial_end, updated_at", {
-        count: "exact",
-      })
+      // count pertence as opcoes do upsert: no select encadeado a assinatura
+      // nao aceita opcoes, entao o count vinha sempre null no log abaixo.
+      .upsert(payload, { onConflict: "user_id", count: "exact" })
+      .select("user_id, plan, status, stripe_subscription_id, trial_start, trial_end, updated_at")
       .single();
 
     const finalRow = await getPersistedSubscriptionRow(params.userId);
@@ -198,8 +198,8 @@ const syncSubscriptionFromStripe = async (
     plan,
     status: subscription.status,
     cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
-    currentPeriodStart: toIso(subscription.current_period_start),
-    currentPeriodEnd: toIso(subscription.current_period_end),
+    currentPeriodStart: toIso(subscriptionPeriod(subscription).start),
+    currentPeriodEnd: toIso(subscriptionPeriod(subscription).end),
     trialStart: toIso(subscription.trial_start),
     trialEnd: toIso(subscription.trial_end),
   });
@@ -215,12 +215,50 @@ const syncSubscriptionFromStripe = async (
   return upsertResult;
 };
 
+/**
+ * ID da assinatura que gerou a fatura.
+ *
+ * A Stripe REMOVEU `Invoice.subscription` — no SDK 18.x o campo vive em
+ * `invoice.parent.subscription_details.subscription`. O codigo antigo lia o
+ * campo inexistente, recebia undefined e saia silenciosamente: toda fatura paga
+ * ou recusada deixava de sincronizar a assinatura, e o subscription_id ia para
+ * o log como null.
+ *
+ * O campo pode vir como string (id) ou como objeto expandido, entao tratamos
+ * os dois — o codigo antigo so cobria a string.
+ */
+/**
+ * Inicio e fim do periodo corrente da assinatura.
+ *
+ * Mesma migracao da Stripe: `current_period_start` e `current_period_end`
+ * sairam do nivel da assinatura e passaram a viver em cada ITEM
+ * (`subscription.items.data[].current_period_*`). Lendo do lugar antigo o valor
+ * vinha undefined e as duas datas eram gravadas como null no banco — e sao elas
+ * que a tela de assinatura mostra como proxima renovacao.
+ *
+ * Usa o primeiro item: os planos daqui tem um item so.
+ */
+const subscriptionPeriod = (subscription: Stripe.Subscription) => {
+  const item = subscription.items?.data?.[0];
+  return {
+    start: item?.current_period_start ?? null,
+    end:   item?.current_period_end   ?? null,
+  };
+};
+
+const invoiceSubscriptionId = (invoice: Stripe.Invoice): string | null => {
+  const sub = invoice.parent?.subscription_details?.subscription;
+  if (typeof sub === "string") return sub;
+  return sub?.id ?? null;
+};
+
 const syncInvoiceSubscription = async (stripe: Stripe, invoice: Stripe.Invoice) => {
-  if (typeof invoice.subscription !== "string") {
+  const subscriptionId = invoiceSubscriptionId(invoice);
+  if (!subscriptionId) {
     return null;
   }
 
-  const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   return syncSubscriptionFromStripe(stripe, subscription);
 };
 
@@ -322,11 +360,11 @@ Deno.serve(async (request) => {
           source: "stripe-webhook.invoice",
           event_type: event.type,
           customer_id: typeof invoice.customer === "string" ? invoice.customer : null,
-          subscription_id: typeof invoice.subscription === "string" ? invoice.subscription : null,
+          subscription_id: invoiceSubscriptionId(invoice),
           invoice_status: invoice.status,
         });
 
-        if (typeof invoice.subscription === "string") {
+        if (invoiceSubscriptionId(invoice)) {
           await syncInvoiceSubscription(stripe, invoice);
         }
         break;

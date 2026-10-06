@@ -9,12 +9,17 @@ import { getSupabaseClient } from "./supabaseClient";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+// Precisa espelhar a uniao de supabase/functions/send-whatsapp-batch/index.ts.
+// As duas listas haviam divergido: o backend ja devolvia "bloqueado_liquidado"
+// e "nao_contatar", e esses itens apareciam sem rotulo na tela de resultado.
 export type BatchItemStatus =
   | "sucesso"
   | "erro"
   | "duplicado"
   | "telefone_invalido"
   | "bloqueado_limite"
+  | "bloqueado_liquidado"
+  | "nao_contatar"
   | "devedor_nao_encontrado";
 
 export type BatchTopStatus =
@@ -84,6 +89,8 @@ export const BATCH_ITEM_STATUS_LABELS: Record<BatchItemStatus, string> = {
   duplicado:              "Duplicado (aguarde 5 min)",
   telefone_invalido:      "Telefone inválido",
   bloqueado_limite:       "Limite atingido",
+  bloqueado_liquidado:    "Bloqueado (liquidado, desabilitado ou valor zerado)",
+  nao_contatar:           "Pediu para não ser contatado",
   devedor_nao_encontrado: "Devedor não encontrado",
 };
 
