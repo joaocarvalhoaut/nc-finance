@@ -241,6 +241,7 @@ export default function App() {
   const tableDragRef = React.useRef({ isDown: false, startX: 0, scrollLeft: 0 });
   const [extractionAlert, setExtractionAlert] = useState<string>("");
   const [dupDocModal, setDupDocModal] = useState<{ pending: typeof extractedDebtors; dupes: { doc: string; count: number }[] } | null>(null);
+  const [revisaoModal, setRevisaoModal] = useState<{ pending: typeof extractedDebtors; duvidosos: number } | null>(null);
   const [notesPopover, setNotesPopover] = useState<{ debtorId: string; draft: string } | null>(null);
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
   // Original File object — needed for OCR fallback on scanned PDFs
@@ -905,7 +906,11 @@ export default function App() {
     // Nunca envia cobranças para títulos liquidados ou clientes desabilitados
     const cobráveis: string[] = Array.from(selectedDebtorIds).filter((id): id is string => {
       const d = debtors.find(x => x.id === id);
-      return Boolean(d && d.category !== "liquidado" && d.category !== "desabilitado");
+      if (!d) return false;
+      if (d.category === "liquidado" || d.category === "desabilitado") return false;
+      // Valor nao cobravel: enviar "R$ 0,00" a um devedor e pior que nao enviar.
+      if (!(d.value > 0)) return false;
+      return true;
     });
 
     if (cobráveis.length === 0) {
@@ -1149,10 +1154,12 @@ export default function App() {
           status: "pending" as const,
         }));
 
-        // Marcar IDs com confiança abaixo de 75%
+        // Marca para revisao todo registro que nao veio completo. O limiar
+        // antigo (75) nao pegava nem registro sem valor, que marca 80 — so a
+        // ausencia do nome do cliente disparava revisao.
         const lowIds = new Set(
           result.records
-            .map((item, index) => item.confidenceScore < 75 ? `ext-${ts}-${index}` : null)
+            .map((item, index) => item.confidenceScore < 100 ? `ext-${ts}-${index}` : null)
             .filter(Boolean) as string[]
         );
         setLowConfidenceIds(lowIds);
@@ -1202,7 +1209,7 @@ export default function App() {
     }
   };
   // Appends parsed extraction items back to the general central view state
-  const sendExtractedToOverview = async () => {
+  const sendExtractedToOverview = async (revisaoConfirmada = false) => {
     if (extractedDebtors.length === 0 || !currentOwnerUserId) return;
 
     const toSend = extractedSelectedIds.size > 0
@@ -1210,6 +1217,16 @@ export default function App() {
       : extractedDebtors;
 
     if (toSend.length === 0) return;
+
+    // Trava de revisao: registros marcados como incompletos na extracao nao
+    // entram na Visao Geral sem confirmacao. Depois da importacao eles viram
+    // devedores cobraveis com id novo do banco, e a marcacao se perde — por
+    // isso a revisao tem de acontecer AQUI, enquanto ainda da para distinguir.
+    const duvidosos = toSend.filter(d => lowConfidenceIds.has(d.id));
+    if (duvidosos.length > 0 && !revisaoConfirmada) {
+      setRevisaoModal({ pending: toSend, duvidosos: duvidosos.length });
+      return;
+    }
 
     // Detecta duplicatas de document_number dentro do lote
     const docCount = new Map<string, number>();
@@ -2954,7 +2971,7 @@ export default function App() {
                             : "Aguardando consolidação do operador."}
                         </span>
                         <button
-                          onClick={sendExtractedToOverview}
+                          onClick={() => void sendExtractedToOverview()}
                           disabled={extractedDebtors.length === 0}
                           className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold flex items-center gap-2 shadow disabled:opacity-50 transition-all text-xs cursor-pointer"
                         >
@@ -5265,6 +5282,40 @@ export default function App() {
           })()}
 
           {/* ── Modal: Documentos Duplicados na Importação ── */}
+          {revisaoModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+              <div className="bg-zinc-900 border border-amber-700/60 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+                <h3 className="text-sm font-bold text-white">
+                  {revisaoModal.duvidosos} registro(s) precisam de revisão
+                </h3>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  A extração não conseguiu ler todos os campos desses registros — pode faltar
+                  telefone, valor, vencimento ou documento. Eles estão marcados em âmbar na lista.
+                </p>
+                <p className="text-xs text-amber-300/90 leading-relaxed">
+                  Depois de importados eles viram cobranças normais, sem nenhuma marcação.
+                  Revise antes de prosseguir.
+                </p>
+                <div className="grid grid-cols-1 gap-3 pt-1">
+                  <button
+                    onClick={() => setRevisaoModal(null)}
+                    className="py-2.5 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                  >
+                    Voltar e revisar
+                    <span className="block text-[10px] font-normal opacity-80">Recomendado</span>
+                  </button>
+                  <button
+                    onClick={() => { const p = revisaoModal.pending; setRevisaoModal(null); void doSendToOverview(p, true); }}
+                    className="py-2.5 px-3 rounded-xl text-xs font-bold bg-zinc-700 hover:bg-zinc-600 text-white transition-colors"
+                  >
+                    Importar assim mesmo
+                    <span className="block text-[10px] font-normal opacity-80">Assumo o risco de cobrar com dado incompleto</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {dupDocModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
               <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">

@@ -60,12 +60,25 @@ export interface RecordCandidate {
 
 // ── Confidence scoring ────────────────────────────────────────────────────────
 
+/**
+ * Nota de 0 a 100 para a extracao de um registro.
+ *
+ * ATENCAO: isto mede PRESENCA dos campos, nunca correcao. Um valor lido errado
+ * pontua igual a um valor certo. A nota serve para decidir o que precisa de
+ * olho humano, nao para atestar que a leitura esta correta.
+ *
+ * O telefone pesa porque e para onde a cobranca vai: um registro sem telefone
+ * nao e enviavel, e um telefone errado manda a cobranca para um estranho.
+ * Antes ele nao pontuava, e um registro sem telefone podia marcar 100.
+ */
 function score(r: RecordCandidate): number {
   let s = 0;
-  if ((r.client && r.client.length >= 3) || (r.supplier && r.supplier.length >= 3)) s += 30;
-  if (r.document) s += 25;
-  if (r.dueDate) s += 25;
-  if (r.value != null && r.value >= 0) s += 20;
+  if ((r.client && r.client.length >= 3) || (r.supplier && r.supplier.length >= 3)) s += 25;
+  if (r.document) s += 20;
+  if (r.dueDate) s += 20;
+  // Valor precisa ser > 0: zero nao e cobravel e antes ganhava os pontos.
+  if (r.value != null && r.value > 0) s += 20;
+  if (r.phone) s += 15;
   return s;
 }
 

@@ -348,6 +348,20 @@ Deno.serve(async (request: Request) => {
       const dueDate       = String(dr.due_date       ?? "");
       // Cobranca usa o valor base (amount), nao o updated_value com multa e juros.
       const amount        = Number(dr.amount ?? 0);
+      // Valor nao cobravel: bloqueia no servidor, nao so na UI.
+      if (!(amount > 0)) {
+        results.push({
+          debtorId,
+          clientName,
+          phone:       "",
+          status:      "bloqueado_liquidado",
+          messageId:   null,
+          logId:       null,
+          error:       "Valor da cobranca precisa ser maior que zero.",
+          sentWithPdf: false,
+        });
+        continue;
+      }
       const driveFileId   = (dr.drive_file_id   as string | null) ?? null;
       const driveFileUrl  = (dr.drive_file_url  as string | null) ?? null;
       const driveFileName = (dr.drive_file_name as string | null) ?? null;

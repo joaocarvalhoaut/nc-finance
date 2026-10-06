@@ -310,6 +310,12 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     const dueDate       = String(dr.due_date       ?? "");
     // Cobranca usa o valor base (amount), nao o updated_value com multa e juros.
     const amount        = Number(dr.amount ?? 0);
+    // Enviar "R$ 0,00" a um devedor e pior que nao enviar: confunde e expoe
+    // erro de extracao. O front ja filtra, mas o servidor e a autoridade.
+    if (!(amount > 0)) {
+      await markJob("failed", { last_error: "Valor da cobranca precisa ser maior que zero." });
+      return;
+    }
     const driveFileUrl  = (dr.drive_file_url  as string | null) ?? null;
     const driveFileName = (dr.drive_file_name as string | null) ?? null;
     const customMsg     = (meta.custom_message as string | null) ?? null;
