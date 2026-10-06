@@ -29,7 +29,8 @@ import { createClient }                          from "npm:@supabase/supabase-js
 import { corsHeaders }                           from "../_shared/cors.ts";
 import { normalizePhone, validatePhone, sendTextMessage } from "../_shared/zapi.ts";
 import { checkSubscription }                     from "../_shared/subscriptionGuard.ts";
-import { getUsageSnapshot, incrementChargesSent, getPlanLimit } from "../_shared/usageGuard.ts";
+import { getUsageSnapshot, incrementChargesSent } from "../_shared/usageGuard.ts";
+import { checkPilotGuard, incrementPilotDailyCount } from "../_shared/pilotGuard.ts";
 import { insertBillingLog }                      from "../_shared/billingLog.ts";
 import { buildMessage }                          from "../_shared/messageBuilder.ts";
 import { loadZApiCredentialsForUser }             from "../_shared/platformIntegrations.ts";
@@ -135,8 +136,9 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
   };
 
   try {
-    // ── 1. Carrega credenciais Z-API — número próprio (add-on) tem prioridade ──
-    // Lookup: user_zapi_config → platform_integrations → env vars
+    // ── 1. Carrega credenciais Z-API da conta ────────────────────────────
+    // Lookup: user_zapi_config apenas. Sem fallback global — conta sem numero
+    // conectado nao envia.
     const zapiCreds = await loadZApiCredentialsForUser(admin, userId);
     if (!zapiCreds) {
       await markJob("failed", { last_error: "Nenhum numero de WhatsApp conectado a esta conta. Conecte o numero em Configuracoes antes de enviar cobrancas." });
@@ -187,6 +189,65 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
           return;
         }
       }
+    }
+
+    // ── 4b. Piloto: janela, dias e teto diario do pilot_config ─────────────
+    // Mesmas regras que o envio manual ja aplica. Contas sem pilot_config
+    // passam direto (nao sao tenants de piloto). Fora da janela ou do dia
+    // permitido o job e REAGENDADO, nunca descartado — mesmo tratamento que a
+    // janela da propria regra recebe acima.
+    const pilot = await checkPilotGuard(admin, userId);
+    if (!pilot.ok && pilot.reason !== "config_ausente") {
+      if (pilot.reason === "fora_horario" || pilot.reason === "dia_nao_permitido") {
+        const agora = new Date();
+        const { data: pcfg } = await admin
+          .from("pilot_config")
+          .select("allowed_send_start, allowed_send_end")
+          .eq("user_id", userId)
+          .maybeSingle();
+        const pc = pcfg as Record<string, string> | null;
+        const ini = String(pc?.allowed_send_start ?? "08:00").slice(0, 5);
+        const fim = String(pc?.allowed_send_end   ?? "18:00").slice(0, 5);
+        // Fora do horario: proximo inicio de janela. Dia nao permitido ja dentro
+        // do horario: deferred devolve null, entao tenta de novo em 24h.
+        const proximo = deferredAutomationStart(ini, fim, agora)
+          ?? new Date(agora.getTime() + 24 * 60 * 60 * 1000);
+        await admin
+          .from("user_dispatch_jobs")
+          .update({ status: "queued", scheduled_for: proximo.toISOString(), updated_at: new Date().toISOString() })
+          .eq("id", jobId);
+        return;
+      }
+      // limite_diario e demais bloqueios: para o job, nao reagenda.
+      await markJob("blocked_limit", { last_error: pilot.message });
+      return;
+    }
+
+    // ── 4c. Anti-abuso: bloqueia conta com alto indice de reclamacoes ──────
+    // Espelha a regra do envio manual: se >=20% dos contatos pediram "PARE"
+    // (opt-out por RESPOSTA) e ja houve ao menos 20 cobrancas enviadas, a conta
+    // entra em revisao. Protege contra uso da plataforma para cobranca indevida.
+    // Fail-open: qualquer erro de consulta nunca bloqueia um envio legitimo.
+    try {
+      const [{ count: optOutsResposta }, { count: cobrancasEnviadas }] = await Promise.all([
+        admin.from("user_do_not_contact")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId).eq("source", "reply"),
+        admin.from("user_logs_cobranca")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .in("status", ["sucesso", "sent", "recebido", "entregue", "lido"]),
+      ]);
+      const enviadas   = cobrancasEnviadas ?? 0;
+      const reclamacoes = optOutsResposta  ?? 0;
+      if (enviadas >= 20 && reclamacoes / enviadas >= 0.20) {
+        await markJob("conta_em_revisao", {
+          last_error: `Conta em revisao: ${reclamacoes}/${enviadas} opt-out por resposta (>=20%).`,
+        });
+        return;
+      }
+    } catch (e) {
+      console.error("[process-dispatch-jobs] anti-abuso falhou (fail-open):", e instanceof Error ? e.message : String(e));
     }
 
     // ── 5. Valida limite mensal ────────────────────────────────────────────
@@ -329,6 +390,8 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     // ── 12. Incrementa usage em sucesso ───────────────────────────────────
     if (zapiResult.success) {
       await incrementChargesSent(admin, userId, usage, 1);
+      // Sem isto o teto diario do piloto nunca sobe e vira decorativo.
+      await incrementPilotDailyCount(admin, userId, 1);
       await markJob("success", {
         provider_message_id: zapiResult.messageId,
         attempts: attempts + 1,
