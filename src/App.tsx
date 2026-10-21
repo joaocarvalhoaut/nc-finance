@@ -181,6 +181,35 @@ const DEFAULT_USER_CONFIG = {
 
 // (Gemini extraction API types removed — pipeline is now fully local)
 
+/**
+ * Mescla os registros devolvidos pelo banco na lista em memoria.
+ *
+ * financeService.createMany faz UPSERT por (user_id, document_number). Quando o
+ * documento ja existe, o banco ATUALIZA a linha e devolve ela com o id ANTIGO —
+ * nao um id novo. Anexar esse retorno sem conferir colocava o mesmo id duas
+ * vezes no array: a linha aparecia duplicada, o React avisava de key repetida e
+ * a reconciliacao seguinte derrubava uma delas. Era o "duplica, some, fica um".
+ *
+ * Aqui o que ja esta na lista e atualizado no lugar, preservando a posicao, e so
+ * o que e realmente novo entra.
+ */
+const mesclarDevedores = (
+  anteriores: Debtor[],
+  salvos: Debtor[],
+  posicao: "inicio" | "fim",
+): Debtor[] => {
+  if (!salvos.length) return anteriores;
+
+  const salvosPorId = new Map(salvos.map((d) => [d.id, d]));
+  const atualizados = anteriores.map((d) => salvosPorId.get(d.id) ?? d);
+
+  const idsExistentes = new Set(anteriores.map((d) => d.id));
+  const novos = salvos.filter((d) => !idsExistentes.has(d.id));
+  if (!novos.length) return atualizados;
+
+  return posicao === "inicio" ? [...novos, ...atualizados] : [...atualizados, ...novos];
+};
+
 export default function App() {
   const {
     account,
@@ -242,6 +271,7 @@ export default function App() {
   const [extractionAlert, setExtractionAlert] = useState<string>("");
   const [dupDocModal, setDupDocModal] = useState<{ pending: typeof extractedDebtors; dupes: { doc: string; count: number }[] } | null>(null);
   const [revisaoModal, setRevisaoModal] = useState<{ pending: typeof extractedDebtors; duvidosos: number } | null>(null);
+  const [addDupModal, setAddDupModal] = useState<{ novo: Debtor; existente: Debtor } | null>(null);
   const [notesPopover, setNotesPopover] = useState<{ debtorId: string; draft: string } | null>(null);
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
   // Original File object — needed for OCR fallback on scanned PDFs
@@ -1261,7 +1291,7 @@ export default function App() {
 
     try {
       const savedDebtors = await financeService.createMany(currentOwnerUserId!, finalList);
-      setDebtors((prev) => [...prev, ...savedDebtors]);
+      setDebtors((prev) => mesclarDevedores(prev, savedDebtors, "fim"));
       const sentIds = new Set(finalList.map(d => d.id));
       setExtractedDebtors(prev => prev.filter(d => !sentIds.has(d.id)));
       setExtractedSelectedIds(new Set());
@@ -1512,31 +1542,58 @@ export default function App() {
       setAddDebtorError("Informe um vencimento válido no formato DD/MM/AAAA.");
       return;
     }
+    setAddDebtorError("");
+
+    const newDebtor: Debtor = {
+      id:       crypto.randomUUID(),
+      client:   addDebtorForm.client.trim(),
+      supplier: addDebtorForm.supplier.trim(),
+      document: addDebtorForm.document.trim() || `M-${Date.now()}`,
+      dueDate:  addDebtorForm.dueDate.trim(),
+      value:    val,
+      phone:    addDebtorForm.phone.trim(),
+      category: addDebtorForm.category,
+      status:   "pending",
+      interestApplied: addDebtorForm.category === "liquidado" ? 0 : globalInterestDayPct,
+      fineApplied:     addDebtorForm.category === "liquidado" ? 0 : globalFinePct,
+      updatedValue:    addDebtorForm.category === "liquidado"
+        ? val
+        : Math.round(val * (1 + globalFinePct / 100) * 100) / 100,
+    };
+
+    // createMany faz upsert por (user_id, document_number): salvar com um
+    // documento que ja existe SOBRESCREVE o boleto anterior, sem aviso. Como o
+    // usuario acha que esta criando um novo, perguntamos antes.
+    const existente = debtors.find(d => d.document === newDebtor.document);
+    if (existente) {
+      setAddDupModal({ novo: newDebtor, existente });
+      return;
+    }
+
+    await salvarDevedorManual(newDebtor);
+  };
+
+  /** Proximo documento livre no padrao "base-2", "base-3"… */
+  const documentoLivre = (base: string): string => {
+    const usados = new Set(debtors.map(d => d.document));
+    if (!usados.has(base)) return base;
+    let n = 2;
+    while (usados.has(`${base}-${n}`)) n++;
+    return `${base}-${n}`;
+  };
+
+  const salvarDevedorManual = async (devedor: Debtor) => {
+    if (!currentOwnerUserId) return;
     setAddDebtorSaving(true);
     setAddDebtorError("");
     try {
-      const newDebtor: Debtor = {
-        id:       crypto.randomUUID(),
-        client:   addDebtorForm.client.trim(),
-        supplier: addDebtorForm.supplier.trim(),
-        document: addDebtorForm.document.trim() || `M-${Date.now()}`,
-        dueDate:  addDebtorForm.dueDate.trim(),
-        value:    val,
-        phone:    addDebtorForm.phone.trim(),
-        category: addDebtorForm.category,
-        status:   "pending",
-        interestApplied: addDebtorForm.category === "liquidado" ? 0 : globalInterestDayPct,
-        fineApplied:     addDebtorForm.category === "liquidado" ? 0 : globalFinePct,
-        updatedValue:    addDebtorForm.category === "liquidado"
-          ? val
-          : Math.round(val * (1 + globalFinePct / 100) * 100) / 100,
-      };
-      const [saved] = await financeService.createMany(currentOwnerUserId, [newDebtor]);
-      setDebtors(prev => [saved, ...prev]);
+      const [saved] = await financeService.createMany(currentOwnerUserId, [devedor]);
+      setDebtors(prev => mesclarDevedores(prev, [saved], "inicio"));
       // Aprende o contato (telefone) para sugerir em cadastros/importações futuras
       void learnContactsFromDebtors([saved]);
       setAddDebtorForm({ client: "", supplier: "", document: "", dueDate: "", value: "", phone: "", category: "vencidos" });
       setShowAddDebtorModal(false);
+      setAddDupModal(null);
     } catch (err) {
       setAddDebtorError(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
     } finally {
@@ -5282,6 +5339,64 @@ export default function App() {
           })()}
 
           {/* ── Modal: Documentos Duplicados na Importação ── */}
+          {addDupModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+              <div className="bg-zinc-900 border border-amber-700/60 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+                <h3 className="text-sm font-bold text-white">
+                  Já existe um boleto com o documento {addDupModal.novo.document}
+                </h3>
+                <div className="bg-zinc-950 rounded-xl p-3 space-y-1 text-xs">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-zinc-500">Cliente</span>
+                    <span className="text-zinc-200 truncate">{addDupModal.existente.client}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-zinc-500">Vencimento</span>
+                    <span className="text-zinc-200 font-mono">{addDupModal.existente.dueDate}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-zinc-500">Valor</span>
+                    <span className="text-zinc-200 font-mono">{formatBRL(addDupModal.existente.value)}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Atualizar substitui os dados acima pelos que você acabou de preencher.
+                  O boleto anterior deixa de existir.
+                </p>
+                <div className="grid grid-cols-1 gap-3 pt-1">
+                  <button
+                    onClick={() => {
+                      const alvo = addDupModal.novo;
+                      void salvarDevedorManual({ ...alvo, document: documentoLivre(alvo.document) });
+                    }}
+                    disabled={addDebtorSaving}
+                    className="py-2.5 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-colors cursor-pointer"
+                  >
+                    Criar como boleto separado
+                    <span className="block text-[10px] font-normal opacity-80">
+                      Salva com o documento {documentoLivre(addDupModal.novo.document)} e mantém o anterior
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => void salvarDevedorManual(addDupModal.novo)}
+                    disabled={addDebtorSaving}
+                    className="py-2.5 px-3 rounded-xl text-xs font-bold bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white transition-colors cursor-pointer"
+                  >
+                    Atualizar o existente
+                    <span className="block text-[10px] font-normal opacity-80">Sobrescreve o boleto acima</span>
+                  </button>
+                </div>
+                <button
+                  onClick={() => setAddDupModal(null)}
+                  disabled={addDebtorSaving}
+                  className="w-full text-[10px] text-zinc-600 hover:text-zinc-400 disabled:opacity-50 transition-colors pt-1 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
           {revisaoModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
               <div className="bg-zinc-900 border border-amber-700/60 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
