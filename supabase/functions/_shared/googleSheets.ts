@@ -7,6 +7,8 @@
  * - Nunca expostos ao frontend.
  */
 
+import { mapHeaders } from "./columnHeaders.ts";
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 export interface SheetRow {
@@ -117,29 +119,10 @@ export const extractSpreadsheetId = (urlOrId: string): string => {
   );
 };
 
-// ─── Column aliases ─────────────────────────────────────────────────────────────
-
-const COL_ALIASES: Record<string, string[]> = {
-  clientName:     ["nome", "cliente", "devedor", "customer", "name", "razão social", "razao social", "tomador"],
-  documentNumber: ["documento", "cpf", "cnpj", "cpf_cnpj", "cpf/cnpj", "doc", "numero", "número"],
-  phone:          ["telefone", "celular", "whatsapp", "phone", "fone", "contato", "tel"],
-  amount:         ["valor", "valor_original", "valor_atualizado", "amount", "vlr", "vl", "total"],
-  dueDate:        ["vencimento", "data_vencimento", "due_date", "dt_vencimento", "venc", "data venc", "dt venc"],
-  status:         ["status", "situacao", "situação", "categoria", "situação do título"],
-  notes:          ["observacao", "observação", "obs", "notes", "nota", "comentario", "comentário"],
-  supplier:       ["fornecedor", "empresa", "supplier", "emissor", "credor"],
-};
-
-const findColIndex = (header: string[], fieldKey: string): number => {
-  const aliases = COL_ALIASES[fieldKey] ?? [];
-  for (const alias of aliases) {
-    const idx = header.findIndex(
-      (h) => h.toLowerCase().trim() === alias.toLowerCase(),
-    );
-    if (idx !== -1) return idx;
-  }
-  return -1;
-};
+// ─── Column mapping ─────────────────────────────────────────────────────────────
+// Vem de columnHeaders.ts, a mesma fonte da importação de PDF/Excel/CSV. A lista
+// que existia aqui comparava por igualdade exata e não conhecia "sacado" nem
+// "pagador": "Data de Vencimento", "Venc." e "Vcto" passavam despercebidos.
 
 // ─── Value normalizers ──────────────────────────────────────────────────────────
 
@@ -233,19 +216,24 @@ export const readSpreadsheet = async (params: {
   }
 
   // First row = header
-  const headerRaw = rawValues[0].map((h) => (h ?? "").toLowerCase().trim());
-  const dataRows  = rawValues.slice(1);
+  const dataRows = rawValues.slice(1);
+  const m = mapHeaders(
+    rawValues[0].map((h) => h ?? ""),
+    ["client", "document", "cnpj", "phone", "value", "dueDate", "status", "notes", "supplier"] as const,
+  );
 
   // Detect column indices
   const colIdx = {
-    clientName:     findColIndex(headerRaw, "clientName"),
-    documentNumber: findColIndex(headerRaw, "documentNumber"),
-    phone:          findColIndex(headerRaw, "phone"),
-    amount:         findColIndex(headerRaw, "amount"),
-    dueDate:        findColIndex(headerRaw, "dueDate"),
-    status:         findColIndex(headerRaw, "status"),
-    notes:          findColIndex(headerRaw, "notes"),
-    supplier:       findColIndex(headerRaw, "supplier"),
+    clientName:     m.client   ?? -1,
+    // Sem coluna de documento, cai no CPF/CNPJ como antes — preserva o
+    // comportamento de planilhas já em uso.
+    documentNumber: m.document ?? m.cnpj ?? -1,
+    phone:          m.phone    ?? -1,
+    amount:         m.value    ?? -1,
+    dueDate:        m.dueDate  ?? -1,
+    status:         m.status   ?? -1,
+    notes:          m.notes    ?? -1,
+    supplier:       m.supplier ?? -1,
   };
 
   // Require at minimum: clientName, amount, dueDate

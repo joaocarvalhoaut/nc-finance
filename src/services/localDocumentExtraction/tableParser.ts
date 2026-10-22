@@ -3,7 +3,12 @@
  *
  * Detects the header line, maps column names to canonical field names,
  * and extracts rows as key→value objects.
+ *
+ * O reconhecimento dos cabeçalhos vem de supabase/functions/_shared/columnHeaders.ts,
+ * a mesma fonte usada pela importação do Google Sheets.
  */
+
+import { countStrongFields, mapHeaders } from "../../../supabase/functions/_shared/columnHeaders.ts";
 
 /** Canonical field names we want to produce. */
 export type FieldName =
@@ -18,19 +23,10 @@ export type FieldName =
   | "docType"
   | "bank";
 
-/** Header keywords that map to canonical field names */
-const HEADER_ALIASES: Record<FieldName, string[]> = {
-  client: ["sacado", "cliente", "devedor", "nome", "razao social", "razão social"],
-  supplier: ["empresa", "fornecedor", "emissor", "sacador", "cedente"],
-  cnpj: ["cnpj", "cpf", "cnpj/cpf"],
-  document: ["titulo", "título", "n°", "no titulo", "documento", "nosso numero", "boleto", "titulo/numero"],
-  dueDate: ["vencimento", "vcto", "vecto", "data venc"],
-  value: ["valor", "saldo", "total", "valor titulo", "valor original"],
-  phone: ["telefone", "fone", "celular", "tel", "contato"],
-  status: ["estado", "situacao", "situação", "status"],
-  docType: ["tipo", "especie", "espécie", "tipo titulo"],
-  bank: ["banco", "bank", "instituicao", "instituição", "inst. financeira"],
-};
+/** Campos que a extração de tabelas produz (o Sheets usa também "notes"). */
+const TABLE_FIELDS: readonly FieldName[] = [
+  "client", "supplier", "cnpj", "document", "dueDate", "value", "phone", "status", "docType", "bank",
+];
 
 /** Mapping from column index to field name */
 export type ColumnMap = Partial<Record<FieldName, number>>;
@@ -63,11 +59,8 @@ export function isHeaderLine(line: string): boolean {
   ) {
     return false;
   }
-  let hits = 0;
-  for (const aliases of Object.values(HEADER_ALIASES)) {
-    if (aliases.some((a) => norm.includes(a))) hits++;
-  }
-  return hits >= 2;
+  // Cabeçalho = menciona com segurança pelo menos dois campos diferentes.
+  return countStrongFields(line) >= 2;
 }
 
 /**
@@ -120,17 +113,10 @@ export function detectDelimiter(lines: string[]): string {
 
 /** Build a ColumnMap from a header line and delimiter. */
 export function buildColumnMap(headerLine: string, delimiter: string): ColumnMap {
-  const cells = splitDelimitedLine(headerLine, delimiter);
-  const map: ColumnMap = {};
-  cells.forEach((cell, idx) => {
-    const norm = deaccent(cell);
-    for (const [field, aliases] of Object.entries(HEADER_ALIASES) as [FieldName, string[]][]) {
-      if (!(field in map) && aliases.some((a) => norm.includes(a))) {
-        map[field] = idx;
-      }
-    }
-  });
-  return map;
+  // Cada coluna vai para no máximo um campo, pela maior pontuação. A comparação
+  // antiga era por substring e por ordem: "Sacador" contém "sacado", e se viesse
+  // antes da coluna Sacado o cliente era mapeado para o fornecedor.
+  return mapHeaders(splitDelimitedLine(headerLine, delimiter), TABLE_FIELDS);
 }
 
 /**

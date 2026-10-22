@@ -2,6 +2,8 @@
  * Text normalization helpers for financial document extraction.
  */
 
+import { countStrongFields } from "../../../supabase/functions/_shared/columnHeaders.ts";
+
 /** Lines matching these patterns are page noise and should be dropped. */
 const SKIP_PATTERNS: RegExp[] = [
   /^\s*p[áa]gina\s+\d+/i,
@@ -70,18 +72,8 @@ export function looksLikeDelimited(text: string): boolean {
   // O portão abaixo ainda exige 2+ palavras de cabeçalho financeiras.
   const hasDelimiter = firstLines.some((l) => /[;\t|]/.test(l) || /(?<!\d),(?!\d)/.test(l));
   if (!hasDelimiter) return false;
-  const headerKeywords = [
-    "vencimento",
-    "vcto",
-    "valor",
-    "cliente",
-    "sacado",
-    "titulo",
-    "título",
-    "documento",
-    "cnpj",
-  ];
-  const joined = firstLines.join(" ").toLowerCase();
-  const hits = headerKeywords.filter((k) => joined.includes(k)).length;
-  return hits >= 2;
+  // Mesmo reconhecedor dos importadores. A lista fixa que existia aqui não
+  // conhecia "pagador", "venc.", "vlr"…: uma planilha com cabeçalho
+  // "Pagador;Venc.;Vlr" nem chegava ao parser de tabela.
+  return countStrongFields(firstLines.join(" ")) >= 2;
 }

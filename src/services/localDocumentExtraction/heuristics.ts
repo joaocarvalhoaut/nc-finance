@@ -89,6 +89,11 @@ const HEADER_WORDS = new Set([
   "dias", "valor", "estado", "emissao", "emissão", "pagamento", "pago",
   "cnpj", "cpf", "lista", "recebiveis", "recebíveis", "data", "registro",
   "nfe", "nf", "serie", "numero", "n°", "no",
+  // Sinônimos e abreviações de cabeçalho que vazam para o nome do cliente.
+  // De propósito NÃO entram "cliente" e "devedor": cortariam nomes reais como
+  // "CLIENTE FIEL COMERCIO".
+  "pagador", "sacador", "cedente", "beneficiario",
+  "venc", "vcto", "vecto", "vencto", "vlr",
 ]);
 
 function isHeaderWord(word: string): boolean {

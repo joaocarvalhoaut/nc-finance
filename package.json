@@ -16,7 +16,7 @@
     "lint:functions": "cd supabase/functions && npx --yes deno@latest task check",
     "test:parser": "npx tsx src/services/localDocumentExtraction/__tests__/normalizeText.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/tableParser.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/regexExtractors.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/heuristics.test.ts && npx tsx src/services/localDocumentExtraction/__tests__/validation.test.ts",
     "test:hardening": "node scripts/hardening.js --report",
-    "test:shared": "npx tsx supabase/functions/_shared/__tests__/format.test.ts && npx tsx supabase/functions/_shared/__tests__/phone.test.ts && npx tsx supabase/functions/_shared/__tests__/optOut.test.ts && npx tsx supabase/functions/_shared/__tests__/sanitize.test.ts",
+    "test:shared": "npx tsx supabase/functions/_shared/__tests__/format.test.ts && npx tsx supabase/functions/_shared/__tests__/phone.test.ts && npx tsx supabase/functions/_shared/__tests__/optOut.test.ts && npx tsx supabase/functions/_shared/__tests__/sanitize.test.ts && npx tsx supabase/functions/_shared/__tests__/columnHeaders.test.ts",
     "test:security": "node tests/hardening.test.mjs",
     "test:files": "node tests/import-files.test.mjs",
     "test:local-db": "node tests/local-db.test.mjs",
