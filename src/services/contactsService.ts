@@ -1,5 +1,9 @@
 import { getSupabaseClient } from "./supabaseClient";
 import type { Debtor } from "../types";
+import { UUID_REGEX, buildContactSyncBatches, contactKeyFromName, hasValidPhone } from "./contactSync";
+
+// Mantém o import de quem já usava daqui (App.tsx, ClientDashboard.tsx).
+export { contactKeyFromName } from "./contactSync";
 
 /**
  * Cadastro persistente de contatos por cliente.
@@ -42,24 +46,6 @@ interface ContactRow {
 const TABLE_NAME = "user_contatos";
 const SELECT_FIELDS =
   "id, user_id, contact_key, client_name, phone, email, notes, representative_id, created_at, updated_at";
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-/** Normaliza o nome do cliente em uma chave estável de casamento. */
-export function contactKeyFromName(name: string): string {
-  return (name || "")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "") // remove acentos
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ") // pontuação → espaço
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-/** Considera válido um telefone com 10+ dígitos (DDD + número). */
-function hasValidPhone(phone: string | null | undefined): boolean {
-  return Boolean(phone && phone.replace(/\D/g, "").length >= 10);
-}
-
 const mapRowToContact = (row: ContactRow): Contact => ({
   id: row.id,
   userId: row.user_id,
@@ -139,38 +125,19 @@ export const contactsService = {
    * em caso de erro — apenas registra no console.
    */
   async syncFromDebtors(userId: string, debtors: Debtor[]): Promise<void> {
-    const byKey = new Map<string, { client_name: string; phone: string; representative_id: string | null }>();
-
-    for (const d of debtors) {
-      if (!hasValidPhone(d.phone)) continue;
-      const key = contactKeyFromName(d.client);
-      if (!key) continue;
-      byKey.set(key, {
-        client_name: d.client.trim(),
-        phone: d.phone.trim(),
-        representative_id:
-          d.representativeId && UUID_REGEX.test(d.representativeId) ? d.representativeId : null,
-      });
-    }
-
-    if (!byKey.size) return;
-
-    const now = new Date().toISOString();
-    const payload = [...byKey.entries()].map(([contact_key, v]) => ({
-      user_id: userId,
-      contact_key,
-      client_name: v.client_name,
-      phone: v.phone,
-      representative_id: v.representative_id,
-      updated_at: now,
-    }));
+    // Regra (e o porquê dos dois lotes) em contactSync.ts, onde é testada.
+    const { comRep, semRep } = buildContactSyncBatches(userId, debtors, new Date().toISOString());
+    if (!comRep.length && !semRep.length) return;
 
     try {
       const supabase = getSupabaseClient();
-      const { error } = await supabase
-        .from(TABLE_NAME)
-        .upsert(payload, { onConflict: "user_id,contact_key", ignoreDuplicates: false });
-      if (error) console.warn("[contacts.sync]", error.message);
+      for (const lote of [comRep, semRep]) {
+        if (!lote.length) continue;
+        const { error } = await supabase
+          .from(TABLE_NAME)
+          .upsert(lote, { onConflict: "user_id,contact_key", ignoreDuplicates: false });
+        if (error) console.warn("[contacts.sync]", error.message);
+      }
     } catch (err) {
       console.warn("[contacts.sync]", err instanceof Error ? err.message : "falha ao sincronizar contatos");
     }
