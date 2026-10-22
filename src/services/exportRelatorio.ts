@@ -10,9 +10,12 @@ const BRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 const CATEGORY_LABEL: Record<string, string> = {
-  vencidos:  "Vencido",
-  a_vencer:  "A Vencer",
-  liquidado: "Liquidado",
+  vencidos:     "Vencido",
+  a_vencer:     "A Vencer",
+  recompra:     "Recompra",
+  liquidado:    "Liquidado",
+  // Antes ausente: desabilitado saía em branco no relatório.
+  desabilitado: "Desabilitado",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -68,11 +71,13 @@ export function exportRelatorio(
   const totalDebtors  = debtors.length;
   const vencidos      = debtors.filter(d => d.category === "vencidos");
   const aVencer       = debtors.filter(d => d.category === "a_vencer");
+  const recompras     = debtors.filter(d => d.category === "recompra");
   const liquidados    = debtors.filter(d => d.category === "liquidado");
 
   const totalValor    = debtors.reduce((s, d) => s + (d.updatedValue || d.value), 0);
   const vencidosVal   = vencidos.reduce((s, d) => s + (d.updatedValue || d.value), 0);
   const aVencerVal    = aVencer.reduce((s, d) => s + (d.updatedValue || d.value), 0);
+  const recompraVal   = recompras.reduce((s, d) => s + (d.updatedValue || d.value), 0);
   const liquidadoVal  = liquidados.reduce((s, d) => s + d.value, 0);
 
   // Descobre quantas categorias distintas há nos dados
@@ -88,6 +93,8 @@ export function exportRelatorio(
       cards.push({ label: "Vencidos",  value: String(vencidos.length),  sub: BRL(vencidosVal),  color: [239, 68, 68] });
     if (categoriesPresent.has("a_vencer"))
       cards.push({ label: "A Vencer",  value: String(aVencer.length),   sub: BRL(aVencerVal),   color: [245, 158, 11] });
+    if (categoriesPresent.has("recompra"))
+      cards.push({ label: "Recompra",  value: String(recompras.length), sub: BRL(recompraVal),  color: [14, 165, 233] });
     if (categoriesPresent.has("liquidado"))
       cards.push({ label: "Liquidados", value: String(liquidados.length), sub: BRL(liquidadoVal), color: [16, 185, 129] });
   }
@@ -189,6 +196,7 @@ export function exportRelatorio(
         const val = data.cell.raw as string;
         if (val === "Vencido")    { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = "bold"; }
         if (val === "A Vencer")   { data.cell.styles.textColor = [180, 83, 9]; }
+        if (val === "Recompra")   { data.cell.styles.textColor = [2, 132, 199]; }
         if (val === "Liquidado")  { data.cell.styles.textColor = [16, 185, 129]; }
       }
     },

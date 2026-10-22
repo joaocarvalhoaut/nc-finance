@@ -17,7 +17,7 @@ export interface SheetRow {
   phone: string;
   amount: number;
   dueDate: string;        // ISO: YYYY-MM-DD
-  category: "vencidos" | "a_vencer" | "liquidado";
+  category: "vencidos" | "a_vencer" | "recompra" | "liquidado";
   notes: string;
   supplier: string;
   rawStatus: string | null;
@@ -157,10 +157,11 @@ const parseDate = (raw: string): string | null => {
 const detectCategory = (
   rawStatus: string | null,
   dueDate: string,
-): "vencidos" | "a_vencer" | "liquidado" => {
+): "vencidos" | "a_vencer" | "recompra" | "liquidado" => {
   if (rawStatus) {
     const s = rawStatus.toLowerCase().trim();
     if (/pago|liquid|quitad|baixado/.test(s)) return "liquidado";
+    if (/recompr/.test(s)) return "recompra";
     if (/a[_\s]?vencer|vigente|em dia/.test(s)) return "a_vencer";
     if (/vencido|atraso|venc/.test(s)) return "vencidos";
   }

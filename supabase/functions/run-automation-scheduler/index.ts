@@ -110,8 +110,9 @@ const processRule = async (rule: RuleRow): Promise<void> => {
     // usuário move um cliente para "vencidos", as regras de "a vencer" deixam
     // de cobrá-lo (e vice-versa) — respeitando o tipo atual do cliente.
     if (ruleType === "overdue") {
-      // Vencidos: todos os devedores marcados como vencidos
-      debtorQuery = debtorQuery.eq("category", "vencidos");
+      // Vencidos: devedores marcados como vencidos — e recompra, que é
+      // cobrada como vencido.
+      debtorQuery = debtorQuery.in("category", ["vencidos", "recompra"]);
     } else if (ruleType === "due_today") {
       // Vencem hoje: a_vencer com vencimento = hoje
       debtorQuery = debtorQuery.eq("category", "a_vencer").eq("due_date", today);

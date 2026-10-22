@@ -1,7 +1,7 @@
 import type { Debtor } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
 
-type FinancialCategory = "vencidos" | "a_vencer" | "liquidado" | "desabilitado";
+type FinancialCategory = "vencidos" | "a_vencer" | "recompra" | "liquidado" | "desabilitado";
 type FinancialStatus = "pending" | "sent" | "failed";
 
 interface FinancialRecordRow {
@@ -327,7 +327,9 @@ export const financeService = {
    * reconcileLiquidations — marca como liquidado devedores existentes que
    * correspondem aos registros do arquivo de liquidação (por número de documento).
    *
-   * Regra: apenas altera registros em category "vencidos" ou "a_vencer".
+   * Regra: apenas altera registros em category "vencidos", "a_vencer" ou
+   * "recompra". Sem recompra aqui, uma recompra já paga continuaria sendo
+   * cobrada depois de importado o arquivo de liquidação.
    * Nunca cria cobranças para registros de liquidação.
    *
    * @returns quantidade de registros reconciliados no DB.
@@ -352,7 +354,7 @@ export const financeService = {
       .from(TABLE_NAME)
       .select("id, document_number")
       .eq("user_id", userId)
-      .in("category", ["vencidos", "a_vencer"]);
+      .in("category", ["vencidos", "a_vencer", "recompra"]);
 
     if (fetchErr) return 0; // non-critical — não bloqueia o fluxo
 

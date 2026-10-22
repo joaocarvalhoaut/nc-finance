@@ -1,4 +1,5 @@
 import { isValidDueDate, parseManualAmount } from "./utils/manualDebtorValidation";
+import { CATEGORY_BADGE, CATEGORY_CYCLE, CATEGORY_LABEL, CATEGORY_TINT, cobraComoVencido } from "./config/categories";
 import React, { useState, useEffect, useMemo, lazy } from "react";
 import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
@@ -259,7 +260,7 @@ export default function App() {
 
   // Extraction screen properties
   const [importText, setImportText] = useState<string>("");
-  const [importCategory, setImportCategory] = useState<"vencidos" | "a_vencer" | "liquidado">("vencidos");
+  const [importCategory, setImportCategory] = useState<"vencidos" | "a_vencer" | "recompra" | "liquidado">("vencidos");
   const [isExtracting, setIsExtracting] = useState<boolean>(false);
   const [extractedDebtors, setExtractedDebtors] = useState<Debtor[]>([]);
   const [extractedSelectedIds, setExtractedSelectedIds] = useState<Set<string>>(new Set());
@@ -393,7 +394,7 @@ export default function App() {
     dueDate:  "",
     value:    "",
     phone:    "",
-    category: "vencidos" as "vencidos" | "a_vencer" | "liquidado",
+    category: "vencidos" as "vencidos" | "a_vencer" | "recompra" | "liquidado",
   });
 
   // Billing Tab specific interactive properties
@@ -1097,7 +1098,7 @@ export default function App() {
     const pat = patternTemplates.find(p => p.id === tone);
     if (!pat) return "";
 
-    const daysAtraso = debtor.category === "vencidos" ? "12" : "0";
+    const daysAtraso = cobraComoVencido(debtor.category) ? "12" : "0";
     // Cobranca usa o valor base: multa e juros seguem calculados para gestao,
     // mas nao entram no que e cobrado do devedor.
     const valStr = debtor.value.toFixed(2);
@@ -1764,9 +1765,12 @@ export default function App() {
   // Excel (.xlsx) export with proper formatting
   const downloadExcelFormat = () => {
     const CATEGORY_PT: Record<string, string> = {
-      vencidos:  "Vencido",
-      a_vencer:  "A Vencer",
-      liquidado: "Liquidado",
+      vencidos:     "Vencido",
+      a_vencer:     "A Vencer",
+      recompra:     "Recompra",
+      liquidado:    "Liquidado",
+      // Antes ausente: desabilitado saía em branco na planilha exportada.
+      desabilitado: "Desabilitado",
     };
 
     const rows = debtors.map((d) => {
@@ -1961,7 +1965,8 @@ export default function App() {
     let vencidosValue = 0, aVencerValue = 0, liquidadoValue = 0;
     for (const d of debtors) {
       const v = d.updatedValue || d.value;
-      if (d.category === "vencidos")          { vencidosCount++;     vencidosValue += v; }
+      // Recompra é cobrada como vencido e soma nos totais de vencidos.
+      if (cobraComoVencido(d.category))       { vencidosCount++;     vencidosValue += v; }
       else if (d.category === "a_vencer")     { aVencerCount++;      aVencerValue += v; }
       else if (d.category === "liquidado")    { liquidadoCount++;    liquidadoValue += d.value; }
       else if (d.category === "desabilitado") { desabilitadoCount++; }
@@ -1971,7 +1976,7 @@ export default function App() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const criticalDebtors = debtors.filter(d => {
-      if (d.category !== "vencidos") return false;
+      if (!cobraComoVencido(d.category)) return false;
       if (!d.dueDate) return false;
       const [dd, mm, yyyy] = d.dueDate.split("/");
       if (!dd || !mm || !yyyy) return false;
@@ -2472,13 +2477,8 @@ export default function App() {
                                         <p className="text-[10px] text-zinc-500 font-mono">{d.document}</p>
                                       </div>
                                       <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                                          d.category === "vencidos"     ? "bg-rose-500/10 text-rose-400"   :
-                                          d.category === "a_vencer"     ? "bg-amber-500/10 text-amber-400" :
-                                          d.category === "desabilitado" ? "bg-zinc-600/20 text-zinc-400"   :
-                                          "bg-emerald-500/10 text-emerald-400"
-                                        }`}>
-                                          {d.category === "vencidos" ? "Vencido" : d.category === "a_vencer" ? "A vencer" : d.category === "desabilitado" ? "Desabilitado" : "Liquidado"}
+                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${CATEGORY_TINT[d.category]}`}>
+                                          {CATEGORY_LABEL[d.category]}
                                         </span>
                                         <span className="text-[10px] font-mono text-zinc-400">
                                           {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(d.updatedValue || d.value)}
@@ -2618,10 +2618,11 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {[
                         { label: "Vencidos", count: debtors.filter(d => d.category === "vencidos").length, color: "text-rose-400 border-rose-500/20 bg-rose-500/5" },
                         { label: "A Vencer", count: debtors.filter(d => d.category === "a_vencer").length, color: "text-amber-400 border-amber-500/20 bg-amber-500/5" },
+                        { label: "Recompra", count: debtors.filter(d => d.category === "recompra").length, color: "text-sky-400 border-sky-500/20 bg-sky-500/5" },
                         { label: "Liquidados", count: debtors.filter(d => d.category === "liquidado").length, color: "text-emerald-400 border-emerald-500/20 bg-emerald-500/5" },
                       ].map(({ label, count, color }) => (
                         <div key={label} className={`border rounded-2xl p-4 flex items-center justify-between ${color}`}>
@@ -2668,7 +2669,7 @@ export default function App() {
                           name: rep ? rep.name : "Sem representante",
                           color: rep?.color ?? "text-zinc-400",
                           total: items.length,
-                          vencidos: items.filter(d => d.category === "vencidos").length,
+                          vencidos: items.filter(d => cobraComoVencido(d.category)).length,
                           aVencer: items.filter(d => d.category === "a_vencer").length,
                           liquidados: items.filter(d => d.category === "liquidado").length,
                           valorTotal: items.reduce((s, d) => s + (d.updatedValue || d.value), 0),
@@ -2776,10 +2777,11 @@ export default function App() {
                           <FileCheck2 className="w-3.5 h-3.5" />
                           Tipo de arquivo
                         </label>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 gap-2">
                           {([
                             { value: "vencidos",  label: "Vencidos",   description: "Títulos já vencidos — cobráveis com juros e multa", inactive: "border-zinc-700 text-zinc-400 hover:border-rose-500/50 hover:text-rose-300",    active: "border-rose-500 bg-rose-500/10 text-rose-300" },
                             { value: "a_vencer",  label: "A vencer",   description: "Títulos a vencer — aviso preventivo amigável",       inactive: "border-zinc-700 text-zinc-400 hover:border-amber-500/50 hover:text-amber-300",   active: "border-amber-500 bg-amber-500/10 text-amber-300" },
+                            { value: "recompra",  label: "Recompra",   description: "Títulos recomprados — cobráveis com juros e multa", inactive: "border-zinc-700 text-zinc-400 hover:border-sky-500/50 hover:text-sky-300",     active: "border-sky-500 bg-sky-500/10 text-sky-300" },
                             { value: "liquidado", label: "Liquidação", description: "Títulos pagos — reconciliação, SEM cobrança",        inactive: "border-zinc-700 text-zinc-400 hover:border-emerald-500/50 hover:text-emerald-300", active: "border-emerald-500 bg-emerald-500/10 text-emerald-300" },
                           ] as const).map(cat => (
                             <button
@@ -3568,6 +3570,7 @@ export default function App() {
                                     <option value="all">Todos</option>
                                     <option value="vencidos">Vencidos</option>
                                     <option value="a_vencer">A vencer</option>
+                                    <option value="recompra">Recompra</option>
                                     <option value="liquidado">Liquidado</option>
                                     <option value="desabilitado">Desabilitados</option>
                                   </select>
@@ -3730,25 +3733,19 @@ export default function App() {
                                   <td className="px-4 py-4 text-center">
                                     <span 
                                       onClick={() => {
-                                        const cats: ("vencidos"| "a_vencer" | "liquidado")[] = ["vencidos", "a_vencer", "liquidado"];
-                                        const currentIdx = cats.indexOf(d.category as "vencidos"| "a_vencer" | "liquidado");
-                                        // Desabilitado não cicla ao clicar (mude pela lista de desabilitados)
+                                        // Vencido → A vencer → Recompra → Liquidado. Desabilitado não
+                                        // cicla ao clicar (mude pela lista de desabilitados).
+                                        const currentIdx = CATEGORY_CYCLE.indexOf(d.category);
                                         if (currentIdx === -1) return;
-                                        const nextCat = cats[(currentIdx + 1) % cats.length];
+                                        const nextCat = CATEGORY_CYCLE[(currentIdx + 1) % CATEGORY_CYCLE.length];
                                         updateGeneralDebtorField(d.id, "category", nextCat);
                                       }}
                                       title={d.category === "desabilitado" && d.notes ? d.notes : undefined}
                                       className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase select-none transition-all ${d.category === "desabilitado" ? "cursor-default" : "cursor-pointer"}
-                                        ${d.category === "vencidos" && "bg-rose-500/10 text-rose-400 border border-rose-500/20"}
-                                        ${d.category === "a_vencer" && "bg-amber-500/10 text-amber-400 border border-amber-500/20"}
-                                        ${d.category === "liquidado" && "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"}
-                                        ${d.category === "desabilitado" && "bg-zinc-600/20 text-zinc-400 border border-zinc-600/30"}
+                                        ${CATEGORY_BADGE[d.category]}
                                       `}
                                     >
-                                      {d.category === "vencidos" && "Vencido"}
-                                      {d.category === "a_vencer" && "A vencer"}
-                                      {d.category === "liquidado" && "Liquidado"}
-                                      {d.category === "desabilitado" && "Desabilitado"}
+                                      {CATEGORY_LABEL[d.category]}
                                     </span>
                                   </td>
                                   <td className="px-4 py-4">
@@ -3996,10 +3993,11 @@ export default function App() {
                             <FileCheck2 className="w-3 h-3" />
                             Tipo de arquivo
                           </label>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-2 gap-2">
                             {([
                               { value: "vencidos",  label: "Vencidos",   description: "Títulos já vencidos — cobráveis com juros e multa", inactive: "border-zinc-700 text-zinc-400 hover:border-rose-500/50 hover:text-rose-300",    active: "border-rose-500 bg-rose-500/10 text-rose-300" },
                               { value: "a_vencer",  label: "A vencer",   description: "Títulos a vencer — aviso preventivo amigável",       inactive: "border-zinc-700 text-zinc-400 hover:border-amber-500/50 hover:text-amber-300",   active: "border-amber-500 bg-amber-500/10 text-amber-300" },
+                              { value: "recompra",  label: "Recompra",   description: "Títulos recomprados — cobráveis com juros e multa", inactive: "border-zinc-700 text-zinc-400 hover:border-sky-500/50 hover:text-sky-300",     active: "border-sky-500 bg-sky-500/10 text-sky-300" },
                               { value: "liquidado", label: "Liquidação", description: "Títulos pagos — reconciliação, SEM cobrança",        inactive: "border-zinc-700 text-zinc-400 hover:border-emerald-500/50 hover:text-emerald-300", active: "border-emerald-500 bg-emerald-500/10 text-emerald-300" },
                             ] as const).map(cat => (
                               <button
@@ -4312,13 +4310,9 @@ export default function App() {
 
                                   <div className="text-right flex flex-col items-end gap-1.5">
                                     <span className={`px-2 py-0.5 rounded text-[8px] uppercase tracking-wide font-bold font-mono
-                                      ${d.category === "vencidos" && "bg-rose-500/10 text-rose-400"}
-                                      ${d.category === "a_vencer" && "bg-amber-500/10 text-amber-400"}
-                                      ${d.category === "liquidado" && "bg-emerald-500/10 text-emerald-400"}
+                                      ${CATEGORY_TINT[d.category]}
                                     `}>
-                                      {d.category === "vencidos" && "Vencido"}
-                                      {d.category === "a_vencer" && "A vencer"}
-                                      {d.category === "liquidado" && "Liquidado"}
+                                      {CATEGORY_LABEL[d.category]}
                                     </span>
 
                                     {d.status === "sent" ? (
@@ -5023,7 +5017,7 @@ export default function App() {
                             let matchCount = 0;
 
                             if (ruleType === "overdue") {
-                              matchCount = debtors.filter(d => d.category === "vencidos" && d.status !== "sent").length;
+                              matchCount = debtors.filter(d => cobraComoVencido(d.category) && d.status !== "sent").length;
                             } else if (ruleType === "due_in_days") {
                               const today = new Date();
                               today.setHours(0, 0, 0, 0);

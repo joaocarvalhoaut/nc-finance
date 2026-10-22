@@ -294,7 +294,9 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     // cobre a janela entre criar o job e enviá-lo (se o usuário mudou o tipo).
     if (jobRuleType) {
       const cat = dr.category;
-      const okOverdue = jobRuleType === "overdue" && cat === "vencidos";
+      // Recompra entra na regra de vencidos. Precisa bater com o agendador:
+      // se só ele aceitasse, o job seria enfileirado e descartado aqui.
+      const okOverdue = jobRuleType === "overdue" && (cat === "vencidos" || cat === "recompra");
       const okAvencer = (jobRuleType === "due_today" || jobRuleType === "due_in_days") && cat === "a_vencer";
       if (!okOverdue && !okAvencer) {
         await markJob("skipped", {
