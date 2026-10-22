@@ -155,6 +155,8 @@ assert(r0?.valuePaid === 0 || r0?.valuePaid === null, `r0 valuePaid is 0 or null
 
 // Phone not confused with CNPJ/doc number
 assert(r0?.phone === "33988245284", `r0 phone = 33988245284 (got "${r0?.phone}")`);
+// O relatório traz o celular do Francisco no formato antigo, sem o 9. O parser
+// devolve como está no documento; o 9 entra no index.ts (ver Criterion 7).
 assert(r3?.phone === "3399137848",  `r3 phone = 3399137848 (got "${r3?.phone}")`);
 
 // CNPJ is separate from client
@@ -182,6 +184,11 @@ assert(emptyResult.method === "empty",    `Empty text → method = 'empty' (got 
 const goodResult = await extractDocumentLocally(ERP_FLAT, "vencidos");
 assert(goodResult.records.length === 4,    `Full ERP via index → 4 records (got ${goodResult.records.length})`);
 assert(goodResult.method !== "empty",      `Method is not 'empty' (got '${goodResult.method}')`);
+
+// Nono dígito no pipeline completo: celular antigo ganha o 9, fixo não.
+const phones = goodResult.records.map(r => r.phone);
+assert(phones.includes("33999137848"), `Francisco → 33999137848, com o nono dígito (got ${JSON.stringify(phones)})`);
+assert(phones.includes("3835721919"),  `Menezes (fixo) → 3835721919, sem 9 (got ${JSON.stringify(phones)})`);
 
 // ── Criterion 8: no "Gemini" text produced by the pipeline itself ─────────────
 

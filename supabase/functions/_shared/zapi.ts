@@ -7,6 +7,8 @@
  * - Todo envio passa obrigatoriamente pelo backend.
  */
 
+import { toWhatsappNumber } from "./brPhone.ts";
+
 const ZAPI_BASE = "https://api.z-api.io";
 const SEND_TIMEOUT_MS = 15_000;
 
@@ -33,26 +35,12 @@ const MAX_DOC_BYTES = 8 * 1024 * 1024;
  *   "5577999887720"   → "5577999887720"
  *   "+55 77 9988-7720" → "5577999887720"
  */
-export const normalizePhone = (raw: string): string => {
-  // Remove tudo que não for dígito
-  const digits = raw.replace(/\D/g, "");
-
-  // Remove zero inicial (discagem local)
-  const noLeadingZero = digits.startsWith("0") ? digits.slice(1) : digits;
-
-  // Se tiver DDI (12-13 dígitos) retorna como está
-  if (noLeadingZero.length === 12 || noLeadingZero.length === 13) {
-    return noLeadingZero;
-  }
-
-  // DDD + número sem DDI (10-11 dígitos) → adiciona 55
-  if (noLeadingZero.length === 10 || noLeadingZero.length === 11) {
-    return `55${noLeadingZero}`;
-  }
-
-  // Qualquer outro tamanho: retorna como está (será rejeitado em validatePhone)
-  return noLeadingZero;
-};
+//
+// Regra em brPhone.ts. Inclui o nono dígito em celular no formato antigo, o
+// que este comentário já prometia ("+55 77 9988-7720" → com 9) mas o código
+// não fazia. Como o envio passa por aqui, números já salvos sem o 9 também
+// saem corrigidos, sem precisar editar um por um.
+export const normalizePhone = (raw: string): string => toWhatsappNumber(raw);
 
 /**
  * Valida se o número normalizado é um celular brasileiro válido.

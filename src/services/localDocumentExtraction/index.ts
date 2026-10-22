@@ -18,6 +18,7 @@ import {
 } from "./heuristics";
 import { extractOCRFromPdfFile } from "./ocrFallback";
 import { maskName } from "./piiUtils";
+import { ensureNinthDigit } from "../../../supabase/functions/_shared/brPhone.ts";
 
 /**
  * Tenta extrair o nome do banco a partir do nome do arquivo.
@@ -228,6 +229,10 @@ export async function extractDocumentLocally(
     ...rec,
     // Banco do filename tem prioridade; se já veio do documento, mantém
     bank: rec.bank || bankFromFilename,
+    // Nono dígito só aqui, com o registro já montado: o parser usa o número
+    // detectado para achar no texto onde termina o nome do cliente, e um
+    // número alterado antes disso quebraria essa busca.
+    phone: rec.phone ? ensureNinthDigit(rec.phone) : rec.phone,
   }));
   const missingDocCount = conversionResults.filter((r) => r!.usedPlaceholder).length;
 

@@ -1,5 +1,6 @@
 import type { Debtor } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
+import { ensureNinthDigit } from "../../supabase/functions/_shared/brPhone.ts";
 
 type FinancialCategory = "vencidos" | "a_vencer" | "recompra" | "liquidado" | "desabilitado";
 type FinancialStatus = "pending" | "sent" | "failed";
@@ -124,7 +125,10 @@ const mapDebtorToRow = (userId: string, debtor: Debtor) => ({
   document_number: debtor.document?.trim() || null,
   due_date: normalizeDateToStorage(debtor.dueDate),
   amount: Number(debtor.value || 0),
-  phone: debtor.phone || null,
+  // Funil único de gravação: cadastro, importação (Visão Geral e Cobrar) e
+  // edição na tabela passam por aqui. Celular no formato antigo ganha o 9;
+  // fixo e número já correto ficam como foram digitados.
+  phone: debtor.phone ? ensureNinthDigit(debtor.phone) || null : null,
   category: debtor.category,
   interest_applied: debtor.interestApplied ?? 0,
   fine_applied: debtor.fineApplied ?? 0,

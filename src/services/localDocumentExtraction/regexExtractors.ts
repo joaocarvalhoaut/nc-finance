@@ -118,8 +118,12 @@ export function findFirstPhone(text: string): string | null {
     const end = start + m[0].length;
     if (!inExclusion(start, end)) {
       const digits = m[0].replace(/\D/g, "");
-      // Strip leading country code "55" if result is 12-13 digits
-      const phone = digits.length > 11 ? digits.slice(digits.length - 11) : digits;
+      // Remove o DDI 55 quando vier (12 ou 13 dígitos). O slice(-11) antigo
+      // cortava errado número com DDI e sem o 9: "557799887720" virava
+      // "57799887720", com o 5 do país no lugar do DDD.
+      const phone = (digits.length === 12 || digits.length === 13) && digits.startsWith("55")
+        ? digits.slice(2)
+        : digits.length > 11 ? digits.slice(digits.length - 11) : digits;
       if (phone.length >= 10 && phone.length <= 11) return phone;
     }
   }

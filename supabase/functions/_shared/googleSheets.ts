@@ -8,6 +8,7 @@
  */
 
 import { mapHeaders } from "./columnHeaders.ts";
+import { toWhatsappNumber } from "./brPhone.ts";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -169,12 +170,8 @@ const detectCategory = (
   return dueDate < today ? "vencidos" : "a_vencer";
 };
 
-const normalizePhone = (raw: string): string => {
-  const digits = raw.replace(/\D/g, "");
-  const noZero = digits.startsWith("0") ? digits.slice(1) : digits;
-  if (noZero.length === 10 || noZero.length === 11) return `55${noZero}`;
-  return noZero; // já tem DDI ou será validado depois
-};
+// Regra em brPhone.ts — inclui o nono dígito em celular no formato antigo.
+const normalizePhone = (raw: string): string => toWhatsappNumber(raw);
 
 // ─── Main read function ─────────────────────────────────────────────────────────
 

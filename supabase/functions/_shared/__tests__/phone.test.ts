@@ -16,7 +16,9 @@ function eq(got: unknown, want: unknown, label: string) {
 console.log("\n══ normalizePhone ═════════════════════════════════════════");
 eq(normalizePhone("77 9 9988-7720"),   "5577999887720", "11 dígitos → prefixa 55");
 eq(normalizePhone("5577999887720"),    "5577999887720", "13 dígitos → mantém");
-eq(normalizePhone("+55 77 9988-7720"), "557799887720",  "12 dígitos (DDI) → mantém");
+// Antes fixava o número SEM o 9 ("557799887720"). Agora celular no formato
+// antigo ganha o nono dígito — ver brPhone.test.ts.
+eq(normalizePhone("+55 77 9988-7720"), "5577999887720", "DDI sem o 9 → ganha o 9");
 eq(normalizePhone("011 98765-4321"),   "5511987654321", "zero inicial removido + prefixa 55");
 eq(normalizePhone("(11) 98765-4321"),  "5511987654321", "pontuação/parênteses ignorados");
 
