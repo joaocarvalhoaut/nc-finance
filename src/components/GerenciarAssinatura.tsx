@@ -72,8 +72,19 @@ export default function GerenciarAssinatura({ subscription, onClose, onAction, o
   };
 
   const pagar = () => executar(async () => {
-    const { invoice_url } = await onAction("pay");
-    if (invoice_url) window.location.assign(invoice_url);
+    try {
+      const { invoice_url } = await onAction("pay");
+      if (invoice_url) window.location.assign(invoice_url);
+    } catch (e) {
+      // Tudo pago e a próxima fatura ainda não foi gerada: não é erro.
+      if (e instanceof BillingError && e.code === "sem_fatura") {
+        setInfo(fim && status === "active"
+          ? `Nada em aberto — está tudo pago. A próxima fatura vence em ${formatDate(fim)}.`
+          : "Nada em aberto — está tudo pago.");
+        return;
+      }
+      throw e;
+    }
   });
 
   const trocarPlano = (planId: PlanId) => executar(async () => {
