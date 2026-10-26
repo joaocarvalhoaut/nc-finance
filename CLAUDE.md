@@ -7,7 +7,7 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
 - **Front:** React 19 + Vite 6 + TypeScript (SPA). Tailwind v4 (CSS-based, sem config). motion/react, lucide-react.
 - **Back:** Supabase — Postgres + **RLS** + Auth + **Edge Functions (Deno)** + Storage.
 - **Hosting:** Vercel (auto-deploy no push da `main`). Prod ref Supabase: `hiabmnyyxbedtkigcjdx`.
-- **Integrações:** Stripe (billing), Z-API (WhatsApp atual), Resend (SMTP auth), Google Drive/Sheets, Sentry, PostHog (analytics opt-in).
+- **Integrações:** Asaas (billing — Pix, boleto, cartão), Z-API (WhatsApp atual), Resend (SMTP auth), Google Drive/Sheets, Sentry, PostHog (analytics opt-in).
 
 ## Regras inegociáveis
 1. **Segredos nunca no front nem no git.** `.env` é gitignored. Credenciais de provider só em Edge Functions (service_role). O browser nunca recebe token.
@@ -22,7 +22,7 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
 
 ## Arquitetura (monólito modular)
 - `src/services/*` — camada de serviço do front (auth, cobrança, billing, drive…). Fronteiras claras.
-- `supabase/functions/*` — lógica sensível (envio, webhooks, Stripe). `_shared/*` = helpers reutilizados.
+- `supabase/functions/*` — lógica sensível (envio, webhooks, cobrança da assinatura). `_shared/*` = helpers reutilizados.
 - **WhatsApp por trás de flag de provider:** `_shared/zapi.ts` (atual) e `_shared/whatsappCloud.ts`
   (Cloud API oficial, pronto mas não ligado) têm o mesmo shape de retorno. Trocar via
   `WHATSAPP_PROVIDER=zapi|cloud`. Ver `MIGRACAO-WHATSAPP-CLOUD.md`.
@@ -38,7 +38,11 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
 
 ## Estado / pendências (ver memória do agente para datas)
 - Migração WhatsApp Cloud: motor + webhook prontos; falta conta Meta ativa + template + virar a flag.
-- Go-live billing: virar Stripe Test→Live.
+- Billing: **Asaas em produção** desde 26/10/2026 (a Stripe não verificou a conta; código dela
+  segue no repo, sem uso). Regra de acesso única em `_shared/billingStatus.ts` (`canUseSubscription`,
+  `ACCESS_COLUMNS`) — todo guard usa ela. Contas da Stripe sem assinatura no Asaas valem até
+  02/11/2026; `billing_provider = 'cortesia'` libera sem cobrança (conta do dono).
+  Pix nas faturas depende da verificação da conta Asaas + chave Pix (em andamento).
 - PostHog: **ativo**. A `VITE_POSTHOG_KEY` esta no Vercel desde 25/08/2026, mas o CSP
   nao liberava `us.i.posthog.com` — a lib inicializava e o navegador descartava todo
   evento, em silencio. Corrigido no `vercel.json` e no `server.ts`. Ao mexer no CSP,
