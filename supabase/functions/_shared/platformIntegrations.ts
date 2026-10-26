@@ -228,7 +228,7 @@ export async function savePlatformCredentials(
 
 /** Mascara telefone cru: mantem 4 primeiros e 3 ultimos digitos. */
 function maskPhoneDigits(rawPhone: string | null): string | null {
-  const digits = (rawPhone ?? "").replace(/D/g, "");
+  const digits = (rawPhone ?? "").replace(/\D/g, "");
   if (digits.length < 6) return null;
   return digits.slice(0, 4) + "*".repeat(Math.max(0, digits.length - 7)) + digits.slice(-3);
 }

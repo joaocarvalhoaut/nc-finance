@@ -181,6 +181,18 @@ Deno.serve(async (req: Request) => {
     if (!creds) {
       return err(503, "Nenhum número de WhatsApp conectado a esta conta. Fale com o suporte para provisionar a instância.");
     }
+    // Já pareado: não há QR a mostrar (escanear de novo falharia). Atualiza o
+    // status e avisa a tela, que troca o QR por "Conectado".
+    const atual = await fetchZApiStatus(creds.instanceId, creds.token, creds.clientToken);
+    if (atual && Boolean(atual.connected ?? atual.status === "CONNECTED")) {
+      const phone = ((atual.phone ?? atual.smartphonePhone ?? atual.number ?? "") as string)
+        || (await fetchZApiPhone(creds.instanceId, creds.token, creds.clientToken)) || null;
+      await updateUserZApiStatus(admin, user.id, {
+        status: "active", connected: true, connected_pending_phone: false, phone_number: phone, last_error: null,
+      });
+      return ok({ ok: true, connected: true, qrCode: null });
+    }
+
     const qrCode = await fetchZApiQR(creds.instanceId, creds.token, creds.clientToken);
     if (!qrCode) {
       return err(502, "Não foi possível obter QR Code da Z-API. Verifique se a instância já está conectada.");
@@ -259,7 +271,11 @@ Deno.serve(async (req: Request) => {
     // Parse Z-API status response
     // Typical fields: connected (bool), smartphoneConnected (bool), phone (string)
     const connected     = Boolean(zapiStatus.connected ?? zapiStatus.status === "CONNECTED");
-    const pendingPhone  = !connected && Boolean(zapiStatus.qrCode ?? zapiStatus.waiting);
+    // A Z-API respondeu e o número não está pareado ("You are not connected" /
+    // "You need to restore the session"): a instância está no ar esperando o QR
+    // Code. Antes isso virava status "error" e a tela mostrava "Erro de conexão"
+    // para quem só precisava escanear. "error" fica para quando a Z-API nem responde.
+    const pendingPhone  = !connected;
     // Try phone from status response first, then fetch from secondary endpoint
     let rawPhone = (zapiStatus.phone ?? zapiStatus.smartphonePhone ?? zapiStatus.number ?? "") as string;
     if (!rawPhone && connected) {
@@ -267,7 +283,7 @@ Deno.serve(async (req: Request) => {
     }
 
     await updateUserZApiStatus(admin, user.id, {
-      status:                  connected ? "active" : (pendingPhone ? "inactive" : "error"),
+      status:                  connected ? "active" : "inactive",
       connected,
       connected_pending_phone: pendingPhone,
       phone_number:            rawPhone || null,
@@ -280,9 +296,7 @@ Deno.serve(async (req: Request) => {
       ok: true,
       message: connected
         ? "Conexão Z-API validada com sucesso."
-        : pendingPhone
-          ? "Instância aguardando leitura de QR Code."
-          : "Z-API respondeu mas não está conectada.",
+        : "Número ainda não conectado. Abra a aba QR Code e escaneie com o WhatsApp do celular.",
       ...platformStatus,
     });
   }

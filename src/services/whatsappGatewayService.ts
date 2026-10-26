@@ -38,6 +38,8 @@ export interface GatewayQRResult {
   ok:      boolean;
   /** QR Code data (imagem base64 ou string sem credenciais) */
   qrCode:  string | null;
+  /** true quando o número já está pareado — não há QR a mostrar */
+  connected?: boolean;
   error?:  string;
 }
 

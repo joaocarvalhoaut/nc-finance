@@ -23,6 +23,11 @@ import {
 
 type ViewMode = "status" | "config" | "qr";
 
+// Pareamento por QR (recomendação da Z-API: novo QR a cada 10–20 s, parar após 3).
+const QR_RENOVAR_MS     = 15_000;
+const QR_MAX_TENTATIVAS = 3;
+const QR_POLL_MS        = 4_000;
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function WhatsappGatewayCard() {
@@ -48,6 +53,10 @@ export default function WhatsappGatewayCard() {
   const [qrCode,       setQrCode]       = useState<string | null>(null);
   const [isLoadingQR,  setIsLoadingQR]  = useState(false);
   const [qrError,      setQrError]      = useState("");
+  /** Quantos QR já foram mostrados nesta sessão de pareamento (0 = nenhum na tela). */
+  const [qrTentativa,  setQrTentativa]  = useState(0);
+  /** true logo depois que o celular escaneou — mostra a confirmação. */
+  const [qrConectado,  setQrConectado]  = useState(false);
 
   // ── View ───────────────────────────────────────────────────────────────────
   const [view, setView] = useState<ViewMode>("status");
@@ -115,23 +124,76 @@ export default function WhatsappGatewayCard() {
   };
 
   // ── Load QR Code ───────────────────────────────────────────────────────────
-  const handleLoadQR = async () => {
+  // O WhatsApp invalida o QR a cada 20 s. A Z-API recomenda buscar um novo a
+  // cada 10–20 s e, depois de 3 sem leitura, parar e oferecer um botão — é o
+  // que o efeito abaixo faz. Antes o QR era buscado uma vez só: quem demorava
+  // mais de 20 s para escanear recebia "QR inválido" no celular.
+  const handleLoadQR = async (tentativa = 1) => {
     setIsLoadingQR(true);
     setQrError("");
-    setQrCode(null);
+    if (tentativa === 1) setQrCode(null);
     try {
       const result = await whatsappGatewayService.getQRCode();
-      if (result.ok && result.qrCode) {
+      if (result.ok && result.connected) {
+        setQrCode(null);
+        setQrTentativa(0);
+        setQrConectado(true);
+        await loadStatus();
+      } else if (result.ok && result.qrCode) {
         setQrCode(result.qrCode);
+        setQrTentativa(tentativa);
       } else {
+        setQrCode(null);
+        setQrTentativa(0);
         setQrError(result.error ?? "Não foi possível obter o QR Code.");
       }
     } catch {
+      setQrCode(null);
+      setQrTentativa(0);
       setQrError("Falha de rede ao obter QR Code.");
     } finally {
       setIsLoadingQR(false);
     }
   };
+
+  // Enquanto o QR está na tela: confere a conexão a cada 4 s (para trocar o QR
+  // por "Conectado" assim que o celular escanear) e renova o QR a cada 15 s,
+  // até 3 vezes.
+  useEffect(() => {
+    if (view !== "qr" || !qrCode || qrTentativa === 0) return;
+
+    let ativo = true;
+    const poll = setInterval(async () => {
+      try {
+        const r = await whatsappGatewayService.validateConnection();
+        if (ativo && r.connected) {
+          setGatewayStatus(r);
+          setQrCode(null);
+          setQrTentativa(0);
+          setQrConectado(true);
+        }
+      } catch { /* tenta de novo no próximo ciclo */ }
+    }, QR_POLL_MS);
+
+    const renovar = setTimeout(() => {
+      if (!ativo) return;
+      if (qrTentativa < QR_MAX_TENTATIVAS) {
+        void handleLoadQR(qrTentativa + 1);
+      } else {
+        setQrCode(null);
+        setQrTentativa(0);
+        setQrError("O QR Code expirou. Clique em \"Gerar QR Code\" para tentar de novo.");
+      }
+    }, QR_RENOVAR_MS);
+
+    return () => {
+      ativo = false;
+      clearInterval(poll);
+      clearTimeout(renovar);
+    };
+    // handleLoadQR muda a cada render; o ciclo depende só do QR atual.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, qrCode, qrTentativa]);
 
   // ── Status badge ───────────────────────────────────────────────────────────
   const StatusBadge = () => {
@@ -323,16 +385,24 @@ export default function WhatsappGatewayCard() {
             Só disponível quando a instância está aguardando conexão.
           </p>
 
-          <button
-            onClick={() => void handleLoadQR()}
-            disabled={isLoadingQR}
-            className="w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
-          >
-            {isLoadingQR
-              ? <><RefreshCw className="w-4 h-4 animate-spin" /> Carregando QR…</>
-              : <><QrCode className="w-4 h-4" /> Gerar QR Code</>
-            }
-          </button>
+          {!qrCode && (
+            <button
+              onClick={() => { setQrConectado(false); void handleLoadQR(); }}
+              disabled={isLoadingQR}
+              className="w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+            >
+              {isLoadingQR
+                ? <><RefreshCw className="w-4 h-4 animate-spin" /> Carregando QR…</>
+                : <><QrCode className="w-4 h-4" /> Gerar QR Code</>
+              }
+            </button>
+          )}
+
+          {qrConectado && (
+            <p className="text-xs p-2 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center gap-1.5">
+              <CheckCircle className="w-3.5 h-3.5" /> WhatsApp conectado. Já dá para enviar cobranças por este número.
+            </p>
+          )}
 
           {qrError && (
             <p className="text-xs p-2 rounded-lg bg-rose-500/10 text-rose-400">{qrError}</p>
@@ -349,7 +419,11 @@ export default function WhatsappGatewayCard() {
                 </div>
               )}
               <p className="text-[10px] text-zinc-500 text-center mt-1">
-                Escaneie com o WhatsApp no celular do número que será usado.
+                No celular do número que será usado: WhatsApp &gt; Aparelhos conectados &gt; Conectar um aparelho.
+              </p>
+              <p className="text-[10px] text-zinc-400 text-center flex items-center gap-1">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                Aguardando leitura — o código se renova sozinho ({qrTentativa}/{QR_MAX_TENTATIVAS})
               </p>
             </div>
           )}
