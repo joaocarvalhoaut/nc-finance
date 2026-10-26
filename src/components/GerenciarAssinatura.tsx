@@ -140,7 +140,7 @@ export default function GerenciarAssinatura({ subscription, onClose, onAction, o
           </div>
           <div className="flex justify-between gap-3">
             <span className="text-zinc-500">Status</span>
-            <span className="text-zinc-200">{STATUS_PT[status] ?? status}</span>
+            <span className="text-zinc-200">{cancelada ? "Cancelada" : STATUS_PT[status] ?? status}</span>
           </div>
           {linhaData && <p className="text-zinc-400 pt-1">{linhaData}</p>}
         </div>
@@ -205,7 +205,7 @@ export default function GerenciarAssinatura({ subscription, onClose, onAction, o
           </div>
         )}
 
-        {!semAsaas && status !== "canceled" && (
+        {!semAsaas && !cancelada && (
           <button
             onClick={() => void pagar()}
             disabled={busy}
