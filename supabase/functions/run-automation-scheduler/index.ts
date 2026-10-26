@@ -21,6 +21,7 @@ import { nextAutomationStart, scheduledAutomationStart } from "../_shared/automa
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
 import { ACCESS_COLUMNS, canUseSubscription } from "../_shared/billingStatus.ts";
+import { reconcileAutoInstances } from "../_shared/zapiProvisioning.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -277,8 +278,18 @@ Deno.serve(async (request: Request) => {
       processed++;
     }
 
+    // Instâncias Z-API automáticas: cancela as de contas sem assinatura válida,
+    // assina as que conectaram e desativa as que nunca conectaram. Roda aqui
+    // para aproveitar o cron diário; uma falha nesta etapa não derruba as regras.
+    let zapiInstances: Awaited<ReturnType<typeof reconcileAutoInstances>> | null = null;
+    try {
+      zapiInstances = await reconcileAutoInstances(admin);
+    } catch (zapiErr) {
+      console.error("[run-automation-scheduler] reconcile zapi:", zapiErr instanceof Error ? zapiErr.message : zapiErr);
+    }
+
     return new Response(
-      JSON.stringify({ success: true, rulesProcessed: processed, timestamp: now }),
+      JSON.stringify({ success: true, rulesProcessed: processed, zapiInstances, timestamp: now }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {

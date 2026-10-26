@@ -14,6 +14,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
 import { writeAudit } from "../_shared/auditLog.ts";
+import { cancelAutoInstance } from "../_shared/zapiProvisioning.ts";
+import { inactivateSubscription } from "../_shared/asaas.ts";
 
 const SUPABASE_URL      = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -82,10 +84,27 @@ Deno.serve(async (request: Request) => {
       details: { self_service: true },
     });
 
-    // 2. Storage
+    // 2. Cobranças recorrentes: a exclusão apaga em cascata os ids do Asaas e da
+    //    Z-API — sem cancelar antes, o cliente continuaria pagando a assinatura e
+    //    a Z-API continuaria cobrando a instância. Falha aqui não impede excluir.
+    const { data: sub } = await admin
+      .from("user_subscriptions")
+      .select("asaas_subscription_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (sub?.asaas_subscription_id) {
+      try {
+        await inactivateSubscription(sub.asaas_subscription_id);
+      } catch (e) {
+        console.error(`[delete-account] falha ao cancelar assinatura Asaas: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    await cancelAutoInstance(admin, userId, "conta_excluida");
+
+    // 3. Storage
     const filesRemoved = await purgeStorage(admin, userId);
 
-    // 3. Deleta o usuário → CASCADE em todas as tabelas user_*
+    // 4. Deleta o usuário → CASCADE em todas as tabelas user_*
     const { error: delErr } = await admin.auth.admin.deleteUser(userId);
     if (delErr) {
       console.error(`[delete-account] falha ao deletar auth user: ${delErr.message}`);

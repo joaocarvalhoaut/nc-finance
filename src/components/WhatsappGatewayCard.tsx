@@ -27,6 +27,9 @@ type ViewMode = "status" | "config" | "qr";
 const QR_RENOVAR_MS     = 15_000;
 const QR_MAX_TENTATIVAS = 3;
 const QR_POLL_MS        = 4_000;
+// Instância recém-criada: espera ela subir (até ~40 s) antes de mostrar erro.
+const PREPARO_ESPERA_MS      = 5_000;
+const PREPARO_MAX_TENTATIVAS = 8;
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -57,9 +60,12 @@ export default function WhatsappGatewayCard() {
   const [qrTentativa,  setQrTentativa]  = useState(0);
   /** true logo depois que o celular escaneou — mostra a confirmação. */
   const [qrConectado,  setQrConectado]  = useState(false);
+  /** Instância nova subindo — mostra "Preparando seu número". */
+  const [preparando,   setPreparando]   = useState(false);
 
   // ── View ───────────────────────────────────────────────────────────────────
-  const [view, setView] = useState<ViewMode>("status");
+  // Começa em "Conectar": é o que o cliente veio fazer aqui.
+  const [view, setView] = useState<ViewMode>("qr");
 
   // ── Load status on mount ───────────────────────────────────────────────────
   const loadStatus = useCallback(async () => {
@@ -128,7 +134,11 @@ export default function WhatsappGatewayCard() {
   // cada 10–20 s e, depois de 3 sem leitura, parar e oferecer um botão — é o
   // que o efeito abaixo faz. Antes o QR era buscado uma vez só: quem demorava
   // mais de 20 s para escanear recebia "QR inválido" no celular.
-  const handleLoadQR = async (tentativa = 1) => {
+  //
+  // `preparo` > 0: a conta acabou de ganhar uma instância nova (criada pela API
+  // de parceiro da Z-API), que leva alguns segundos para subir. Nesse intervalo
+  // a Z-API ainda não entrega o QR — tenta de novo sozinho em vez de mostrar erro.
+  const handleLoadQR = async (tentativa = 1, preparo = 0) => {
     setIsLoadingQR(true);
     setQrError("");
     if (tentativa === 1) setQrCode(null);
@@ -137,19 +147,26 @@ export default function WhatsappGatewayCard() {
       if (result.ok && result.connected) {
         setQrCode(null);
         setQrTentativa(0);
+        setPreparando(false);
         setQrConectado(true);
         await loadStatus();
       } else if (result.ok && result.qrCode) {
         setQrCode(result.qrCode);
         setQrTentativa(tentativa);
+        setPreparando(false);
+      } else if ((result.ok && result.preparing) || (preparo > 0 && preparo < PREPARO_MAX_TENTATIVAS)) {
+        setPreparando(true);
+        setTimeout(() => void handleLoadQR(1, preparo + 1), PREPARO_ESPERA_MS);
       } else {
         setQrCode(null);
         setQrTentativa(0);
+        setPreparando(false);
         setQrError(result.error ?? "Não foi possível obter o QR Code.");
       }
     } catch {
       setQrCode(null);
       setQrTentativa(0);
+      setPreparando(false);
       setQrError("Falha de rede ao obter QR Code.");
     } finally {
       setIsLoadingQR(false);
@@ -260,7 +277,9 @@ export default function WhatsappGatewayCard() {
         <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
           <div className="bg-zinc-950 rounded-lg p-2 space-y-0.5">
             <div className="text-zinc-500 uppercase text-[9px] font-bold tracking-widest">Status</div>
-            <div className="text-zinc-200">{gatewayStatus.status}</div>
+            <div className="text-zinc-200">
+              {gatewayStatus.connected ? "Conectado" : gatewayStatus.status === "error" ? "Sem resposta da Z-API" : "Não conectado"}
+            </div>
           </div>
           <div className="bg-zinc-950 rounded-lg p-2 space-y-0.5">
             <div className="text-zinc-500 uppercase text-[9px] font-bold tracking-widest">Número</div>
@@ -274,7 +293,7 @@ export default function WhatsappGatewayCard() {
 
       {/* ── Tab navigation ───────────────────────────────────────────────── */}
       <div className="flex gap-1 border-b border-zinc-800 pb-2">
-        {(["status", "config", "qr"] as ViewMode[]).map((v) => (
+        {(["qr", "status"] as ViewMode[]).map((v) => (
           <button
             key={v}
             onClick={() => setView(v)}
@@ -284,7 +303,7 @@ export default function WhatsappGatewayCard() {
                 : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
-            {v === "status" ? "Validar" : v === "config" ? "Configurar" : "QR Code"}
+            {v === "status" ? "Testar conexão" : "Conectar WhatsApp"}
           </button>
         ))}
       </div>
@@ -293,7 +312,7 @@ export default function WhatsappGatewayCard() {
       {view === "status" && (
         <div className="space-y-3">
           <p className="text-xs text-zinc-500">
-            Testa a conexão Z-API com as credenciais salvas e atualiza o status.
+            Confere se o número continua conectado e atualiza o status.
           </p>
           <button
             onClick={() => void handleValidate()}
@@ -381,21 +400,27 @@ export default function WhatsappGatewayCard() {
       {view === "qr" && (
         <div className="space-y-3">
           <p className="text-xs text-zinc-500">
-            Gere o QR Code para parear o WhatsApp com a instância Z-API.
-            Só disponível quando a instância está aguardando conexão.
+            Conecte o WhatsApp do número que vai enviar as cobranças. Clique no botão e
+            escaneie o código com o celular — leva menos de um minuto.
           </p>
 
           {!qrCode && (
             <button
               onClick={() => { setQrConectado(false); void handleLoadQR(); }}
-              disabled={isLoadingQR}
-              className="w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+              disabled={isLoadingQR || preparando}
+              className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
             >
               {isLoadingQR
                 ? <><RefreshCw className="w-4 h-4 animate-spin" /> Carregando QR…</>
-                : <><QrCode className="w-4 h-4" /> Gerar QR Code</>
+                : <><QrCode className="w-4 h-4" /> {gatewayStatus?.connected ? "Verificar conexão" : "Conectar WhatsApp"}</>
               }
             </button>
+          )}
+
+          {preparando && !qrCode && (
+            <p className="text-xs p-2 rounded-lg bg-zinc-800 text-zinc-300 flex items-center gap-1.5">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Preparando seu número… isso leva alguns segundos.
+            </p>
           )}
 
           {qrConectado && (
@@ -428,6 +453,17 @@ export default function WhatsappGatewayCard() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Credenciais à mão: só para o suporte (exige o Token de Admin). O
+          cliente conecta pelo "Conectar WhatsApp" acima. */}
+      {view !== "config" && (
+        <button
+          onClick={() => setView("config")}
+          className="w-full text-[10px] text-zinc-700 hover:text-zinc-500 transition-colors pt-1"
+        >
+          Configuração manual (suporte)
+        </button>
       )}
     </div>
   );

@@ -30,6 +30,15 @@ import {
   saveUserZApiCredentials,
 }                                 from "../_shared/platformIntegrations.ts";
 import { maskToken }              from "../_shared/sanitize.ts";
+import { checkRateLimit }         from "../_shared/rateLimit.ts";
+import { checkSubscription }      from "../_shared/subscriptionGuard.ts";
+import { zapiPartnerConfigured }  from "../_shared/zapiPartner.ts";
+import {
+  ensureSubscribed,
+  loadAutoInstance,
+  needsNewInstance,
+  provisionInstanceForUser,
+}                                 from "../_shared/zapiProvisioning.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -177,9 +186,35 @@ Deno.serve(async (req: Request) => {
 
   // ── GET ?action=qr ─────────────────────────────────────────────────────────
   if (req.method === "GET" && action === "qr") {
+    // Sem instância (ou a automática expirou/foi cancelada): cria uma agora pela
+    // API de parceiro da Z-API — o cliente conecta o próprio número sozinho.
+    if (needsNewInstance(await loadAutoInstance(admin, user.id))) {
+      if (!zapiPartnerConfigured()) {
+        return err(503, "A conexão do WhatsApp ainda não está disponível. Fale com o suporte.");
+      }
+      const sub = await checkSubscription(admin, user.id);
+      if (!sub.ok) return err(403, "Ative sua assinatura para conectar o WhatsApp.");
+
+      // Cada instância criada pode virar custo: no máximo 3 por hora por conta.
+      const rl = await checkRateLimit(admin, `zapi-provision:${user.id}`, 3, 3600);
+      if (!rl.allowed) return err(429, "Muitas tentativas de conexão. Tente de novo em alguns minutos.");
+
+      try {
+        await provisionInstanceForUser(admin, user.id);
+      } catch (e) {
+        console.log(JSON.stringify({
+          source: "whatsapp-gateway.provision_error", user_id: user.id,
+          message: e instanceof Error ? e.message : String(e),
+        }));
+        return err(502, "Não foi possível preparar seu número agora. Tente de novo em instantes.");
+      }
+      // Instância recém-criada leva alguns segundos para subir: a tela tenta de novo.
+      return ok({ ok: true, preparing: true, qrCode: null });
+    }
+
     const creds = await loadZApiCredentialsForUser(admin, user.id);
     if (!creds) {
-      return err(503, "Nenhum número de WhatsApp conectado a esta conta. Fale com o suporte para provisionar a instância.");
+      return err(503, "Nenhum número de WhatsApp conectado a esta conta. Fale com o suporte.");
     }
     // Já pareado: não há QR a mostrar (escanear de novo falharia). Atualiza o
     // status e avisa a tela, que troca o QR por "Conectado".
@@ -190,6 +225,7 @@ Deno.serve(async (req: Request) => {
       await updateUserZApiStatus(admin, user.id, {
         status: "active", connected: true, connected_pending_phone: false, phone_number: phone, last_error: null,
       });
+      await ensureSubscribed(admin, user.id);
       return ok({ ok: true, connected: true, qrCode: null });
     }
 
@@ -289,6 +325,9 @@ Deno.serve(async (req: Request) => {
       phone_number:            rawPhone || null,
       last_error:              connected ? null : String(zapiStatus.message ?? zapiStatus.error ?? ""),
     });
+
+    // Primeiro pareamento de uma instância automática: passa a assinar na Z-API.
+    if (connected) await ensureSubscribed(admin, user.id);
 
     const platformStatus = await loadUserZApiStatus(admin, user.id);
 

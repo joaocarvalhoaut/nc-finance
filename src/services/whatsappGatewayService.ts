@@ -40,6 +40,8 @@ export interface GatewayQRResult {
   qrCode:  string | null;
   /** true quando o número já está pareado — não há QR a mostrar */
   connected?: boolean;
+  /** true logo após criar a instância da conta: o QR fica pronto em segundos */
+  preparing?: boolean;
   error?:  string;
 }
 
