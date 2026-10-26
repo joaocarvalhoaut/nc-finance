@@ -21,7 +21,7 @@ import { reserveChargeSend } from "../_shared/sendReservation.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
-import { canUseSubscription } from "../_shared/billingStatus.ts";
+import { ACCESS_COLUMNS, canUseSubscription } from "../_shared/billingStatus.ts";
 import { normalizePhone, validatePhone, sendTextMessage, sendDocumentMessage } from "../_shared/zapi.ts";
 import { downloadDriveFile, getDriveAccessToken } from "../_shared/driveFolderIndex.ts";
 import { loadZApiCredentialsForUser } from "../_shared/platformIntegrations.ts";
@@ -165,7 +165,7 @@ Deno.serve(async (request: Request) => {
     // ── 4. Valida assinatura Stripe ────────────────────────────────────────────
     const { data: subscription } = await admin
       .from("user_subscriptions")
-      .select("status, plan, current_period_end, cancel_at_period_end")
+      .select(ACCESS_COLUMNS)
       .eq("user_id", userId)
       .maybeSingle();
 

@@ -9,6 +9,7 @@ import {
   brDateToIso,
   canUseSubscription,
   computeSubscriptionState,
+  isStripeLegacy,
   todayBr,
   type AsaasPaymentLite,
 } from "../billingStatus.ts";
@@ -88,6 +89,18 @@ eq(canUseSubscription({ status: "active", cancel_at_period_end: true, current_pe
 eq(canUseSubscription({ status: "incomplete" }, NOW), false, "aguardando 1º pagamento");
 eq(canUseSubscription({ status: "canceled" }, NOW), false, "cancelada");
 eq(canUseSubscription(null, NOW), false, "sem assinatura");
+
+console.log("\n══ Contas da Stripe e cortesia ═════════════════════════════");
+const legado = { status: "trialing", current_period_end: null, billing_provider: "stripe", asaas_subscription_id: null };
+eq(isStripeLegacy(legado), true, "Stripe sem assinatura no Asaas é legado");
+eq(canUseSubscription(legado, new Date("2026-11-02T20:00:00Z")), true, "legado: libera em 02/11 (último dia)");
+eq(canUseSubscription(legado, new Date("2026-11-03T03:00:00Z")), false, "legado: bloqueia a partir de 03/11");
+eq(canUseSubscription({ ...legado, asaas_subscription_id: "sub_1", current_period_end: brDateToIso("2026-11-20") },
+  new Date("2026-11-10T12:00:00Z")), true, "Stripe que ativou no Asaas segue a regra normal");
+eq(canUseSubscription({ status: "canceled", billing_provider: "cortesia" }, new Date("2030-01-01T00:00:00Z")),
+  true, "cortesia libera sempre");
+eq(canUseSubscription({ status: "active" }, new Date("2030-01-01T00:00:00Z")), true,
+  "sem billing_provider (Asaas antigo): não sofre o prazo");
 
 console.log("\n══ Plano pelo valor ════════════════════════════════════════");
 eq(planFromValue(49), "basic", "49 → Básico");

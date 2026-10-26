@@ -64,7 +64,7 @@ const invokeBilling = async <T>(fn: string, body: Record<string, unknown>, fallb
   throw new BillingError(message, code);
 };
 
-export type BillingAction = "sync" | "pay" | "change_plan" | "cancel";
+export type BillingAction = "sync" | "pay" | "change_plan" | "cancel" | "reactivate";
 
 const SUBSCRIPTIONS_TABLE = "user_subscriptions";
 const USAGE_TABLE = "user_usage_counters";
@@ -239,6 +239,8 @@ export const getSubscriptionEntitlements = (
     status: subscription.status,
     cancel_at_period_end: subscription.cancelAtPeriodEnd,
     current_period_end: subscription.currentPeriodEnd,
+    billing_provider: subscription.billingProvider,
+    asaas_subscription_id: subscription.asaasSubscriptionId,
   });
   const canSendCharge = canUseApp && remainingCharges > 0;
 

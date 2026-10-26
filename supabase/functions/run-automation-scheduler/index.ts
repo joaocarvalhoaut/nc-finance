@@ -20,7 +20,7 @@ import { nextAutomationStart, scheduledAutomationStart } from "../_shared/automa
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
-import { canUseSubscription } from "../_shared/billingStatus.ts";
+import { ACCESS_COLUMNS, canUseSubscription } from "../_shared/billingStatus.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -77,7 +77,7 @@ const processRule = async (rule: RuleRow): Promise<void> => {
     // ── 1. Verifica assinatura ──────────────────────────────────────────────
     const { data: sub } = await admin
       .from("user_subscriptions")
-      .select("status, plan, cancel_at_period_end, current_period_end")
+      .select(ACCESS_COLUMNS)
       .eq("user_id", userId)
       .maybeSingle();
 

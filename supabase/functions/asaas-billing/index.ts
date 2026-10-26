@@ -7,7 +7,9 @@
  *   pay          devolve o link da fatura em aberto mais antiga
  *   change_plan  { planId } muda o valor da assinatura; vale na hora e na
  *                fatura em aberto
- *   cancel       encerra a recorrência; o acesso segue até o fim do período pago
+ *   cancel       desativa a recorrência; o acesso segue até o fim do período pago
+ *   reactivate   religa a assinatura cancelada, ainda dentro do período pago;
+ *                a próxima fatura vence quando esse período acaba
  *
  * Sempre opera na assinatura da conta autenticada — nenhum id vem do cliente.
  */
@@ -17,14 +19,15 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { checkRateLimit, tooManyRequests } from "../_shared/rateLimit.ts";
 import {
   AsaasError,
-  deleteSubscription,
+  getSubscription,
+  inactivateSubscription,
   listSubscriptionPayments,
   openInvoice,
   syncAsaasSubscription,
   updateSubscription,
 } from "../_shared/asaas.ts";
 import { isPlanId, PLAN_PRICE_BRL } from "../_shared/billingPlans.ts";
-import { canUseSubscription } from "../_shared/billingStatus.ts";
+import { ACCESS_COLUMNS, canUseSubscription, todayBr } from "../_shared/billingStatus.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -60,7 +63,7 @@ Deno.serve(async (request) => {
 
     const { data: row, error: rowError } = await admin
       .from("user_subscriptions")
-      .select("plan, status, cancel_at_period_end, current_period_end, asaas_subscription_id")
+      .select(ACCESS_COLUMNS)
       .eq("user_id", user.id)
       .maybeSingle();
     if (rowError) throw rowError;
@@ -104,11 +107,39 @@ Deno.serve(async (request) => {
       }
 
       case "cancel": {
-        await deleteSubscription(subscriptionId);
+        await inactivateSubscription(subscriptionId);
         const result = await syncAsaasSubscription(admin, user.id, subscriptionId);
         console.log(JSON.stringify({ source: "asaas-billing.cancel", user_id: user.id }));
         return json(200, {
           status: result?.row?.status ?? "canceled",
+          current_period_end: result?.row?.current_period_end ?? null,
+        });
+      }
+
+      case "reactivate": {
+        if (!row?.cancel_at_period_end || !canUseSubscription(row)) {
+          return json(409, {
+            error: "Só é possível reativar uma assinatura cancelada que ainda está no período pago.",
+            code: "nao_reativavel",
+          });
+        }
+        const atual = await getSubscription(subscriptionId);
+        if (!atual || atual.deleted) {
+          // Cancelada antes desta versão (a assinatura era apagada no Asaas).
+          return json(409, {
+            error: "Esta assinatura foi encerrada de vez. Quando o período pago acabar, assine de novo pela tela de planos.",
+            code: "nao_reativavel",
+          });
+        }
+
+        // Próxima fatura no fim do período já pago (ou do teste) — nunca no passado.
+        const fimPago = row.current_period_end ? todayBr(new Date(row.current_period_end)) : todayBr();
+        const hoje = todayBr();
+        await updateSubscription(subscriptionId, { status: "ACTIVE", nextDueDate: fimPago > hoje ? fimPago : hoje });
+        const result = await syncAsaasSubscription(admin, user.id, subscriptionId);
+        console.log(JSON.stringify({ source: "asaas-billing.reactivate", user_id: user.id }));
+        return json(200, {
+          status: result?.row?.status ?? "active",
           current_period_end: result?.row?.current_period_end ?? null,
         });
       }

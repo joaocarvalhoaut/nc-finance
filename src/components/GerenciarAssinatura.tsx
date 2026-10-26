@@ -49,10 +49,14 @@ export default function GerenciarAssinatura({ subscription, onClose, onAction, o
   const fim = subscription?.currentPeriodEnd ?? null;
   // Conta sem assinatura no Asaas: as ações de pagar, trocar e cancelar não têm
   // o que alterar — a tela oferece ativar a assinatura.
-  const semAsaas = !subscription?.asaasSubscriptionId;
+  const cortesia = subscription?.billingProvider === "cortesia";
+  const semAsaas = !subscription?.asaasSubscriptionId && !cortesia;
+  // Cancelada mas ainda no período pago (ou no teste): dá para religar.
+  const podeReativar = !semAsaas && !cortesia && cancelada && status !== "canceled";
 
   const linhaData =
-    cancelada && status !== "canceled" ? `Cancelada — acesso até ${formatDate(fim)}`
+    cortesia || semAsaas ? null
+    : cancelada && status !== "canceled" ? `Cancelada — acesso até ${formatDate(fim)}`
     : status === "trialing" && fim ? `Teste grátis até ${formatDate(fim)}. A primeira fatura vence nesse dia.`
     : status === "past_due" ? `Fatura vencida em ${formatDate(fim)}.`
     : status === "active" ? `Próxima fatura: ${formatDate(fim)}`
@@ -116,6 +120,12 @@ export default function GerenciarAssinatura({ subscription, onClose, onAction, o
     }
   });
 
+  const reativar = () => executar(async () => {
+    const { current_period_end } = await onAction("reactivate");
+    await onChanged();
+    setInfo(`Assinatura reativada. A próxima fatura vence em ${formatDate(current_period_end ?? fim)}.`);
+  });
+
   const cancelar = () => executar(async () => {
     const { current_period_end } = await onAction("cancel");
     await onChanged();
@@ -140,13 +150,32 @@ export default function GerenciarAssinatura({ subscription, onClose, onAction, o
           </div>
           <div className="flex justify-between gap-3">
             <span className="text-zinc-500">Status</span>
-            <span className="text-zinc-200">{cancelada ? "Cancelada" : STATUS_PT[status] ?? status}</span>
+            <span className="text-zinc-200">{cortesia ? "Cortesia" : cancelada ? "Cancelada" : STATUS_PT[status] ?? status}</span>
           </div>
           {linhaData && <p className="text-zinc-400 pt-1">{linhaData}</p>}
         </div>
 
         {error && <p className="text-xs text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">{error}</p>}
         {info && <p className="text-xs text-emerald-200 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2">{info}</p>}
+
+        {cortesia && (
+          <p className="text-xs text-zinc-300 leading-relaxed">
+            Esta conta tem acesso cortesia, sem cobrança. Não há assinatura para gerenciar.
+          </p>
+        )}
+
+        {podeReativar && (
+          <button
+            onClick={() => void reativar()}
+            disabled={busy}
+            className="w-full py-2.5 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-colors cursor-pointer"
+          >
+            Reativar assinatura
+            <span className="block text-[10px] font-normal opacity-80">
+              Sem cobrança agora — a próxima fatura vence em {formatDate(fim)}
+            </span>
+          </button>
+        )}
 
         {semAsaas && (
           <div className="space-y-2">
@@ -205,7 +234,7 @@ export default function GerenciarAssinatura({ subscription, onClose, onAction, o
           </div>
         )}
 
-        {!semAsaas && !cancelada && (
+        {!semAsaas && !cortesia && !cancelada && (
           <button
             onClick={() => void pagar()}
             disabled={busy}
@@ -216,7 +245,7 @@ export default function GerenciarAssinatura({ subscription, onClose, onAction, o
           </button>
         )}
 
-        {!semAsaas && !cancelada && (status === "active" || status === "trialing" || status === "past_due") && (
+        {!semAsaas && !cortesia && !cancelada && (status === "active" || status === "trialing" || status === "past_due") && (
           <div className="space-y-2">
             <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Trocar de plano</p>
             {PLAN_LIST.filter((p) => p.id !== plano.id).map((p) => (
@@ -260,7 +289,7 @@ export default function GerenciarAssinatura({ subscription, onClose, onAction, o
           </div>
         )}
 
-        {!semAsaas && !cancelada && status !== "not_started" && (
+        {!semAsaas && !cortesia && !cancelada && status !== "not_started" && (
           confirmarCancelamento ? (
             <div className="border border-rose-800/60 rounded-xl p-3 space-y-2">
               <p className="text-xs text-zinc-300">

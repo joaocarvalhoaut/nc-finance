@@ -216,6 +216,29 @@ export const deleteSubscription = async (id: string): Promise<void> => {
   }
 };
 
+/** Remove uma cobrança. Já removida conta como sucesso. */
+const deletePayment = async (id: string): Promise<void> => {
+  try {
+    await asaasRequest("DELETE", `/payments/${encodeURIComponent(id)}`);
+  } catch (err) {
+    if (err instanceof AsaasError && (err.status === 404 || /not_found/i.test(err.code || ""))) return;
+    throw err;
+  }
+};
+
+/**
+ * Cancelamento pelo cliente. Desativa (INACTIVE) em vez de remover: a
+ * assinatura e o histórico do que foi pago continuam lá, e "Reativar" religa a
+ * mesma assinatura. As cobranças em aberto são removidas para o Asaas não
+ * cobrar nem mandar lembrete de uma assinatura cancelada.
+ */
+export const inactivateSubscription = async (id: string): Promise<void> => {
+  await updateSubscription(id, { status: "INACTIVE" });
+  const abertas = (await listSubscriptionPayments(id))
+    .filter((p) => !p.deleted && (p.status === "PENDING" || p.status === "OVERDUE"));
+  for (const p of abertas) await deletePayment(p.id);
+};
+
 /** Fatura em aberto mais antiga (vencida ou pendente), com o link de pagamento. */
 export const openInvoice = (payments: AsaasPayment[]): AsaasPayment | null =>
   payments

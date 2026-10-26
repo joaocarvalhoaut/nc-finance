@@ -22,6 +22,7 @@ import { financeService } from "./services/financeService";
 import { representativesService } from "./services/representativesService";
 import { contactsService, contactKeyFromName, type Contact } from "./services/contactsService";
 import { BillingError, subscriptionService } from "./services/subscriptionService";
+import { isStripeLegacy, STRIPE_LEGACY_CUTOFF } from "../supabase/functions/_shared/billingStatus.ts";
 import { userConfigService } from "./services/userConfigService";
 import { whatsappService, SEND_STATUS_LABELS, type SendChargeStatus } from "./services/whatsappService";
 import { googleSheetsService, type ImportResult as SheetsImportResult, type ExportResult as SheetsExportResult } from "./services/googleSheetsService";
@@ -2247,6 +2248,29 @@ export default function App() {
                       Salvando suas preferencias...
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Conta da época da Stripe: precisa ativar pelo Asaas até o prazo. */}
+            {subscription && isStripeLegacy({
+              status: subscription.status,
+              billing_provider: subscription.billingProvider,
+              asaas_subscription_id: subscription.asaasSubscriptionId,
+            }) && (
+              <div className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-amber-100">
+                    Mudamos o sistema de pagamento. Ative sua assinatura até{" "}
+                    <strong>{new Date(Date.parse(STRIPE_LEGACY_CUTOFF) - 1).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}</strong>{" "}
+                    para não perder o acesso — Pix, boleto ou cartão.
+                  </p>
+                  <button
+                    onClick={handleOpenBillingPortal}
+                    className="flex-shrink-0 rounded-xl bg-amber-400 px-4 py-2 text-xs font-bold text-black transition hover:bg-amber-300 cursor-pointer"
+                  >
+                    Ativar assinatura
+                  </button>
                 </div>
               </div>
             )}

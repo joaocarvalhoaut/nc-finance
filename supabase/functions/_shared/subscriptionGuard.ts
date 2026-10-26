@@ -6,7 +6,7 @@
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
-import { canUseSubscription } from "./billingStatus.ts";
+import { ACCESS_COLUMNS, canUseSubscription } from "./billingStatus.ts";
 
 // Os genericos precisam ser explicitos: sem eles o ReturnType resolve para os
 // padroes da DECLARACAO (SupabaseClient<unknown, never, GenericSchema>), que nao
@@ -41,7 +41,7 @@ export const checkSubscription = async (
 ): Promise<SubscriptionGuardResult> => {
   const { data: sub } = await admin
     .from("user_subscriptions")
-    .select("status, plan, cancel_at_period_end, current_period_end")
+    .select(ACCESS_COLUMNS)
     .eq("user_id", userId)
     .maybeSingle();
 

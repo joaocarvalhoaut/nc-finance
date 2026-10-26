@@ -14,6 +14,9 @@
  *   past_due  → libera durante a tolerância após o vencimento em aberto
  *   resto     → bloqueia
  *
+ * Antes do status: cortesia libera sempre; conta da época da Stripe sem
+ * assinatura no Asaas só vale até STRIPE_LEGACY_CUTOFF.
+ *
  * Tolerância: boleto pago no dia do vencimento leva até 3 dias úteis para
  * compensar, e o Asaas marca a cobrança como vencida no dia seguinte. Sem
  * tolerância, quem pagou em dia seria bloqueado.
@@ -29,15 +32,42 @@ export type LocalSubscriptionStatus =
   | "canceled"
   | "incomplete";
 
+/**
+ * Prazo das contas da época da Stripe (que nunca cobrou de verdade) para
+ * ativarem a assinatura pelo Asaas: acesso até o fim de 02/11/2026 (Brasília).
+ * Depois disso, sem assinatura no Asaas, a conta é bloqueada como qualquer outra.
+ */
+export const STRIPE_LEGACY_CUTOFF = "2026-11-03T03:00:00.000Z";
+
+/**
+ * Colunas de user_subscriptions que canUseSubscription precisa. Todo select
+ * que alimenta o guard usa esta lista — faltar uma coluna desliga a regra
+ * correspondente em silêncio.
+ */
+export const ACCESS_COLUMNS =
+  "status, plan, cancel_at_period_end, current_period_end, billing_provider, asaas_subscription_id";
+
 export interface AccessRow {
   status: string | null | undefined;
   cancel_at_period_end?: boolean | null;
   current_period_end?: string | null;
+  /** "asaas" | "stripe" (legado) | "cortesia" (acesso sem cobrança, ex.: o dono) */
+  billing_provider?: string | null;
+  asaas_subscription_id?: string | null;
 }
+
+/** Conta da época da Stripe que ainda não ativou a assinatura no Asaas. */
+export const isStripeLegacy = (row: AccessRow | null | undefined): boolean =>
+  row?.billing_provider === "stripe" && !row?.asaas_subscription_id;
 
 /** Pode usar o sistema agora? */
 export const canUseSubscription = (row: AccessRow | null | undefined, now: Date = new Date()): boolean => {
   if (!row) return false;
+  // Cortesia: liberada sempre, sem cobrança. Marcada à mão no banco.
+  if (row.billing_provider === "cortesia") return true;
+  // Legado da Stripe: além da regra normal, só até o prazo de migração.
+  if (isStripeLegacy(row) && now.getTime() >= Date.parse(STRIPE_LEGACY_CUTOFF)) return false;
+
   const end = row.current_period_end ? Date.parse(row.current_period_end) : NaN;
   const hasEnd = Number.isFinite(end);
   const t = now.getTime();

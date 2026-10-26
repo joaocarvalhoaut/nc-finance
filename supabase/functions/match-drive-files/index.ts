@@ -22,7 +22,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
-import { canUseSubscription } from "../_shared/billingStatus.ts";
+import { ACCESS_COLUMNS, canUseSubscription } from "../_shared/billingStatus.ts";
 import {
   getGoogleAccessToken,
   listFilesInFolderDeep,
@@ -91,7 +91,7 @@ Deno.serve(async (request: Request) => {
     // ── 2. Valida assinatura ───────────────────────────────────────────────────
     const { data: subscription } = await admin
       .from("user_subscriptions")
-      .select("status, plan, cancel_at_period_end, current_period_end")
+      .select(ACCESS_COLUMNS)
       .eq("user_id", userId)
       .maybeSingle();
 

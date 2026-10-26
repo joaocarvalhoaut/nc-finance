@@ -85,7 +85,7 @@ Deno.serve(async (request) => {
     if (row?.asaas_subscription_id && canUseSubscription(row)) {
       return json(409, {
         error: row.cancel_at_period_end
-          ? "Sua assinatura foi cancelada e continua valendo até o fim do período pago. Depois disso, é só assinar de novo."
+          ? "Sua assinatura foi cancelada, mas ainda vale até o fim do período pago. Para continuar, use \"Reativar assinatura\" em Gerenciar assinatura."
           : "Você já tem uma assinatura ativa. Para trocar de plano, use \"Gerenciar assinatura\".",
         code: "ja_assinante",
       });
