@@ -5384,6 +5384,7 @@ export default function App() {
               subscription={subscription}
               onClose={() => setShowGerenciarAssinatura(false)}
               onAction={(action, planId) => subscriptionService.billingAction(action, planId)}
+              onCheckout={(planId, cpfCnpj) => subscriptionService.createCheckoutSession(planId, cpfCnpj)}
               onChanged={syncSubscription}
             />
           )}

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
 import { PLAN_LIST, getPlanDefinition } from "../config/plans";
-import type { BillingAction } from "../services/subscriptionService";
+import { BillingError, type BillingAction } from "../services/subscriptionService";
 import type { PlanId, UserSubscription } from "../types";
 
 /**
@@ -14,6 +14,8 @@ interface GerenciarAssinaturaProps {
   subscription: UserSubscription | null;
   onClose: () => void;
   onAction: (action: BillingAction, planId?: PlanId) => Promise<{ invoice_url?: string | null; current_period_end?: string | null }>;
+  /** Conta sem assinatura no Asaas (ex.: criada na época da Stripe): ativa uma. */
+  onCheckout: (planId: PlanId, cpfCnpj?: string) => Promise<{ status: string; invoice_url?: string | null; trial_end?: string | null }>;
   /** Recarrega a assinatura depois de uma mudança. */
   onChanged: () => Promise<void>;
 }
@@ -29,21 +31,29 @@ const STATUS_PT: Record<string, string> = {
   incomplete: "Aguardando pagamento",
 };
 
-export default function GerenciarAssinatura({ subscription, onClose, onAction, onChanged }: GerenciarAssinaturaProps) {
+export default function GerenciarAssinatura({ subscription, onClose, onAction, onCheckout, onChanged }: GerenciarAssinaturaProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [planoPendente, setPlanoPendente] = useState<PlanId | null>(null);
   const [confirmarCancelamento, setConfirmarCancelamento] = useState(false);
+  // Ativação no Asaas: plano escolhido e, se o cadastro não tiver CPF, o documento.
+  const [planoAtivar, setPlanoAtivar] = useState<PlanId | null>(null);
+  const [pedirDocumento, setPedirDocumento] = useState(false);
+  const [documento, setDocumento] = useState("");
+  const documentoDigitos = documento.replace(/\D/g, "");
 
   const plano = getPlanDefinition(subscription?.plan);
   const status = subscription?.status ?? "not_started";
   const cancelada = Boolean(subscription?.cancelAtPeriodEnd) || status === "canceled";
   const fim = subscription?.currentPeriodEnd ?? null;
+  // Conta sem assinatura no Asaas: as ações de pagar, trocar e cancelar não têm
+  // o que alterar — a tela oferece ativar a assinatura.
+  const semAsaas = !subscription?.asaasSubscriptionId;
 
   const linhaData =
     cancelada && status !== "canceled" ? `Cancelada — acesso até ${formatDate(fim)}`
-    : status === "trialing" ? `Teste grátis até ${formatDate(fim)}. A primeira fatura vence nesse dia.`
+    : status === "trialing" && fim ? `Teste grátis até ${formatDate(fim)}. A primeira fatura vence nesse dia.`
     : status === "past_due" ? `Fatura vencida em ${formatDate(fim)}.`
     : status === "active" ? `Próxima fatura: ${formatDate(fim)}`
     : null;
@@ -71,6 +81,28 @@ export default function GerenciarAssinatura({ subscription, onClose, onAction, o
     await onChanged();
     setPlanoPendente(null);
     setInfo(`Plano alterado para ${getPlanDefinition(planId).name}. O novo valor vale a partir da fatura em aberto.`);
+  });
+
+  const ativar = (planId: PlanId) => executar(async () => {
+    try {
+      const result = await onCheckout(planId, pedirDocumento ? documentoDigitos : undefined);
+      if (result.invoice_url) {
+        window.location.assign(result.invoice_url);
+        return;
+      }
+      await onChanged();
+      setPlanoAtivar(null);
+      setPedirDocumento(false);
+      setInfo(result.trial_end
+        ? `Assinatura ativada. Teste grátis até ${formatDate(result.trial_end)}, quando vence a primeira fatura.`
+        : "Assinatura ativada.");
+    } catch (e) {
+      if (e instanceof BillingError && e.code === "documento_necessario") {
+        setPedirDocumento(true);
+        throw new Error("Informe seu CPF ou CNPJ para emitir a cobrança.");
+      }
+      throw e;
+    }
   });
 
   const cancelar = () => executar(async () => {
@@ -105,7 +137,64 @@ export default function GerenciarAssinatura({ subscription, onClose, onAction, o
         {error && <p className="text-xs text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">{error}</p>}
         {info && <p className="text-xs text-emerald-200 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2">{info}</p>}
 
-        {status !== "canceled" && (
+        {semAsaas && (
+          <div className="space-y-2">
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              Sua conta ainda não tem assinatura no novo sistema de pagamento (Asaas).
+              Escolha o plano para ativar — a fatura mensal é paga por Pix, boleto ou cartão.
+            </p>
+            {PLAN_LIST.map((p) => (
+              planoAtivar === p.id ? (
+                <div key={p.id} className="border border-emerald-700/60 rounded-xl p-3 space-y-2">
+                  <p className="text-xs text-zinc-300">
+                    Ativar o <strong className="text-white">{p.name}</strong> por R$ {p.priceBRL.toLocaleString("pt-BR")}/mês?
+                    Na primeira assinatura a fatura só vence depois de 7 dias grátis.
+                  </p>
+                  {pedirDocumento && (
+                    <input
+                      value={documento}
+                      onChange={(e) => setDocumento(e.target.value)}
+                      inputMode="numeric"
+                      autoFocus
+                      placeholder="CPF ou CNPJ"
+                      className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs text-white font-mono placeholder:text-zinc-600 focus:border-emerald-400 focus:outline-none"
+                    />
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => void ativar(p.id)}
+                      disabled={busy || (pedirDocumento && documentoDigitos.length !== 11 && documentoDigitos.length !== 14)}
+                      className="flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white cursor-pointer"
+                    >
+                      Ativar
+                    </button>
+                    <button
+                      onClick={() => { setPlanoAtivar(null); setPedirDocumento(false); }}
+                      disabled={busy}
+                      className="flex-1 py-2 rounded-xl text-xs font-bold bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white cursor-pointer"
+                    >
+                      Voltar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  key={p.id}
+                  onClick={() => { setPlanoAtivar(p.id); setError(""); }}
+                  disabled={busy}
+                  className="w-full flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl text-xs bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white transition-colors cursor-pointer"
+                >
+                  <span className="font-bold">{p.name}</span>
+                  <span className="text-zinc-400">
+                    {p.monthlyChargeLimit.toLocaleString("pt-BR")} cobranças · R$ {p.priceBRL.toLocaleString("pt-BR")}/mês
+                  </span>
+                </button>
+              )
+            ))}
+          </div>
+        )}
+
+        {!semAsaas && status !== "canceled" && (
           <button
             onClick={() => void pagar()}
             disabled={busy}
@@ -116,7 +205,7 @@ export default function GerenciarAssinatura({ subscription, onClose, onAction, o
           </button>
         )}
 
-        {!cancelada && (status === "active" || status === "trialing" || status === "past_due") && (
+        {!semAsaas && !cancelada && (status === "active" || status === "trialing" || status === "past_due") && (
           <div className="space-y-2">
             <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Trocar de plano</p>
             {PLAN_LIST.filter((p) => p.id !== plano.id).map((p) => (
@@ -160,7 +249,7 @@ export default function GerenciarAssinatura({ subscription, onClose, onAction, o
           </div>
         )}
 
-        {!cancelada && status !== "not_started" && (
+        {!semAsaas && !cancelada && status !== "not_started" && (
           confirmarCancelamento ? (
             <div className="border border-rose-800/60 rounded-xl p-3 space-y-2">
               <p className="text-xs text-zinc-300">

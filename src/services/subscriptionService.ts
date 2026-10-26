@@ -17,6 +17,8 @@ interface UserSubscriptionRow {
   current_period_end: string | null;
   trial_start: string | null;
   trial_end: string | null;
+  billing_provider: string | null;
+  asaas_subscription_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -79,6 +81,8 @@ const SUBSCRIPTION_FIELDS = `
   current_period_end,
   trial_start,
   trial_end,
+  billing_provider,
+  asaas_subscription_id,
   created_at,
   updated_at
 `;
@@ -106,6 +110,8 @@ const mapSubscriptionRow = (row: UserSubscriptionRow): UserSubscription => ({
   currentPeriodEnd: row.current_period_end,
   trialStart: row.trial_start,
   trialEnd: row.trial_end,
+  billingProvider: row.billing_provider,
+  asaasSubscriptionId: row.asaas_subscription_id,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });

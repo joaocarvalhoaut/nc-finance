@@ -206,6 +206,10 @@ export interface UserSubscription {
   currentPeriodEnd: string | null;
   trialStart: string | null;
   trialEnd: string | null;
+  /** "asaas" ou "stripe" (contas de teste da época da Stripe). */
+  billingProvider?: string | null;
+  /** Sem ela a conta ainda não tem assinatura no Asaas. */
+  asaasSubscriptionId?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
