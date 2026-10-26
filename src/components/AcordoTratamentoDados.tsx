@@ -65,7 +65,7 @@ export default function AcordoTratamentoDados({ onClose }: Props) {
             <ul className="list-disc pl-5 space-y-1 text-zinc-400 mt-1">
               <li><strong className="text-zinc-300">Supabase</strong> — banco de dados e autenticação (armazenamento dos registros)</li>
               <li><strong className="text-zinc-300">Z-API</strong> — envio das mensagens de WhatsApp (recebe o telefone do devedor e o texto da mensagem)</li>
-              <li><strong className="text-zinc-300">Stripe</strong> — processamento da sua assinatura (dados de cobrança do Cliente — não dos devedores)</li>
+              <li><strong className="text-zinc-300">Asaas</strong> — processamento da sua assinatura (nome, CPF/CNPJ e e-mail do Cliente — não dos devedores)</li>
               <li><strong className="text-zinc-300">Resend</strong> — e-mails do serviço, como recuperação de senha (recebe apenas o e-mail do Cliente)</li>
               <li><strong className="text-zinc-300">Google Cloud</strong> — integração com Sheets e Drive, somente quando habilitada pelo Cliente</li>
               <li><strong className="text-zinc-300">Short.io</strong> — encurtamento do link do boleto incluído nas mensagens</li>

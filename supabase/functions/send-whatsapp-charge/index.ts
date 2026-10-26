@@ -21,6 +21,7 @@ import { reserveChargeSend } from "../_shared/sendReservation.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
+import { canUseSubscription } from "../_shared/billingStatus.ts";
 import { normalizePhone, validatePhone, sendTextMessage, sendDocumentMessage } from "../_shared/zapi.ts";
 import { downloadDriveFile, getDriveAccessToken } from "../_shared/driveFolderIndex.ts";
 import { loadZApiCredentialsForUser } from "../_shared/platformIntegrations.ts";
@@ -168,8 +169,7 @@ Deno.serve(async (request: Request) => {
       .eq("user_id", userId)
       .maybeSingle();
 
-    const ALLOWED_STATUSES = ["trialing", "active"];
-    if (!subscription || !ALLOWED_STATUSES.includes(subscription.status)) {
+    if (!subscription || !canUseSubscription(subscription)) {
       // P2: persist masked phone + message preview — never raw data
       await admin.from("user_logs_cobranca").insert({
         user_id: userId,

@@ -99,6 +99,10 @@ inspector_port = 8083
 [functions.stripe-webhook]
 verify_jwt = false
 
+# Asaas envia webhooks sem JWT — auth via header asaas-access-token (ASAAS_WEBHOOK_TOKEN)
+[functions.asaas-webhook]
+verify_jwt = false
+
 [functions.run-automation-scheduler]
 verify_jwt = false
 

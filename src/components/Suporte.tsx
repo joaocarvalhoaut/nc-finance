@@ -151,17 +151,17 @@ const FAQS: FAQ[] = [
   {
     category: "Planos e Pagamentos",
     question: "Como faço para mudar de plano?",
-    answer: "Acesse a aba de configurações do seu perfil e clique em 'Gerenciar Assinatura'. Você será redirecionado ao portal do Stripe onde pode fazer upgrade, downgrade ou cancelar. Upgrades têm efeito imediato com cobrança proporcional.",
+    answer: "Em Minha Conta, clique em 'Gerenciar assinatura' e escolha o novo plano. O limite de cobranças muda na hora, e a fatura em aberto passa a ter o valor do novo plano.",
   },
   {
     category: "Planos e Pagamentos",
     question: "Como cancelo minha assinatura?",
-    answer: "Você pode cancelar a qualquer momento pelo portal do Stripe (acessível nas configurações do perfil). O acesso permanece ativo até o final do período já pago. Não há taxas de cancelamento.",
+    answer: "Em Minha Conta, clique em 'Gerenciar assinatura' e depois em 'Cancelar assinatura'. O acesso continua até o fim do período já pago (ou até o fim do teste grátis, sem cobrança). Não há taxa de cancelamento.",
   },
   {
     category: "Planos e Pagamentos",
-    question: "Meu pagamento falhou — o que acontece?",
-    answer: "Caso o pagamento da renovação falhe, o Stripe tentará cobrar novamente em alguns dias. Se todas as tentativas falharem, a assinatura é cancelada e o acesso ao envio de cobranças é suspenso. Você receberá notificações por e-mail durante esse processo.",
+    question: "E se a fatura vencer sem pagamento?",
+    answer: "A fatura mensal chega por e-mail e pode ser paga por Pix, boleto ou cartão. Depois do vencimento há 3 dias de tolerância (o tempo de compensação do boleto). Passado esse prazo, o envio de cobranças fica suspenso até o pagamento — seus dados continuam guardados. Para pagar, use 'Gerenciar assinatura' > 'Pagar fatura em aberto'.",
   },
   {
     category: "Planos e Pagamentos",

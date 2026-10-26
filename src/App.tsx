@@ -12,6 +12,7 @@ import { addOptOuts } from "./services/optOutService";
 import LandingPage from "./components/LandingPage";
 import SubscriptionGate from "./components/SubscriptionGate";
 import SubscriptionStatusCard from "./components/SubscriptionStatusCard";
+import GerenciarAssinatura from "./components/GerenciarAssinatura";
 const ClientDashboard = lazy(() => import("./components/ClientDashboard"));
 import { PLAN_LIST, getPlanDefinition } from "./config/plans";
 import { useAccount } from "./hooks/useAccount";
@@ -20,7 +21,7 @@ import { billingLogsService } from "./services/billingLogsService";
 import { financeService } from "./services/financeService";
 import { representativesService } from "./services/representativesService";
 import { contactsService, contactKeyFromName, type Contact } from "./services/contactsService";
-import { subscriptionService } from "./services/subscriptionService";
+import { BillingError, subscriptionService } from "./services/subscriptionService";
 import { userConfigService } from "./services/userConfigService";
 import { whatsappService, SEND_STATUS_LABELS, type SendChargeStatus } from "./services/whatsappService";
 import { googleSheetsService, type ImportResult as SheetsImportResult, type ExportResult as SheetsExportResult } from "./services/googleSheetsService";
@@ -246,6 +247,9 @@ export default function App() {
   const [showSuporte, setShowSuporte] = useState(false);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [subscriptionGateError, setSubscriptionGateError] = useState("");
+  // Plano à espera do CPF/CNPJ (cadastro sem documento) e modal de gerenciar.
+  const [documentPromptPlanId, setDocumentPromptPlanId] = useState<PlanId | null>(null);
+  const [showGerenciarAssinatura, setShowGerenciarAssinatura] = useState(false);
 
   // Temporary seed data is now persisted by user_id on first authenticated access.
   const [debtors, setDebtors] = useState<Debtor[]>([]);
@@ -486,9 +490,9 @@ export default function App() {
     setCurrentTab("inicio");
   };
 
-  // Detec??o de retorno do Stripe Checkout
-  // Stripe redireciona para ?checkout=success após pagamento confirmado.
-  // O webhook pode chegar com 1-10 s de atraso ? iniciamos polling para aguardar.
+  // Retorno com ?checkout=success: aguarda o webhook atualizar a assinatura
+  // (polling). O fluxo do Asaas não usa mais esse parâmetro — quem volta da
+  // fatura é tratado pelo efeito de visibilidade abaixo.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const checkoutResult = params.get("checkout");
@@ -500,7 +504,7 @@ export default function App() {
     window.history.replaceState({}, "", cleanUrl.toString());
 
     if (checkoutResult === "success" && userId) {
-      // Inicia polling aguardando o webhook do Stripe atualizar o status
+      // Inicia polling aguardando o webhook atualizar o status
       startCheckoutPolling();
     }
     // canceled: apenas limpa URL, não faz nada (usuário volta para SubscriptionGate)
@@ -508,31 +512,70 @@ export default function App() {
 
   // Carregamento inicial de dados da conta autenticada
 
-  const handleStartCheckout = async (planId: PlanId) => {
+  // Assinatura pelo Asaas. Primeira vez: teste grátis, acesso liberado na hora.
+  // Depois disso: vai para a fatura (Pix, boleto ou cartão).
+  const handleStartCheckout = async (planId: PlanId, cpfCnpj?: string) => {
     setIsSubscriptionActionLoading(true);
     setSubscriptionGateError("");
 
     try {
-      const { checkout_url } = await subscriptionService.createCheckoutSession(planId);
-      window.location.assign(checkout_url);
+      const result = await subscriptionService.createCheckoutSession(planId, cpfCnpj);
+      setDocumentPromptPlanId(null);
+      if (result.invoice_url) {
+        window.location.assign(result.invoice_url);
+        return;
+      }
+      await refreshSubscription();
     } catch (error) {
-      setSubscriptionGateError(error instanceof Error ? error.message : "Falha ao iniciar checkout Stripe.");
+      if (error instanceof BillingError && error.code === "documento_necessario") {
+        setDocumentPromptPlanId(planId);
+      } else {
+        setSubscriptionGateError(error instanceof Error ? error.message : "Falha ao iniciar a assinatura.");
+      }
+    } finally {
       setIsSubscriptionActionLoading(false);
     }
   };
 
-  const handleOpenBillingPortal = async () => {
+  // Relê a assinatura direto no Asaas antes de recarregar — cobre webhook
+  // atrasado (boleto compensando) ou perdido.
+  const syncSubscription = async () => {
+    try {
+      await subscriptionService.billingAction("sync");
+    } catch { /* Asaas indisponível: mostra o que já está no banco */ }
+    await refreshSubscription();
+  };
+
+  // Tela de bloqueio: abre direto a fatura em aberto.
+  const handlePayInvoice = async () => {
     setIsSubscriptionActionLoading(true);
     setSubscriptionGateError("");
 
     try {
-      const { portal_url } = await subscriptionService.createBillingPortalSession();
-      window.location.assign(portal_url);
+      const { invoice_url } = await subscriptionService.billingAction("pay");
+      if (invoice_url) {
+        window.location.assign(invoice_url);
+        return;
+      }
     } catch (error) {
-      setSubscriptionGateError(error instanceof Error ? error.message : "Falha ao abrir portal de assinatura.");
+      setSubscriptionGateError(error instanceof Error ? error.message : "Falha ao abrir a fatura.");
+    } finally {
       setIsSubscriptionActionLoading(false);
     }
   };
+
+  const handleOpenBillingPortal = () => setShowGerenciarAssinatura(true);
+
+  // Quem foi pagar a fatura em outra aba (ou no app do banco) e voltou:
+  // sincroniza ao reabrir a página, sem precisar clicar em "Atualizar".
+  useEffect(() => {
+    if (!userId || canUseApp) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void syncSubscription();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [userId, canUseApp]);
 
   // Future service calls should derive ownership from the authenticated account, never from client-supplied ownership fields.
   const currentOwnerUserId = userId;
@@ -2145,8 +2188,11 @@ export default function App() {
             setSelectedPlanId(planId);
             void handleStartCheckout(planId);
           }}
-          onManageSubscription={() => void handleOpenBillingPortal()}
-          onRefresh={() => void refreshSubscription()}
+          onManageSubscription={() => void handlePayInvoice()}
+          documentPromptPlanId={documentPromptPlanId}
+          onSubmitDocument={(planId, cpfCnpj) => void handleStartCheckout(planId, cpfCnpj)}
+          onCancelDocument={() => setDocumentPromptPlanId(null)}
+          onRefresh={() => void syncSubscription()}
           onBack={() => {
             setSubscriptionGateError("");
             setCurrentTab("inicio");
@@ -2216,7 +2262,7 @@ export default function App() {
                   plan={plan}
                   subscriptionStatus={subscription?.status ?? null}
                   chargesSent={usage?.chargesSent ?? 0}
-                  onManageSubscription={() => void handleOpenBillingPortal()}
+                  onManageSubscription={handleOpenBillingPortal}
                   onDeleteAccount={() => setShowDeleteAccount(true)}
                 />
               )}
@@ -2719,7 +2765,7 @@ export default function App() {
                     usage={usage}
                     remainingCharges={remainingCharges}
                     canSendCharge={canSendCharge}
-                    onManageSubscription={() => void handleOpenBillingPortal()}
+                    onManageSubscription={handleOpenBillingPortal}
                   />
 
                 </div>
@@ -4785,7 +4831,7 @@ export default function App() {
                           prioridade na fila.
                         </p>
                         <button
-                          onClick={() => void handleOpenBillingPortal()}
+                          onClick={handleOpenBillingPortal}
                           className="mt-3 px-4 py-1.5 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl transition-all cursor-pointer"
                         >
                           Fazer upgrade agora
@@ -5333,6 +5379,15 @@ export default function App() {
           })()}
 
           {/* ── Modal: Documentos Duplicados na Importação ── */}
+          {showGerenciarAssinatura && (
+            <GerenciarAssinatura
+              subscription={subscription}
+              onClose={() => setShowGerenciarAssinatura(false)}
+              onAction={(action, planId) => subscriptionService.billingAction(action, planId)}
+              onChanged={syncSubscription}
+            />
+          )}
+
           {addDupModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
               <div className="bg-zinc-900 border border-amber-700/60 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">

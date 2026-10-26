@@ -59,7 +59,7 @@ export default function TermosDeUso({ onClose }: Props) {
           <section className="space-y-2">
             <h3 className="text-white font-semibold text-base">4. Planos e Pagamentos</h3>
             <p>
-              O serviço é oferecido mediante assinatura mensal nos planos disponíveis (Básico, Pro e Premium), com cobranças recorrentes processadas pela Stripe. O valor é cobrado antecipadamente no início de cada período.
+              O serviço é oferecido mediante assinatura mensal nos planos disponíveis (Básico, Pro e Premium), com cobranças recorrentes processadas pelo Asaas, pagáveis por Pix, boleto ou cartão. Na primeira assinatura há 7 dias de teste grátis, e a primeira fatura vence ao fim do teste; as seguintes vencem a cada mês, antecipadamente.
             </p>
             <p>
               Não há reembolso por períodos não utilizados. O cancelamento da assinatura impede novas cobranças, mas o acesso permanece ativo até o final do período já pago.
@@ -100,7 +100,7 @@ export default function TermosDeUso({ onClose }: Props) {
           <section className="space-y-2">
             <h3 className="text-white font-semibold text-base">7. Limitação de Responsabilidade</h3>
             <p>
-              A NC Finance não garante disponibilidade ininterrupta do serviço e não se responsabiliza por falhas de APIs terceiras (Z-API, Stripe, Google). Em nenhuma hipótese a responsabilidade total da NC Finance excederá o valor pago pelo usuário nos últimos 30 dias.
+              A NC Finance não garante disponibilidade ininterrupta do serviço e não se responsabiliza por falhas de APIs terceiras (Z-API, Asaas, Google). Em nenhuma hipótese a responsabilidade total da NC Finance excederá o valor pago pelo usuário nos últimos 30 dias.
             </p>
           </section>
 

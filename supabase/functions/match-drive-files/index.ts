@@ -22,6 +22,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
+import { canUseSubscription } from "../_shared/billingStatus.ts";
 import {
   getGoogleAccessToken,
   listFilesInFolderDeep,
@@ -90,11 +91,11 @@ Deno.serve(async (request: Request) => {
     // ── 2. Valida assinatura ───────────────────────────────────────────────────
     const { data: subscription } = await admin
       .from("user_subscriptions")
-      .select("status, plan")
+      .select("status, plan, cancel_at_period_end, current_period_end")
       .eq("user_id", userId)
       .maybeSingle();
 
-    if (!subscription || !["trialing", "active"].includes(subscription.status)) {
+    if (!subscription || !canUseSubscription(subscription)) {
       return errResponse(403, {
         error: "Assinatura necessaria (trialing ou active) para usar o Drive.",
         status: "bloqueado_assinatura",

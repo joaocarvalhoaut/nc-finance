@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -19,7 +19,12 @@ interface SubscriptionGateProps {
   error: string;
   selectedPlanId: PlanId | null;
   onSelectPlan: (planId: PlanId) => void;
+  /** Abre a fatura em aberto no Asaas (assinatura aguardando pagamento). */
   onManageSubscription: () => void;
+  /** Plano aguardando CPF/CNPJ (o cadastro não tem documento). */
+  documentPromptPlanId?: PlanId | null;
+  onSubmitDocument?: (planId: PlanId, cpfCnpj: string) => void;
+  onCancelDocument?: () => void;
   onRefresh: () => void;
   onBack: () => void;
   onLogout: () => void;
@@ -57,8 +62,16 @@ export default function SubscriptionGate({
   subscription,
   usage,
   isSyncing = false,
+  documentPromptPlanId = null,
+  onSubmitDocument,
+  onCancelDocument,
 }: SubscriptionGateProps) {
   const isBusy = loading || isSyncing;
+  const [documento, setDocumento] = useState("");
+  const documentoDigitos = documento.replace(/\D/g, "");
+  const documentoValido = documentoDigitos.length === 11 || documentoDigitos.length === 14;
+  // Fatura a pagar: assinatura criada mas sem pagamento, ou vencida além da tolerância.
+  const temFatura = subscription?.status === "incomplete" || subscription?.status === "past_due";
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white px-4 py-10 sm:px-8">
@@ -95,8 +108,8 @@ export default function SubscriptionGate({
                   Ative seu acesso ao NC Finance
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm text-zinc-400 sm:text-base">
-                  Cada conta possui uma assinatura Stripe com 7 dias grátis. O cartão é exigido
-                  no checkout, mas você pode cancelar a qualquer momento pelo portal de cobrança.
+                  Na primeira assinatura você tem 7 dias grátis, sem cartão. A fatura mensal
+                  pode ser paga por Pix, boleto ou cartão, e você cancela quando quiser.
                 </p>
               </div>
             </div>
@@ -171,6 +184,49 @@ export default function SubscriptionGate({
           </div>
         )}
 
+        {/* ── CPF/CNPJ para emitir a cobrança ──────────────────────────────── */}
+        {documentPromptPlanId && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (documentoValido) onSubmitDocument?.(documentPromptPlanId, documentoDigitos);
+            }}
+            className="rounded-2xl border border-emerald-500/20 bg-zinc-900/60 p-5 space-y-3"
+          >
+            <div>
+              <p className="text-sm font-semibold text-white">Informe seu CPF ou CNPJ</p>
+              <p className="text-xs text-zinc-400 mt-1">
+                É exigido para emitir a fatura da assinatura. Vai direto para o Asaas, que processa o
+                pagamento — não fica guardado no NC Finance.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                value={documento}
+                onChange={(e) => setDocumento(e.target.value)}
+                inputMode="numeric"
+                autoFocus
+                placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                className="flex-1 rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-2.5 text-sm text-white font-mono placeholder:text-zinc-600 focus:border-emerald-400 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!documentoValido || isBusy}
+                className="rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-black transition hover:bg-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Continuar
+              </button>
+              <button
+                type="button"
+                onClick={onCancelDocument}
+                className="rounded-xl border border-zinc-800 px-4 py-2.5 text-sm text-zinc-400 hover:text-white cursor-pointer"
+              >
+                Voltar
+              </button>
+            </div>
+          </form>
+        )}
+
         {/* ── Assinatura existente mas status bloqueado ───────────────────── */}
         {subscription && !isSyncing && (
           <div className="rounded-[28px] border border-zinc-800 bg-zinc-900/50 p-6">
@@ -180,21 +236,24 @@ export default function SubscriptionGate({
                   <AlertTriangle className="h-4 w-4" /> Assinatura encontrada
                 </div>
                 <p className="text-sm text-zinc-300">
-                  Você já tem uma assinatura registrada (status:{" "}
-                  <span className="font-semibold text-white">{subscription.status}</span>).
-                  Se precisar atualizar cartão, cancelar ou reativar, use o portal Stripe.
-                  Se acabou de pagar e está aguardando confirmação, clique em "Atualizar
-                  assinatura".
+                  {temFatura
+                    ? <>Sua assinatura está aguardando pagamento ({STATUS_PT[subscription.status] ?? subscription.status}).
+                        Pague a fatura por Pix, boleto ou cartão para liberar o acesso. Se já pagou,
+                        clique em "Atualizar assinatura" — boleto pode levar até 3 dias úteis para compensar.</>
+                    : <>Sua assinatura está {(STATUS_PT[subscription.status] ?? subscription.status).toLowerCase()}.
+                        Escolha um plano abaixo para assinar de novo.</>}
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={onManageSubscription}
-                  disabled={isBusy}
-                  className="rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:border-emerald-400 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-                >
-                  Gerenciar assinatura
-                </button>
+                {temFatura && (
+                  <button
+                    onClick={onManageSubscription}
+                    disabled={isBusy}
+                    className="rounded-2xl bg-white px-4 py-2 text-sm font-bold text-black transition hover:bg-emerald-300 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    Pagar fatura
+                  </button>
+                )}
                 <button
                   onClick={onRefresh}
                   disabled={isBusy}
@@ -234,6 +293,13 @@ export default function SubscriptionGate({
 
                   <p className="text-sm text-zinc-400">{plan.description}</p>
 
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-black text-white">
+                      R$ {plan.priceBRL.toLocaleString("pt-BR")}
+                    </span>
+                    <span className="text-sm text-zinc-500">/mês</span>
+                  </div>
+
                   <div className="rounded-2xl border border-zinc-800 bg-zinc-950/80 p-4">
                     <div className="text-xs uppercase tracking-[0.2em] text-zinc-500">
                       Limite mensal
@@ -260,7 +326,7 @@ export default function SubscriptionGate({
                   className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-black transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <CreditCard className="h-4 w-4" />
-                  {isSyncing ? "Aguardando confirmação…" : "Iniciar trial de 7 dias"}
+                  {isSyncing ? "Aguardando confirmação…" : `Assinar o ${plan.name}`}
                   {!isSyncing && <ArrowRight className="h-4 w-4" />}
                   {isSyncing && (
                     <RefreshCw className="h-4 w-4 animate-spin" />

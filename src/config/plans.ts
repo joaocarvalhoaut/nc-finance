@@ -1,4 +1,5 @@
 import type { PlanId } from "../types";
+import { PLAN_PRICE_BRL } from "../../supabase/functions/_shared/billingPlans.ts";
 
 export interface PlanDefinition {
   id: PlanId;
@@ -6,12 +7,9 @@ export interface PlanDefinition {
   description: string;
   monthlyChargeLimit: number;
   features: string[];
-  stripePriceId: string;
+  /** Mensalidade em reais — a mesma que o checkout do Asaas cobra. */
+  priceBRL: number;
 }
-
-const basicPriceId = String(import.meta.env.VITE_STRIPE_BASIC_PRICE_ID || "").trim();
-const proPriceId = String(import.meta.env.VITE_STRIPE_PRO_PRICE_ID || "").trim();
-const premiumPriceId = String(import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID || "").trim();
 
 export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
   basic: {
@@ -25,7 +23,7 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
       "Importação de Excel, CSV, PDF e TXT",
       "Histórico de envios",
     ],
-    stripePriceId: basicPriceId,
+    priceBRL: PLAN_PRICE_BRL.basic,
   },
   pro: {
     id: "pro",
@@ -39,7 +37,7 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
       "Mensagens em vários tons (amigável a jurídico)",
       "Anexo automático de boletos do Google Drive",
     ],
-    stripePriceId: proPriceId,
+    priceBRL: PLAN_PRICE_BRL.pro,
   },
   premium: {
     id: "premium",
@@ -53,7 +51,7 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
       "Dashboard de métricas e taxa de sucesso",
       "Prioridade na fila de envio",
     ],
-    stripePriceId: premiumPriceId,
+    priceBRL: PLAN_PRICE_BRL.premium,
   },
 };
 

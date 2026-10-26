@@ -1,4 +1,5 @@
-import { getPlanDefinition, PLAN_DEFINITIONS, type PlanDefinition } from "../config/plans";
+import { getPlanDefinition, type PlanDefinition } from "../config/plans";
+import { canUseSubscription } from "../../supabase/functions/_shared/billingStatus.ts";
 import type { PlanId, UserSubscription, UserUsageCounter } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
 import { track } from "../lib/analytics";
@@ -30,6 +31,38 @@ interface UserUsageCounterRow {
   created_at: string;
   updated_at: string;
 }
+
+/** Erro de cobrança com o código devolvido pela Edge Function (ex.: documento_necessario). */
+export class BillingError extends Error {
+  constructor(message: string, public code: string | null = null) {
+    super(message);
+    this.name = "BillingError";
+  }
+}
+
+/**
+ * Chama uma Edge Function de cobrança. Em resposta non-2xx o supabase-js só
+ * dá uma mensagem genérica; o corpo real ({ error, code }) vem em error.context.
+ */
+const invokeBilling = async <T>(fn: string, body: Record<string, unknown>, fallback: string): Promise<T> => {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.functions.invoke(fn, { body });
+  if (!error) return data as T;
+
+  let message = fallback;
+  let code: string | null = null;
+  try {
+    const ctx = (error as unknown as { context?: Response }).context;
+    if (ctx) {
+      const parsed = await ctx.json() as { error?: string; code?: string };
+      if (parsed.error) message = parsed.error;
+      if (parsed.code) code = parsed.code;
+    }
+  } catch { /* corpo não-JSON: usa a mensagem genérica */ }
+  throw new BillingError(message, code);
+};
+
+export type BillingAction = "sync" | "pay" | "change_plan" | "cancel";
 
 const SUBSCRIPTIONS_TABLE = "user_subscriptions";
 const USAGE_TABLE = "user_usage_counters";
@@ -139,31 +172,36 @@ export const subscriptionService = {
         };
   },
 
-  async createCheckoutSession(planId: PlanId) {
-    const supabase = getSupabaseClient();
-    const { data, error } = await supabase.functions.invoke("create-checkout-session", {
-      body: { planId },
-    });
-
-    if (error) {
-      throw new Error(error.message || "Falha ao criar sessão de checkout.");
-    }
+  /**
+   * Inicia a assinatura no Asaas. Primeira assinatura: volta "trialing" e o
+   * acesso já está liberado. Depois disso: volta o link da fatura a pagar.
+   * cpfCnpj só é enviado quando o cadastro não tem documento (vai direto ao
+   * Asaas; não é gravado).
+   */
+  async createCheckoutSession(planId: PlanId, cpfCnpj?: string) {
+    const data = await invokeBilling<{ status: string; invoice_url?: string | null; trial_end?: string | null }>(
+      "asaas-checkout",
+      cpfCnpj ? { planId, cpfCnpj } : { planId },
+      "Falha ao iniciar a assinatura.",
+    );
 
     // Analytics (opt-in): só o plano escolhido — sem dados de pagamento/PII.
     track("checkout_started", { plan: planId });
 
-    return data as { checkout_url: string };
+    return data;
   },
 
-  async createBillingPortalSession() {
-    const supabase = getSupabaseClient();
-    const { data, error } = await supabase.functions.invoke("create-billing-portal-session");
-
-    if (error) {
-      throw new Error(error.message || "Falha ao abrir portal de cobrança.");
-    }
-
-    return data as { portal_url: string };
+  /** Gerenciar assinatura: sincronizar, pagar fatura, trocar plano, cancelar. */
+  async billingAction(action: BillingAction, planId?: PlanId) {
+    return invokeBilling<{
+      synced?: boolean;
+      invoice_url?: string | null;
+      due_date?: string;
+      value?: number;
+      plan?: PlanId;
+      status?: string;
+      current_period_end?: string | null;
+    }>("asaas-billing", planId ? { action, planId } : { action }, "Falha ao processar a assinatura.");
   },
 
   async recordUsage(metric: "charges_sent" | "sheets_imports" | "drive_lookups", amount = 1) {
@@ -189,7 +227,13 @@ export const getSubscriptionEntitlements = (
   const remainingCharges = Math.max(planDefinition.monthlyChargeLimit - chargesUsed, 0);
   const isTrialing = subscription?.status === "trialing";
   const isActive = subscription?.status === "active";
-  const canUseApp = isTrialing || isActive;
+  // Regra única com o servidor (billingStatus.ts): considera fim do teste,
+  // tolerância de pagamento e cancelamento no fim do período pago.
+  const canUseApp = canUseSubscription(subscription && {
+    status: subscription.status,
+    cancel_at_period_end: subscription.cancelAtPeriodEnd,
+    current_period_end: subscription.currentPeriodEnd,
+  });
   const canSendCharge = canUseApp && remainingCharges > 0;
 
   return {
@@ -204,9 +248,4 @@ export const getSubscriptionEntitlements = (
     isTrialing,
     isActive,
   };
-};
-
-export const getPlanByPriceId = (priceId: string | null | undefined) => {
-  const found = Object.values(PLAN_DEFINITIONS).find((plan) => plan.stripePriceId === priceId);
-  return found?.id || null;
 };

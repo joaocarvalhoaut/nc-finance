@@ -20,6 +20,7 @@ import { nextAutomationStart, scheduledAutomationStart } from "../_shared/automa
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
+import { canUseSubscription } from "../_shared/billingStatus.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -76,11 +77,11 @@ const processRule = async (rule: RuleRow): Promise<void> => {
     // ── 1. Verifica assinatura ──────────────────────────────────────────────
     const { data: sub } = await admin
       .from("user_subscriptions")
-      .select("status, plan")
+      .select("status, plan, cancel_at_period_end, current_period_end")
       .eq("user_id", userId)
       .maybeSingle();
 
-    if (!sub || !["trialing", "active"].includes(String(sub.status))) {
+    if (!sub || !canUseSubscription(sub)) {
       runStatus = "error";
       await finalizeRun(runId, runStatus, 0, 0, 0, { reason: "blocked_subscription" });
       await updateRule(ruleId);

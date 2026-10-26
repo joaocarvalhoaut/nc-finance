@@ -91,7 +91,7 @@ export default function PoliticaPrivacidade({ onClose }: Props) {
                 <tbody className="text-zinc-400 divide-y divide-zinc-900">
                   <tr><td className="py-2 pr-4">Prestação do serviço de cobrança</td><td className="py-2">Execução de contrato (art. 7º, V)</td></tr>
                   <tr><td className="py-2 pr-4">Controle de limites de plano</td><td className="py-2">Execução de contrato (art. 7º, V)</td></tr>
-                  <tr><td className="py-2 pr-4">Processamento de pagamentos via Stripe</td><td className="py-2">Execução de contrato (art. 7º, V)</td></tr>
+                  <tr><td className="py-2 pr-4">Processamento de pagamentos via Asaas</td><td className="py-2">Execução de contrato (art. 7º, V)</td></tr>
                   <tr><td className="py-2 pr-4">Envio de notificações do serviço</td><td className="py-2">Legítimo interesse (art. 7º, IX)</td></tr>
                   <tr><td className="py-2 pr-4">Prevenção a fraudes e abusos</td><td className="py-2">Legítimo interesse (art. 7º, IX)</td></tr>
                   <tr><td className="py-2 pr-4">Cumprimento de obrigações legais</td><td className="py-2">Obrigação legal (art. 7º, II)</td></tr>
@@ -105,7 +105,7 @@ export default function PoliticaPrivacidade({ onClose }: Props) {
             <p>Compartilhamos dados apenas com os seguintes fornecedores essenciais à operação do serviço:</p>
             <ul className="list-disc pl-5 space-y-1 text-zinc-400 mt-2">
               <li><strong className="text-zinc-300">Supabase</strong> — infraestrutura de banco de dados e autenticação (servidores na região South America)</li>
-              <li><strong className="text-zinc-300">Stripe</strong> — processamento de pagamentos (dados de cobrança do usuário — não de devedores)</li>
+              <li><strong className="text-zinc-300">Asaas</strong> — processamento de pagamentos da assinatura (nome, CPF/CNPJ e e-mail do usuário — não de devedores)</li>
               <li><strong className="text-zinc-300">Z-API</strong> — gateway de envio de mensagens WhatsApp (recebe apenas o número de telefone e o texto da mensagem)</li>
               <li><strong className="text-zinc-300">Google Cloud</strong> — integração com Google Sheets e Drive (apenas quando habilitado pelo usuário)</li>
               <li><strong className="text-zinc-300">Resend</strong> — envio de e-mails do serviço, como recuperação de senha (recebe apenas o e-mail do usuário)</li>

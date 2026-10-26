@@ -1125,7 +1125,7 @@ export default function LandingPage({
                   <span style={{ color: "#FFCB05" }}>e</span><span style={{ color: "#EF4123" }}>l</span><span style={{ color: "#00A4E0" }}>o</span>
                 </span>
               </div>
-              <p className="text-xs text-zinc-500">Pagamento processado com segurança pela Stripe.</p>
+              <p className="text-xs text-zinc-500">Pagamento processado com segurança pelo Asaas — Pix, boleto ou cartão.</p>
             </div>
           </div>
 

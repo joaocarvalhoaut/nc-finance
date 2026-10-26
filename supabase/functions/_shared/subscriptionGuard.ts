@@ -1,9 +1,12 @@
 /**
- * subscriptionGuard.ts — valida assinatura Stripe (trialing | active).
+ * subscriptionGuard.ts — valida se a assinatura libera o uso do sistema.
+ * Regra em billingStatus.ts (teste, ativa, tolerância de pagamento, cancelada
+ * dentro do período pago).
  * Usado por Edge Functions que exigem assinatura ativa.
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
+import { canUseSubscription } from "./billingStatus.ts";
 
 // Os genericos precisam ser explicitos: sem eles o ReturnType resolve para os
 // padroes da DECLARACAO (SupabaseClient<unknown, never, GenericSchema>), que nao
@@ -28,10 +31,8 @@ export type SubscriptionGuardResult =
   | { ok: true; subscription: SubscriptionInfo }
   | { ok: false; guard: SubscriptionGuardError };
 
-const ALLOWED_STATUSES = ["trialing", "active"];
-
 /**
- * Verifica se o usuário possui assinatura ativa (trialing | active).
+ * Verifica se a assinatura do usuário libera o uso (ver canUseSubscription).
  * Retorna o objeto de assinatura em caso de sucesso.
  */
 export const checkSubscription = async (
@@ -40,16 +41,16 @@ export const checkSubscription = async (
 ): Promise<SubscriptionGuardResult> => {
   const { data: sub } = await admin
     .from("user_subscriptions")
-    .select("status, plan")
+    .select("status, plan, cancel_at_period_end, current_period_end")
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (!sub || !ALLOWED_STATUSES.includes(sub.status)) {
+  if (!sub || !canUseSubscription(sub)) {
     return {
       ok: false,
       guard: {
         kind: "bloqueado_assinatura",
-        error: `Assinatura necessaria (trialing ou active). Status: ${sub?.status ?? "sem_assinatura"}.`,
+        error: `Assinatura necessaria. Status: ${sub?.status ?? "sem_assinatura"}.`,
         statusCode: 403,
       },
     };
