@@ -1,5 +1,5 @@
 /**
- * WhatsappGatewayCard — painel de configuração da instância Z-API.
+ * WhatsappGatewayCard — conexão do número de WhatsApp da conta (instância Z-API).
  *
  * Regras de segurança (IMUTÁVEIS):
  *   - token, client_token e instance_id NÃO ficam em estado React após o envio.
@@ -262,356 +262,297 @@ export default function WhatsappGatewayCard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, qrCode, qrTentativa]);
 
-  // ── Status badge ───────────────────────────────────────────────────────────
-  const StatusBadge = () => {
-    if (!gatewayStatus) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">
-          <Clock className="w-3 h-3" /> carregando…
-        </span>
-      );
-    }
-    if (gatewayStatus.connected) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-          <CheckCircle className="w-3 h-3" /> Conectado
-        </span>
-      );
-    }
-    if (gatewayStatus.connected_pending_phone) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20">
-          <QrCode className="w-3 h-3" /> Aguardando QR
-        </span>
-      );
-    }
-    if (gatewayStatus.status === "error") {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-rose-500/10 text-rose-400 border border-rose-500/20">
-          <AlertTriangle className="w-3 h-3" /> Erro de conexão
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-500 border border-zinc-700">
-        <WifiOff className="w-3 h-3" /> Inativo
-      </span>
-    );
-  };
+  // ── Selo de status ─────────────────────────────────────────────────────────
+  const selo =
+    !gatewayStatus ? { txt: "…", cls: "text-zinc-400 border-zinc-700 bg-zinc-900" }
+    : gatewayStatus.connected ? { txt: "Conectado", cls: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10" }
+    : gatewayStatus.status === "error" ? { txt: "Sem resposta", cls: "text-rose-300 border-rose-500/30 bg-rose-500/10" }
+    : { txt: "Não conectado", cls: "text-zinc-300 border-zinc-600 bg-zinc-800" };
+
+  const Rotulo = ({ children }: { children: React.ReactNode }) => (
+    <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{children}</p>
+  );
+  const inputCls = "w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-200 font-mono focus:outline-none focus:border-emerald-500 transition-colors";
+  const btnPrimario = "w-full py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors cursor-pointer";
+  const btnSecundario = "px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold disabled:opacity-50 transition-colors cursor-pointer";
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-5 space-y-4">
+    <section className="bg-zinc-950 border border-zinc-800 rounded-xl">
 
-      {/* ── Header ───────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Wifi className="w-4 h-4 text-emerald-400" />
-          <h3 className="text-sm font-bold text-white">Integração WhatsApp (Z-API)</h3>
+      {/* ── Cabeçalho ────────────────────────────────────────────────────── */}
+      <header className="flex items-start justify-between gap-3 px-5 py-4 border-b border-zinc-800/80">
+        <div className="min-w-0">
+          <h3 className="text-sm font-bold text-white">WhatsApp</h3>
+          <p className="text-xs text-zinc-500 mt-0.5">Número que envia as suas cobranças</p>
         </div>
-        <div className="flex items-center gap-2">
-          <StatusBadge />
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className={`text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border ${selo.cls}`}>{selo.txt}</span>
           <button
             onClick={() => void loadStatus()}
             disabled={isLoadingStatus}
-            className="p-1 rounded text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="p-1 rounded text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
             title="Atualizar status"
+            aria-label="Atualizar status"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoadingStatus ? "animate-spin" : ""}`} />
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* ── Status summary ───────────────────────────────────────────────── */}
-      {gatewayStatus && (
-        <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
-          <div className="bg-zinc-950 rounded-lg p-2 space-y-0.5">
-            <div className="text-zinc-500 uppercase text-[9px] font-bold tracking-widest">Status</div>
-            <div className="text-zinc-200">
-              {gatewayStatus.connected ? "Conectado" : gatewayStatus.status === "error" ? "Sem resposta da Z-API" : "Não conectado"}
+      <div className="px-5 py-4 space-y-4">
+
+        {/* ── Credenciais à mão (só suporte) ───────────────────────────── */}
+        {view === "config" && gatewayStatus?.can_manage_instances ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <Rotulo>Configuração manual (suporte)</Rotulo>
+              <button onClick={() => setView("qr")} className="text-[11px] text-zinc-500 hover:text-zinc-300 cursor-pointer">Voltar</button>
             </div>
-          </div>
-          <div className="bg-zinc-950 rounded-lg p-2 space-y-0.5">
-            <div className="text-zinc-500 uppercase text-[9px] font-bold tracking-widest">Número</div>
-            <div className="text-zinc-200 flex items-center gap-1">
-              <Smartphone className="w-3 h-3 text-zinc-600" />
-              {gatewayStatus.phone_number_masked ?? "—"}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Tab navigation ───────────────────────────────────────────────── */}
-      <div className="flex gap-1 border-b border-zinc-800 pb-2">
-        {(["qr", "status"] as ViewMode[]).map((v) => (
-          <button
-            key={v}
-            onClick={() => setView(v)}
-            className={`px-3 py-1 rounded text-[11px] font-semibold transition-colors ${
-              view === v
-                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                : "text-zinc-500 hover:text-zinc-300"
-            }`}
-          >
-            {v === "status" ? "Testar conexão" : "Conectar WhatsApp"}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Status / Validate tab ─────────────────────────────────────────── */}
-      {view === "status" && (
-        <div className="space-y-3">
-          <p className="text-xs text-zinc-500">
-            Confere se o número continua conectado e atualiza o status.
-          </p>
-          <button
-            onClick={() => void handleValidate()}
-            disabled={isValidating}
-            className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
-          >
-            {isValidating
-              ? <><RefreshCw className="w-4 h-4 animate-spin" /> Validando…</>
-              : <><Wifi className="w-4 h-4" /> Testar Conexão</>
-            }
-          </button>
-          {validateMsg && (
-            <p className={`text-xs p-2 rounded-lg ${
-              gatewayStatus?.connected
-                ? "bg-emerald-500/10 text-emerald-400"
-                : "bg-amber-500/10 text-amber-400"
-            }`}>
-              {validateMsg}
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              As credenciais vão direto ao servidor e <strong className="text-zinc-300">nunca ficam no navegador</strong>.
+              Os campos são limpos depois de salvar.
             </p>
-          )}
-        </div>
-      )}
 
-      {/* ── Config tab ───────────────────────────────────────────────────── */}
-      {view === "config" && gatewayStatus?.can_manage_instances && (
-        <div className="space-y-3">
-          <p className="text-xs text-zinc-500">
-            As credenciais são enviadas diretamente ao servidor e <strong className="text-zinc-300">nunca ficam
-            armazenadas no browser</strong>. Os campos são limpos automaticamente após o envio.
-          </p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowSecrets((v) => !v)}
+                className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+              >
+                {showSecrets ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                {showSecrets ? "Ocultar campos" : "Mostrar campos"}
+              </button>
+            </div>
 
-          <div className="flex items-center justify-end gap-2">
-            <button
-              onClick={() => setShowSecrets((v) => !v)}
-              className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
-            >
-              {showSecrets ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-              {showSecrets ? "Ocultar campos" : "Mostrar campos"}
-            </button>
-          </div>
+            {[
+              { label: "Instance ID",    value: instanceId,   setter: setInstanceId,  placeholder: "ID da instância na Z-API" },
+              { label: "Token",          value: token,        setter: setToken,        placeholder: "Token da instância" },
+              { label: "Client Token",   value: clientToken,  setter: setClientToken,  placeholder: "Token de segurança da conta Z-API" },
+              { label: "Token de Admin", value: adminToken,   setter: setAdminToken,   placeholder: "GATEWAY_ADMIN_SECRET" },
+            ].map(({ label, value, setter, placeholder }) => (
+              <div key={label}>
+                <label className="block mb-1"><Rotulo>{label}</Rotulo></label>
+                <input
+                  type={showSecrets ? "text" : "password"}
+                  value={value}
+                  onChange={(e) => setter(e.target.value)}
+                  placeholder={placeholder}
+                  autoComplete="off"
+                  className={inputCls}
+                />
+              </div>
+            ))}
 
-          {[
-            { label: "Instance ID",    value: instanceId,   setter: setInstanceId,  placeholder: "Sua Instance ID" },
-            { label: "Token",          value: token,        setter: setToken,        placeholder: "Token da instância" },
-            { label: "Client Token",   value: clientToken,  setter: setClientToken,  placeholder: "Client-Token" },
-            { label: "Token de Admin", value: adminToken,   setter: setAdminToken,   placeholder: "GATEWAY_ADMIN_SECRET" },
-          ].map(({ label, value, setter, placeholder }) => (
-            <div key={label}>
-              <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">{label}</label>
+            <div>
+              <label className="block mb-1"><Rotulo>E-mail da conta do cliente (opcional)</Rotulo></label>
               <input
-                type={showSecrets ? "text" : "password"}
-                value={value}
-                onChange={(e) => setter(e.target.value)}
-                placeholder={placeholder}
+                type="email"
+                value={clienteEmail}
+                onChange={(e) => setClienteEmail(e.target.value)}
+                placeholder="vazio = esta conta"
                 autoComplete="off"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-200 font-mono focus:outline-none focus:border-emerald-500 transition-all"
+                className={inputCls}
               />
+              <p className="text-[10px] text-zinc-600 mt-1">
+                Liga uma instância comprada à mão na Z-API à conta do cliente. Ele depois conecta o
+                número sozinho, pelo &quot;Conectar WhatsApp&quot;.
+              </p>
             </div>
-          ))}
 
-          <div>
-            <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">
-              E-mail da conta do cliente (opcional)
-            </label>
-            <input
-              type="email"
-              value={clienteEmail}
-              onChange={(e) => setClienteEmail(e.target.value)}
-              placeholder="vazio = esta conta"
-              autoComplete="off"
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-200 font-mono focus:outline-none focus:border-emerald-500 transition-all"
-            />
-            <p className="text-[10px] text-zinc-600 mt-1">
-              Liga uma instância comprada à mão na Z-API à conta do cliente. Ele depois conecta o
-              número sozinho, pelo &quot;Conectar WhatsApp&quot;.
-            </p>
-          </div>
+            {saveMsg && (
+              <p className={`text-xs p-2 rounded-lg ${
+                saveMsg.toLowerCase().includes("sucesso") || saveMsg.toLowerCase().includes("salvo")
+                  ? "bg-emerald-500/10 text-emerald-400"
+                  : "bg-amber-500/10 text-amber-400"
+              }`}>
+                {saveMsg}
+              </p>
+            )}
 
-          {saveMsg && (
-            <p className={`text-xs p-2 rounded-lg ${
-              saveMsg.toLowerCase().includes("sucesso") || saveMsg.toLowerCase().includes("salvo")
-                ? "bg-emerald-500/10 text-emerald-400"
-                : "bg-amber-500/10 text-amber-400"
-            }`}>
-              {saveMsg}
-            </p>
-          )}
-
-          <button
-            onClick={() => void handleSave()}
-            disabled={isSaving}
-            className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
-          >
-            {isSaving
-              ? <><RefreshCw className="w-4 h-4 animate-spin" /> Salvando…</>
-              : <><Save className="w-4 h-4" /> Salvar Credenciais</>
-            }
-          </button>
-        </div>
-      )}
-
-      {/* ── QR Code tab ──────────────────────────────────────────────────── */}
-      {view === "qr" && (
-        <div className="space-y-3">
-          <p className="text-xs text-zinc-500">
-            Conecte o WhatsApp do número que vai enviar as cobranças. Clique no botão e
-            escaneie o código com o celular — leva menos de um minuto.
-          </p>
-
-          {!qrCode && (
-            <button
-              onClick={() => { setQrConectado(false); void handleLoadQR(); }}
-              disabled={isLoadingQR || preparando}
-              className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
-            >
-              {isLoadingQR
-                ? <><RefreshCw className="w-4 h-4 animate-spin" /> Carregando QR…</>
-                : <><QrCode className="w-4 h-4" /> {gatewayStatus?.connected ? "Verificar conexão" : "Conectar WhatsApp"}</>
-              }
+            <button onClick={() => void handleSave()} disabled={isSaving} className={btnPrimario}>
+              {isSaving
+                ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Salvando…</>
+                : <><Save className="w-3.5 h-3.5" /> Salvar credenciais</>}
             </button>
-          )}
-
-          {preparando && !qrCode && (
-            <p className="text-xs p-2 rounded-lg bg-zinc-800 text-zinc-300 flex items-center gap-1.5">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Preparando seu número… isso leva alguns segundos.
-            </p>
-          )}
-
-          {qrConectado && (
-            <p className="text-xs p-2 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center gap-1.5">
-              <CheckCircle className="w-3.5 h-3.5" /> WhatsApp conectado. Já dá para enviar cobranças por este número.
-            </p>
-          )}
-
-          {pedidoAt && !gatewayStatus?.connected && (
-            <div className="text-xs p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200 space-y-1">
-              <p className="font-semibold">Recebemos seu pedido!</p>
-              <p>
-                Seu número de WhatsApp fica pronto em <strong>até {PRAZO_ATIVACAO_HORAS} horas</strong> — até{" "}
-                <strong>{formatarPrazo(prazoAtivacao(pedidoAt))}</strong>. Muitas vezes fica pronto bem antes disso.
-              </p>
-              <p className="text-amber-300/80">
-                Quando estiver pronto, volte aqui e clique em &quot;Conectar WhatsApp&quot; para escanear o código.
-              </p>
-            </div>
-          )}
-
-          {disconnectMsg && (
-            <p className="text-xs p-2 rounded-lg bg-zinc-800 text-zinc-300">{disconnectMsg}</p>
-          )}
-
-          {gatewayStatus?.connected && !qrCode && (
-            confirmarDesconexao ? (
-              <div className="border border-rose-800/60 rounded-xl p-3 space-y-2">
-                <p className="text-xs text-zinc-300">
-                  Desconectar o número {gatewayStatus.phone_number_masked ?? ""}? Nenhuma cobrança sai até
-                  você conectar um número de novo — inclusive as automações agendadas.
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => void handleDisconnect()}
-                    disabled={isDisconnecting}
-                    className="flex-1 py-2 rounded-xl text-xs font-bold bg-rose-700 hover:bg-rose-600 disabled:opacity-50 text-white transition-colors"
-                  >
-                    {isDisconnecting ? "Desconectando…" : "Desconectar"}
-                  </button>
-                  <button
-                    onClick={() => setConfirmarDesconexao(false)}
-                    disabled={isDisconnecting}
-                    className="flex-1 py-2 rounded-xl text-xs font-bold bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white transition-colors"
-                  >
-                    Manter conectado
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => { setConfirmarDesconexao(true); setDisconnectMsg(""); }}
-                className="w-full py-2 rounded-xl text-xs font-semibold border border-zinc-800 text-zinc-400 hover:text-rose-400 hover:border-rose-800/60 transition-colors"
-              >
-                Desconectar número
-              </button>
-            )
-          )}
-
-          {qrError && (
-            <p className="text-xs p-2 rounded-lg bg-rose-500/10 text-rose-400">{qrError}</p>
-          )}
-
-          {qrCode && (
-            <div className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl">
-              {/* Z-API returns base64 image or a URL */}
-              {qrCode.startsWith("data:") || qrCode.startsWith("http") ? (
-                <img src={qrCode} alt="QR Code WhatsApp" className="w-48 h-48" />
-              ) : (
-                <div className="text-[9px] font-mono text-zinc-900 break-all max-w-xs text-center">
-                  {qrCode}
-                </div>
-              )}
-              <p className="text-[10px] text-zinc-500 text-center mt-1">
-                No celular do número que será usado: WhatsApp &gt; Aparelhos conectados &gt; Conectar um aparelho.
-              </p>
-              <p className="text-[10px] text-zinc-400 text-center flex items-center gap-1">
-                <RefreshCw className="w-3 h-3 animate-spin" />
-                Aguardando leitura — o código se renova sozinho ({qrTentativa}/{QR_MAX_TENTATIVAS})
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Credenciais à mão: só aparece para contas do suporte (ADMIN_EMAILS no
-          servidor), que ainda precisam do Token de Admin. O cliente conecta
-          pelo "Conectar WhatsApp" acima. */}
-      {/* Suporte: clientes que pediram para conectar e ainda não têm instância. */}
-      {gatewayStatus?.can_manage_instances && (gatewayStatus.pending_requests?.length ?? 0) > 0 && (
-        <div className="border border-amber-700/40 rounded-xl p-3 space-y-2">
-          <p className="text-[10px] font-mono uppercase tracking-widest text-amber-400">
-            Clientes aguardando número ({gatewayStatus.pending_requests!.length})
-          </p>
-          {gatewayStatus.pending_requests!.map((p) => (
-            <div key={(p.email ?? "") + p.requested_at} className="flex items-center justify-between gap-3 text-xs">
+          </div>
+        ) : (
+          <>
+            {/* ── Número ─────────────────────────────────────────────────── */}
+            <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-zinc-200 truncate">{p.email ?? "(sem e-mail)"}</div>
-                {/* Prazo prometido ao cliente; em vermelho quando já passou. */}
-                <div className={`text-[10px] ${prazoAtivacao(p.requested_at).getTime() < Date.now() ? "text-rose-400 font-semibold" : "text-zinc-500"}`}>
-                  {prazoAtivacao(p.requested_at).getTime() < Date.now() ? "prazo vencido em " : "prazo até "}
-                  {formatarPrazo(prazoAtivacao(p.requested_at))}
+                <Rotulo>Número</Rotulo>
+                <p className={`mt-0.5 text-sm font-mono ${gatewayStatus?.connected ? "text-white" : "text-zinc-600"}`}>
+                  {gatewayStatus?.connected
+                    ? gatewayStatus.phone_number_masked ?? "Conectado"
+                    : "Nenhum número conectado"}
+                </p>
+              </div>
+              {gatewayStatus?.connected && !qrCode && (
+                <button onClick={() => void handleValidate()} disabled={isValidating} className={`${btnSecundario} flex-shrink-0`}>
+                  {isValidating ? "Testando…" : "Testar conexão"}
+                </button>
+              )}
+            </div>
+
+            {validateMsg && (
+              <p className={`text-xs p-2 rounded-lg ${
+                gatewayStatus?.connected ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"
+              }`}>
+                {validateMsg}
+              </p>
+            )}
+
+            {/* ── Conectar ───────────────────────────────────────────────── */}
+            {!gatewayStatus?.connected && !qrCode && (
+              <>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Conecte o WhatsApp do número que vai enviar as cobranças: clique no botão e escaneie
+                  o código com o celular. Leva menos de um minuto.
+                </p>
+                <button
+                  onClick={() => { setQrConectado(false); setValidateMsg(""); void handleLoadQR(); }}
+                  disabled={isLoadingQR || preparando}
+                  className={btnPrimario}
+                >
+                  {isLoadingQR
+                    ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Carregando…</>
+                    : <><QrCode className="w-3.5 h-3.5" /> Conectar WhatsApp</>}
+                </button>
+              </>
+            )}
+
+            {preparando && !qrCode && (
+              <p className="text-xs p-2.5 rounded-lg bg-zinc-900 text-zinc-300 flex items-center gap-1.5">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Preparando seu número… isso leva alguns segundos.
+              </p>
+            )}
+
+            {qrConectado && (
+              <p className="text-xs p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center gap-1.5">
+                <CheckCircle className="w-3.5 h-3.5" /> WhatsApp conectado. Já dá para enviar cobranças por este número.
+              </p>
+            )}
+
+            {pedidoAt && !gatewayStatus?.connected && (
+              <div className="text-xs p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200 space-y-1">
+                <p className="font-semibold">Recebemos seu pedido!</p>
+                <p>
+                  Seu número de WhatsApp fica pronto em <strong>até {PRAZO_ATIVACAO_HORAS} horas</strong> — até{" "}
+                  <strong>{formatarPrazo(prazoAtivacao(pedidoAt))}</strong>. Muitas vezes fica pronto bem antes disso.
+                </p>
+                <p className="text-amber-300/80">
+                  Quando estiver pronto, volte aqui e clique em &quot;Conectar WhatsApp&quot; para escanear o código.
+                </p>
+              </div>
+            )}
+
+            {disconnectMsg && (
+              <p className="text-xs p-2.5 rounded-lg bg-zinc-900 text-zinc-300">{disconnectMsg}</p>
+            )}
+
+            {qrError && (
+              <p className="text-xs p-2.5 rounded-lg bg-rose-500/10 text-rose-400">{qrError}</p>
+            )}
+
+            {/* ── QR Code ────────────────────────────────────────────────── */}
+            {qrCode && (
+              <div className="rounded-lg border border-zinc-800 overflow-hidden">
+                <div className="flex justify-center p-5 bg-white">
+                  {/* Z-API devolve imagem base64 ou URL */}
+                  {qrCode.startsWith("data:") || qrCode.startsWith("http") ? (
+                    <img src={qrCode} alt="QR Code para conectar o WhatsApp" className="w-48 h-48" />
+                  ) : (
+                    <div className="text-[9px] font-mono text-zinc-900 break-all max-w-xs text-center">{qrCode}</div>
+                  )}
+                </div>
+                <div className="px-4 py-3 space-y-1.5 bg-zinc-900/60">
+                  <p className="text-xs text-zinc-300">
+                    No celular: <strong className="text-white">WhatsApp › Aparelhos conectados › Conectar um aparelho</strong>
+                  </p>
+                  <p className="text-[11px] text-zinc-500 flex items-center gap-1.5">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    Aguardando leitura — o código se renova sozinho ({qrTentativa}/{QR_MAX_TENTATIVAS})
+                  </p>
                 </div>
               </div>
-              <button
-                onClick={() => { setClienteEmail(p.email ?? ""); setSaveMsg(""); setView("config"); }}
-                className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold transition-colors"
-              >
-                Ligar instância
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+            )}
 
-      {view !== "config" && gatewayStatus?.can_manage_instances && (
-        <button
-          onClick={() => setView("config")}
-          className="w-full text-[10px] text-zinc-700 hover:text-zinc-500 transition-colors pt-1"
-        >
-          Configuração manual (suporte)
-        </button>
+            {/* ── Desconectar ────────────────────────────────────────────── */}
+            {gatewayStatus?.connected && !qrCode && (
+              confirmarDesconexao ? (
+                <div className="border-t border-zinc-900 pt-4 space-y-2.5">
+                  <p className="text-xs text-zinc-300 leading-relaxed">
+                    Desconectar o número {gatewayStatus.phone_number_masked ?? ""}? Nenhuma cobrança sai até
+                    você conectar um número de novo — inclusive as automações agendadas.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => void handleDisconnect()}
+                      disabled={isDisconnecting}
+                      className="flex-1 py-2 rounded-lg text-xs font-bold bg-rose-700 hover:bg-rose-600 disabled:opacity-50 text-white transition-colors cursor-pointer"
+                    >
+                      {isDisconnecting ? "Desconectando…" : "Desconectar"}
+                    </button>
+                    <button onClick={() => setConfirmarDesconexao(false)} disabled={isDisconnecting} className={btnSecundario}>
+                      Manter conectado
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="border-t border-zinc-900 pt-3">
+                  <button
+                    onClick={() => { setConfirmarDesconexao(true); setDisconnectMsg(""); setValidateMsg(""); }}
+                    className="text-[11px] text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer"
+                  >
+                    Desconectar número
+                  </button>
+                </div>
+              )
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Suporte: pedidos pendentes e acesso à configuração manual ────── */}
+      {gatewayStatus?.can_manage_instances && view !== "config" && (
+        <footer className="border-t border-zinc-800/80 px-5 py-3 space-y-3">
+          {(gatewayStatus.pending_requests?.length ?? 0) > 0 && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-mono uppercase tracking-widest text-amber-400">
+                Clientes aguardando número ({gatewayStatus.pending_requests!.length})
+              </p>
+              {gatewayStatus.pending_requests!.map((p) => {
+                const vencido = prazoAtivacao(p.requested_at).getTime() < Date.now();
+                return (
+                  <div key={(p.email ?? "") + p.requested_at} className="flex items-center justify-between gap-3 text-xs">
+                    <div className="min-w-0">
+                      <div className="text-zinc-200 truncate">{p.email ?? "(sem e-mail)"}</div>
+                      {/* Prazo prometido ao cliente; em vermelho quando já passou. */}
+                      <div className={`text-[10px] ${vencido ? "text-rose-400 font-semibold" : "text-zinc-500"}`}>
+                        {vencido ? "prazo vencido em " : "prazo até "}{formatarPrazo(prazoAtivacao(p.requested_at))}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => { setClienteEmail(p.email ?? ""); setSaveMsg(""); setView("config"); }}
+                      className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold transition-colors cursor-pointer"
+                    >
+                      Ligar instância
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {/* Credenciais à mão: só contas do suporte (ADMIN_EMAILS no servidor),
+              que ainda precisam do Token de Admin. */}
+          <button
+            onClick={() => setView("config")}
+            className="text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
+          >
+            Configuração manual (suporte)
+          </button>
+        </footer>
       )}
-    </div>
+    </section>
   );
 }

@@ -3,6 +3,7 @@ import { Check, X } from "lucide-react";
 import { PLAN_LIST, getPlanDefinition } from "../config/plans";
 import { BillingError, type BillingAction } from "../services/subscriptionService";
 import type { PlanId, UserSubscription } from "../types";
+import { subscriptionBadge } from "../config/subscriptionBadge";
 
 /**
  * Gerenciar assinatura — substitui o portal da Stripe: pagar a fatura em
@@ -26,17 +27,6 @@ const formatDate = (value: string | null | undefined) =>
   value ? new Date(value).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—";
 
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR")}`;
-
-/** Selo de status: texto e cor. */
-const SELO: Record<string, { txt: string; cls: string }> = {
-  active:     { txt: "Ativa",                cls: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10" },
-  trialing:   { txt: "Teste grátis",         cls: "text-sky-300 border-sky-500/30 bg-sky-500/10" },
-  past_due:   { txt: "Pagamento pendente",   cls: "text-amber-300 border-amber-500/30 bg-amber-500/10" },
-  incomplete: { txt: "Aguardando pagamento", cls: "text-amber-300 border-amber-500/30 bg-amber-500/10" },
-  canceled:   { txt: "Cancelada",            cls: "text-rose-300 border-rose-500/30 bg-rose-500/10" },
-  cortesia:   { txt: "Cortesia",             cls: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10" },
-  sem_asaas:  { txt: "Não ativada",          cls: "text-zinc-300 border-zinc-600 bg-zinc-800" },
-};
 
 const Rotulo = ({ children }: { children: React.ReactNode }) => (
   <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{children}</p>
@@ -69,11 +59,7 @@ export default function GerenciarAssinatura({
   const podeGerenciar = !semAsaas && !cortesia && !cancelada;
   const podeTrocar = podeGerenciar && (status === "active" || status === "trialing" || status === "past_due");
 
-  const selo =
-    cortesia ? SELO.cortesia
-    : semAsaas ? SELO.sem_asaas
-    : cancelada ? SELO.canceled
-    : SELO[status] ?? { txt: status, cls: SELO.sem_asaas.cls };
+  const selo = subscriptionBadge(subscription);
 
   // Linha de data: o que importa saber agora sobre esta assinatura.
   const data: { rotulo: string; valor: string; nota?: string } | null =

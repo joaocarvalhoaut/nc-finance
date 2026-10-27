@@ -2284,7 +2284,7 @@ export default function App() {
                   email={account?.email || user?.email || ""}
                   displayName={account?.displayName || "Conta autenticada"}
                   plan={plan}
-                  subscriptionStatus={subscription?.status ?? null}
+                  subscription={subscription}
                   chargesSent={usage?.chargesSent ?? 0}
                   onManageSubscription={handleOpenBillingPortal}
                   onDeleteAccount={() => setShowDeleteAccount(true)}
