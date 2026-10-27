@@ -65,6 +65,11 @@ export default function WhatsappGatewayCard() {
   /** Instância nova subindo — mostra "Preparando seu número". */
   const [preparando,   setPreparando]   = useState(false);
 
+  // ── Desconectar ────────────────────────────────────────────────────────────
+  const [confirmarDesconexao, setConfirmarDesconexao] = useState(false);
+  const [isDisconnecting,     setIsDisconnecting]     = useState(false);
+  const [disconnectMsg,       setDisconnectMsg]       = useState("");
+
   // ── View ───────────────────────────────────────────────────────────────────
   // Começa em "Conectar": é o que o cliente veio fazer aqui.
   const [view, setView] = useState<ViewMode>("qr");
@@ -174,6 +179,28 @@ export default function WhatsappGatewayCard() {
       setQrError("Falha de rede ao obter QR Code.");
     } finally {
       setIsLoadingQR(false);
+    }
+  };
+
+  // Desconecta o celular. A instância continua da conta; para voltar é só
+  // "Conectar WhatsApp" de novo — com o mesmo número ou outro.
+  const handleDisconnect = async () => {
+    setIsDisconnecting(true);
+    setDisconnectMsg("");
+    try {
+      const result = await whatsappGatewayService.disconnect();
+      if (result.ok) {
+        setConfirmarDesconexao(false);
+        setQrConectado(false);
+        setDisconnectMsg("Número desconectado. As cobranças só voltam a sair depois de conectar um número de novo.");
+        await loadStatus();
+      } else {
+        setDisconnectMsg(result.error ?? "Não foi possível desconectar.");
+      }
+    } catch {
+      setDisconnectMsg("Falha de rede ao desconectar.");
+    } finally {
+      setIsDisconnecting(false);
     }
   };
 
@@ -449,6 +476,44 @@ export default function WhatsappGatewayCard() {
             <p className="text-xs p-2 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center gap-1.5">
               <CheckCircle className="w-3.5 h-3.5" /> WhatsApp conectado. Já dá para enviar cobranças por este número.
             </p>
+          )}
+
+          {disconnectMsg && (
+            <p className="text-xs p-2 rounded-lg bg-zinc-800 text-zinc-300">{disconnectMsg}</p>
+          )}
+
+          {gatewayStatus?.connected && !qrCode && (
+            confirmarDesconexao ? (
+              <div className="border border-rose-800/60 rounded-xl p-3 space-y-2">
+                <p className="text-xs text-zinc-300">
+                  Desconectar o número {gatewayStatus.phone_number_masked ?? ""}? Nenhuma cobrança sai até
+                  você conectar um número de novo — inclusive as automações agendadas.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => void handleDisconnect()}
+                    disabled={isDisconnecting}
+                    className="flex-1 py-2 rounded-xl text-xs font-bold bg-rose-700 hover:bg-rose-600 disabled:opacity-50 text-white transition-colors"
+                  >
+                    {isDisconnecting ? "Desconectando…" : "Desconectar"}
+                  </button>
+                  <button
+                    onClick={() => setConfirmarDesconexao(false)}
+                    disabled={isDisconnecting}
+                    className="flex-1 py-2 rounded-xl text-xs font-bold bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white transition-colors"
+                  >
+                    Manter conectado
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setConfirmarDesconexao(true); setDisconnectMsg(""); }}
+                className="w-full py-2 rounded-xl text-xs font-semibold border border-zinc-800 text-zinc-400 hover:text-rose-400 hover:border-rose-800/60 transition-colors"
+              >
+                Desconectar número
+              </button>
+            )
           )}
 
           {qrError && (

@@ -147,6 +147,24 @@ async function fetchZApiQR(instanceId: string, token: string, clientToken: strin
 }
 
 /**
+ * Desconecta o celular pareado. A instância continua existindo: para voltar,
+ * basta ler um novo QR Code (docs Z-API, instance/disconnect).
+ */
+async function fetchZApiDisconnect(instanceId: string, token: string, clientToken: string): Promise<boolean> {
+  const url = `${ZAPI_BASE}/instances/${instanceId}/token/${token}/disconnect`;
+  const ctrl = new AbortController();
+  const tid  = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { headers: { "Client-Token": clientToken }, signal: ctrl.signal });
+    clearTimeout(tid);
+    return res.ok;
+  } catch {
+    clearTimeout(tid);
+    return false;
+  }
+}
+
+/**
  * user_id da conta com este e-mail. A Admin API do Supabase não filtra por
  * e-mail, então percorre as páginas — suficiente enquanto a base tiver poucos
  * milhares de contas (só o suporte chama, ao ligar uma instância a um cliente).
@@ -320,6 +338,27 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  // ── POST { action: "disconnect" } — o cliente desconecta o próprio número ──
+  if (postAction === "disconnect") {
+    const creds = await loadZApiCredentialsForUser(admin, user.id);
+    if (!creds) return err(404, "Nenhum número conectado a esta conta.");
+
+    const desconectou = await fetchZApiDisconnect(creds.instanceId, creds.token, creds.clientToken);
+    if (!desconectou) {
+      return err(502, "Não foi possível desconectar agora. Tente de novo em instantes.");
+    }
+
+    // A instância segue da conta (e assinada, se automática): conectar de novo
+    // — inclusive outro número — é só ler um novo QR Code.
+    await updateUserZApiStatus(admin, user.id, {
+      status: "inactive", connected: false, connected_pending_phone: true, phone_number: null, last_error: null,
+    });
+    console.log(JSON.stringify({ source: "whatsapp-gateway.disconnect", user_id: user.id }));
+
+    const platformStatus = await loadUserZApiStatus(admin, user.id);
+    return ok({ ok: true, message: "Número desconectado.", ...platformStatus });
+  }
+
   // ── POST { action: "validate" } ───────────────────────────────────────────
   if (postAction === "validate") {
     const creds = await loadZApiCredentialsForUser(admin, user.id);
@@ -409,5 +448,5 @@ Deno.serve(async (req: Request) => {
     return ok({ ok: true, message: "Credenciais inicializadas a partir das variáveis de ambiente. Use action=validate para testar a conexão." });
   }
 
-  return err(400, `Ação desconhecida: "${postAction}". Use: save, init, validate.`);
+  return err(400, `Ação desconhecida: "${postAction}". Use: save, init, validate, disconnect.`);
 });

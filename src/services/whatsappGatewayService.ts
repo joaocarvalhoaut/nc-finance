@@ -133,6 +133,29 @@ export const whatsappGatewayService = {
   },
 
   /**
+   * Desconecta o celular pareado. A instância continua da conta: para voltar
+   * (com o mesmo ou outro número), basta "Conectar WhatsApp" de novo.
+   */
+  async disconnect(): Promise<{ ok: boolean; message?: string; error?: string }> {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase.functions.invoke<{ ok: boolean; message?: string }>(
+      "whatsapp-gateway",
+      { method: "POST", body: { action: "disconnect" } },
+    );
+    if (!error && data) return data;
+
+    let message = "Não foi possível desconectar.";
+    try {
+      const ctx = (error as unknown as { context?: Response })?.context;
+      if (ctx) {
+        const body = await ctx.json() as { error?: string };
+        if (body.error) message = body.error;
+      }
+    } catch { /* corpo não-JSON */ }
+    return { ok: false, error: message };
+  },
+
+  /**
    * Valida a conexão com a Z-API.
    * Atualiza status em platform_integrations e retorna resultado seguro.
    */
