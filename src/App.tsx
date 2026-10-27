@@ -838,12 +838,18 @@ export default function App() {
     try {
       const result = await googleDriveService.matchDriveFiles();
       setDriveMatchResult(result);
-      if (result.success && result.matches.length > 0) {
-        // Aplica os matches retornados no state local de devedores
+      if (result.success) {
+        // Aplica os matches retornados no state local de devedores. Quem não
+        // veio na lista ficou sem sugestão no servidor (o novo casamento limpa
+        // sugestão que não se sustenta) — exceto boleto já anexado.
         setDebtors((prev) =>
           prev.map((d) => {
             const m = result.matches.find((r) => r.debtorId === d.id);
-            if (!m) return d;
+            if (!m) {
+              return d.driveFileId && d.driveFileId !== "uploaded"
+                ? { ...d, driveFileId: null, driveFileName: null, driveFileUrl: null, driveMatchScore: null }
+                : d;
+            }
             return {
               ...d,
               driveFileId:      m.fileId,
@@ -855,6 +861,8 @@ export default function App() {
           }),
         );
         void refreshSubscription();
+        // Contador "sem boleto" da barra do Drive
+        void driveFolderService.getStatus().then((s) => { if (!s.loadError) setDriveFolderStatus(s); });
       }
     } finally {
       setIsDriveMatching(false);
@@ -923,17 +931,18 @@ export default function App() {
   };
 
   // Acompanha o progresso da indexação em background, fazendo polling do status
-  // até o servidor terminar de ler o conteúdo de todos os PDFs.
-  const pollDriveIndexingProgress = async () => {
+  // até o servidor terminar de ler o conteúdo de todos os PDFs. true = terminou.
+  const pollDriveIndexingProgress = async (): Promise<boolean> => {
     for (let i = 0; i < 120; i++) { // ~6 min de teto; o background segue mesmo após
       const status = await driveFolderService.getStatus();
       setDriveFolderStatus(status);
+      if (status.loadError) return false;
       if (!status.indexing) {
         setDriveSaveMsg({
           ok: true,
           text: `Indexação concluída: ${status.contentIndexed ?? status.fileCount} de ${status.fileCount} boleto(s) lidos. Clique em "Buscar boletos no Drive" para casar com os devedores.`,
         });
-        return;
+        return true;
       }
       setDriveSaveMsg({
         ok: true,
@@ -941,6 +950,7 @@ export default function App() {
       });
       await new Promise((r) => setTimeout(r, 3000));
     }
+    return false;
   };
 
   // Salvar pasta do Google Drive — indexa o 1º lote e segue em background
@@ -971,34 +981,53 @@ export default function App() {
     }
   };
 
-  // Reindexar a pasta — dispara o ciclo de indexação e acompanha o progresso
-  const handleSyncDriveFolder = async () => {
+  // Reindexar a pasta — dispara o ciclo de indexação e acompanha o progresso.
+  // true = pasta relida até o fim.
+  const handleSyncDriveFolder = async (): Promise<boolean> => {
     setIsDriveSyncing(true);
     try {
       const r = await driveFolderService.syncFolder();
       const status = await driveFolderService.getStatus();
       setDriveFolderStatus(status);
 
-      if (!r.success && !(status?.configured && status.fileCount > 0)) {
+      // Indexação rodando em background segue valendo mesmo se a chamada caiu
+      // (tempo esgotado); fora isso, falha é falha — antes, havendo índice
+      // antigo, a tela dizia "concluída" até com a pasta sem acesso.
+      if (status.indexing) return await pollDriveIndexingProgress();
+      if (!r.success) {
         setDriveSaveMsg({ ok: false, text: r.error || "Falha ao indexar a pasta." });
-        return;
+        return false;
       }
-      if (status.indexing) {
-        await pollDriveIndexingProgress();
-      } else {
-        setDriveSaveMsg({
-          ok: true,
-          text: `Indexação concluída: ${status.contentIndexed ?? status.fileCount} de ${status.fileCount} boleto(s) lidos. Clique em "Buscar boletos no Drive" para casar com os devedores.`,
-        });
-      }
+      setDriveSaveMsg({
+        ok: true,
+        text: `Indexação concluída: ${status.contentIndexed ?? status.fileCount} de ${status.fileCount} boleto(s) lidos. Clique em "Buscar boletos no Drive" para casar com os devedores.`,
+      });
+      return true;
     } finally {
       setIsDriveSyncing(false);
     }
   };
 
+  // Pasta lida há mais de 12 h é relida sozinha ao abrir a tela, e os devedores
+  // são casados em seguida. Antes dependia de alguém lembrar do "Reindexar": o
+  // índice ficava meses parado e os boletos novos nunca apareciam.
+  const DRIVE_RELEITURA_MS = 12 * 60 * 60 * 1000;
+  const driveReleituraFeitaRef = React.useRef(false);
+
   const loadDriveFolderStatus = async () => {
     const status = await driveFolderService.getStatus();
     setDriveFolderStatus(status);
+
+    // "indexing" não segura a releitura: leitura em fila há mais de 12 h é
+    // cadeia em background que parou — a releitura a retoma.
+    const lidaHa = status.lastIndexedAt ? Date.now() - new Date(status.lastIndexedAt).getTime() : Infinity;
+    if (!status.configured || !status.isAccessible || lidaHa < DRIVE_RELEITURA_MS) return;
+    if (driveReleituraFeitaRef.current) return;
+    driveReleituraFeitaRef.current = true;
+    if (await handleSyncDriveFolder()) {
+      setDriveSaveMsg(null);
+      await handleMatchDriveFiles();
+    }
   };
 
 
@@ -2489,7 +2518,7 @@ export default function App() {
                         role="tab"
                         aria-selected={dashView === v}
                         onClick={() => setDashView(v)}
-                        className={`px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${dashView === v ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-300"}`}
+                        className={`px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${dashView === v ? "bg-emerald-500/15 text-emerald-300" : "text-zinc-500 hover:text-zinc-300"}`}
                       >
                         {txt}
                       </button>
@@ -2554,7 +2583,7 @@ export default function App() {
                               onClick={() => setCriticalWithInterest(comJuros)}
                               aria-pressed={criticalWithInterest === comJuros}
                               className={`px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                                criticalWithInterest === comJuros ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-300"
+                                criticalWithInterest === comJuros ? "bg-emerald-500/15 text-emerald-300" : "text-zinc-500 hover:text-zinc-300"
                               }`}
                             >
                               {comJuros ? "c/ juros" : "s/ juros"}
@@ -2944,7 +2973,7 @@ export default function App() {
                                   aria-checked={ativo}
                                   onClick={() => setImportCategory(cat.value)}
                                   className={`px-3 py-2.5 rounded-lg border text-left transition-colors cursor-pointer ${
-                                    ativo ? "border-zinc-500 bg-zinc-900" : "border-zinc-800 hover:border-zinc-700"
+                                    ativo ? "border-emerald-500/40 bg-emerald-500/10" : "border-zinc-800 hover:border-zinc-700"
                                   }`}
                                 >
                                   <span className="flex items-center gap-2 text-xs font-semibold text-white">
@@ -4272,7 +4301,29 @@ export default function App() {
 
                   {/* ── Boletos do Google Drive ───────────────────────────────── */}
                   <div className={`${card} px-4 py-3 space-y-2.5`}>
-                    {driveFolderStatus?.configured && !editingDriveFolder ? (
+                    {/* Sem status ainda (ou falha ao consultar) não é "sem pasta": antes a
+                        tela pedia para conectar a pasta enquanto o status carregava. */}
+                    {driveFolderStatus === null ? (
+                      <p className="text-xs text-zinc-500 flex items-center gap-2">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Carregando a pasta do Drive…
+                      </p>
+                    ) : driveFolderStatus.loadError ? (
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                        <p className="text-xs text-zinc-400 flex items-center gap-2 min-w-0">
+                          <HardDrive className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+                          <span>{driveFolderStatus.loadError}</span>
+                        </p>
+                        {driveFolderStatus.loadErrorStatus !== "bloqueado_plano" && (
+                          <button
+                            type="button"
+                            onClick={() => { setDriveFolderStatus(null); void loadDriveFolderStatus(); }}
+                            className="px-2.5 py-1.5 rounded-lg text-[11px] text-zinc-400 hover:text-white inline-flex items-center gap-1 transition-colors cursor-pointer"
+                          >
+                            <RefreshCw className="w-3 h-3" /> Tentar de novo
+                          </button>
+                        )}
+                      </div>
+                    ) : driveFolderStatus.configured && !editingDriveFolder ? (
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                         <span className="flex items-center gap-2 min-w-0 flex-1 text-xs text-zinc-400">
                           <HardDrive className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
@@ -4282,7 +4333,12 @@ export default function App() {
                             <span className="text-zinc-500"> · {driveFolderStatus.fileCount} arquivo(s)</span>
                             {driveFolderStatus.indexing
                               ? <span className="text-sky-300"> · lendo {driveFolderStatus.contentIndexed ?? 0}/{driveFolderStatus.fileCount}…</span>
-                              : null}
+                              : driveFolderStatus.lastIndexedAt && (
+                                <span className="text-zinc-500" title="Última leitura da pasta">
+                                  {" "}· lida em {new Date(driveFolderStatus.lastIndexedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              )}
+                            {driveFolderStatus.isAccessible === false && <span className="text-amber-300"> · sem acesso à pasta</span>}
                             {driveFolderStatus.unmatchedDebtors > 0 && <span className="text-zinc-500"> · {driveFolderStatus.unmatchedDebtors} sem boleto</span>}
                           </span>
                         </span>
@@ -4364,7 +4420,7 @@ export default function App() {
                     )}
                     {driveMatchResult && !driveMatchResult.success && (
                       <p className="text-[11px] rounded-lg px-3 py-2 border text-rose-300 bg-rose-500/10 border-rose-500/20">
-                        {DRIVE_STATUS_LABELS[driveMatchResult.status] ?? driveMatchResult.error}
+                        {driveMatchResult.error ?? DRIVE_STATUS_LABELS[driveMatchResult.status]}
                       </p>
                     )}
                     {driveMatchResult && driveMatchResult.success && (
@@ -4612,7 +4668,7 @@ export default function App() {
                                       aria-checked={ativo}
                                       onClick={() => setSelectedTone(tone)}
                                       className={`py-2 px-2 rounded-lg text-xs font-semibold text-center transition-colors border cursor-pointer ${
-                                        ativo ? "border-zinc-500 bg-zinc-900 text-white" : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                                        ativo ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300" : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
                                       }`}
                                     >
                                       {tone === "amigavel" ? "Amigável" : tone === "neutro" ? "Neutro" : tone === "firme" ? "Firme" : "Jurídico"}
@@ -4913,7 +4969,7 @@ export default function App() {
                 const campo = "w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors";
                 const selecionavel = (ativo: boolean) =>
                   `px-3 py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
-                    ativo ? "border-zinc-500 bg-zinc-900 text-white" : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                    ativo ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300" : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
                   }`;
                 const nomeTom = (t: string) => t === "amigavel" ? "Amigável" : t === "neutro" ? "Neutro" : t === "firme" ? "Firme" : "Jurídico";
                 const execucoes = verTodasExecucoes ? automationRuns : automationRuns.slice(0, 7);

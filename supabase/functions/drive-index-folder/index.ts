@@ -23,7 +23,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
 import { checkSubscription } from "../_shared/subscriptionGuard.ts";
-import { getGoogleAccessToken, listFilesInFolderDeep } from "../_shared/googleDrive.ts";
+import { getGoogleAccessToken } from "../_shared/googleDrive.ts";
 import {
   saveFolderConfig,
   indexFolderForUser,
@@ -108,23 +108,33 @@ function extractFolderIdFromUrl(input: string): string | null {
 }
 
 /**
- * Resolve the folder name from Drive API.
- * Returns null if not accessible.
+ * Confere a pasta na API do Drive: existe, é pasta e a conta do sistema a vê.
+ * Pasta não compartilhada responde 404 aqui — já a listagem dos filhos
+ * devolveria só uma lista vazia, e a pasta parecia "conectada, 0 boletos".
  */
-async function resolveFolderName(folderId: string, accessToken: string): Promise<string | null> {
+async function checkFolder(
+  folderId: string,
+  accessToken: string,
+): Promise<{ ok: true; name: string | null } | { ok: false; reason: string }> {
   try {
     const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${folderId}?fields=name`,
+      `https://www.googleapis.com/drive/v3/files/${folderId}?fields=name,mimeType`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
         signal: AbortSignal.timeout(8_000),
       },
     );
-    if (!res.ok) return null;
-    const data = await res.json() as { name?: string };
-    return data.name ?? null;
+    if (res.status === 404 || res.status === 403 || res.status === 401) {
+      return { ok: false, reason: "a pasta não foi compartilhada com a conta do sistema" };
+    }
+    if (!res.ok) return { ok: false, reason: "o Google Drive não respondeu" };
+    const data = await res.json() as { name?: string; mimeType?: string };
+    if (data.mimeType && data.mimeType !== "application/vnd.google-apps.folder") {
+      return { ok: false, reason: "o link é de um arquivo, não de uma pasta" };
+    }
+    return { ok: true, name: data.name ?? null };
   } catch {
-    return null;
+    return { ok: false, reason: "o Google Drive não respondeu" };
   }
 }
 
@@ -218,16 +228,19 @@ Deno.serve(async (request: Request) => {
         .eq("user_id", userId)
         .is("drive_file_id", null);
 
-      // Progresso da indexação de conteúdo: quantos PDFs já tiveram o conteúdo lido
+      // Progresso da indexação de conteúdo: conta o que FALTA ler. Comparar "lidos"
+      // com file_count falhava quando o índice guarda mais linhas que a última
+      // varredura — a tela dizia "concluída" com centenas de PDFs na fila.
       const fileCount = Number(row.file_count ?? 0);
-      const { count: contentDone } = await admin
+      const { count: contentPending } = await admin
         .from("user_drive_index")
         .select("file_id", { count: "exact", head: true })
         .eq("user_id", userId)
-        .eq("metadata_extraction_attempted", true);
+        .eq("metadata_extraction_attempted", false);
 
-      const contentIndexed = contentDone ?? 0;
-      const indexing = fileCount > 0 && contentIndexed < fileCount;
+      const pending = contentPending ?? 0;
+      const contentIndexed = Math.max(0, fileCount - pending);
+      const indexing = pending > 0;
 
       return ok({
         configured:     true,
@@ -289,28 +302,18 @@ Deno.serve(async (request: Request) => {
         return err(502, { error: "Falha na autenticação com o Google. Contate o suporte.", status: "google_auth_erro" });
       }
 
-      // Validate access by attempting to list files
-      let isAccessible = false;
-      let fileCount = 0;
-      let folderName: string | null = null;
-      let listError: string | null = null;
-
-      try {
-        folderName = await resolveFolderName(folderId, accessToken);
-        const files = await listFilesInFolderDeep(folderId, accessToken);
-        isAccessible = true;
-        fileCount = files.length;
-      } catch (e) {
-        listError = e instanceof Error ? e.message : "Sem acesso à pasta.";
-        isAccessible = false;
-      }
+      // Valida o acesso antes de indexar. A varredura completa (subpastas)
+      // acontece uma vez só, dentro da indexação abaixo.
+      const pasta = await checkFolder(folderId, accessToken);
+      const isAccessible = pasta.ok;
+      const folderName = pasta.ok ? pasta.name : null;
 
       // Save config regardless (user may fix permissions later and resync)
       await saveFolderConfig(admin, userId, body.folderUrl, folderId, folderName, isAccessible);
 
-      if (!isAccessible) {
+      if (!pasta.ok) {
         return err(422, {
-          error: `Pasta inacessível: ${listError}. Compartilhe a pasta com o e-mail da conta do sistema.`,
+          error: `Não deu para abrir a pasta: ${pasta.reason}. No Google Drive, compartilhe a pasta com ${GOOGLE_EMAIL} como Leitor e tente de novo.`,
           status: "drive_sem_acesso",
           folderId,        // safe to return — user just pasted this
           serviceAccountHint: GOOGLE_EMAIL,  // the email to share with
@@ -335,6 +338,7 @@ Deno.serve(async (request: Request) => {
         await batchMatchDebtors(admin, userId, { onlyUnmatched: true });
       }
 
+      const fileCount = firstBatch.filesFound;
       return ok({
         success:        true,
         status:         firstBatch.contentPending > 0 ? "indexing" : "done",
@@ -371,6 +375,20 @@ Deno.serve(async (request: Request) => {
         return err(502, { error: "Falha na autenticação com o Google.", status: "google_auth_erro" });
       }
 
+      // Acesso perdido (pasta descompartilhada) vira aviso claro, não "0 boletos".
+      const pasta = await checkFolder(folderId, accessToken);
+      if (!pasta.ok) {
+        await admin
+          .from("user_drive_folders")
+          .update({ is_accessible: false, last_index_error: pasta.reason, updated_at: new Date().toISOString() })
+          .eq("user_id", userId);
+        return err(422, {
+          error: `Não deu para ler a pasta: ${pasta.reason}. No Google Drive, compartilhe a pasta com ${GOOGLE_EMAIL} como Leitor.`,
+          status: "drive_sem_acesso",
+          serviceAccountHint: GOOGLE_EMAIL,
+        });
+      }
+
       // Sync = SOMENTE indexação (varredura + extração). O casamento é feito
       // separadamente pelo botão "Buscar boletos" (match-drive-files), evitando
       // estourar o tempo da função em pastas com milhares de PDFs.
@@ -378,10 +396,13 @@ Deno.serve(async (request: Request) => {
       try {
         indexResult = await indexFolderForUser(admin, userId, folderId, accessToken);
       } catch (e) {
-        return err(500, {
-          error: e instanceof Error ? e.message : "Erro na sincronização.",
-          status: "sync_erro",
-        });
+        // Detalhe só no log: a mensagem pode trazer texto interno do banco/Google.
+        console.error("[drive-index-folder] sync error:", e instanceof Error ? e.message : String(e));
+        await admin
+          .from("user_drive_folders")
+          .update({ last_index_error: String(e instanceof Error ? e.message : e).slice(0, 500), updated_at: new Date().toISOString() })
+          .eq("user_id", userId);
+        return err(500, { error: "Não deu para ler a pasta do Drive agora. Tente de novo em instantes.", status: "sync_erro" });
       }
 
       // Encadeia o restante em background; quando o conteúdo zera, casa devedores.

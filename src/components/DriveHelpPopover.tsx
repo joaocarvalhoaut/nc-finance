@@ -81,6 +81,7 @@ export default function DriveHelpPopover() {
                 <p>O sistema só sugere um boleto quando há <strong>prova segura</strong>:</p>
                 <ul className="list-disc pl-5 space-y-1 text-xs text-zinc-400">
                   <li><strong>Número do documento</strong> do devedor presente no nome do arquivo (ou na linha digitável), <strong>ou</strong></li>
+                  <li><strong>Número do título + nome do cliente</strong> no nome do arquivo, sem a parcela (<span className="font-mono">2718 CLIENTE.pdf</span> para o título <span className="font-mono">2718/1</span>) — só quando é o único arquivo desse título e o título tem uma parcela só no sistema, <strong>ou</strong></li>
                   <li><strong>Valor + vencimento</strong> do boleto iguais aos do título (lidos de dentro do PDF).</li>
                 </ul>
                 <p className="text-xs text-zinc-500">

@@ -7,6 +7,7 @@
  */
 
 import { getSupabaseClient } from "../supabaseClient";
+import { readFunctionErrorBody } from "../edgeFunctionError";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,13 @@ export interface DriveFolderStatus {
   lastIndexedAt:    string | null;
   lastIndexError:   string | null;
   unmatchedDebtors: number;
+  /**
+   * Falha ao consultar o status (rede, plano sem Drive…). Não quer dizer que
+   * não há pasta — a tela não deve pedir para conectar uma de novo.
+   */
+  loadError?:       string | null;
+  /** Código do erro acima (ex.: "bloqueado_plano" — tentar de novo não resolve) */
+  loadErrorStatus?: string | null;
 }
 
 export interface DriveSaveResult {
@@ -62,9 +70,12 @@ export const driveFolderService = {
     );
 
     if (error || !data) {
+      const body = await readFunctionErrorBody(error);
       return {
         configured: false, folderName: null, isAccessible: false,
         fileCount: 0, lastIndexedAt: null, lastIndexError: null, unmatchedDebtors: 0,
+        loadError: typeof body?.error === "string" ? body.error : "Não foi possível consultar a pasta do Drive.",
+        loadErrorStatus: typeof body?.status === "string" ? body.status : null,
       };
     }
     return data;
@@ -81,11 +92,15 @@ export const driveFolderService = {
     );
 
     if (error || !data) {
+      const body = await readFunctionErrorBody(error);
+      const message = typeof body?.error === "string" ? body.error : "Não foi possível salvar a pasta. Tente novamente.";
       return {
-        success: false, status: "error",
-        message: error?.message ?? "Não foi possível salvar a pasta. Tente novamente.",
+        success: false,
+        status: typeof body?.status === "string" ? body.status : "error",
+        message,
         folderName: null, fileCount: 0,
-        error: error?.message,
+        serviceAccountHint: typeof body?.serviceAccountHint === "string" ? body.serviceAccountHint : undefined,
+        error: message,
       };
     }
     return data;
@@ -102,11 +117,12 @@ export const driveFolderService = {
     );
 
     if (error || !data) {
+      const body = await readFunctionErrorBody(error);
       return {
         success: false, filesFound: 0, filesIndexed: 0,
         filesSkipped: 0, durationMs: 0,
         debtorsMatched: 0, debtorsTotal: 0,
-        error: error?.message ?? "Falha na sincronização.",
+        error: typeof body?.error === "string" ? body.error : "Falha na sincronização.",
       };
     }
     return data;

@@ -17,6 +17,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { getGoogleAccessToken, listFilesInFolderDeep, type DriveFile } from "./googleDrive.ts";
 import { bestNameSimilarity, blockingKeys } from "./nameMatch.ts";
+import { numerosDoArquivo, tituloBase, titulosRepetidos } from "./tituloBase.ts";
 
 // Os genericos precisam ser explicitos: sem eles o ReturnType resolve para os
 // padroes da DECLARACAO (SupabaseClient<unknown, never, GenericSchema>), que nao
@@ -45,6 +46,32 @@ const MAX_CONTENT_PER_RUN = 25;
 
 /** How long a token cache entry is valid (seconds) */
 const TOKEN_CACHE_TTL_S = 3_500;
+
+/**
+ * Lê todas as linhas de uma consulta, em páginas. O PostgREST corta cada
+ * resposta em 1000 linhas (max_rows): um `.limit(2000)` devolvia só 1000, e o
+ * resto do índice ficava invisível para o casamento e para a reindexação.
+ * A consulta precisa de `.order()` estável para as páginas não se sobreporem.
+ */
+async function selectAll<T>(
+  pagina: (de: number, ate: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  teto = 20_000,
+): Promise<T[]> {
+  const TAMANHO = 1000;
+  const linhas: T[] = [];
+  for (let de = 0; de < teto; de += TAMANHO) {
+    const { data, error } = await pagina(de, de + TAMANHO - 1);
+    if (error) throw new Error(error.message);
+    const lote = (data ?? []) as T[];
+    linhas.push(...lote);
+    if (lote.length < TAMANHO) break;
+  }
+  return linhas;
+}
+
+const INDEX_MATCH_FIELDS =
+  "file_id, file_name, file_name_normalized, linha_digitavel, nosso_numero, " +
+  "cpf_cnpj, client_name_extracted, valor, vencimento";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -605,33 +632,52 @@ export async function indexFolderForUser(
 
   // List all PDFs in the folder (including subfolders named after clients)
   let driveFiles: DriveFile[] = [];
+  const varredura = { completa: false };
   try {
-    driveFiles = await listFilesInFolderDeep(folderId, accessToken);
+    driveFiles = await listFilesInFolderDeep(folderId, accessToken, varredura);
   } catch (e) {
     throw new Error(`Drive list error: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   const filesFound = driveFiles.length;
 
+  // Pasta trocada: o índice da pasta anterior sai, senão o casamento seguiria
+  // sugerindo boletos dela.
+  await admin.from("user_drive_index").delete().eq("user_id", userId).neq("folder_id", folderId);
+
   // Load existing index for this user+folder. Arquivos já com conteúdo extraído
   // são pulados sem nova chamada de API (re-sync rápido + convergência ao longo
-  // de execuções para arquivos novos/incompletos).
-  const { data: existingRows } = await admin
-    .from("user_drive_index")
-    .select("file_id, metadata_extraction_attempted")
-    .eq("user_id", userId)
-    .eq("folder_id", folderId);
+  // de execuções para arquivos novos/incompletos). Paginado: sem isso só 1000
+  // linhas voltavam, e o resto era tratado como arquivo novo — perdia o
+  // conteúdo já extraído e era baixado de novo a cada reindexação.
+  const existingRows = await selectAll<{ file_id: string; metadata_extraction_attempted: boolean | null }>(
+    (de, ate) => admin
+      .from("user_drive_index")
+      .select("file_id, metadata_extraction_attempted")
+      .eq("user_id", userId)
+      .eq("folder_id", folderId)
+      .order("file_id")
+      .range(de, ate),
+  );
 
   // "Done" = já tentamos extrair o conteúdo do PDF (não basta ter o nome da pasta).
   // Assim todo arquivo passa pela extração pesada uma vez, ao longo das execuções.
   const existingDone = new Set<string>(
-    ((existingRows ?? []) as Array<{ file_id: string; metadata_extraction_attempted: boolean | null }>)
-      .filter((r) => r.metadata_extraction_attempted)
-      .map((r) => r.file_id),
+    existingRows.filter((r) => r.metadata_extraction_attempted).map((r) => r.file_id),
   );
-  const existingAny = new Set<string>(
-    ((existingRows ?? []) as Array<{ file_id: string }>).map((r) => r.file_id),
-  );
+  const existingAny = new Set<string>(existingRows.map((r) => r.file_id));
+
+  // Com a varredura completa, o que não veio saiu da pasta (apagado ou ficou
+  // fora dos mais recentes): tira do índice para não ser sugerido.
+  // Lista vazia não apaga nada: é mais provável perda de acesso que pasta vazia.
+  if (varredura.completa && driveFiles.length > 0) {
+    const naPasta = new Set(driveFiles.map((f) => f.id));
+    const sairam = [...existingAny].filter((id) => !naPasta.has(id));
+    for (let i = 0; i < sairam.length; i += 200) {
+      await admin.from("user_drive_index").delete()
+        .eq("user_id", userId).eq("folder_id", folderId).in("file_id", sairam.slice(i, i + 200));
+    }
+  }
 
   const now = new Date().toISOString();
 
@@ -652,7 +698,7 @@ export async function indexFolderForUser(
     file_size:            0,
     mime_type:            "application/pdf",
     md5_checksum:         null,
-    drive_modified_at:    null,
+    drive_modified_at:    file.modifiedTime || null,
     indexed_at:           now,
     updated_at:           now,
     linha_digitavel:      null,
@@ -935,6 +981,8 @@ function bestMatchInIndex(
   rows: IndexRow[],
   blockIndex: Map<string, number[]>,
   rowDocs: RowDoc[],
+  /** Títulos com mais de uma parcela cadastrada; sem ele a regra do título não roda */
+  titulosAmbiguos?: Set<string>,
 ): { score: number; fileId: string; fileName: string; reason: string } {
   const candidates = new Set<number>();
 
@@ -960,6 +1008,24 @@ function bestMatchInIndex(
       bestScore = score; bestFileId = rows[i].file_id; bestName = rows[i].file_name; bestReason = reason;
     }
   }
+
+  // Arquivo com só o número do título ("2718 CLIENTE.pdf") e devedor com a
+  // parcela ("2718/1"): o número completo não bate. Vale como prova quando
+  // título + nome apontam para UM arquivo só e o título não tem outra parcela
+  // cadastrada — o carnê num PDF só. Dois arquivos ou duas parcelas → ambíguo,
+  // não sugere (o boleto errado é pior que nenhum).
+  const base = titulosAmbiguos ? tituloBase(debtor.documentNumber) : null;
+  if (bestScore < AUTO_ATTACH_THRESHOLD && base && !titulosAmbiguos!.has(base)) {
+    const doTitulo = [...candidates].filter((i) =>
+      numerosDoArquivo(rows[i].file_name_normalized ?? "").includes(base) &&
+      bestNameSimilarity(debtor.clientName, [rows[i].file_name_normalized, rows[i].client_name_extracted]) >= 0.35
+    );
+    if (doTitulo.length === 1) {
+      const row = rows[doTitulo[0]];
+      return { score: 0.80, fileId: row.file_id, fileName: row.file_name, reason: "titulo_sem_parcela+name_unico" };
+    }
+  }
+
   return { score: bestScore, fileId: bestFileId, fileName: bestName, reason: bestReason };
 }
 
@@ -980,19 +1046,17 @@ export async function matchBoletoForDebtor(
   },
 ): Promise<DriveMatchResult | null> {
   // Load all indexed files for this user
-  const { data: rows } = await admin
-    .from("user_drive_index")
-    .select(
-      "file_id, file_name, file_name_normalized, linha_digitavel, nosso_numero, " +
-      "cpf_cnpj, client_name_extracted, valor, vencimento",
-    )
-    .eq("user_id", userId)
-    .limit(2_000);
+  const indexRows = await selectAll<IndexRow>(
+    (de, ate) => admin
+      .from("user_drive_index")
+      .select(INDEX_MATCH_FIELDS)
+      .eq("user_id", userId)
+      .order("file_id")
+      .range(de, ate),
+  );
 
-  if (!rows || rows.length === 0) return null;
+  if (indexRows.length === 0) return null;
 
-  // data do Supabase pode ser erro: converte via unknown, como o TS exige.
-  const indexRows = rows as unknown as IndexRow[];
   const best = bestMatchInIndex(debtor, indexRows, buildBlockIndex(indexRows), precomputeRowDocs(indexRows));
 
   if (best.score >= AUTO_ATTACH_THRESHOLD) {
@@ -1022,37 +1086,50 @@ export async function batchMatchDebtors(
   options?: { onlyUnmatched?: boolean; debtorIds?: string[] },
 ): Promise<{ matched: number; unmatched: number; total: number }> {
   // Build query
-  let query = admin
-    .from("user_registros_financeiros")
-    .select("id, document_number, client_name, amount, due_date, updated_value, drive_file_id")
-    .eq("user_id", userId);
+  const debtors = await selectAll<Record<string, unknown>>((de, ate) => {
+    let query = admin
+      .from("user_registros_financeiros")
+      .select("id, document_number, client_name, amount, due_date, updated_value, drive_file_id")
+      .eq("user_id", userId);
 
-  if (options?.debtorIds?.length) {
-    query = query.in("id", options.debtorIds);
-  } else if (options?.onlyUnmatched !== false) {
-    query = query.is("drive_file_id", null);
-  }
-
-  const { data: debtors } = await query.limit(500);
-  if (!debtors || debtors.length === 0) return { matched: 0, unmatched: 0, total: 0 };
+    if (options?.debtorIds?.length) {
+      query = query.in("id", options.debtorIds);
+    } else if (options?.onlyUnmatched !== false) {
+      query = query.is("drive_file_id", null);
+    }
+    return query.order("id").range(de, ate);
+  }, 5_000);
+  if (debtors.length === 0) return { matched: 0, unmatched: 0, total: 0 };
 
   // Pre-load index (all rows) once — avoids N×DB round trips
-  const { data: indexRows } = await admin
-    .from("user_drive_index")
-    .select(
-      "file_id, file_name, file_name_normalized, linha_digitavel, nosso_numero, " +
-      "cpf_cnpj, client_name_extracted, valor, vencimento",
-    )
-    .eq("user_id", userId)
-    .limit(2_000);
+  const rows = await selectAll<IndexRow>(
+    (de, ate) => admin
+      .from("user_drive_index")
+      .select(INDEX_MATCH_FIELDS)
+      .eq("user_id", userId)
+      .order("file_id")
+      .range(de, ate),
+  );
 
-  if (!indexRows || indexRows.length === 0) {
+  if (rows.length === 0) {
     return { matched: 0, unmatched: debtors.length, total: debtors.length };
   }
 
+  // Parcelas de todos os devedores (não só dos pendentes): um título com outra
+  // parcela já casada continua ambíguo para a regra do título sem parcela.
+  const todosDocs = await selectAll<{ document_number: string | null }>(
+    (de, ate) => admin
+      .from("user_registros_financeiros")
+      .select("document_number")
+      .eq("user_id", userId)
+      .order("id")
+      .range(de, ate),
+    5_000,
+  );
+  const titulosAmbiguos = titulosRepetidos(todosDocs.map((d) => d.document_number));
+
   let matched = 0;
   const now = new Date().toISOString();
-  const rows = indexRows as unknown as IndexRow[];
   const blockIndex = buildBlockIndex(rows);
   const rowDocs = precomputeRowDocs(rows);
 
@@ -1069,7 +1146,7 @@ export async function batchMatchDebtors(
       dueDate:        (d.due_date as string | null) ?? null,
     };
 
-    const best = bestMatchInIndex(debtor, rows, blockIndex, rowDocs);
+    const best = bestMatchInIndex(debtor, rows, blockIndex, rowDocs, titulosAmbiguos);
 
     if (best.score >= AUTO_ATTACH_THRESHOLD) {
       await admin

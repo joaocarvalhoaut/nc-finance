@@ -16,6 +16,8 @@ export interface DriveFile {
   webViewLink: string;
   size: string; // bytes as string (may be absent for Google-native files)
   createdTime: string;
+  /** Última alteração no Drive — decide quais PDFs ficam quando a pasta passa do teto */
+  modifiedTime?: string;
   /** Nome da subpasta pai, quando o PDF está dentro de uma subpasta de cliente */
   parentFolderName?: string;
 }
@@ -111,7 +113,7 @@ export const listFolderChildren = async (
   do {
     const params = new URLSearchParams({
       q: `'${folderId}' in parents and trashed=false and (mimeType='application/pdf' or mimeType='application/vnd.google-apps.folder')`,
-      fields: "nextPageToken,files(id,name,mimeType,webViewLink,size,createdTime)",
+      fields: "nextPageToken,files(id,name,mimeType,webViewLink,size,createdTime,modifiedTime)",
       pageSize: "200",
     });
     if (pageToken) params.set("pageToken", pageToken);
@@ -131,7 +133,7 @@ export const listFolderChildren = async (
 
     const json = await res.json() as {
       nextPageToken?: string;
-      files: Array<{ id: string; name: string; mimeType: string; webViewLink?: string; size?: string; createdTime?: string }>;
+      files: Array<{ id: string; name: string; mimeType: string; webViewLink?: string; size?: string; createdTime?: string; modifiedTime?: string }>;
     };
 
     for (const f of json.files ?? []) {
@@ -144,6 +146,7 @@ export const listFolderChildren = async (
           webViewLink: f.webViewLink ?? `https://drive.google.com/file/d/${f.id}/view`,
           size: f.size ?? "—",
           createdTime: f.createdTime ?? "",
+          modifiedTime: f.modifiedTime ?? "",
         });
       }
     }
@@ -197,27 +200,37 @@ export const listSubfoldersInFolder = async (
 
 // Limites de segurança da varredura recursiva — evitam timeout / estouro de cota
 // da API do Drive em pastas muito grandes ou profundas.
-const DEEP_MAX_DEPTH   = 8;     // níveis de subpasta a partir da raiz
-const DEEP_MAX_FOLDERS = 600;   // total de pastas visitadas
-const DEEP_MAX_FILES   = 3000;  // total de PDFs coletados
-const DEEP_CONCURRENCY = 12;    // pastas listadas em paralelo por "onda"
+const DEEP_MAX_DEPTH      = 8;      // níveis de subpasta a partir da raiz
+const DEEP_MAX_FOLDERS    = 600;    // total de pastas visitadas
+const DEEP_SCAN_MAX_FILES = 20000;  // PDFs listados (só metadados — barato)
+const DEEP_MAX_FILES      = 3000;   // PDFs devolvidos: os mais recentes
+const DEEP_CONCURRENCY    = 12;     // pastas listadas em paralelo por "onda"
 
 /**
- * Lista TODOS os PDFs dentro de um folder do Drive, descendo recursivamente
- * por todas as subpastas (BFS) até os limites de segurança acima.
+ * Lista os PDFs de um folder do Drive, descendo recursivamente por todas as
+ * subpastas (BFS) até os limites de segurança acima.
  *
  * Como não sabemos como o cliente organiza a pasta, varremos qualquer
  * profundidade. Cada PDF em subpasta recebe `parentFolderName` = o caminho
  * de nomes das pastas ancestrais (ex: "MENEZES E BATISTA BOLETOS"), que o
  * algoritmo de matching usa como sinal de nome do cliente — os termos de
  * organização ("clientes", "boletos", anos) já têm peso baixo no scoring.
+ *
+ * Pasta com mais de DEEP_MAX_FILES PDFs: devolve os mais recentes. A API não
+ * garante ordem, e cortar no meio da varredura pegava 3000 arquivos quaisquer —
+ * os boletos do mês podiam ficar de fora do índice.
+ *
+ * `info.completa` = false quando alguma pasta falhou ou um teto foi atingido
+ * (a lista não é a pasta inteira; quem chama não deve apagar o que faltou).
  */
 export const listFilesInFolderDeep = async (
   folderId: string,
   accessToken: string,
+  info?: { completa: boolean },
 ): Promise<DriveFile[]> => {
   const allFiles: DriveFile[] = [];
   let foldersVisited = 0;
+  let completa = true;
 
   // Fila BFS: cada item carrega o caminho de nomes acumulado e a profundidade
   const queue: Array<{ id: string; path: string; depth: number }> = [
@@ -225,7 +238,7 @@ export const listFilesInFolderDeep = async (
   ];
 
   // BFS em ondas: lista até DEEP_CONCURRENCY pastas em paralelo por iteração
-  while (queue.length > 0 && foldersVisited < DEEP_MAX_FOLDERS && allFiles.length < DEEP_MAX_FILES) {
+  while (queue.length > 0 && foldersVisited < DEEP_MAX_FOLDERS && allFiles.length < DEEP_SCAN_MAX_FILES) {
     const batch = queue.splice(0, DEEP_CONCURRENCY);
     foldersVisited += batch.length;
 
@@ -234,22 +247,25 @@ export const listFilesInFolderDeep = async (
         try {
           const children = await listFolderChildren(node.id, accessToken);
           return { node, children };
-        } catch {
-          return null; // pasta inacessível — ignora
+        } catch (e) {
+          // A raiz sem acesso é erro de verdade (pasta não compartilhada);
+          // subpasta inacessível só fica de fora.
+          if (node.depth === 0) throw e;
+          return null;
         }
       }),
     );
 
     for (const res of results) {
-      if (!res) continue;
+      if (!res) { completa = false; continue; }
       const { node, children } = res;
 
       for (const f of children.files) {
-        if (allFiles.length >= DEEP_MAX_FILES) break;
+        if (allFiles.length >= DEEP_SCAN_MAX_FILES) break;
         allFiles.push(node.path ? { ...f, parentFolderName: node.path } : f);
       }
 
-      if (node.depth < DEEP_MAX_DEPTH && allFiles.length < DEEP_MAX_FILES) {
+      if (node.depth < DEEP_MAX_DEPTH && allFiles.length < DEEP_SCAN_MAX_FILES) {
         for (const folder of children.folders) {
           const childPath = node.path ? `${node.path} ${folder.name}` : folder.name;
           queue.push({ id: folder.id, path: childPath, depth: node.depth + 1 });
@@ -258,7 +274,14 @@ export const listFilesInFolderDeep = async (
     }
   }
 
-  return allFiles;
+  if (queue.length > 0 || allFiles.length >= DEEP_SCAN_MAX_FILES) completa = false;
+  if (info) info.completa = completa;
+
+  if (allFiles.length <= DEEP_MAX_FILES) return allFiles;
+  const quando = (f: DriveFile) => f.modifiedTime || f.createdTime || "";
+  return allFiles
+    .sort((a, b) => quando(b).localeCompare(quando(a)))
+    .slice(0, DEEP_MAX_FILES);
 };
 
 // ─── Normalizers ───────────────────────────────────────────────────────────────

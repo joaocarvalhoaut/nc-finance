@@ -129,8 +129,10 @@ Deno.serve(async (request: Request) => {
       .from(STORAGE_BUCKET)
       .upload(path, bytes, { upsert: true, contentType: "application/pdf" });
 
+    // Mensagens de banco/Storage só no log — a tela mostra o texto de erro daqui.
     if (uploadErr) {
-      return errResponse(500, { success: false, error: `Falha ao salvar o boleto: ${uploadErr.message}`, status: "erro_interno" });
+      console.error("[drive-import-boleto] upload:", uploadErr.message);
+      return errResponse(500, { success: false, error: "Falha ao salvar o boleto. Tente novamente.", status: "erro_interno" });
     }
 
     const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${path}`;
@@ -148,14 +150,16 @@ Deno.serve(async (request: Request) => {
       .eq("user_id", userId);
 
     if (updErr) {
-      return errResponse(500, { success: false, error: `Falha ao atualizar o registro: ${updErr.message}`, status: "erro_interno" });
+      console.error("[drive-import-boleto] update:", updErr.message);
+      return errResponse(500, { success: false, error: "Falha ao vincular o boleto ao cliente. Tente novamente.", status: "erro_interno" });
     }
 
     return okResponse({ success: true, status: "success", fileName: driveFileName, fileUrl: publicUrl });
   } catch (err) {
+    console.error("[drive-import-boleto] unhandled:", err instanceof Error ? err.message : String(err));
     return errResponse(500, {
       success: false,
-      error: err instanceof Error ? err.message : "Erro interno.",
+      error: "Erro interno. Tente novamente.",
       status: "erro_interno",
     });
   }

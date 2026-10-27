@@ -6,6 +6,7 @@
  */
 
 import { getSupabaseClient } from "./supabaseClient";
+import { readFunctionErrorBody } from "./edgeFunctionError";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,13 +79,17 @@ export const googleDriveService = {
     );
 
     if (error || !data) {
+      const body = await readFunctionErrorBody(error);
+      const status = typeof body?.status === "string" && body.status in DRIVE_STATUS_LABELS
+        ? body.status as DriveMatchStatus
+        : "error";
       return {
         success: false,
-        status: "error",
+        status,
         filesFound: 0,
         debtorsTotal: 0,
         debtorsMatched: 0,
-        error: error?.message ?? "Não foi possível contatar o servidor.",
+        error: typeof body?.error === "string" ? body.error : "Não foi possível contatar o servidor.",
         logId: null,
         matchedAt: null,
         matches: [],
@@ -112,11 +117,12 @@ export const googleDriveService = {
     }>("drive-import-boleto", { body: { debtorId } });
 
     if (error || !data) {
+      const body = await readFunctionErrorBody(error);
       return {
         success: false,
         fileName: null,
         fileUrl: null,
-        error: error?.message ?? "Não foi possível importar o boleto do Drive.",
+        error: typeof body?.error === "string" ? body.error : "Não foi possível importar o boleto do Drive.",
       };
     }
 

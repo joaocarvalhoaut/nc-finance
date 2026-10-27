@@ -576,7 +576,7 @@ export default function ClientDashboard({
             const atual = step === id || (id === "sending" && step === "reconciling") || (id === "done" && step === "reconciled");
             return (
               <li key={id} aria-current={atual ? "step" : undefined}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md ${atual ? "bg-zinc-900 text-white" : "text-zinc-500"}`}>
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md ${atual ? "bg-emerald-500/10 text-emerald-300" : "text-zinc-500"}`}>
                 <span className={`font-mono text-[10px] ${atual ? "text-emerald-400" : "text-zinc-600"}`}>{String(i + 1).padStart(2, "0")}</span>
                 {label}
               </li>
@@ -639,7 +639,7 @@ export default function ClientDashboard({
                       aria-checked={ativo}
                       onClick={() => setImportCategory(cat.value)}
                       className={`px-3 py-2.5 rounded-lg border text-left transition-colors cursor-pointer ${
-                        ativo ? "border-zinc-500 bg-zinc-900" : "border-zinc-800 hover:border-zinc-700"
+                        ativo ? "border-emerald-500/40 bg-emerald-500/10" : "border-zinc-800 hover:border-zinc-700"
                       }`}
                     >
                       <span className="flex items-center gap-2 text-xs font-semibold text-white">
@@ -773,10 +773,10 @@ export default function ClientDashboard({
                     onClick={() => setSelectedTone(t.value)}
                     aria-pressed={selectedTone === t.value}
                     className={`text-left px-3 py-2.5 rounded-lg border transition-colors cursor-pointer ${
-                      selectedTone === t.value ? "border-zinc-500 bg-zinc-900" : "border-zinc-800 hover:border-zinc-700"
+                      selectedTone === t.value ? "border-emerald-500/40 bg-emerald-500/10" : "border-zinc-800 hover:border-zinc-700"
                     }`}
                   >
-                    <span className={`block text-xs font-semibold ${selectedTone === t.value ? "text-white" : "text-zinc-300"}`}>{t.label}</span>
+                    <span className={`block text-xs font-semibold ${selectedTone === t.value ? "text-emerald-300" : "text-zinc-300"}`}>{t.label}</span>
                     <span className="block mt-0.5 text-[10px] text-zinc-500 leading-snug">{t.description}</span>
                   </button>
                 ))}

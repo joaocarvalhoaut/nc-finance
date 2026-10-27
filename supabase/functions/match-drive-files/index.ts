@@ -192,8 +192,10 @@ Deno.serve(async (request: Request) => {
         "https://www.googleapis.com/auth/drive.readonly",
       );
     } catch (e) {
+      // Resposta do Google só no log — pode trazer detalhe da credencial.
+      console.error("[match-drive-files] google auth:", e instanceof Error ? e.message : String(e));
       return errResponse(502, {
-        error: e instanceof Error ? e.message : "Falha na autenticacao Google.",
+        error: "Falha na autenticação com o Google. Contate o suporte.",
         status: "google_auth_erro",
       });
     }
