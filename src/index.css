@@ -65,4 +65,13 @@
   from { transform: scaleY(0); }
   to   { transform: scaleY(1); }
 }
-@media (prefers-reduced-motion: reduce) { .dash-bar { animation: none; } }
+/* Barras horizontais do Dashboard (Carteira por situação): crescem da esquerda. */
+.dash-bar-x {
+  transform-origin: left;
+  animation: dash-grow-x 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes dash-grow-x {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@media (prefers-reduced-motion: reduce) { .dash-bar, .dash-bar-x { animation: none; } }

@@ -11,7 +11,6 @@ const DeleteAccountModal = lazy(() => import("./components/DeleteAccountModal"))
 import { addOptOuts } from "./services/optOutService";
 import LandingPage from "./components/LandingPage";
 import SubscriptionGate from "./components/SubscriptionGate";
-import SubscriptionStatusCard from "./components/SubscriptionStatusCard";
 import GerenciarAssinatura from "./components/GerenciarAssinatura";
 import CompletarCadastro from "./components/CompletarCadastro";
 import { fetchMyProfileOrThrow, isProfileComplete, type UserProfileData } from "./services/accountService";
@@ -2354,474 +2353,425 @@ export default function App() {
                 </div>
               )}
 
-              {currentTab === "dashboard" && (
-                <div className="space-y-8">
+              {currentTab === "dashboard" && (() => {
+                // ── Dashboard ──────────────────────────────────────────────
+                // Mesmo padrão visual de Minha Conta e Gerenciar assinatura:
+                // seções com cabeçalho e linha fina, cantos retos, rótulos mono.
+                // Cores das situações validadas para fundo escuro (dataviz):
+                // vencido #e11d48 · a vencer #d97706 · liquidado #059669, sempre
+                // com o nome escrito ao lado — a cor nunca identifica sozinha.
+                const card = "bg-zinc-950 border border-zinc-800 rounded-xl";
+                const cabecalho = "flex items-start justify-between gap-3 px-5 py-4 border-b border-zinc-800/80";
+                const rotulo = "text-[10px] font-mono uppercase tracking-widest text-zinc-500";
+                const recompraCount = debtors.filter(d => d.category === "recompra").length;
+                const situacoes = [
+                  { key: "vencidos",  label: "Vencidos",   count: vencidosCount,  value: vencidosValue,  cor: "#e11d48",
+                    nota: recompraCount > 0 ? `com multa e juros · inclui ${recompraCount} recompra${recompraCount !== 1 ? "s" : ""}` : "com multa e juros" },
+                  { key: "a_vencer",  label: "A vencer",   count: aVencerCount,   value: aVencerValue,   cor: "#d97706", nota: "ainda no prazo" },
+                  { key: "liquidado", label: "Liquidados", count: liquidadoCount, value: liquidadoValue, cor: "#059669", nota: "valor original recebido" },
+                ];
+                const maxSituacao = Math.max(1, ...situacoes.map(s => s.value));
+                const somaSituacoes = situacoes.reduce((a, s) => a + s.value, 0) || 1;
+                const totalClientes = vencidosCount + aVencerCount + liquidadoCount;
+                const enviosUsados = operationalMetrics?.usageThisMonth?.chargesUsed ?? (usage?.chargesSent ?? 0);
+                const enviosLimite = operationalMetrics?.usageThisMonth?.planLimit ?? getPlanDefinition(plan).monthlyChargeLimit;
+                const enviosRestantes = operationalMetrics?.usageThisMonth?.remaining ?? remainingCharges ?? 0;
+                const enviosPct = Math.min(100, (enviosUsados / (enviosLimite || 1)) * 100);
+                const titulos = (n: number) => `${n} título${n !== 1 ? "s" : ""}`;
+
+                return (
+                <div className="space-y-6">
+
+                  {/* ── Indicadores ─────────────────────────────────────────── */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    
-                    <div className="bg-zinc-900/60 border border-zinc-900 p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[120px] shadow">
-                      <div className="flex items-center justify-between text-zinc-500 text-xs uppercase tracking-wider font-mono">
-                        <span>Faturamento Base Inicial</span>
-                        <DollarSign className="w-4 h-4 text-zinc-500" />
-                      </div>
-                      <div className="mt-3">
-                        <span className="text-2xl sm:text-3xl font-extrabold text-white font-mono"><CountUp to={totalOriginalVolumeStatus} prefix="R$ " decimals={2} /></span>
-                      </div>
-                      <div className="text-[10px] text-zinc-500 mt-2">
-                        Valor original em aberto (não inclui liquidados).
-                      </div>
-                    </div>
-
-                    <div className="bg-zinc-900/60 border border-emerald-500/10 p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[120px] shadow">
-
-                      <div className="flex items-center justify-between text-emerald-400 text-xs uppercase tracking-wider font-mono">
-                        <span>Faturamento Corrigido</span>
-                        <TrendingUp className="w-4 h-4 text-emerald-400" />
-                      </div>
-                      <div className="mt-3">
-                        <span className="text-2xl sm:text-3xl font-extrabold text-emerald-300 font-mono"><CountUp to={vencidosValue} prefix="R$ " decimals={2} /></span>
-                      </div>
-                      <div className="text-[10px] text-emerald-400/60 mt-2">
-                        Total dos vencidos com {globalFinePct}% de multa + {globalInterestDayPct}% de juros diários.
-                      </div>
-                    </div>
-
-                    <div className="bg-zinc-900/60 border border-rose-950/40 p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[120px] shadow-lg shadow-rose-950/20">
-                      {/* subtle glow accent */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-rose-950/20 via-transparent to-transparent pointer-events-none rounded-2xl" />
-
-                      {/* Header */}
+                    <div className={`${card} p-5`}>
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-rose-400/80 uppercase tracking-widest font-mono font-semibold">Pendência Crítica</span>
-                        <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                        <p className={rotulo}>Em aberto</p>
+                        <DollarSign className="w-3.5 h-3.5 text-zinc-600" />
                       </div>
+                      <p className="mt-3 text-2xl font-bold text-white font-mono tabular-nums"><CountUp to={totalOriginalVolumeStatus} prefix="R$ " decimals={2} /></p>
+                      <p className="mt-1.5 text-[11px] text-zinc-500">Valor original dos títulos não pagos.</p>
+                    </div>
 
-                      {/* Value + count */}
-                      <div className="mt-2 flex items-end justify-between gap-2">
-                        <span className="text-2xl sm:text-3xl font-extrabold text-rose-400 font-mono leading-none"><CountUp to={criticalValue} prefix="R$ " decimals={2} /></span>
-                        <span className="text-[11px] text-rose-400/50 font-mono mb-0.5 shrink-0">{criticalDebtors.length} títulos</span>
+                    <div className={`${card} p-5`}>
+                      <div className="flex items-center justify-between">
+                        <p className={rotulo}>Vencidos corrigidos</p>
+                        <TrendingUp className="w-3.5 h-3.5 text-zinc-600" />
                       </div>
+                      <p className="mt-3 text-2xl font-bold text-white font-mono tabular-nums"><CountUp to={vencidosValue} prefix="R$ " decimals={2} /></p>
+                      <p className="mt-1.5 text-[11px] text-zinc-500">Com {globalFinePct}% de multa + {globalInterestDayPct}% de juros ao dia.</p>
+                    </div>
 
-                      {/* Controls */}
-                      <div className="mt-3 flex items-center gap-2">
-                        {/* Days input pill */}
-                        <div className="flex items-center gap-1.5 bg-zinc-800/80 border border-zinc-700/60 rounded-lg px-2.5 py-1">
-                          <span className="text-[10px] text-zinc-500 select-none">dias ≥</span>
-                          <input
-                            type="number"
-                            min={1}
-                            max={9999}
-                            value={criticalDaysStr}
-                            onChange={e => {
-                              const raw = e.target.value;
-                              setCriticalDaysStr(raw);
-                              const n = parseInt(raw, 10);
-                              if (!isNaN(n) && n > 0) setCriticalDays(n);
-                            }}
-                            onBlur={() => {
-                              const n = parseInt(criticalDaysStr, 10);
-                              if (isNaN(n) || n <= 0) { setCriticalDays(1); setCriticalDaysStr("1"); }
-                            }}
-                            className="w-10 bg-transparent text-[11px] text-rose-300 font-mono text-center outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                          />
+                    <div className={`${card} p-5 border-rose-900/50`}>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-mono uppercase tracking-widest text-rose-400 flex items-center gap-1.5">
+                          <AlertTriangle className="w-3 h-3" /> Pendência crítica
+                        </p>
+                        <span className="text-[11px] text-zinc-500 font-mono">{titulos(criticalDebtors.length)}</span>
+                      </div>
+                      <p className="mt-3 text-2xl font-bold text-white font-mono tabular-nums"><CountUp to={criticalValue} prefix="R$ " decimals={2} /></p>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[11px] text-zinc-500">
+                        <span className="whitespace-nowrap">Atraso ≥</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={9999}
+                          aria-label="Dias de atraso para pendência crítica"
+                          value={criticalDaysStr}
+                          onChange={e => {
+                            const raw = e.target.value;
+                            setCriticalDaysStr(raw);
+                            const n = parseInt(raw, 10);
+                            if (!isNaN(n) && n > 0) setCriticalDays(n);
+                          }}
+                          onBlur={() => {
+                            const n = parseInt(criticalDaysStr, 10);
+                            if (isNaN(n) || n <= 0) { setCriticalDays(1); setCriticalDaysStr("1"); }
+                          }}
+                          className="w-12 bg-zinc-900 border border-zinc-800 rounded px-1.5 py-0.5 text-[11px] text-white font-mono text-center outline-none focus:border-rose-500/60 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                        <span>dias</span>
+                        <div className="ml-auto flex rounded border border-zinc-800 overflow-hidden" role="group" aria-label="Juros na pendência crítica">
+                          {[true, false].map(comJuros => (
+                            <button
+                              key={String(comJuros)}
+                              type="button"
+                              onClick={() => setCriticalWithInterest(comJuros)}
+                              aria-pressed={criticalWithInterest === comJuros}
+                              className={`px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                                criticalWithInterest === comJuros ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-300"
+                              }`}
+                            >
+                              {comJuros ? "c/ juros" : "s/ juros"}
+                            </button>
+                          ))}
                         </div>
-
-                        {/* Interest toggle */}
-                        <button
-                          type="button"
-                          onClick={() => setCriticalWithInterest(v => !v)}
-                          className={`relative flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all duration-200 ${
-                            criticalWithInterest
-                              ? "bg-rose-500/15 border-rose-500/40 text-rose-300"
-                              : "bg-zinc-800/80 border-zinc-700/60 text-zinc-500 hover:text-zinc-300"
-                          }`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full transition-colors ${criticalWithInterest ? "bg-rose-400" : "bg-zinc-600"}`} />
-                          {criticalWithInterest ? "c/ juros" : "s/ juros"}
-                        </button>
                       </div>
                     </div>
 
-                    <div className="bg-zinc-900/60 border border-zinc-900 p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[120px] shadow">
-                      <div className="flex items-center justify-between text-emerald-400 text-xs uppercase tracking-wider font-mono">
-                        <span>Total Liquidado</span>
-                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    <div className={`${card} p-5`}>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 flex items-center gap-1.5">
+                          <CheckCircle className="w-3 h-3" /> Recebido
+                        </p>
+                        <span className="text-[11px] text-zinc-500 font-mono">{titulos(liquidadoCount)}</span>
                       </div>
-                      <div className="mt-2 flex items-baseline justify-between">
-                        <span className="text-2xl sm:text-3xl font-extrabold text-white font-mono"><CountUp to={liquidadoValue} prefix="R$ " decimals={2} /></span>
-                      </div>
-                      <div className="text-[10px] text-zinc-500 mt-2">
-                        Faturas baixadas e confirmadas em sistema.
-                      </div>
+                      <p className="mt-3 text-2xl font-bold text-white font-mono tabular-nums"><CountUp to={liquidadoValue} prefix="R$ " decimals={2} /></p>
+                      <p className="mt-1.5 text-[11px] text-zinc-500">Títulos liquidados e confirmados.</p>
                     </div>
-
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    
-                    <div className="lg:col-span-8 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+                    {/* ── Carteira por situação ───────────────────────────────── */}
+                    <section className={`${card} lg:col-span-7`}>
+                      <header className={cabecalho}>
                         <div>
-                          <h4 className="text-sm font-bold text-white">Fluxo Projetado de Recuperação</h4>
-                          <p className="text-xs text-zinc-500">Representação visual do volume devedor por categoria contábil</p>
+                          <h4 className="text-sm font-bold text-white">Carteira por situação</h4>
+                          <p className="text-xs text-zinc-500 mt-0.5">Quanto há em cada situação, em reais</p>
                         </div>
-                        <div className="flex items-center gap-4 text-xs font-mono">
-                          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-rose-500 inline-block"/> Vencidos</span>
-                          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-amber-500 inline-block"/> A Vencer</span>
-                          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block"/> Liquidados</span>
-                        </div>
-                      </div>
-
-                      <div className="relative w-full h-[240px] border-b border-l border-zinc-800 pt-4 px-2">
-                        <svg className="w-full h-full" viewBox="0 0 600 200" preserveAspectRatio="none">
-                          <defs>
-                            <linearGradient id="gVenc" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#fb7185" stopOpacity="0.95" />
-                              <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.28" />
-                            </linearGradient>
-                            <linearGradient id="gAvenc" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.95" />
-                              <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.28" />
-                            </linearGradient>
-                            <linearGradient id="gLiq" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#34d399" stopOpacity="1" />
-                              <stop offset="100%" stopColor="#10b981" stopOpacity="0.32" />
-                            </linearGradient>
-                          </defs>
-
-                          <line x1="0" y1="50" x2="600" y2="50" stroke="#27272a" strokeDasharray="3 6" strokeWidth="1" />
-                          <line x1="0" y1="100" x2="600" y2="100" stroke="#27272a" strokeDasharray="3 6" strokeWidth="1" />
-                          <line x1="0" y1="150" x2="600" y2="150" stroke="#27272a" strokeDasharray="3 6" strokeWidth="1" />
-
-                          {[
-                            { v: vencidosValue, x: 82,  fill: "url(#gVenc)" },
-                            { v: aVencerValue,  x: 255, fill: "url(#gAvenc)" },
-                            { v: liquidadoValue, x: 428, fill: "url(#gLiq)" },
-                          ].map((b, i) => {
-                            const h = Math.max(2, Math.min(190, (b.v / (totalUpdatedVolumeStatus || 1)) * 190));
-                            return (
-                              <rect
-                                key={i}
-                                className="dash-bar"
-                                style={{ animationDelay: `${i * 110}ms` }}
-                                x={b.x}
-                                y={200 - h}
-                                width={90}
-                                height={h}
-                                fill={b.fill}
-                              />
-                            );
-                          })}
-                        </svg>
-
-                        <div className="absolute left-0 right-0 -bottom-6 flex justify-around text-[10px] text-zinc-500 font-mono">
-                          <span className="text-rose-400 font-bold">Vencidos (<CountUp to={vencidosValue} prefix="R$ " decimals={2} />)</span>
-                          <span className="text-amber-400 font-bold">A Vencer (<CountUp to={aVencerValue} prefix="R$ " decimals={2} />)</span>
-                          <span className="text-emerald-400 font-bold">Liquidado (<CountUp to={liquidadoValue} prefix="R$ " decimals={2} />)</span>
-                        </div>
-                      </div>
-
-                      <div className="pt-4 flex flex-col sm:flex-row justify-between text-xs text-zinc-400 gap-2">
-                        <span>
-                          Total Geral em Monitoria: <span className="text-white font-mono font-bold">{vencidosCount + aVencerCount + liquidadoCount} clientes</span>
-                          {desabilitadoCount > 0 && (
-                            <span className="text-zinc-500"> · {desabilitadoCount} desabilitado{desabilitadoCount !== 1 ? "s" : ""}</span>
-                          )}
-                        </span>
-                        <span>Média por Boleto: <span className="text-emerald-400 font-mono font-bold">{formatBRL(debtors.length > 0 ? totalUpdatedVolumeStatus / debtors.length : 0)}</span></span>
-                      </div>
-                    </div>
-
-                    <div className="lg:col-span-4 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 flex flex-col justify-between shadow-xl">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-white">Responsáveis Ativos</h4>
-                        <p className="text-xs text-zinc-500">Membros de cobrança cadastrados</p>
-                      </div>
-
-                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                        {representatives.map(r => {
-                          const assignedDebtors = debtors.filter(db => db.representativeId === r.id);
-                          const assignedCount = assignedDebtors.length;
-                          const isExpanded = expandedRepId === r.id;
+                        <span className="text-xs text-zinc-400 font-mono flex-shrink-0">{totalClientes} cliente{totalClientes !== 1 ? "s" : ""}</span>
+                      </header>
+                      <div className="px-5 py-5 space-y-5">
+                        {situacoes.map(s => {
+                          const largura = s.value > 0 ? Math.max(1.5, (s.value / maxSituacao) * 100) : 0;
+                          const pct = Math.round((s.value / somaSituacoes) * 100);
                           return (
-                            <div key={r.id} className="rounded-xl bg-zinc-950 border border-zinc-800 overflow-hidden">
-                              <div className="flex items-center justify-between p-2.5">
-                                <div className="flex items-center gap-2">
-                                  <div className={`w-2.5 h-2.5 rounded-full ${r.color}`} />
-                                  <div>
-                                    <div className="text-xs font-bold text-zinc-300">{r.name}</div>
-                                    <div className="text-[10px] text-zinc-500">{r.role}</div>
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={() => setExpandedRepId(isExpanded ? null : r.id)}
-                                  disabled={assignedCount === 0}
-                                  className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
-                                    assignedCount === 0
-                                      ? "bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-default"
-                                      : isExpanded
-                                        ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-300"
-                                        : "bg-zinc-900 border border-zinc-700 text-zinc-300 hover:border-emerald-500/40 hover:text-emerald-300"
-                                  }`}
-                                >
-                                  {assignedCount} {assignedCount === 1 ? "devedor" : "devedores"} {assignedCount > 0 && (isExpanded ? "▲" : "▼")}
-                                </button>
+                            <div key={s.key} title={`${s.label}: ${formatBRL(s.value)} — ${titulos(s.count)}, ${pct}% da carteira`}>
+                              <div className="flex items-baseline justify-between gap-3">
+                                <span className="text-xs font-semibold text-zinc-200 flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: s.cor }} />
+                                  {s.label}
+                                  <span className="font-normal text-zinc-500">· {titulos(s.count)}</span>
+                                </span>
+                                <span className="text-sm font-mono text-white tabular-nums">{formatBRL(s.value)}</span>
                               </div>
-                              {isExpanded && assignedDebtors.length > 0 && (
-                                <div className="border-t border-zinc-800 divide-y divide-zinc-800/60">
-                                  {assignedDebtors.map(d => (
-                                    <div key={d.id} className="flex items-center justify-between px-3 py-2 gap-2">
-                                      <div className="min-w-0">
-                                        <p className="text-[11px] font-semibold text-zinc-200 truncate">{d.client}</p>
-                                        <p className="text-[10px] text-zinc-500 font-mono">{d.document}</p>
-                                      </div>
-                                      <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${CATEGORY_TINT[d.category]}`}>
-                                          {CATEGORY_LABEL[d.category]}
-                                        </span>
-                                        <span className="text-[10px] font-mono text-zinc-400">
-                                          {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(d.updatedValue || d.value)}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                              <div className="mt-2 h-2.5 bg-zinc-900 rounded-sm overflow-hidden">
+                                <div className="dash-bar-x h-full rounded-r" style={{ width: `${largura}%`, background: s.cor }} />
+                              </div>
+                              <p className="mt-1.5 text-[11px] text-zinc-500">{pct}% da carteira · {s.nota}</p>
                             </div>
                           );
                         })}
                       </div>
+                      <footer className="px-5 py-3 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500">
+                        <span>
+                          Média por boleto <span className="text-zinc-200 font-mono">{formatBRL(debtors.length > 0 ? totalUpdatedVolumeStatus / debtors.length : 0)}</span>
+                        </span>
+                        {desabilitadoCount > 0 && <span>{desabilitadoCount} desabilitado{desabilitadoCount !== 1 ? "s" : ""} fora da conta</span>}
+                      </footer>
+                    </section>
 
-                      <button
-                        onClick={() => setShowRepModal(true)}
-                        className="w-full mt-2 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold text-center transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        <UserPlus className="w-3.5 h-3.5" /> Gerenciar Responsáveis Ativos
-                      </button>
-                    </div>
+                    {/* ── Operação do mês ─────────────────────────────────────── */}
+                    <section className={`${card} lg:col-span-5`}>
+                      <header className={cabecalho}>
+                        <div>
+                          <h4 className="text-sm font-bold text-white">Operação do mês</h4>
+                          <p className="text-xs text-zinc-500 mt-0.5">Envios, entregas e fila de disparo</p>
+                        </div>
+                        <button
+                          onClick={() => void loadOperationalMetrics()}
+                          disabled={isLoadingMetrics}
+                          className="flex-shrink-0 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-40"
+                          title="Atualizar"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${isLoadingMetrics ? "animate-spin" : ""}`} />
+                          {operationalMetrics ? new Date(operationalMetrics.loadedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "Carregar"}
+                        </button>
+                      </header>
+                      <div className="px-5 py-5 space-y-5">
+                        <div>
+                          <div className="flex items-baseline justify-between">
+                            <p className={rotulo}>Envios</p>
+                            <span className="text-xs font-mono text-zinc-300 tabular-nums">
+                              {enviosUsados.toLocaleString("pt-BR")} <span className="text-zinc-600">/ {enviosLimite.toLocaleString("pt-BR")}</span>
+                            </span>
+                          </div>
+                          <div className="mt-2 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${enviosPct >= 90 ? "bg-amber-400" : "bg-emerald-500"}`} style={{ width: `${enviosPct}%` }} />
+                          </div>
+                          <p className={`mt-1.5 text-[11px] ${enviosRestantes > 0 ? "text-zinc-500" : "text-rose-400"}`}>
+                            {enviosRestantes > 0 ? `Restam ${enviosRestantes.toLocaleString("pt-BR")} envios no mês` : "Limite do mês atingido"}
+                          </p>
+                        </div>
 
+                        <div className="grid grid-cols-2 gap-px bg-zinc-800 rounded-lg overflow-hidden border border-zinc-800">
+                          <div className="bg-zinc-950 p-3">
+                            <p className={rotulo}>Taxa de entrega</p>
+                            <p className="mt-1.5 text-xl font-bold text-white font-mono tabular-nums flex items-center gap-1.5">
+                              {isLoadingMetrics || !operationalMetrics ? "—" : `${operationalMetrics.successRateThisMonth}%`}
+                              {operationalMetrics && (
+                                <span className={`w-1.5 h-1.5 rounded-full ${operationalMetrics.successRateThisMonth >= 80 ? "bg-emerald-500" : "bg-amber-400"}`}
+                                  title={operationalMetrics.successRateThisMonth >= 80 ? "Boa" : "Abaixo de 80%"} />
+                              )}
+                            </p>
+                          </div>
+                          <div className="bg-zinc-950 p-3">
+                            <p className={rotulo}>Na fila</p>
+                            <p className="mt-1.5 text-xl font-bold text-white font-mono tabular-nums">
+                              {isLoadingMetrics ? "…" : (operationalMetrics?.activeJobsInQueue ?? 0)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {isLoadingMetrics && !operationalMetrics && (
+                          <div className="h-10 rounded-lg bg-zinc-900 animate-pulse" />
+                        )}
+                      </div>
+                      <footer className="px-5 py-3 border-t border-zinc-800/80 flex items-center justify-between gap-3 text-xs">
+                        <span className="text-zinc-500">Plano <span className="text-zinc-200">{getPlanDefinition(plan).name}</span></span>
+                        <button onClick={handleOpenBillingPortal} className="text-zinc-400 hover:text-white transition-colors cursor-pointer">
+                          Gerenciar assinatura
+                        </button>
+                      </footer>
+                    </section>
                   </div>
 
-                  {/* ── Automation rules card ─────────────────────────────────── */}
-                  <div className="bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+                    {/* ── Responsáveis ────────────────────────────────────────── */}
+                    <section className={`${card} lg:col-span-5`}>
+                      <header className={cabecalho}>
+                        <div>
+                          <h4 className="text-sm font-bold text-white">Responsáveis</h4>
+                          <p className="text-xs text-zinc-500 mt-0.5">Quem cuida de cada carteira</p>
+                        </div>
+                        <button
+                          onClick={() => setShowRepModal(true)}
+                          className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                        >
+                          <UserPlus className="w-3 h-3" /> Gerenciar
+                        </button>
+                      </header>
+                      {representatives.length === 0 ? (
+                        <p className="px-5 py-6 text-xs text-zinc-500 text-center">Nenhum responsável cadastrado.</p>
+                      ) : (
+                        <div className="max-h-[340px] overflow-y-auto divide-y divide-zinc-900">
+                          {representatives.map(r => {
+                            const assignedDebtors = debtors.filter(db => db.representativeId === r.id);
+                            const assignedCount = assignedDebtors.length;
+                            const isExpanded = expandedRepId === r.id;
+                            return (
+                              <div key={r.id}>
+                                <button
+                                  onClick={() => setExpandedRepId(isExpanded ? null : r.id)}
+                                  disabled={assignedCount === 0}
+                                  aria-expanded={isExpanded}
+                                  className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left hover:bg-zinc-900/60 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-default"
+                                >
+                                  <span className="flex items-center gap-2.5 min-w-0">
+                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${r.color}`} />
+                                    <span className="min-w-0">
+                                      <span className="block text-xs font-semibold text-zinc-200 truncate">{r.name}</span>
+                                      <span className="block text-[10px] text-zinc-500">{r.role}</span>
+                                    </span>
+                                  </span>
+                                  <span className={`text-[11px] font-mono flex-shrink-0 ${assignedCount === 0 ? "text-zinc-600" : "text-zinc-300"}`}>
+                                    {assignedCount} {assignedCount === 1 ? "devedor" : "devedores"}{assignedCount > 0 && (isExpanded ? " ▴" : " ▾")}
+                                  </span>
+                                </button>
+                                {isExpanded && assignedDebtors.length > 0 && (
+                                  <div className="bg-zinc-900/40 divide-y divide-zinc-900">
+                                    {assignedDebtors.map(d => (
+                                      <div key={d.id} className="flex items-center justify-between gap-2 pl-10 pr-5 py-2">
+                                        <div className="min-w-0">
+                                          <p className="text-[11px] font-semibold text-zinc-200 truncate">{d.client}</p>
+                                          <p className="text-[10px] text-zinc-500 font-mono">{d.document}</p>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${CATEGORY_TINT[d.category]}`}>
+                                            {CATEGORY_LABEL[d.category]}
+                                          </span>
+                                          <span className="text-[10px] font-mono text-zinc-400">{formatBRL(d.updatedValue || d.value)}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </section>
+
+                    {/* ── Resumo por responsável ──────────────────────────────── */}
+                    <section className={`${card} lg:col-span-7`}>
+                      <header className={cabecalho}>
+                        <div>
+                          <h4 className="text-sm font-bold text-white flex items-center gap-2"><Users className="w-3.5 h-3.5 text-zinc-500" /> Resumo por responsável</h4>
+                          <p className="text-xs text-zinc-500 mt-0.5">Clientes e valores de cada carteira</p>
+                        </div>
+                      </header>
+                      {(() => {
+                        // Agrupa os devedores por responsável (e "Sem responsável").
+                        const repGroups = new Map<string, { rep: Representative | null; items: typeof debtors }>();
+                        repGroups.set("__none__", { rep: null, items: [] });
+                        representatives.forEach(r => repGroups.set(r.id, { rep: r, items: [] }));
+                        debtors.forEach(d => {
+                          const key = d.representativeId && repGroups.has(d.representativeId) ? d.representativeId : "__none__";
+                          repGroups.get(key)!.items.push(d);
+                        });
+
+                        const rows = Array.from(repGroups.entries())
+                          .map(([key, { rep, items }]) => ({
+                            key,
+                            name: rep ? rep.name : "Sem responsável",
+                            total: items.length,
+                            vencidos: items.filter(d => cobraComoVencido(d.category)).length,
+                            aVencer: items.filter(d => d.category === "a_vencer").length,
+                            liquidados: items.filter(d => d.category === "liquidado").length,
+                            valorTotal: items.reduce((s, d) => s + (d.updatedValue || d.value), 0),
+                          }))
+                          .filter(r => r.total > 0)
+                          .sort((a, b) => b.total - a.total);
+
+                        if (rows.length === 0) {
+                          return <p className="px-5 py-6 text-xs text-zinc-500 text-center">Nenhum cliente cadastrado ainda.</p>;
+                        }
+
+                        const th = "px-3 py-2.5 font-medium";
+                        return (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs text-left text-zinc-300">
+                              <thead className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 border-b border-zinc-800">
+                                <tr>
+                                  <th className={`${th} pl-5`}>Responsável</th>
+                                  <th className={`${th} text-right`}>Clientes</th>
+                                  <th className={`${th} text-right`}><span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm" style={{ background: "#e11d48" }} />Vencidos</span></th>
+                                  <th className={`${th} text-right`}><span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm" style={{ background: "#d97706" }} />A vencer</span></th>
+                                  <th className={`${th} text-right`}><span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm" style={{ background: "#059669" }} />Liquidados</span></th>
+                                  <th className={`${th} pr-5 text-right`}>Valor</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-zinc-900">
+                                {rows.map(r => (
+                                  <tr key={r.key} className="hover:bg-zinc-900/40 transition-colors">
+                                    <td className="px-3 pl-5 py-2.5 font-semibold text-zinc-200">{r.name}</td>
+                                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-white">{r.total}</td>
+                                    <td className="px-3 py-2.5 text-right font-mono tabular-nums">{r.vencidos}</td>
+                                    <td className="px-3 py-2.5 text-right font-mono tabular-nums">{r.aVencer}</td>
+                                    <td className="px-3 py-2.5 text-right font-mono tabular-nums">{r.liquidados}</td>
+                                    <td className="px-3 pr-5 py-2.5 text-right font-mono tabular-nums text-white">{formatBRL(r.valorTotal)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        );
+                      })()}
+                    </section>
+                  </div>
+
+                  {/* ── Regras de automação ─────────────────────────────────── */}
+                  <section className={card}>
+                    <header className={cabecalho}>
                       <div>
-                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                          <Bot className="w-4 h-4 text-emerald-400" /> Regras de Automação
-                        </h4>
-                        <p className="text-xs text-zinc-500 mt-0.5">Regras ativas de disparo automático de cobranças</p>
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2"><Bot className="w-3.5 h-3.5 text-zinc-500" /> Regras de automação</h4>
+                        <p className="text-xs text-zinc-500 mt-0.5">Disparos automáticos de cobrança</p>
                       </div>
                       <button
                         onClick={() => setCurrentTab("automacoes")}
-                        className="text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 rounded-xl px-3 py-1.5 transition-colors flex items-center gap-1.5"
+                        className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
                       >
-                        Gerenciar regras <ArrowRight className="w-3 h-3" />
+                        Gerenciar <ArrowRight className="w-3 h-3" />
                       </button>
-                    </div>
+                    </header>
                     {isLoadingAutomation ? (
-                      <div className="flex items-center gap-2 text-xs text-zinc-500">
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Carregando regras...
+                      <div className="px-5 py-4 flex items-center gap-2 text-xs text-zinc-500">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Carregando regras…
                       </div>
                     ) : automationRules.length === 0 ? (
-                      <div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-5 text-center space-y-1">
-                        <Bot className="w-8 h-8 text-zinc-700 mx-auto" />
-                        <p className="text-xs font-semibold text-zinc-400">Nenhuma regra configurada</p>
-                        <p className="text-[11px] text-zinc-600">Clique em "Gerenciar regras" para criar sua primeira automação.</p>
+                      <div className="px-5 py-6 text-center">
+                        <p className="text-xs font-semibold text-zinc-300">Nenhuma regra configurada</p>
+                        <p className="text-[11px] text-zinc-500 mt-1">Em "Gerenciar", crie a primeira automação para cobrar sozinho.</p>
                       </div>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="divide-y divide-zinc-900">
                         {automationRules.map((rule) => (
-                          <div key={rule.id} className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800 gap-3">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${rule.enabled ? "bg-emerald-400" : "bg-zinc-600"}`} />
-                              <div className="min-w-0">
-                                <p className="text-xs font-semibold text-zinc-200 truncate">{rule.name}</p>
-                                <p className="text-[10px] text-zinc-500">{RULE_TYPE_LABELS[rule.ruleType] ?? rule.ruleType} · tom: {rule.messageTone}</p>
-                              </div>
+                          <div key={rule.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-zinc-200 truncate">{rule.name}</p>
+                              <p className="text-[10px] text-zinc-500">{RULE_TYPE_LABELS[rule.ruleType] ?? rule.ruleType} · tom {rule.messageTone}</p>
                             </div>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border flex-shrink-0 ${rule.enabled ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-zinc-800 border-zinc-700 text-zinc-500"}`}>
-                              {rule.enabled ? "ATIVA" : "PAUSADA"}
+                            <span className={`text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border flex-shrink-0 ${
+                              rule.enabled ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10" : "text-zinc-400 border-zinc-700 bg-zinc-900"
+                            }`}>
+                              {rule.enabled ? "Ativa" : "Pausada"}
                             </span>
                           </div>
                         ))}
                       </div>
                     )}
-                  </div>
+                  </section>
 
-                  <div className="p-6 rounded-3xl bg-zinc-900/60 border border-zinc-900">
-                    <h4 className="text-sm font-bold text-white mb-4">Fluxo Operacional de Cobranças da NC Finance</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-                      <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col gap-2">
-                        <span className="font-mono text-emerald-400 font-bold">Passo 1</span>
-                        <h5 className="font-bold text-white">Importação e Extração</h5>
-                        <p className="text-zinc-500 font-light">Cole o relatório bruto ou insira as parcelas para que o extrator local estruture os vencimentos.</p>
+                  {/* ── Como funciona ───────────────────────────────────────── */}
+                  <section className={card}>
+                    <header className={cabecalho}>
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Como funciona</h4>
+                        <p className="text-xs text-zinc-500 mt-0.5">Da planilha ao WhatsApp do cliente em quatro passos</p>
                       </div>
-                      <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col gap-2">
-                        <span className="font-mono text-emerald-400 font-bold">Passo 2</span>
-                        <h5 className="font-bold text-white">Correção de Valores</h5>
-                        <p className="text-zinc-500 font-light">Defina os juros diários e a multa de atraso. O sistema atualiza os valores finais imediatamente.</p>
-                      </div>
-                      <div className="p-4 rounded-xl bg-zinc-300/5 border border-zinc-800 flex flex-col gap-2">
-                        <span className="font-mono text-emerald-400 font-bold">Passo 3</span>
-                        <h5 className="font-mono text-zinc-400">Seleção do Tom</h5>
-                        <p className="text-zinc-500 font-light">Escolha entre Amigável, Neutro, Firme ou de Notificação Jurídica de acordo com o atraso.</p>
-                      </div>
-                      <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 flex flex-col gap-2">
-                        <span className="font-mono text-emerald-400 font-bold">Passo 4</span>
-                        <h5 className="font-bold text-emerald-400">Disparo Automatizado</h5>
-                        <p className="text-emerald-400/70 font-light">Configure o disparador via Z-API integrado aos boletos do Google Drive para envio imediato.</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-emerald-400" /> Painel Operacional
-                      </h4>
-                      <button
-                        onClick={() => void loadOperationalMetrics()}
-                        disabled={isLoadingMetrics}
-                        className="text-xs text-zinc-500 hover:text-emerald-400 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-40"
-                      >
-                        <RefreshCw className={`w-3 h-3 ${isLoadingMetrics ? "animate-spin" : ""}`} />
-                        {operationalMetrics ? `Atualizar · ${new Date(operationalMetrics.loadedAt).toLocaleTimeString("pt-BR")}` : "Carregar"}
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-1">
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Envios este mês</p>
-                        <p className="text-xl font-extrabold text-white font-mono">
-                          {operationalMetrics?.usageThisMonth?.chargesUsed ?? (usage?.chargesSent ?? 0)}
-                          <span className="text-xs font-normal text-zinc-500">/{operationalMetrics?.usageThisMonth?.planLimit ?? getPlanDefinition(plan).monthlyChargeLimit}</span>
-                        </p>
-                      </div>
-                      <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-1">
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Limite restante</p>
-                        <p className={`text-xl font-extrabold font-mono ${(operationalMetrics?.usageThisMonth?.remaining ?? remainingCharges ?? 0) > 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                          {operationalMetrics?.usageThisMonth?.remaining ?? remainingCharges ?? "?"}
-                        </p>
-                      </div>
-                      <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-1">
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Taxa de sucesso</p>
-                        <p className={`text-xl font-extrabold font-mono ${(operationalMetrics?.successRateThisMonth ?? 100) >= 80 ? "text-emerald-400" : "text-amber-400"}`}>
-                          {isLoadingMetrics || !operationalMetrics ? "—" : `${operationalMetrics.successRateThisMonth}%`}
-                        </p>
-                      </div>
-                      <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-1">
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Jobs na fila</p>
-                        <p className={`text-xl font-extrabold font-mono ${(operationalMetrics?.activeJobsInQueue ?? 0) > 0 ? "text-amber-400" : "text-zinc-400"}`}>
-                          {isLoadingMetrics ? "?" : (operationalMetrics?.activeJobsInQueue ?? 0)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    </header>
+                    <ol className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-zinc-900">
                       {[
-                        { label: "Vencidos", count: debtors.filter(d => d.category === "vencidos").length, color: "text-rose-400 border-rose-500/20 bg-rose-500/5" },
-                        { label: "A Vencer", count: debtors.filter(d => d.category === "a_vencer").length, color: "text-amber-400 border-amber-500/20 bg-amber-500/5" },
-                        { label: "Recompra", count: debtors.filter(d => d.category === "recompra").length, color: "text-sky-400 border-sky-500/20 bg-sky-500/5" },
-                        { label: "Liquidados", count: debtors.filter(d => d.category === "liquidado").length, color: "text-emerald-400 border-emerald-500/20 bg-emerald-500/5" },
-                      ].map(({ label, count, color }) => (
-                        <div key={label} className={`border rounded-2xl p-4 flex items-center justify-between ${color}`}>
-                          <span className="text-xs font-semibold">{label}</span>
-                          <span className="text-2xl font-extrabold font-mono">{count}</span>
-                        </div>
+                        { t: "Importe", d: "Envie o relatório, a planilha ou o PDF. O sistema lê os vencimentos sozinho." },
+                        { t: "Corrija os valores", d: "Defina multa e juros ao dia. Os valores atualizados aparecem na hora." },
+                        { t: "Escolha o tom", d: "Amigável, neutro, firme ou notificação jurídica, conforme o atraso." },
+                        { t: "Dispare", d: "Envie pelo seu WhatsApp, com o boleto do Google Drive anexado, ou deixe automático." },
+                      ].map((p, i) => (
+                        <li key={p.t} className="px-5 py-4">
+                          <p className="text-[10px] font-mono text-emerald-400">{String(i + 1).padStart(2, "0")}</p>
+                          <p className="mt-1.5 text-xs font-bold text-white">{p.t}</p>
+                          <p className="mt-1 text-[11px] text-zinc-500 leading-relaxed">{p.d}</p>
+                        </li>
                       ))}
-                    </div>
-
-                    {isLoadingMetrics && !operationalMetrics && (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {[0, 1, 2].map((i) => (
-                          <div key={i} className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4 h-24 animate-pulse" />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* ── Resumo por Representante ──────────────────────────── */}
-                  <div className="bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl">
-                    <div>
-                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                        <Users className="w-4 h-4 text-emerald-400" /> Resumo por Representante
-                      </h4>
-                      <p className="text-xs text-zinc-500 mt-0.5">Distribuição de clientes e valores por responsável atribuído</p>
-                    </div>
-
-                    {(() => {
-                      // Group debtors by representativeId
-                      const repGroups = new Map<string, { rep: Representative | null; items: typeof debtors }>();
-
-                      // Add "Sem representante" group
-                      repGroups.set("__none__", { rep: null, items: [] });
-                      representatives.forEach(r => repGroups.set(r.id, { rep: r, items: [] }));
-
-                      debtors.forEach(d => {
-                        const key = d.representativeId && repGroups.has(d.representativeId) ? d.representativeId : "__none__";
-                        repGroups.get(key)!.items.push(d);
-                      });
-
-                      const rows = Array.from(repGroups.entries())
-                        .map(([key, { rep, items }]) => ({
-                          key,
-                          name: rep ? rep.name : "Sem representante",
-                          color: rep?.color ?? "text-zinc-400",
-                          total: items.length,
-                          vencidos: items.filter(d => cobraComoVencido(d.category)).length,
-                          aVencer: items.filter(d => d.category === "a_vencer").length,
-                          liquidados: items.filter(d => d.category === "liquidado").length,
-                          valorTotal: items.reduce((s, d) => s + (d.updatedValue || d.value), 0),
-                        }))
-                        .filter(r => r.total > 0)
-                        .sort((a, b) => b.total - a.total);
-
-                      if (rows.length === 0) {
-                        return (
-                          <p className="text-xs text-zinc-500 text-center py-4">Nenhum cliente cadastrado ainda.</p>
-                        );
-                      }
-
-                      return (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-xs text-left text-zinc-300">
-                            <thead className="text-[10px] uppercase font-mono tracking-wider bg-zinc-900/80 border-b border-zinc-800 text-zinc-400">
-                              <tr>
-                                <th className="px-4 py-3">Representante</th>
-                                <th className="px-4 py-3 text-center">Total clientes</th>
-                                <th className="px-4 py-3 text-center text-rose-400">Vencidos</th>
-                                <th className="px-4 py-3 text-center text-amber-400">A Vencer</th>
-                                <th className="px-4 py-3 text-center text-emerald-400">Liquidados</th>
-                                <th className="px-4 py-3 text-right">Valor Total</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-800">
-                              {rows.map(r => (
-                                <tr key={r.key} className="hover:bg-zinc-900/30 transition-colors">
-                                  <td className="px-4 py-3 font-semibold text-zinc-200">{r.name}</td>
-                                  <td className="px-4 py-3 text-center font-mono font-bold text-white">{r.total}</td>
-                                  <td className="px-4 py-3 text-center font-mono text-rose-400">{r.vencidos}</td>
-                                  <td className="px-4 py-3 text-center font-mono text-amber-400">{r.aVencer}</td>
-                                  <td className="px-4 py-3 text-center font-mono text-emerald-400">{r.liquidados}</td>
-                                  <td className="px-4 py-3 text-right font-mono font-bold text-emerald-300">{formatBRL(r.valorTotal)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  <SubscriptionStatusCard
-                    subscription={subscription}
-                    usage={usage}
-                    remainingCharges={remainingCharges}
-                    canSendCharge={canSendCharge}
-                    onManageSubscription={handleOpenBillingPortal}
-                  />
+                    </ol>
+                  </section>
 
                 </div>
-              )}
+                );
+              })()}
 
               {currentTab === "importar" && (
                 <div className="space-y-8">
