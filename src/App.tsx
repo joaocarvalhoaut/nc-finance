@@ -2257,7 +2257,7 @@ export default function App() {
                 <h2 className="text-lg font-bold text-white">
                   {currentTab === "cobrar"     && "Enviar Cobranças"}
                   {currentTab === "dashboard"  && "Dashboard & Métricas"}
-                  {currentTab === "importar"   && "Importação Avançada"}
+                  {currentTab === "importar"   && "Importar carteira"}
                   {currentTab === "visao_geral"&& "Carteira"}
                   {currentTab === "cobranca"   && "Cobrança — WhatsApp"}
                   {currentTab === "historico"  && "Histórico de Cobrança"}
@@ -2774,326 +2774,315 @@ export default function App() {
                 );
               })()}
 
-              {currentTab === "importar" && (
-                <div className="space-y-8">
-                  <div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-xs text-sky-200">
-                      Esta é a ferramenta avançada de extração (OCR, presets e texto bruto). Para o fluxo guiado de importação e envio, use a aba <strong>Cobrar</strong>.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setCurrentTab("cobrar")}
-                      className="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-300 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
-                    >
-                      Ir para Cobrar <ArrowRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    
-                    <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
-                          <Upload className="w-4 h-4 text-emerald-400" /> Upload ou Texto de Cobrança
-                        </h4>
-                        <p className="text-xs text-zinc-500 font-light">
-                          Cole faturas, relatórios de ERP ou selecione presets abaixo. O extrator local identifica clientes, vencimentos, valores e documentos automaticamente.
-                        </p>
-                      </div>
+              {currentTab === "importar" && (() => {
+                // ── Importar carteira ──────────────────────────────────────
+                // Mesmo padrão das telas novas: duas seções numeradas (arquivo →
+                // revisão), cantos retos, rótulos mono, cor só onde identifica.
+                const card = "bg-zinc-950 border border-zinc-800 rounded-xl";
+                const cabecalho = "flex items-start justify-between gap-3 px-5 py-4 border-b border-zinc-800/80";
+                const rotulo = "block text-[10px] font-mono uppercase tracking-widest text-zinc-500";
+                const campo = "w-full bg-zinc-900 border border-zinc-800 rounded-md px-2 py-1.5 text-white focus:outline-none focus:border-emerald-500 transition-colors";
+                const tipos = [
+                  { value: "vencidos",  label: "Vencidos",   cor: "#e11d48", description: "Cobrados com multa e juros" },
+                  { value: "a_vencer",  label: "A vencer",   cor: "#d97706", description: "Aviso preventivo, tom amigável" },
+                  { value: "recompra",  label: "Recompra",   cor: "#0284c7", description: "Cobrados como vencidos" },
+                  { value: "liquidado", label: "Liquidação", cor: "#059669", description: "Marca como pago, sem cobrança" },
+                ] as const;
+                const todosMarcados = extractedDebtors.length > 0 && extractedDebtors.every(d => extractedSelectedIds.has(d.id));
 
-                      <div className="p-4 rounded-2xl bg-zinc-950 border-2 border-dashed border-zinc-800 hover:border-emerald-500/30 transition-all text-center space-y-2 relative group">
-                        <div className="w-10 h-10 rounded-full bg-zinc-900/50 flex items-center justify-center text-zinc-400 mx-auto group-hover:bg-emerald-500/10 group-hover:text-emerald-400 transition-colors">
-                          <FileCheck2 className="w-5 h-5" />
-                        </div>
+                return (
+                <div className="space-y-4">
+                  <p className="text-xs text-zinc-500">
+                    Ferramenta completa de importação: PDF, Excel, CSV ou texto colado. Para o caminho guiado de
+                    importar e enviar, use{" "}
+                    <button type="button" onClick={() => setCurrentTab("cobrar")} className="text-zinc-300 hover:text-white underline underline-offset-2 cursor-pointer">
+                      Cobranças
+                    </button>.
+                  </p>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+                    {/* ── 1. Arquivo ──────────────────────────────────────────── */}
+                    <section className={`${card} lg:col-span-5`}>
+                      <header className={cabecalho}>
                         <div>
-                          <p className="text-xs font-semibold text-zinc-300">Arraste seus relatórios PDF, TXT ou EXCEL aqui</p>
-                          <p className="text-[10px] text-zinc-600">
-                            {isParsingImportFile
-                              ? "Lendo arquivo..."
-                              : importFileName
-                                ? `Arquivo carregado: ${importFileName}`
-                                : "O conteúdo real do arquivo terá prioridade sobre presets e textos de exemplo."}
-                          </p>
+                          <p className="text-[10px] font-mono text-emerald-400">01</p>
+                          <h4 className="mt-0.5 text-sm font-bold text-white">Arquivo</h4>
+                          <p className="text-xs text-zinc-500 mt-0.5">O sistema lê clientes, vencimentos, valores e documentos</p>
                         </div>
-                        <input 
-                          type="file" 
-                          accept=".pdf,.txt,.xlsx,.xls,.csv"
-                          onChange={handleImportFileChange}
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-1.5">
-                          <FileCheck2 className="w-3.5 h-3.5" />
-                          Tipo de arquivo
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {([
-                            { value: "vencidos",  label: "Vencidos",   description: "Títulos já vencidos — cobráveis com juros e multa", inactive: "border-zinc-700 text-zinc-400 hover:border-rose-500/50 hover:text-rose-300",    active: "border-rose-500 bg-rose-500/10 text-rose-300" },
-                            { value: "a_vencer",  label: "A vencer",   description: "Títulos a vencer — aviso preventivo amigável",       inactive: "border-zinc-700 text-zinc-400 hover:border-amber-500/50 hover:text-amber-300",   active: "border-amber-500 bg-amber-500/10 text-amber-300" },
-                            { value: "recompra",  label: "Recompra",   description: "Títulos recomprados — cobráveis com juros e multa", inactive: "border-zinc-700 text-zinc-400 hover:border-sky-500/50 hover:text-sky-300",     active: "border-sky-500 bg-sky-500/10 text-sky-300" },
-                            { value: "liquidado", label: "Liquidação", description: "Títulos pagos — reconciliação, SEM cobrança",        inactive: "border-zinc-700 text-zinc-400 hover:border-emerald-500/50 hover:text-emerald-300", active: "border-emerald-500 bg-emerald-500/10 text-emerald-300" },
-                          ] as const).map(cat => (
-                            <button
-                              key={cat.value}
-                              type="button"
-                              onClick={() => setImportCategory(cat.value)}
-                              className={`px-3 py-3 rounded-xl border transition-all text-left ${importCategory === cat.value ? cat.active : cat.inactive}`}
-                            >
-                              <div className="font-semibold text-sm">{cat.label}</div>
-                              <div className="text-[10px] opacity-70 mt-0.5 leading-tight">{cat.description}</div>
-                            </button>
-                          ))}
-                        </div>
-                        {importCategory === "liquidado" && (
-                          <div className="flex items-start gap-2 text-xs text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3">
-                            <HandCoins className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                            <span>Arquivo de <strong>liquidação</strong>: os registros identificados serão marcados como pagos na base consolidada. <strong>Nenhuma cobrança será enviada.</strong></span>
+                      </header>
+                      <div className="px-5 py-4 space-y-4">
+
+                        <div className={`relative rounded-lg border border-dashed transition-colors px-4 py-5 flex items-center gap-3 ${
+                          importFileName ? "border-emerald-500/40 bg-emerald-500/5" : "border-zinc-700 hover:border-zinc-500 bg-zinc-900/40"
+                        }`}>
+                          <div className="w-9 h-9 flex-shrink-0 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
+                            {isParsingImportFile ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                           </div>
-                        )}
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block">Dados textuais para OCR / Extração:</label>
-                        <textarea aria-label="Dados textuais para OCR / Extração:"
-                          rows={6}
-                          value={importText}
-                          onChange={(e) => setImportText(e.target.value)}
-                          placeholder="Cole as linhas financeiras cruas ou digite manualmente ex: Nome, Fatura, Telefone..."
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500 transition-all font-mono"
-                        />
-                      </div>
-
-                      {extractionAlert && (
-                        <div className="p-3 border text-xs rounded-xl flex items-start gap-2 bg-amber-500/10 border-amber-500/20 text-amber-400">
-                          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                          <span className="flex-1">{extractionAlert}</span>
-                        </div>
-                      )}
-
-                      <button
-                        onClick={handleAIExtract}
-                        disabled={isExtracting}
-                        className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all text-sm cursor-pointer disabled:cursor-not-allowed"
-                      >
-                        {isExtracting ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 animate-spin" /> Extraindo dados do documento…
-                          </>
-                        ) : (
-                          <>
-                            <Zap className="w-4 h-4" /> Extrair Dados do Documento
-                          </>
-                        )}
-                      </button>
-
-                    </div>
-
-                    <div className="lg:col-span-7 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl flex flex-col justify-between">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-white">Dados Financeiros Extraídos Revisáveis</h4>
-                        <p className="text-xs text-zinc-500 font-light">
-                          Os dados abaixo foram extraídos pelo pipeline local. Você pode editar os campos e optar por enviá-los de forma consolidada para a Visão Geral.
-                        </p>
-                      </div>
-
-                      {/* ── Post-import summary chips ──────────────────────── */}
-                      {lastExtractionResult && (
-                        <div className="flex flex-wrap gap-1.5 pt-0.5">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            <CheckCircle className="w-3 h-3" />
-                            {lastExtractionResult.records.length} registro{lastExtractionResult.records.length !== 1 ? "s" : ""}
-                          </span>
-                          {lowConfidenceIds.size > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const ids = [...lowConfidenceIds];
-                                if (!ids.length) return;
-                                // Cicla pelo próximo item de baixa confiança a cada clique
-                                lowConfCursorRef.current = lowConfCursorRef.current % ids.length;
-                                const targetId = ids[lowConfCursorRef.current];
-                                lowConfCursorRef.current++;
-                                // Flash
-                                setFlashedLowConfId(targetId);
-                                setTimeout(() => setFlashedLowConfId(null), 1200);
-                                // Scroll
-                                document.getElementById(`extracted-card-${targetId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-                              }}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors cursor-pointer"
-                            >
-                              <AlertTriangle className="w-3 h-3" />
-                              {lowConfidenceIds.size} para revisar
-                            </button>
-                          )}
-                          {lastExtractionResult.missingDocCount > 0 && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-500 border border-zinc-700">
-                              {lastExtractionResult.missingDocCount} doc gerado
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="flex-1 min-h-[300px] overflow-y-auto max-h-[420px] pr-1 space-y-4">
-                        {extractedDebtors.length === 0 ? (
-                          <div className="h-full flex flex-col items-center justify-center text-center p-8 border border-zinc-800 border-dashed rounded-2xl text-zinc-500">
-                            <SlidersHorizontal className="w-10 h-10 text-zinc-700 animate-pulse mb-2" />
-                            <p className="text-xs font-semibold">Nenhuma informação estruturada pendente</p>
-                            <p className="text-[10px] text-zinc-600 max-w-sm mt-1">Cole as faturas e clique no botão verde para ver os campos extraídos estruturados em tabela editável.</p>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-zinc-200 truncate">
+                              {isParsingImportFile ? "Lendo arquivo…" : importFileName ? importFileName : "Clique ou arraste o arquivo aqui"}
+                            </p>
+                            <p className="text-[11px] text-zinc-500">
+                              {importFileName ? "Clique para trocar o arquivo" : "PDF, Excel (XLS/XLSX), CSV ou TXT"}
+                            </p>
                           </div>
-                        ) : (
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-mono font-bold text-emerald-400">✓ {extractedDebtors.length} Registros Prontos para Revisão:</span>
-                              <div className="flex items-center gap-3">
-                                {extractedSelectedIds.size > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setExtractedDebtors(prev => prev.filter(d => !extractedSelectedIds.has(d.id)));
-                                      setExtractedSelectedIds(new Set());
-                                    }}
-                                    className="flex items-center gap-1.5 text-[10px] text-rose-400 hover:text-rose-300 transition-colors font-semibold"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" /> Remover {extractedSelectedIds.size} selecionado{extractedSelectedIds.size !== 1 ? "s" : ""}
-                                  </button>
-                                )}
+                          <input
+                            type="file"
+                            accept=".pdf,.txt,.xlsx,.xls,.csv"
+                            onChange={handleImportFileChange}
+                            aria-label="Escolher arquivo para importar"
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                          />
+                        </div>
+
+                        <div>
+                          <span className={`${rotulo} mb-1.5`}>O que tem no arquivo</span>
+                          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Tipo de arquivo">
+                            {tipos.map(cat => {
+                              const ativo = importCategory === cat.value;
+                              return (
                                 <button
+                                  key={cat.value}
                                   type="button"
-                                  onClick={() => {
-                                    const allSelected = extractedDebtors.every(d => extractedSelectedIds.has(d.id));
-                                    setExtractedSelectedIds(allSelected ? new Set() : new Set(extractedDebtors.map(d => d.id)));
-                                  }}
-                                  className="flex items-center gap-1.5 text-[10px] text-zinc-400 hover:text-emerald-400 transition-colors font-semibold"
+                                  role="radio"
+                                  aria-checked={ativo}
+                                  onClick={() => setImportCategory(cat.value)}
+                                  className={`px-3 py-2.5 rounded-lg border text-left transition-colors cursor-pointer ${
+                                    ativo ? "border-zinc-500 bg-zinc-900" : "border-zinc-800 hover:border-zinc-700"
+                                  }`}
                                 >
-                                  {extractedDebtors.every(d => extractedSelectedIds.has(d.id))
-                                    ? <><CheckSquare className="w-3.5 h-3.5 text-emerald-400" /> Desmarcar todos</>
-                                    : <><Square className="w-3.5 h-3.5" /> Selecionar todos</>
-                                  }
+                                  <span className="flex items-center gap-2 text-xs font-semibold text-white">
+                                    <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: cat.cor }} />
+                                    {cat.label}
+                                  </span>
+                                  <span className="block mt-0.5 text-[10px] text-zinc-500 leading-snug">{cat.description}</span>
                                 </button>
-                              </div>
-                            </div>
+                              );
+                            })}
+                          </div>
+                          {importCategory === "liquidado" && (
+                            <p className="mt-2 flex items-start gap-2 text-[11px] text-emerald-300 bg-emerald-500/5 border border-emerald-500/20 rounded-lg px-3 py-2">
+                              <HandCoins className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
+                              <span>Os títulos encontrados serão marcados como pagos na carteira. Nenhuma cobrança é enviada.</span>
+                            </p>
+                          )}
+                        </div>
 
-                            {extractedDebtors.map((item, index) => (
-                              <div key={item.id} id={`extracted-card-${item.id}`} className={`p-3 bg-zinc-950 border rounded-xl space-y-2 relative group transition-all duration-300 ${extractedSelectedIds.has(item.id) ? "border-emerald-500/50" : flashedLowConfId === item.id ? "border-amber-400 bg-amber-500/15 shadow-[0_0_12px_rgba(251,191,36,0.3)]" : lowConfidenceIds.has(item.id) ? "border-amber-500/50 bg-amber-500/5" : "border-zinc-800"}`}>
-                                <div className="flex items-center gap-2 absolute top-2.5 left-2.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => setExtractedSelectedIds(prev => {
-                                      const next = new Set(prev);
-                                      next.has(item.id) ? next.delete(item.id) : next.add(item.id);
-                                      return next;
-                                    })}
-                                    className="text-zinc-500 hover:text-emerald-400 transition-colors"
-                                    title="Selecionar para importar"
-                                  >
-                                    {extractedSelectedIds.has(item.id)
-                                      ? <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
-                                      : <Square className="w-3.5 h-3.5" />}
-                                  </button>
-                                </div>
-                                <button
-                                  onClick={() => removeExtractedRow(item.id)}
-                                  className="absolute top-2.5 right-2.5 text-zinc-600 hover:text-rose-400 p-1 rounded transition-colors"
-                                  title="Ignorar este registro"
+                        <div>
+                          <label htmlFor="importar-texto" className={`${rotulo} mb-1.5`}>Ou cole o texto</label>
+                          <textarea
+                            id="importar-texto"
+                            rows={4}
+                            value={importText}
+                            onChange={(e) => setImportText(e.target.value)}
+                            placeholder="Linhas do relatório: cliente, documento, vencimento, valor, telefone…"
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors font-mono"
+                          />
+                        </div>
+
+                        {extractionAlert && (
+                          <p className="text-[11px] rounded-lg flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 text-amber-300 px-3 py-2">
+                            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
+                            <span className="flex-1">{extractionAlert}</span>
+                          </p>
+                        )}
+
+                        <button
+                          onClick={handleAIExtract}
+                          disabled={isExtracting}
+                          className="w-full py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                        >
+                          {isExtracting
+                            ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Lendo o documento…</>
+                            : <><Zap className="w-3.5 h-3.5" /> Ler dados do documento</>}
+                        </button>
+                      </div>
+                    </section>
+
+                    {/* ── 2. Revisar e enviar ─────────────────────────────────── */}
+                    <section className={`${card} lg:col-span-7 flex flex-col`}>
+                      <header className={cabecalho}>
+                        <div>
+                          <p className="text-[10px] font-mono text-emerald-400">02</p>
+                          <h4 className="mt-0.5 text-sm font-bold text-white">Revisar e enviar</h4>
+                          <p className="text-xs text-zinc-500 mt-0.5">Corrija o que precisar antes de mandar para a carteira</p>
+                        </div>
+                        {lastExtractionResult && (
+                          <div className="flex flex-wrap justify-end gap-1.5 flex-shrink-0">
+                            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border text-zinc-300 border-zinc-700 bg-zinc-900">
+                              {lastExtractionResult.records.length} registro{lastExtractionResult.records.length !== 1 ? "s" : ""}
+                            </span>
+                            {lowConfidenceIds.size > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const ids = [...lowConfidenceIds];
+                                  if (!ids.length) return;
+                                  // Cicla pelo próximo item de baixa confiança a cada clique
+                                  lowConfCursorRef.current = lowConfCursorRef.current % ids.length;
+                                  const targetId = ids[lowConfCursorRef.current];
+                                  lowConfCursorRef.current++;
+                                  setFlashedLowConfId(targetId);
+                                  setTimeout(() => setFlashedLowConfId(null), 1200);
+                                  document.getElementById(`extracted-card-${targetId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                                }}
+                                className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border text-amber-300 border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 transition-colors cursor-pointer inline-flex items-center gap-1"
+                                title="Ir para o próximo registro a revisar"
+                              >
+                                <AlertTriangle className="w-3 h-3" /> {lowConfidenceIds.size} para revisar
+                              </button>
+                            )}
+                            {lastExtractionResult.missingDocCount > 0 && (
+                              <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border text-zinc-500 border-zinc-800" title="Registros sem número de documento: o sistema gerou um">
+                                {lastExtractionResult.missingDocCount} doc. gerado{lastExtractionResult.missingDocCount !== 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </header>
+
+                      {extractedDebtors.length === 0 ? (
+                        <div className="flex-1 min-h-[320px] flex flex-col items-center justify-center text-center px-8 py-12">
+                          <SlidersHorizontal className="w-8 h-8 text-zinc-700 mb-3" />
+                          <p className="text-xs font-semibold text-zinc-300">Nada para revisar ainda</p>
+                          <p className="text-[11px] text-zinc-500 max-w-xs mt-1">Escolha um arquivo ou cole o texto e clique em "Ler dados do documento". Os registros aparecem aqui para conferir.</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between gap-3 px-5 py-2.5 border-b border-zinc-900 text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() => setExtractedSelectedIds(todosMarcados ? new Set() : new Set(extractedDebtors.map(d => d.id)))}
+                              className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                            >
+                              {todosMarcados ? <CheckSquare className="w-3.5 h-3.5 text-emerald-400" /> : <Square className="w-3.5 h-3.5" />}
+                              {todosMarcados ? "Desmarcar todos" : "Selecionar todos"}
+                            </button>
+                            {extractedSelectedIds.size > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setExtractedDebtors(prev => prev.filter(d => !extractedSelectedIds.has(d.id)));
+                                  setExtractedSelectedIds(new Set());
+                                }}
+                                className="flex items-center gap-1.5 text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> Remover {extractedSelectedIds.size} selecionado{extractedSelectedIds.size !== 1 ? "s" : ""}
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="max-h-[480px] overflow-y-auto divide-y divide-zinc-900">
+                            {extractedDebtors.map((item) => {
+                              const marcado = extractedSelectedIds.has(item.id);
+                              const revisar = lowConfidenceIds.has(item.id);
+                              return (
+                                <div
+                                  key={item.id}
+                                  id={`extracted-card-${item.id}`}
+                                  className={`px-5 py-3 space-y-2 transition-colors duration-300 ${
+                                    flashedLowConfId === item.id ? "bg-amber-500/15" : marcado ? "bg-emerald-500/5" : revisar ? "bg-amber-500/5" : ""
+                                  }`}
                                 >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-
-                                {lowConfidenceIds.has(item.id) && (
-                                  <div className="absolute top-2.5 right-8 flex items-center gap-1 text-[9px] font-mono text-amber-400">
-                                    <AlertTriangle className="w-3 h-3" />
-                                    <span>Revisar</span>
-                                  </div>
-                                )}
-
-                                <div className="text-xs pt-5">
-                                  <div>
-                                    <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Cliente</label>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setExtractedSelectedIds(prev => {
+                                        const next = new Set(prev);
+                                        next.has(item.id) ? next.delete(item.id) : next.add(item.id);
+                                        return next;
+                                      })}
+                                      className="text-zinc-500 hover:text-emerald-400 transition-colors cursor-pointer flex-shrink-0"
+                                      title="Selecionar"
+                                      aria-pressed={marcado}
+                                    >
+                                      {marcado ? <CheckSquare className="w-3.5 h-3.5 text-emerald-400" /> : <Square className="w-3.5 h-3.5" />}
+                                    </button>
                                     <input aria-label="Cliente"
                                       type="text"
                                       value={item.client}
                                       onChange={(e) => updateExtractedField(item.id, "client", e.target.value)}
-                                      className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white focus:outline-none focus:border-emerald-500"
+                                      className={`${campo} text-xs font-semibold`}
                                     />
+                                    {revisar && (
+                                      <span className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-amber-300" title="A leitura pode ter errado algum campo">
+                                        <AlertTriangle className="w-3 h-3" /> Revisar
+                                      </span>
+                                    )}
+                                    <button
+                                      onClick={() => removeExtractedRow(item.id)}
+                                      className="flex-shrink-0 p-1 rounded text-zinc-600 hover:text-rose-400 transition-colors cursor-pointer"
+                                      title="Ignorar este registro"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
                                   </div>
-                                </div>
 
-                                <div className="grid grid-cols-4 gap-2 text-[11px]">
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Documento</label>
-                                    <input aria-label="Documento"
-                                      type="text"
-                                      value={item.document}
-                                      onChange={(e) => updateExtractedField(item.id, "document", e.target.value)}
-                                      className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white text-center focus:outline-none"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Vencimento</label>
-                                    <input aria-label="Vencimento"
-                                      type="text"
-                                      value={item.dueDate}
-                                      onChange={(e) => updateExtractedField(item.id, "dueDate", e.target.value)}
-                                      className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white text-center focus:outline-none"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Valor (R$)</label>
-                                    <input aria-label="Valor (R$)"
-                                      type="number"
-                                      value={item.value}
-                                      onChange={(e) => updateExtractedField(item.id, "value", Number(e.target.value))}
-                                      className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white focus:outline-none"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Celular (WhatsApp)</label>
-                                    <input aria-label="Celular (WhatsApp)"
-                                      type="text"
-                                      value={item.phone}
-                                      onChange={(e) => updateExtractedField(item.id, "phone", e.target.value)}
-                                      className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white focus:outline-none font-mono"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">Banco</label>
-                                    <input aria-label="Banco"
-                                      type="text"
-                                      value={item.bank || ""}
-                                      onChange={(e) => updateExtractedField(item.id, "bank", e.target.value)}
-                                      placeholder="—"
-                                      className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-white focus:outline-none"
-                                    />
+                                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px] pl-5">
+                                    <div>
+                                      <label className={`${rotulo} mb-0.5`}>Documento</label>
+                                      <input aria-label="Documento" type="text" value={item.document}
+                                        onChange={(e) => updateExtractedField(item.id, "document", e.target.value)}
+                                        className={`${campo} font-mono`} />
+                                    </div>
+                                    <div>
+                                      <label className={`${rotulo} mb-0.5`}>Vencimento</label>
+                                      <input aria-label="Vencimento" type="text" value={item.dueDate}
+                                        onChange={(e) => updateExtractedField(item.id, "dueDate", e.target.value)}
+                                        className={`${campo} font-mono`} />
+                                    </div>
+                                    <div>
+                                      <label className={`${rotulo} mb-0.5`}>Valor (R$)</label>
+                                      <input aria-label="Valor (R$)" type="number" value={item.value}
+                                        onChange={(e) => updateExtractedField(item.id, "value", Number(e.target.value))}
+                                        className={`${campo} font-mono`} />
+                                    </div>
+                                    <div>
+                                      <label className={`${rotulo} mb-0.5`}>WhatsApp</label>
+                                      <input aria-label="Celular (WhatsApp)" type="text" value={item.phone}
+                                        onChange={(e) => updateExtractedField(item.id, "phone", e.target.value)}
+                                        className={`${campo} font-mono`} />
+                                    </div>
+                                    <div>
+                                      <label className={`${rotulo} mb-0.5`}>Banco</label>
+                                      <input aria-label="Banco" type="text" value={item.bank || ""} placeholder="—"
+                                        onChange={(e) => updateExtractedField(item.id, "bank", e.target.value)}
+                                        className={campo} />
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
-                        )}
-                      </div>
+                        </>
+                      )}
 
-                      <div className="pt-4 border-t border-zinc-900 flex items-center justify-between gap-4 flex-wrap">
-                        <span className="text-zinc-500 text-xs">
-                          {extractedSelectedIds.size > 0
-                            ? `${extractedSelectedIds.size} de ${extractedDebtors.length} selecionado(s)`
-                            : "Aguardando consolidação do operador."}
+                      <footer className="mt-auto px-5 py-3 border-t border-zinc-800/80 flex items-center justify-between gap-4 flex-wrap">
+                        <span className="text-[11px] text-zinc-500">
+                          {extractedDebtors.length === 0
+                            ? "Nenhum registro lido"
+                            : extractedSelectedIds.size > 0
+                              ? `${extractedSelectedIds.size} de ${extractedDebtors.length} selecionado${extractedSelectedIds.size !== 1 ? "s" : ""}`
+                              : `${extractedDebtors.length} registro${extractedDebtors.length !== 1 ? "s" : ""} para enviar`}
                         </span>
                         <button
                           onClick={() => void sendExtractedToOverview()}
                           disabled={extractedDebtors.length === 0}
-                          className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold flex items-center gap-2 shadow disabled:opacity-50 transition-all text-xs cursor-pointer"
+                          className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                         >
-                          <CheckCircle className="w-4 h-4" />
+                          <CheckCircle className="w-3.5 h-3.5" />
                           {extractedSelectedIds.size > 0
-                            ? `Enviar ${extractedSelectedIds.size} selecionado(s) para a Visão Geral`
-                            : "Enviar todos para a Visão Geral"}
+                            ? `Enviar ${extractedSelectedIds.size} para a carteira`
+                            : "Enviar todos para a carteira"}
                         </button>
-                      </div>
-                    </div>
+                      </footer>
+                    </section>
 
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               {currentTab === "visao_geral" && (
                 <>
