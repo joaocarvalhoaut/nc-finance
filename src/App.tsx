@@ -2344,12 +2344,13 @@ export default function App() {
 
               {/* ── Tab: Cobrar (novo fluxo simplificado) ──────────────────── */}
               {currentTab === "cobrar" && userId && (
-                <div className="space-y-6">
-                  <p className="text-sm text-zinc-400">
-                    Importe sua planilha, revise os devedores e envie as mensagens em segundos.
+                <div className="space-y-4 max-w-4xl mx-auto">
+                  <p className="text-xs text-zinc-500">
+                    Importe a planilha, revise os devedores e envie as cobranças pelo seu WhatsApp.
                   </p>
                   <ClientDashboard
                     userId={userId}
+                    onGoToSettings={() => setCurrentTab("minha_conta")}
                     globalFinePct={globalFinePct}
                     globalInterestDayPct={globalInterestDayPct}
                     knownContacts={contactsByKey}

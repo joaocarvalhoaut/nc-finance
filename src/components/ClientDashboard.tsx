@@ -65,36 +65,15 @@ const TONE_OPTIONS: { value: MessageTone; label: string; description: string }[]
 
 // ─── Import category ──────────────────────────────────────────────────────────
 
-type ImportCategory = "vencidos" | "a_vencer" | "liquidado";
+type ImportCategory = "vencidos" | "a_vencer" | "recompra" | "liquidado";
 
-const CATEGORY_OPTIONS: {
-  value: ImportCategory;
-  label: string;
-  description: string;
-  color: string;
-  activeColor: string;
-}[] = [
-  {
-    value: "vencidos",
-    label: "Vencidos",
-    description: "Títulos já vencidos — cobráveis com juros e multa",
-    color: "border-zinc-700 text-zinc-400 hover:border-rose-500/50 hover:text-rose-300",
-    activeColor: "border-rose-500 bg-rose-500/10 text-rose-300 font-semibold",
-  },
-  {
-    value: "a_vencer",
-    label: "A vencer",
-    description: "Títulos a vencer — aviso preventivo amigável",
-    color: "border-zinc-700 text-zinc-400 hover:border-amber-500/50 hover:text-amber-300",
-    activeColor: "border-amber-500 bg-amber-500/10 text-amber-300 font-semibold",
-  },
-  {
-    value: "liquidado",
-    label: "Liquidação",
-    description: "Títulos pagos — reconciliação, SEM cobrança",
-    color: "border-zinc-700 text-zinc-400 hover:border-emerald-500/50 hover:text-emerald-300",
-    activeColor: "border-emerald-500 bg-emerald-500/10 text-emerald-300 font-semibold",
-  },
+// Cor só no marcador ao lado do nome (paleta validada para fundo escuro, a
+// mesma do Dashboard e da Importação); o selecionado se destaca pela borda.
+const CATEGORY_OPTIONS: { value: ImportCategory; label: string; description: string; cor: string }[] = [
+  { value: "vencidos",  label: "Vencidos",   description: "Cobrados com multa e juros",     cor: "#e11d48" },
+  { value: "a_vencer",  label: "A vencer",   description: "Aviso preventivo, tom amigável", cor: "#d97706" },
+  { value: "recompra",  label: "Recompra",   description: "Cobrados como vencidos",         cor: "#0284c7" },
+  { value: "liquidado", label: "Liquidação", description: "Marca como pago, sem cobrança",  cor: "#059669" },
 ];
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -114,6 +93,8 @@ interface ClientDashboardProps {
    * O pai deve recarregar os devedores do DB ao receber esta chamada.
    */
   onDebtorsImported?: () => void;
+  /** Abre Configurações, onde o cliente conecta o próprio WhatsApp. */
+  onGoToSettings?: () => void;
 }
 
 // ─── Step type ────────────────────────────────────────────────────────────────
@@ -130,6 +111,7 @@ export default function ClientDashboard({
   onLearnContacts,
   onBatchSent,
   onDebtorsImported,
+  onGoToSettings,
 }: ClientDashboardProps) {
   // ── WhatsApp status ──────────────────────────────────────────────────────────
   const [waConnected, setWaConnected]   = useState<boolean | null>(null);
@@ -587,152 +569,150 @@ export default function ClientDashboard({
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
 
-      {/* ── Top status bar ─────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      {/* ── Etapas + status do WhatsApp ───────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <ol aria-label="Etapas da cobrança" className="flex flex-wrap items-center gap-1 text-xs">
+          {([["upload", "Importar"], ["preview", "Revisar"], ["sending", "Enviar"], ["done", "Acompanhar"]] as const).map(([id, label], i) => {
+            const atual = step === id || (id === "sending" && step === "reconciling") || (id === "done" && step === "reconciled");
+            return (
+              <li key={id} aria-current={atual ? "step" : undefined}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md ${atual ? "bg-zinc-900 text-white" : "text-zinc-500"}`}>
+                <span className={`font-mono text-[10px] ${atual ? "text-emerald-400" : "text-zinc-600"}`}>{String(i + 1).padStart(2, "0")}</span>
+                {label}
+              </li>
+            );
+          })}
+        </ol>
+
+        <div className="flex items-center gap-2">
+          {debtors.length > 0 && step === "preview" && (
+            <span className="text-xs text-zinc-500 mr-1">
+              <span className="font-mono text-white">{selectedIds.size}</span> selecionado{selectedIds.size !== 1 ? "s" : ""}
+            </span>
+          )}
           {waChecking ? (
-            <span className="flex items-center gap-1.5 text-sm text-zinc-400">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Verificando…
+            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border text-zinc-400 border-zinc-700 bg-zinc-900 inline-flex items-center gap-1.5">
+              <Loader2 className="w-3 h-3 animate-spin" /> Verificando
             </span>
           ) : waConnected === true ? (
-            <span className="flex items-center gap-1.5 text-sm text-emerald-400 font-medium">
-              <Wifi className="w-4 h-4" />
-              WhatsApp ativo
+            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border text-emerald-300 border-emerald-500/30 bg-emerald-500/10 inline-flex items-center gap-1.5">
+              <Wifi className="w-3 h-3" /> WhatsApp conectado
             </span>
           ) : waConnected === false ? (
-            <span className="flex items-center gap-1.5 text-sm text-rose-400 font-medium">
-              <WifiOff className="w-4 h-4" />
-              Canal indisponível — contate o suporte
+            <span className="inline-flex items-center gap-2">
+              <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border text-rose-300 border-rose-500/30 bg-rose-500/10 inline-flex items-center gap-1.5">
+                <WifiOff className="w-3 h-3" /> WhatsApp não conectado
+              </span>
+              {onGoToSettings && (
+                <button type="button" onClick={onGoToSettings} className="text-xs text-zinc-300 hover:text-white underline underline-offset-2 cursor-pointer">
+                  Conectar
+                </button>
+              )}
             </span>
           ) : null}
-
           <button
             onClick={() => void refreshWaStatus()}
             disabled={waChecking}
-            className="text-zinc-500 hover:text-zinc-300 transition-colors disabled:opacity-40"
+            className="p-1 text-zinc-500 hover:text-zinc-300 transition-colors disabled:opacity-40 cursor-pointer"
             title="Verificar status"
+            aria-label="Verificar status do WhatsApp"
           >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
         </div>
-
-        <div className="flex items-center gap-4 text-sm text-zinc-400">
-          {debtors.length > 0 && step === "preview" && (
-            <span className="flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-zinc-500" />
-              <span className="font-semibold text-white">{selectedIds.size}</span> selecionados
-            </span>
-          )}
-
-        </div>
       </div>
 
-
       {/* ── Step: Upload ───────────────────────────────────────────────────── */}
-      <ol aria-label="Etapas da cobrança" className="flex flex-wrap gap-3 text-sm text-zinc-300 mb-4">{[["upload", "1. Importar"], ["preview", "2. Revisar e confirmar"], ["sending", "3. Enviar"], ["done", "4. Acompanhar"]].map(([id, label]) => <li key={id} aria-current={step === id ? "step" : undefined} className={step === id ? "text-emerald-400 font-semibold" : ""}>{label}</li>)}</ol>
       {step === "upload" && (
         <div className="space-y-4">
+          <section className="bg-zinc-950 border border-zinc-800 rounded-xl">
+            <div className="px-5 py-4 border-b border-zinc-800/80">
+              <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2">O que tem no arquivo</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-label="Tipo de arquivo">
+                {CATEGORY_OPTIONS.map(cat => {
+                  const ativo = importCategory === cat.value;
+                  return (
+                    <button
+                      key={cat.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={ativo}
+                      onClick={() => setImportCategory(cat.value)}
+                      className={`px-3 py-2.5 rounded-lg border text-left transition-colors cursor-pointer ${
+                        ativo ? "border-zinc-500 bg-zinc-900" : "border-zinc-800 hover:border-zinc-700"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 text-xs font-semibold text-white">
+                        <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: cat.cor }} />
+                        {cat.label}
+                      </span>
+                      <span className="block mt-0.5 text-[10px] text-zinc-500 leading-snug">{cat.description}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-          {/* Category selector */}
-          <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4">
-            <p className="text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-zinc-400" />
-              Tipo de arquivo
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {CATEGORY_OPTIONS.map(cat => (
-                <button
-                  key={cat.value}
-                  onClick={() => setImportCategory(cat.value)}
-                  className={`px-3 py-3 rounded-xl border text-sm transition-all text-left
-                    ${importCategory === cat.value ? cat.activeColor : cat.color}
-                  `}
-                >
-                  <div className="font-semibold text-sm">{cat.label}</div>
-                  <div className="text-[10px] opacity-70 mt-0.5 leading-tight">{cat.description}</div>
-                </button>
-              ))}
+              {isLiquidacao && (
+                <p className="mt-3 flex items-start gap-2 text-[11px] text-emerald-300 bg-emerald-500/5 border border-emerald-500/20 rounded-lg px-3 py-2">
+                  <HandCoins className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
+                  <span>Os títulos encontrados serão marcados como pagos na carteira. Nenhuma cobrança é enviada.</span>
+                </p>
+              )}
             </div>
 
-            {/* Liquidação warning */}
-            {isLiquidacao && (
-              <div className="mt-3 flex items-start gap-2 text-xs text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3">
-                <HandCoins className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>
-                  Arquivo de <strong>liquidação</strong>: os registros identificados serão marcados como
-                  pagos na base consolidada. <strong>Nenhuma cobrança será enviada.</strong>
-                </span>
+            <div className="p-5">
+              <div
+                onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleFileDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`flex flex-col items-center justify-center gap-3 border border-dashed rounded-lg px-6 py-12 cursor-pointer transition-colors select-none ${
+                  isDragging ? "border-emerald-400 bg-emerald-500/5" : "border-zinc-700 hover:border-zinc-500 bg-zinc-900/30"
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv,.pdf,.txt"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+                    <p className="text-sm font-semibold text-white">{processingMsg}</p>
+                    <p className="text-xs text-zinc-500">Aguarde um momento…</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-11 h-11 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                      <Upload className="w-5 h-5 text-zinc-400" />
+                    </div>
+                    <div className="text-center space-y-1">
+                      <p className="text-sm font-semibold text-white">
+                        {isLiquidacao ? "Arquivo com os pagamentos recebidos" : "Arraste o arquivo ou clique para escolher"}
+                      </p>
+                      <p className="text-xs text-zinc-500">
+                        {isLiquidacao
+                          ? "Planilha ou PDF com os títulos pagos — conferido com a carteira"
+                          : "Planilha Excel, CSV, PDF ou TXT com os dados dos devedores"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-mono">
+                      {[".xlsx", ".xls", ".csv", ".pdf", ".txt"].map(ext => (
+                        <span key={ext} className="px-1.5 py-0.5 border border-zinc-800 rounded">{ext}</span>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
-            )}
-          </div>
-
-          {/* Drop zone */}
-          <div
-            onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleFileDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`
-              relative flex flex-col items-center justify-center gap-4
-              border-2 border-dashed rounded-3xl p-12 cursor-pointer
-              transition-all duration-200 select-none
-              ${isDragging
-                ? "border-emerald-400 bg-emerald-500/10 scale-[1.01]"
-                : "border-zinc-700 bg-zinc-900/40 hover:border-emerald-500/60 hover:bg-zinc-900/60"
-              }
-            `}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls,.csv,.pdf,.txt"
-              className="hidden"
-              onChange={handleFileSelect}
-            />
-
-            {isProcessing ? (
-              <>
-                <Loader2 className="w-12 h-12 text-emerald-400 animate-spin" />
-                <p className="text-base font-medium text-white">{processingMsg}</p>
-                <p className="text-sm text-zinc-400">Aguarde um momento…</p>
-              </>
-            ) : (
-              <>
-                <div className={`w-16 h-16 rounded-2xl border flex items-center justify-center
-                  ${isLiquidacao
-                    ? "bg-emerald-500/10 border-emerald-500/20"
-                    : "bg-zinc-800/60 border-zinc-700"
-                  }`}
-                >
-                  <Upload className={`w-8 h-8 ${isLiquidacao ? "text-emerald-400" : "text-zinc-400"}`} />
-                </div>
-                <div className="text-center space-y-1">
-                  <p className="text-lg font-semibold text-white">
-                    {isLiquidacao
-                      ? "Arquivo de liquidação (pagamentos realizados)"
-                      : "Arraste o arquivo aqui ou clique para selecionar"
-                    }
-                  </p>
-                  <p className="text-sm text-zinc-400">
-                    {isLiquidacao
-                      ? "Planilha ou PDF com títulos liquidados — será reconciliado com a base"
-                      : "Planilha Excel, CSV, PDF ou TXT com os dados dos devedores"
-                    }
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono">
-                  {[".xlsx", ".xls", ".csv", ".pdf", ".txt"].map(ext => (
-                    <span key={ext} className="px-2 py-0.5 bg-zinc-800 rounded-md">{ext}</span>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+            </div>
+          </section>
 
           {extractError && (
-            <div className="flex items-start gap-3 bg-red-950/40 border border-red-500/30 rounded-2xl p-4 text-sm text-red-400">
-              <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2 bg-rose-500/10 border border-rose-500/20 rounded-lg px-4 py-3 text-xs text-rose-300">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-px" />
               <span>{extractError}</span>
             </div>
           )}
@@ -743,28 +723,19 @@ export default function ClientDashboard({
       {step === "preview" && (
         <div className="space-y-5">
 
-          {/* Category badge */}
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm
-            ${catOption.activeColor}`}
-          >
-            {isLiquidacao
-              ? <CheckCircle className="w-4 h-4" />
-              : importCategory === "vencidos"
-              ? <AlertTriangle className="w-4 h-4" />
-              : <Clock className="w-4 h-4" />
-            }
-            <span className="font-semibold">{catOption.label}</span>
-            <span className="opacity-70 text-xs">— {catOption.description}</span>
+          {/* Tipo do arquivo importado */}
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 rounded-lg border border-zinc-800 bg-zinc-950 text-xs">
+            <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: catOption.cor }} />
+            <span className="font-semibold text-white">{catOption.label}</span>
+            <span className="text-zinc-500">· {catOption.description}</span>
             {isLiquidacao && (
-              <span className="ml-auto text-xs font-bold text-emerald-400">
-                SEM envio de cobrança
-              </span>
+              <span className="ml-auto text-[10px] font-mono uppercase tracking-wider text-emerald-300">Sem envio de cobrança</span>
             )}
           </div>
 
           {/* Sugestão: clientes já cadastrados com telefone salvo */}
           {phoneSuggestIds.size > 0 && !phoneSuggestDismissed && (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/10">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 rounded-lg border border-emerald-500/25 bg-emerald-500/5">
               <UserCheck className="w-5 h-5 text-emerald-400 flex-shrink-0" />
               <p className="text-sm text-emerald-100 flex-1">
                 {phoneSuggestIds.size === 1
@@ -793,26 +764,20 @@ export default function ClientDashboard({
 
           {/* Tone selector — apenas para cobráveis */}
           {!isLiquidacao && (
-            <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4">
-              <p className="text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-emerald-400" />
-                Tom da mensagem
-              </p>
+            <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+              <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2">Tom da mensagem</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {TONE_OPTIONS.map(t => (
                   <button
                     key={t.value}
                     onClick={() => setSelectedTone(t.value)}
-                    className={`
-                      text-left px-3 py-2.5 rounded-xl border text-sm transition-all
-                      ${selectedTone === t.value
-                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-300 font-semibold"
-                        : "border-zinc-700 bg-zinc-900/50 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
-                      }
-                    `}
-                    title={t.description}
+                    aria-pressed={selectedTone === t.value}
+                    className={`text-left px-3 py-2.5 rounded-lg border transition-colors cursor-pointer ${
+                      selectedTone === t.value ? "border-zinc-500 bg-zinc-900" : "border-zinc-800 hover:border-zinc-700"
+                    }`}
                   >
-                    {t.label}
+                    <span className={`block text-xs font-semibold ${selectedTone === t.value ? "text-white" : "text-zinc-300"}`}>{t.label}</span>
+                    <span className="block mt-0.5 text-[10px] text-zinc-500 leading-snug">{t.description}</span>
                   </button>
                 ))}
               </div>
@@ -820,7 +785,7 @@ export default function ClientDashboard({
           )}
 
           {/* Records table */}
-          <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
               <div className="flex items-center gap-3">
                 <button
@@ -982,7 +947,7 @@ export default function ClientDashboard({
 
           {/* Reconcile error */}
           {reconcileError && (
-            <div className="flex items-start gap-3 bg-red-950/40 border border-red-500/30 rounded-2xl p-4 text-sm text-red-400">
+            <div className="flex items-start gap-2 bg-rose-500/10 border border-rose-500/20 rounded-lg px-4 py-3 text-xs text-rose-300">
               <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
               <span>{reconcileError}</span>
             </div>
@@ -992,7 +957,7 @@ export default function ClientDashboard({
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={handleReset}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 text-sm font-medium transition-colors"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 text-xs font-semibold transition-colors cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />
               Importar outro arquivo
@@ -1003,7 +968,7 @@ export default function ClientDashboard({
               <button
                 onClick={() => void handleReconcile()}
                 disabled={selectedIds.size === 0 || isReconciling}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-base transition-colors shadow-lg shadow-emerald-900/40"
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold text-sm transition-colors cursor-pointer"
               >
                 {isReconciling
                   ? <><Loader2 className="w-5 h-5 animate-spin" /> Reconciliando…</>
@@ -1015,7 +980,7 @@ export default function ClientDashboard({
               <button
                 onClick={handleSendClick}
                 disabled={selectedIds.size === 0 || waConnected === false}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-base transition-colors shadow-lg shadow-emerald-900/40"
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold text-sm transition-colors cursor-pointer"
               >
                 <Send className="w-5 h-5" />
                 Enviar cobranças
@@ -1025,9 +990,14 @@ export default function ClientDashboard({
           </div>
 
           {!isLiquidacao && waConnected === false && (
-            <p className="text-sm text-rose-400 flex items-center gap-2">
-              <WifiOff className="w-4 h-4" />
-              Canal de envio indisponível no momento. Contate o suporte para reativar.
+            <p className="text-xs text-rose-300 flex flex-wrap items-center gap-2">
+              <WifiOff className="w-3.5 h-3.5" />
+              Seu WhatsApp não está conectado — conecte o número para enviar.
+              {onGoToSettings && (
+                <button type="button" onClick={onGoToSettings} className="text-zinc-200 hover:text-white underline underline-offset-2 cursor-pointer">
+                  Ir para Configurações
+                </button>
+              )}
             </p>
           )}
         </div>
@@ -1049,7 +1019,7 @@ export default function ClientDashboard({
       {/* ── Step: Reconciled ──────────────────────────────────────────────────── */}
       {step === "reconciled" && (
         <div className="space-y-5">
-          <div className="rounded-2xl border bg-emerald-950/30 border-emerald-500/30 p-6">
+          <div className="rounded-xl border bg-zinc-950 border-emerald-500/30 p-6">
             <div className="flex items-center gap-3 mb-4">
               <CheckCircle className="w-8 h-8 text-emerald-400" />
               <div>
@@ -1075,14 +1045,14 @@ export default function ClientDashboard({
             </div>
 
             <p className="text-xs text-zinc-500 mt-4">
-              Nenhuma mensagem de cobrança foi enviada. Verifique a Visão Geral para confirmar as atualizações.
+              Nenhuma mensagem de cobrança foi enviada. Confira na Carteira.
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={handleReset}
-              className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm transition-colors cursor-pointer"
             >
               <FileText className="w-4 h-4" />
               Nova importação
@@ -1107,10 +1077,8 @@ export default function ClientDashboard({
       {/* ── Step: Done ─────────────────────────────────────────────────────── */}
       {step === "done" && sendResult && (
         <div className="space-y-5">
-          <div className={`rounded-2xl border p-6 ${
-            sendResult.success
-              ? "bg-emerald-950/30 border-emerald-500/30"
-              : "bg-red-950/30 border-red-500/30"
+          <div className={`rounded-xl border bg-zinc-950 p-6 ${
+            sendResult.success ? "border-emerald-500/30" : "border-rose-500/30"
           }`}>
             <div className="flex items-center gap-3 mb-4">
               {sendResult.success
@@ -1139,7 +1107,7 @@ export default function ClientDashboard({
                 { label: "Duplicadas",     value: sendResult.duplicated,   color: "text-amber-400" },
                 { label: "Sem telefone",   value: sendResult.invalidPhone, color: "text-zinc-400" },
               ].map(stat => (
-                <div key={stat.label} className="text-center bg-zinc-900/60 rounded-xl p-3">
+                <div key={stat.label} className="text-center bg-zinc-900/60 rounded-lg p-3">
                   <p className={`text-2xl font-bold font-mono ${stat.color}`}>{stat.value}</p>
                   <p className="text-xs text-zinc-500 mt-0.5">{stat.label}</p>
                 </div>
@@ -1149,7 +1117,7 @@ export default function ClientDashboard({
 
           {/* ── Enviados com sucesso (debug info) ──────────────────────────── */}
           {sendResult.results.filter(r => r.status === "sucesso").length > 0 && (
-            <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden">
+            <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden">
               <div className="px-4 py-3 border-b border-zinc-800">
                 <p className="text-sm font-medium text-zinc-300 flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-emerald-400" />
@@ -1175,7 +1143,7 @@ export default function ClientDashboard({
 
           {/* ── Itens com pendência ─────────────────────────────────────────── */}
           {sendResult.results.filter(r => r.status !== "sucesso").length > 0 && (
-            <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden">
+            <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden">
               <div className="px-4 py-3 border-b border-zinc-800">
                 <p className="text-sm font-medium text-zinc-300 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-400" />
@@ -1204,7 +1172,7 @@ export default function ClientDashboard({
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={handleReset}
-              className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm transition-colors cursor-pointer"
             >
               <FileText className="w-4 h-4" />
               Nova cobrança
