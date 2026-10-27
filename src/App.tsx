@@ -130,7 +130,7 @@ Boleto: {documento_boleto}
 Vencimento: {vencimento}
 Valor: R$ {valor_atualizado}
 
-O título está no prazo informado e permanece em acompanhamento preventivo.
+O título consta em aberto em nosso acompanhamento.
 Solicitamos a confirmação do pagamento ou o envio do comprovante para atualização do status.
 
 Atenciosamente, equipe financeira NC Finance.`
@@ -427,6 +427,7 @@ export default function App() {
 
   // Billing Tab specific interactive properties
   const [selectedDebtorForMessage, setSelectedDebtorForMessage] = useState<Debtor | null>(null);
+  const [buscaEnvio, setBuscaEnvio] = useState("");
   const [selectedTone, setSelectedTone] = useState<MessageTone>(DEFAULT_USER_CONFIG.selectedTone);
   const [customMessageDraft, setCustomMessageDraft] = useState<string>("");
   const [isSendingMessage, setIsSendingMessage] = useState<boolean>(false);
@@ -1165,7 +1166,18 @@ export default function App() {
     const pat = patternTemplates.find(p => p.id === tone);
     if (!pat) return "";
 
-    const daysAtraso = cobraComoVencido(debtor.category) ? "12" : "0";
+    // Dias de atraso reais, contados do vencimento (DD/MM/AAAA). Antes era fixo
+    // em "12": os tons Firme e Jurídico diziam a todo vencido que o título
+    // "acumula 12 dia(s) de atraso", qualquer que fosse o atraso de verdade.
+    const diasDeAtraso = (() => {
+      const m = (debtor.dueDate || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (!m) return 0;
+      const venc = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      return Math.max(0, Math.floor((hoje.getTime() - venc.getTime()) / 86_400_000));
+    })();
+    const daysAtraso = cobraComoVencido(debtor.category) ? String(diasDeAtraso) : "0";
     // Cobranca usa o valor base: multa e juros seguem calculados para gestao,
     // mas nao entram no que e cobrado do devedor.
     const valStr = debtor.value.toFixed(2);
@@ -2278,7 +2290,7 @@ export default function App() {
                   {currentTab === "dashboard"  && "Dashboard & Métricas"}
                   {currentTab === "importar"   && "Importar carteira"}
                   {currentTab === "visao_geral"&& "Carteira"}
-                  {currentTab === "cobranca"   && "Cobrança — WhatsApp"}
+                  {currentTab === "cobranca"   && "Preparar envios"}
                   {currentTab === "historico"  && "Histórico de Cobrança"}
                   {currentTab === "automacoes" && "Automações de Cobrança"}
                   {currentTab === "minha_conta"&& "Minha Conta"}
@@ -4179,78 +4191,88 @@ export default function App() {
                 </>
               )}
 
-              {currentTab === "cobranca" && (
-                <div className="space-y-8">
+              {currentTab === "cobranca" && (() => {
+                // ── Preparar envios ────────────────────────────────────────
+                // Padrão das telas novas: Drive numa barra, lista de devedores
+                // com busca à esquerda e a mensagem à direita.
+                const card = "bg-zinc-950 border border-zinc-800 rounded-xl";
+                const cabecalho = "flex items-start justify-between gap-3 px-5 py-4 border-b border-zinc-800/80";
+                const rotulo = "text-[10px] font-mono uppercase tracking-widest text-zinc-500";
+                const termo = buscaEnvio.trim().toLowerCase();
+                const listaEnvio = termo
+                  ? debtors.filter(d => d.client.toLowerCase().includes(termo) || (d.document || "").toLowerCase().includes(termo))
+                  : debtors;
+                const sel = selectedDebtorForMessage;
 
-                  {/* ── Boletos do Google Drive ──────────────────────────────── */}
-                  <div className="bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-xl">
-                    <div className="flex items-start justify-between gap-3 flex-wrap">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                          <HardDrive className="w-4 h-4 text-emerald-400" /> Boletos do Google Drive
-                          <DriveHelpPopover />
-                        </h4>
-                        <p className="text-xs text-zinc-500 font-light max-w-xl">
-                          Conecte a pasta de boletos do Drive. O sistema casa por nome do cliente + número do documento e sugere anexar o boleto encontrado a cada devedor.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => void handleMatchDriveFiles()}
-                        disabled={isDriveMatching || !driveFolderStatus?.configured}
-                        className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 whitespace-nowrap"
-                        title={driveFolderStatus?.configured ? "Buscar boletos correspondentes no Drive" : "Configure a pasta do Drive primeiro"}
-                      >
-                        {isDriveMatching
-                          ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Buscando…</>
-                          : <><Search className="w-3.5 h-3.5" /> Buscar boletos no Drive</>}
-                      </button>
-                    </div>
+                return (
+                <div className="space-y-4">
 
-                    {/* Status da pasta */}
+                  {/* ── Boletos do Google Drive ───────────────────────────────── */}
+                  <div className={`${card} px-4 py-3 space-y-2.5`}>
                     {driveFolderStatus?.configured && !editingDriveFolder ? (
-                      <div className="flex items-center gap-2 text-[11px] text-zinc-400 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2">
-                        <FolderOpen className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                        <span className="truncate flex-1">
-                          Pasta: <span className="text-zinc-200 font-medium">{driveFolderStatus.folderName || "Drive"}</span> · {driveFolderStatus.fileCount} arquivo(s)
-                          {driveFolderStatus.indexing
-                            ? <span className="text-sky-300"> · indexando conteúdo {driveFolderStatus.contentIndexed ?? 0}/{driveFolderStatus.fileCount}…</span>
-                            : ` · ${driveFolderStatus.contentIndexed ?? driveFolderStatus.fileCount} lido(s)`}
-                          {driveFolderStatus.unmatchedDebtors > 0 && ` · ${driveFolderStatus.unmatchedDebtors} sem boleto`}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                        <span className="flex items-center gap-2 min-w-0 flex-1 text-xs text-zinc-400">
+                          <HardDrive className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+                          <DriveHelpPopover />
+                          <span className="truncate">
+                            Boletos do Drive: <span className="text-zinc-200">{driveFolderStatus.folderName || "Drive"}</span>
+                            <span className="text-zinc-500"> · {driveFolderStatus.fileCount} arquivo(s)</span>
+                            {driveFolderStatus.indexing
+                              ? <span className="text-sky-300"> · lendo {driveFolderStatus.contentIndexed ?? 0}/{driveFolderStatus.fileCount}…</span>
+                              : null}
+                            {driveFolderStatus.unmatchedDebtors > 0 && <span className="text-zinc-500"> · {driveFolderStatus.unmatchedDebtors} sem boleto</span>}
+                          </span>
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => void handleSyncDriveFolder()}
-                          disabled={isDriveSyncing}
-                          className="text-sky-400 hover:text-sky-300 disabled:opacity-50 font-semibold inline-flex items-center gap-1 flex-shrink-0 transition-colors"
-                          title="Revarrer a pasta e atualizar o índice"
-                        >
-                          <RefreshCw className={`w-3 h-3 ${isDriveSyncing ? "animate-spin" : ""}`} /> {isDriveSyncing ? "Indexando…" : "Reindexar"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setDriveFolderUrl(""); setDriveSaveMsg(null); setEditingDriveFolder(true); }}
-                          className="text-emerald-400 hover:text-emerald-300 font-semibold inline-flex items-center gap-1 flex-shrink-0 transition-colors"
-                          title="Trocar a pasta do Google Drive"
-                        >
-                          <Pencil className="w-3 h-3" /> Trocar pasta
-                        </button>
+                        <span className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => void handleSyncDriveFolder()}
+                            disabled={isDriveSyncing}
+                            className="px-2.5 py-1.5 rounded-lg text-[11px] text-zinc-400 hover:text-white disabled:opacity-50 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Ler a pasta de novo e atualizar o índice"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${isDriveSyncing ? "animate-spin" : ""}`} /> {isDriveSyncing ? "Lendo…" : "Reindexar"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setDriveFolderUrl(""); setDriveSaveMsg(null); setEditingDriveFolder(true); }}
+                            className="px-2.5 py-1.5 rounded-lg text-[11px] text-zinc-400 hover:text-white inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Trocar a pasta do Google Drive"
+                          >
+                            <Pencil className="w-3 h-3" /> Trocar pasta
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleMatchDriveFiles()}
+                            disabled={isDriveMatching}
+                            className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-100 text-[11px] font-semibold inline-flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
+                            title="Procurar no Drive o boleto de cada devedor"
+                          >
+                            {isDriveMatching ? <><RefreshCw className="w-3 h-3 animate-spin" /> Buscando…</> : <><Search className="w-3 h-3" /> Buscar boletos</>}
+                          </button>
+                        </span>
                       </div>
                     ) : (
                       <div className="space-y-2">
+                        <p className="text-xs text-zinc-400 flex items-center gap-2">
+                          <HardDrive className="w-3.5 h-3.5 text-zinc-500" />
+                          {driveFolderStatus?.configured ? "Trocar a pasta de boletos do Drive" : "Conecte a pasta de boletos do Google Drive"}
+                          <DriveHelpPopover />
+                        </p>
                         <div className="flex flex-col sm:flex-row gap-2">
                           <input
                             type="text"
                             value={driveFolderUrl}
                             onChange={(e) => setDriveFolderUrl(e.target.value)}
-                            placeholder="Cole a URL da nova pasta do Google Drive…"
-                            className="flex-1 bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500 transition-colors"
+                            placeholder="Cole o link da pasta do Google Drive…"
+                            aria-label="Link da pasta do Google Drive"
+                            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white font-mono placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
                           />
                           <button
                             type="button"
                             onClick={() => void handleSaveDriveFolder()}
                             disabled={isDriveSaving || !driveFolderUrl.trim()}
-                            className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-100 text-xs font-semibold border border-zinc-700 transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
+                            className="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-black text-xs font-bold transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
                           >
                             {isDriveSaving ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Salvando…</> : (driveFolderStatus?.configured ? "Salvar nova pasta" : "Conectar pasta")}
                           </button>
@@ -4258,7 +4280,7 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => { setEditingDriveFolder(false); setDriveFolderUrl(""); setDriveSaveMsg(null); }}
-                              className="px-4 py-2 rounded-xl text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 text-xs transition-colors whitespace-nowrap"
+                              className="px-3.5 py-2 rounded-lg text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-600 text-xs transition-colors whitespace-nowrap cursor-pointer"
                             >
                               Cancelar
                             </button>
@@ -4266,95 +4288,104 @@ export default function App() {
                         </div>
                         {driveFolderStatus?.configured && (
                           <p className="text-[10px] text-zinc-500">
-                            Pasta atual: <span className="text-zinc-400">{driveFolderStatus.folderName || "Drive"}</span>. A nova pasta substituirá a atual e será reindexada.
+                            Pasta atual: <span className="text-zinc-400">{driveFolderStatus.folderName || "Drive"}</span>. A nova pasta substitui a atual e é lida de novo.
                           </p>
                         )}
                       </div>
                     )}
 
-                    {/* Mensagens */}
                     {driveSaveMsg && (
-                      <div className={`text-[11px] rounded-lg px-3 py-2 border ${driveSaveMsg.ok ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20" : "text-rose-300 bg-rose-500/10 border-rose-500/20"}`}>
+                      <p className={`text-[11px] rounded-lg px-3 py-2 border ${driveSaveMsg.ok ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20" : "text-rose-300 bg-rose-500/10 border-rose-500/20"}`}>
                         {driveSaveMsg.text}
-                      </div>
+                      </p>
                     )}
                     {driveMatchResult && !driveMatchResult.success && (
-                      <div className="text-[11px] rounded-lg px-3 py-2 border text-rose-300 bg-rose-500/10 border-rose-500/20">
+                      <p className="text-[11px] rounded-lg px-3 py-2 border text-rose-300 bg-rose-500/10 border-rose-500/20">
                         {DRIVE_STATUS_LABELS[driveMatchResult.status] ?? driveMatchResult.error}
-                      </div>
+                      </p>
                     )}
                     {driveMatchResult && driveMatchResult.success && (
-                      <div className="text-[11px] rounded-lg px-3 py-2 border text-emerald-300 bg-emerald-500/10 border-emerald-500/20">
+                      <p className="text-[11px] rounded-lg px-3 py-2 border text-emerald-300 bg-emerald-500/10 border-emerald-500/20">
                         {driveMatchResult.debtorsMatched > 0
                           ? `Encontramos ${driveMatchResult.debtorsMatched} boleto(s) — confirme "Anexar" em cada devedor abaixo.`
                           : "Nenhum boleto correspondente encontrado na pasta."}
-                      </div>
+                      </p>
                     )}
                     {driveBoletoMsg && (
-                      <div className={`text-[11px] rounded-lg px-3 py-2 border ${driveBoletoMsg.ok ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20" : "text-rose-300 bg-rose-500/10 border-rose-500/20"}`}>
+                      <p className={`text-[11px] rounded-lg px-3 py-2 border ${driveBoletoMsg.ok ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20" : "text-rose-300 bg-rose-500/10 border-rose-500/20"}`}>
                         {driveBoletoMsg.text}
-                      </div>
+                      </p>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-                    <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-4 shadow-xl">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-white">Selecione o Devedor Alvo</h4>
-                        <p className="text-xs text-zinc-500 font-light">
-                          Escolha quem receberá a notificação para carregar dados e modelos nos tons adequados.
-                        </p>
+                    {/* ── Devedores ───────────────────────────────────────────── */}
+                    <section className={`${card} lg:col-span-5`}>
+                      <header className={cabecalho}>
+                        <div>
+                          <h4 className="text-sm font-bold text-white">Devedores</h4>
+                          <p className="text-xs text-zinc-500 mt-0.5">Escolha quem vai receber a mensagem</p>
+                        </div>
+                        <span className="text-[11px] text-zinc-500 font-mono flex-shrink-0">{listaEnvio.length}</span>
+                      </header>
+                      <div className="px-4 py-3 border-b border-zinc-900">
+                        <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 focus-within:border-zinc-600">
+                          <Search className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+                          <input
+                            type="text"
+                            value={buscaEnvio}
+                            onChange={(e) => setBuscaEnvio(e.target.value)}
+                            placeholder="Buscar cliente ou documento…"
+                            aria-label="Buscar devedor"
+                            className="w-full text-xs text-zinc-200 bg-transparent focus:outline-none placeholder:text-zinc-600"
+                          />
+                        </div>
                       </div>
 
-                      <div className="space-y-3">
-                        <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-                          {debtors.map((d) => {
-                            const isSelected = selectedDebtorForMessage?.id === d.id;
-                            const isEditingPhone = editingPhoneDebtorId === d.id;
+                      <div className="max-h-[520px] overflow-y-auto divide-y divide-zinc-900">
+                        {listaEnvio.length === 0 && (
+                          <p className="px-5 py-8 text-xs text-zinc-500 text-center">
+                            {debtors.length === 0 ? "A carteira está vazia." : "Nenhum devedor encontrado."}
+                          </p>
+                        )}
+                        {listaEnvio.map((d) => {
+                          const isSelected = sel?.id === d.id;
+                          const isEditingPhone = editingPhoneDebtorId === d.id;
 
-                            return (
-                              <div
-                                key={d.id}
-                                className={`w-full p-3.5 rounded-2xl border text-left transition-all
-                                  ${isSelected
-                                    ? "bg-emerald-500/10 border-emerald-500/80 shadow-[0_4px_15px_rgba(16,185,129,0.15)]"
-                                    : "bg-zinc-950 border-zinc-900 hover:border-zinc-800"
-                                  }
-                                `}
+                          return (
+                            <div
+                              key={d.id}
+                              className={`border-l-2 transition-colors ${isSelected ? "border-emerald-400 bg-emerald-500/5" : "border-transparent hover:bg-zinc-900/50"}`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => setSelectedDebtorForMessage(d)}
+                                aria-pressed={isSelected}
+                                className="w-full flex items-start justify-between gap-3 px-4 pt-3 pb-1.5 text-left cursor-pointer"
                               >
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedDebtorForMessage(d)}
-                                  className="w-full flex items-center justify-between cursor-pointer"
-                                >
-                                  <div className="space-y-1 select-none text-left">
-                                    <div className="text-xs font-black text-white">{d.client}</div>
-                                    <div className="text-[10px] text-zinc-400 font-light font-mono flex items-center gap-1">
-                                      <span>Doc: {d.document}</span> · <span>{d.dueDate}</span>
-                                    </div>
-                                    <div className="text-[11px] font-mono text-emerald-400 font-extrabold">{formatBRL(d.updatedValue || d.value)}</div>
-                                  </div>
-
-                                  <div className="text-right flex flex-col items-end gap-1.5">
-                                    <span className={`px-2 py-0.5 rounded text-[8px] uppercase tracking-wide font-bold font-mono
-                                      ${CATEGORY_TINT[d.category]}
-                                    `}>
-                                      {CATEGORY_LABEL[d.category]}
-                                    </span>
-
-                                    {d.status === "sent" ? (
-                                      <span className="text-[9px] text-emerald-400 flex items-center gap-1">
+                                <span className="min-w-0">
+                                  <span className="block text-xs font-semibold text-white truncate">{d.client}</span>
+                                  <span className="block text-[10px] text-zinc-500 font-mono mt-0.5">{d.document} · {d.dueDate}</span>
+                                </span>
+                                <span className="flex flex-col items-end gap-1 flex-shrink-0">
+                                  <span className="text-xs font-mono text-white tabular-nums">{formatBRL(d.value)}</span>
+                                  <span className="flex items-center gap-1.5">
+                                    {d.status === "sent" && (
+                                      <span className="text-[9px] text-emerald-400 flex items-center gap-0.5">
                                         <Check className="w-2.5 h-2.5" strokeWidth={3} /> Enviado
                                       </span>
-                                    ) : (
-                                      <span className="text-[9px] text-zinc-500 font-light">Pendente</span>
                                     )}
-                                  </div>
-                                </button>
+                                    <span className={`px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wide font-bold font-mono ${CATEGORY_TINT[d.category]}`}>
+                                      {CATEGORY_LABEL[d.category]}
+                                    </span>
+                                  </span>
+                                </span>
+                              </button>
 
-                                {/* Inline phone edit row */}
-                                <div className="mt-2 pt-2 border-t border-zinc-800/60 flex items-center gap-2">
+                              {/* Telefone e boleto */}
+                              <div className="px-4 pb-3 space-y-1.5">
+                                <div className="flex items-center gap-2">
                                   {isEditingPhone ? (
                                     <>
                                       <input
@@ -4363,31 +4394,35 @@ export default function App() {
                                         onChange={(e) => setEditingPhoneValue(e.target.value)}
                                         onKeyDown={(e) => { if (e.key === "Enter") void saveCobrancaPhone(d.id); if (e.key === "Escape") setEditingPhoneDebtorId(null); }}
                                         autoFocus
+                                        aria-label={`Telefone de ${d.client}`}
                                         className="flex-1 bg-zinc-900 border border-emerald-500/40 rounded px-2 py-1 text-[10px] font-mono text-white focus:outline-none"
                                         placeholder="5577999998888"
                                       />
                                       <button
                                         type="button"
                                         onClick={() => void saveCobrancaPhone(d.id)}
-                                        className="text-emerald-400 hover:text-emerald-300 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors"
+                                        className="text-emerald-400 hover:text-emerald-300 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors cursor-pointer"
                                       >
                                         OK
                                       </button>
                                       <button
                                         type="button"
                                         onClick={() => setEditingPhoneDebtorId(null)}
-                                        className="text-zinc-500 hover:text-zinc-300 px-1 transition-colors"
+                                        className="text-zinc-500 hover:text-zinc-300 px-1 transition-colors cursor-pointer"
+                                        aria-label="Cancelar edição do telefone"
                                       >
                                         <X className="w-3 h-3" />
                                       </button>
                                     </>
                                   ) : (
                                     <>
-                                      <span className="text-[10px] font-mono text-zinc-500 flex-1 truncate">{d.phone || "(sem telefone)"}</span>
+                                      <span className={`text-[10px] font-mono flex-1 truncate ${d.phone ? "text-zinc-400" : "text-amber-400"}`}>
+                                        {d.phone || "sem telefone"}
+                                      </span>
                                       <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); setEditingPhoneValue(d.phone || ""); setEditingPhoneDebtorId(d.id); }}
-                                        className="text-zinc-600 hover:text-emerald-400 transition-colors p-0.5 rounded"
+                                        className="text-zinc-600 hover:text-zinc-300 transition-colors p-0.5 rounded cursor-pointer"
                                         title="Editar telefone"
                                       >
                                         <Pencil className="w-3 h-3" />
@@ -4396,41 +4431,36 @@ export default function App() {
                                   )}
                                 </div>
 
-                                {/* PDF attachment row */}
-                                <div className="mt-2 pt-2 border-t border-zinc-800/60 flex items-center gap-2 min-w-0">
+                                <div className="flex items-center gap-2 min-w-0">
                                   {uploadingPdfDebtorId === d.id ? (
                                     <span className="text-[10px] text-zinc-400 flex items-center gap-1.5 flex-1">
-                                      <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" />
-                                      Enviando PDF…
+                                      <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" /> Enviando PDF…
                                     </span>
                                   ) : importingBoletoId === d.id ? (
                                     <span className="text-[10px] text-zinc-400 flex items-center gap-1.5 flex-1">
-                                      <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" />
-                                      Importando do Drive…
+                                      <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" /> Importando do Drive…
                                     </span>
                                   ) : (d.driveFileId && d.driveFileId !== "uploaded") ? (
-                                    /* Estado SUGERIDO — achado no Drive, aguardando confirmação */
-                                    <div className="flex-1 flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                      <span className="text-[10px] text-sky-300 flex items-center gap-1 truncate" title={d.driveFileName || "boleto.pdf"}>
+                                    /* Sugerido: achado no Drive, aguardando confirmação */
+                                    <div className="flex-1 flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                      <span className="text-[10px] text-sky-300 flex items-center gap-1 truncate min-w-0" title={d.driveFileName || "boleto.pdf"}>
                                         <HardDrive className="w-3 h-3 flex-shrink-0" />
-                                        Achamos o boleto no Drive{typeof d.driveMatchScore === "number" ? ` (${Math.round(d.driveMatchScore * 100)}%)` : ""}: {d.driveFileName || "boleto.pdf"}
+                                        No Drive{typeof d.driveMatchScore === "number" ? ` (${Math.round(d.driveMatchScore * 100)}%)` : ""}: {d.driveFileName || "boleto.pdf"}
                                       </span>
-                                      <div className="flex items-center gap-1.5">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => { e.stopPropagation(); void handleAttachDriveBoleto(d.id); }}
-                                          className="px-2 py-0.5 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-bold transition-all inline-flex items-center gap-1"
-                                        >
-                                          <Check className="w-3 h-3" strokeWidth={3} /> Anexar
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => { e.stopPropagation(); void handleIgnoreDriveBoleto(d.id); }}
-                                          className="px-2 py-0.5 rounded text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 text-[10px] transition-colors"
-                                        >
-                                          Ignorar
-                                        </button>
-                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); void handleAttachDriveBoleto(d.id); }}
+                                        className="px-2 py-0.5 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <Check className="w-3 h-3" strokeWidth={3} /> Anexar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); void handleIgnoreDriveBoleto(d.id); }}
+                                        className="px-2 py-0.5 rounded text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-600 text-[10px] transition-colors cursor-pointer"
+                                      >
+                                        Ignorar
+                                      </button>
                                     </div>
                                   ) : d.driveFileId === "uploaded" ? (
                                     <>
@@ -4441,7 +4471,7 @@ export default function App() {
                                         <button
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); openPdfPreview(d.driveFileUrl!, d.driveFileName || "boleto.pdf"); }}
-                                          className="text-zinc-500 hover:text-emerald-400 transition-colors p-0.5 rounded cursor-pointer"
+                                          className="text-zinc-500 hover:text-zinc-200 transition-colors p-0.5 rounded cursor-pointer"
                                           title="Visualizar PDF"
                                         >
                                           <Eye className="w-3 h-3" />
@@ -4450,7 +4480,7 @@ export default function App() {
                                       <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); void handlePdfRemove(d.id); }}
-                                        className="text-zinc-600 hover:text-rose-400 transition-colors p-0.5 rounded"
+                                        className="text-zinc-600 hover:text-rose-400 transition-colors p-0.5 rounded cursor-pointer"
                                         title="Remover PDF"
                                       >
                                         <X className="w-3 h-3" />
@@ -4458,14 +4488,14 @@ export default function App() {
                                     </>
                                   ) : (
                                     <>
-                                      <span className="text-[10px] font-mono text-zinc-600 flex-1 truncate">Sem boleto PDF</span>
+                                      <span className="text-[10px] text-zinc-600 flex-1 truncate">Sem boleto</span>
                                       <label
                                         htmlFor={`pdf-upload-${d.id}`}
-                                        className="text-zinc-500 hover:text-emerald-400 transition-colors p-0.5 rounded cursor-pointer"
+                                        className="text-[10px] text-zinc-500 hover:text-zinc-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
                                         title="Anexar PDF do boleto"
                                         onClick={(e) => e.stopPropagation()}
                                       >
-                                        <Upload className="w-3 h-3" />
+                                        <Upload className="w-3 h-3" /> Anexar
                                       </label>
                                       <input
                                         id={`pdf-upload-${d.id}`}
@@ -4482,102 +4512,114 @@ export default function App() {
                                   )}
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    </div>
+                    </section>
 
-                    <div className="lg:col-span-7 bg-zinc-900/40 border border-zinc-900 p-6 rounded-3xl space-y-5 shadow-xl flex flex-col justify-between">
-                      {selectedDebtorForMessage ? (
+                    {/* ── Mensagem ────────────────────────────────────────────── */}
+                    <section className={`${card} lg:col-span-7 flex flex-col`}>
+                      {sel ? (
                         <>
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between flex-wrap gap-2">
-                              <div>
-                                <h4 className="text-sm font-bold text-white">Editar Abordagem para: <span className="text-emerald-400">{selectedDebtorForMessage.client}</span></h4>
-                                <p className="text-xs text-zinc-500">Documento: {selectedDebtorForMessage.document} | Destino WhatsApp: {selectedDebtorForMessage.phone || "(Não informado)"}</p>
+                          <header className={cabecalho}>
+                            <div className="min-w-0">
+                              <p className={rotulo}>Mensagem para</p>
+                              <h4 className="mt-1 text-sm font-bold text-white truncate">{sel.client}</h4>
+                              <p className="text-xs text-zinc-500 mt-0.5 font-mono">
+                                {sel.document} · WhatsApp {sel.phone || <span className="text-amber-400 font-sans">não informado</span>}
+                              </p>
+                            </div>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wide font-bold font-mono flex-shrink-0 ${CATEGORY_TINT[sel.category]}`}>
+                              {CATEGORY_LABEL[sel.category]}
+                            </span>
+                          </header>
+
+                          <div className="px-5 py-4 space-y-4 flex-1 flex flex-col">
+                            <div>
+                              <p className={`${rotulo} mb-2`}>Tom</p>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-label="Tom da mensagem">
+                                {(["amigavel", "neutro", "firme", "juridico"] as const).map((tone) => {
+                                  const ativo = selectedTone === tone;
+                                  return (
+                                    <button
+                                      key={tone}
+                                      type="button"
+                                      role="radio"
+                                      aria-checked={ativo}
+                                      onClick={() => setSelectedTone(tone)}
+                                      className={`py-2 px-2 rounded-lg text-xs font-semibold text-center transition-colors border cursor-pointer ${
+                                        ativo ? "border-zinc-500 bg-zinc-900 text-white" : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                                      }`}
+                                    >
+                                      {tone === "amigavel" ? "Amigável" : tone === "neutro" ? "Neutro" : tone === "firme" ? "Firme" : "Jurídico"}
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </div>
-                          </div>
 
-                          <div className="space-y-2">
-                            <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Escolher Padrão de Abordagem para o Cliente:</label>
-                            <div className="grid grid-cols-4 gap-2">
-                              {(["amigavel", "neutro", "firme", "juridico"] as const).map((tone) => {
-                                const isToneSelected = selectedTone === tone;
-                                return (
-                                  <button
-                                    key={tone}
-                                    onClick={() => setSelectedTone(tone)}
-                                    className={`py-2 px-1 rounded-xl text-[11px] font-bold text-center capitalize transition-all border cursor-pointer
-                                      ${isToneSelected 
-                                        ? "bg-emerald-500 text-black border-emerald-500 hover:bg-emerald-400" 
-                                        : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
-                                      }
-                                    `}
-                                  >
-                                    {tone === "amigavel" && "Amigável"}
-                                    {tone === "neutro" && "Neutro"}
-                                    {tone === "firme" && "Firme"}
-                                    {tone === "juridico" && "Jurídico"}
-                                  </button>
-                                );
-                              })}
+                            <div className="flex-1 flex flex-col">
+                              <label htmlFor="mensagem-envio" className={`${rotulo} mb-2 block`}>Texto (pode editar)</label>
+                              <textarea
+                                id="mensagem-envio"
+                                rows={12}
+                                value={customMessageDraft}
+                                onChange={(e) => setCustomMessageDraft(e.target.value)}
+                                className="w-full flex-1 bg-zinc-900 border border-zinc-800 rounded-lg p-4 text-xs text-zinc-100 focus:outline-none focus:border-emerald-500 transition-colors leading-relaxed"
+                              />
+                              <p className="mt-1.5 text-[11px] text-zinc-500">
+                                Valor na mensagem: <span className="font-mono text-zinc-300">{formatBRL(sel.value)}</span> — o valor original, sem multa e juros
+                                {(sel.updatedValue || sel.value) !== sel.value && <> (corrigido: <span className="font-mono">{formatBRL(sel.updatedValue || sel.value)}</span>)</>}.
+                              </p>
                             </div>
+
+                            {messageFeedback && (
+                              <p className={`px-3 py-2 border rounded-lg text-xs ${messageFeedback.success ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300" : "bg-rose-500/10 border-rose-500/20 text-rose-300"}`}>
+                                {messageFeedback.text}
+                              </p>
+                            )}
                           </div>
 
-
-                          <div className="space-y-1.5 flex-1 flex flex-col">
-                            <label className="text-xs font-bold uppercase tracking-widest text-zinc-400 block">Esboço Final da Mensagem (Editável):</label>
-                            <textarea aria-label="Esboço Final da Mensagem (Editável):"
-                              rows={10}
-                              value={customMessageDraft}
-                              onChange={(e) => setCustomMessageDraft(e.target.value)}
-                              className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 text-xs text-zinc-100 focus:outline-none focus:border-emerald-500 transition-all font-mono leading-relaxed"
-                            />
-                          </div>
-
-                          {messageFeedback && (
-                            <div className={`p-3 border rounded-xl text-xs text-center font-normal ${messageFeedback.success ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300" : "bg-rose-500/10 border-rose-500/20 text-rose-400"}`}>
-                              {messageFeedback.text}
-                            </div>
-                          )}
-
-                          <div className="pt-4 border-t border-zinc-900 flex justify-end gap-3">
+                          <footer className="px-5 py-3 border-t border-zinc-800/80 flex items-center justify-between gap-3">
+                            <span className="text-[11px] text-zinc-500">
+                              {!sel.phone ? "Informe o telefone na lista para enviar." : sel.status === "sent" ? "Já enviada antes para este devedor." : "Sai pelo seu WhatsApp."}
+                            </span>
                             <button
                               onClick={handleSendMessage}
-                              disabled={isSendingMessage || !selectedDebtorForMessage.phone}
-                              className="px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold flex items-center gap-2 shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer text-xs uppercase"
+                              disabled={isSendingMessage || !sel.phone}
+                              className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                             >
                               {isSendingMessage ? (
-                                "Enviando cobrança..."
+                                <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Enviando…</>
                               ) : (
-                                <>
-                                  <Send className="w-4 h-4" /> Enviar Cobrança WhatsApp
-                                </>
+                                <><Send className="w-3.5 h-3.5" /> Enviar pelo WhatsApp</>
                               )}
                             </button>
-                          </div>
+                          </footer>
                         </>
                       ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-center p-8 text-zinc-500">
-                          <SlidersHorizontal className="w-12 h-12 text-zinc-700 animate-pulse mb-3" />
-                          <p className="font-semibold text-white">Nenhum devedor ativado do painel</p>
-                          <p className="text-xs text-zinc-500 mt-1 max-w-sm">Selecione uma fatura ativa ou inadimplente na lista ao lado para desenhar e projetar a régua de cobrança perfeita.</p>
-                          <button
-                            type="button"
-                            onClick={() => setCurrentTab("visao_geral")}
-                            className="mt-4 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
-                          >
-                            <Eye className="w-3.5 h-3.5" /> Ir para a Visão Geral
-                          </button>
+                        <div className="flex-1 min-h-[360px] flex flex-col items-center justify-center text-center px-8 py-12">
+                          <SlidersHorizontal className="w-8 h-8 text-zinc-700 mb-3" />
+                          <p className="text-xs font-semibold text-zinc-300">Escolha um devedor na lista</p>
+                          <p className="text-[11px] text-zinc-500 mt-1 max-w-xs">A mensagem aparece aqui pronta para revisar, no tom que você escolher.</p>
+                          {debtors.length === 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setCurrentTab("importar")}
+                              className="mt-4 px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                            >
+                              <Upload className="w-3.5 h-3.5" /> Importar carteira
+                            </button>
+                          )}
                         </div>
                       )}
-                    </div>
+                    </section>
 
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               {currentTab === "historico" && (
                 <div className="space-y-6">
