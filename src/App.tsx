@@ -391,6 +391,9 @@ export default function App() {
   // Filters state in Overview Tab
   const [searchFilter, setSearchFilter] = useState<string>("");
   const [showExportMenu, setShowExportMenu] = useState(false);
+  // Carteira: encargos (multa/juros) e "mais ações" abrem no lugar, sem ocupar a tela.
+  const [showEncargos, setShowEncargos] = useState(false);
+  const [showMaisCarteira, setShowMaisCarteira] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [repFilter, setRepFilter] = useState<string>("all");
@@ -2255,7 +2258,7 @@ export default function App() {
                   {currentTab === "cobrar"     && "Enviar Cobranças"}
                   {currentTab === "dashboard"  && "Dashboard & Métricas"}
                   {currentTab === "importar"   && "Importação Avançada"}
-                  {currentTab === "visao_geral"&& "Visão Geral — Base Consolidada"}
+                  {currentTab === "visao_geral"&& "Carteira"}
                   {currentTab === "cobranca"   && "Cobrança — WhatsApp"}
                   {currentTab === "historico"  && "Histórico de Cobrança"}
                   {currentTab === "automacoes" && "Automações de Cobrança"}
@@ -3094,13 +3097,13 @@ export default function App() {
 
               {currentTab === "visao_geral" && (
                 <>
-                <div className="space-y-8">
+                <div className="space-y-4">
 
                   {/* ── Boletos do Google Drive (busca + anexar em lote) ──────── */}
                   {driveFolderStatus?.configured && (() => {
                     const suggestedCount = debtors.filter(d => d.driveFileId && d.driveFileId !== "uploaded").length;
                     return (
-                      <div className="bg-zinc-900/40 border border-zinc-900 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+                      <div className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-2 min-w-0">
                           <HardDrive className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                           <DriveHelpPopover />
@@ -3141,193 +3144,163 @@ export default function App() {
                     );
                   })()}
 
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    
-                    <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-md">
-                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                        <Percent className="w-4 h-4 text-emerald-400" /> Parâmetros de Encargos Globais
-                      </h4>
-                      <p className="text-xs text-zinc-500 font-light leading-relaxed">
-                        Defina a multa padrão imediata e a taxa de juros aplicada por dia de atraso para todos os devedores classificados como Vencidos na visão geral.
-                      </p>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Multa Geral (%)</label>
-                          <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-900 p-2 rounded-xl">
-                            <input aria-label="Multa Geral (%)"
-                              type="text"
-                              inputMode="decimal"
-                              value={globalFinePctStr}
-                              onChange={(e) => {
-                                const raw = e.target.value.replace(",", ".");
-                                setGlobalFinePctStr(e.target.value);
-                                if (raw === "" || raw === ".") { setGlobalFinePct(0); return; }
-                                const n = parseFloat(raw);
-                                if (!isNaN(n)) setGlobalFinePct(Math.max(0, n));
-                              }}
-                              placeholder="0"
-                              className="w-full bg-transparent focus:outline-none focus:border-none text-sm text-center font-mono font-bold text-emerald-400 placeholder:text-zinc-700"
-                            />
-                            <span className="text-xs text-zinc-500">%</span>
-                          </div>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Juros / Dia (%)</label>
-                          <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-900 p-2 rounded-xl">
-                            <input aria-label="Juros / Dia (%)"
-                              type="text"
-                              inputMode="decimal"
-                              value={globalInterestDayPctStr}
-                              onChange={(e) => {
-                                const raw = e.target.value.replace(",", ".");
-                                setGlobalInterestDayPctStr(e.target.value);
-                                if (raw === "" || raw === ".") { setGlobalInterestDayPct(0); return; }
-                                const n = parseFloat(raw);
-                                if (!isNaN(n)) setGlobalInterestDayPct(Math.max(0, n));
-                              }}
-                              placeholder="0"
-                              className="w-full bg-transparent focus:outline-none focus:border-none text-sm text-center font-mono font-bold text-emerald-400 placeholder:text-zinc-700"
-                            />
-                            <span className="text-xs text-zinc-500">%</span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                    </div>
-
-                    <div className="lg:col-span-7 bg-zinc-900/40 border border-zinc-900 p-5 rounded-3xl space-y-4 shadow-md">
-                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                        <UserPlus className="w-4 h-4 text-emerald-400" /> Cadastro de Representantes
-                      </h4>
-                      <p className="text-xs text-zinc-500 font-light leading-none">
-                        Adicione assessores ou assessoria jurídica externa para cobrança dedicada.
-                      </p>
-
-                      <form onSubmit={handleAddRep} className="space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[11px] text-zinc-400">Nome</label>
-                            <input aria-label="Nome"
-                              type="text"
-                              required
-                              value={newRepName}
-                              onChange={(e) => setNewRepName(e.target.value)}
-                              placeholder="Felipe Amorim"
-                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[11px] text-zinc-400">Telefone</label>
-                            <input aria-label="Telefone"
-                              type="text"
-                              value={newRepPhone}
-                              onChange={(e) => setNewRepPhone(e.target.value)}
-                              placeholder="5577999881111"
-                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none font-mono"
-                            />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 items-end">
-                          <div className="space-y-1">
-                            <label className="text-[11px] text-zinc-400">Papel / Cargo</label>
-                            <input aria-label="Papel / Cargo"
-                              type="text"
-                              value={newRepRole}
-                              onChange={(e) => setNewRepRole(e.target.value)}
-                              placeholder="Responsável Financeiro"
-                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs text-white"
-                            />
-                          </div>
-                          <button
-                            type="submit"
-                            className="bg-emerald-500 hover:bg-emerald-400 text-black py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow flex items-center justify-center gap-1.5"
-                          >
-                            <PlusCircle className="w-4 h-4" /> Cadastrar Responsável
-                          </button>
-                        </div>
-                      </form>
-                    </div>
-
-
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-900 flex flex-wrap gap-4 items-center justify-between">
-                    <div className="flex items-center gap-2 bg-zinc-950 p-2 rounded-xl border border-zinc-800 flex-1 min-w-[200px] max-w-sm">
-                      <Search className="w-4 h-4 text-zinc-500" />
-                      <input aria-label="Filtrar por nome do cliente ou documento"
+                  {/* ── Barra da carteira ───────────────────────────────────────
+                      Configurações (encargos, responsáveis) viram botões que abrem
+                      no lugar, para a tabela ser o foco da tela. */}
+                  <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 flex-1 min-w-[200px] focus-within:border-zinc-600">
+                      <Search className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+                      <input aria-label="Buscar por cliente ou documento"
                         type="text"
                         value={searchFilter}
                         onChange={(e) => setSearchFilter(e.target.value)}
-                        placeholder="Filtrar por nome do cliente ou documento..."
-                        className="w-full text-xs text-zinc-300 bg-transparent focus:outline-none font-light"
+                        placeholder="Buscar por cliente ou documento…"
+                        className="w-full text-xs text-zinc-200 bg-transparent focus:outline-none placeholder:text-zinc-600"
                       />
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                    {/* Encargos (multa + juros ao dia) */}
+                    <div className="relative">
                       <button
-                        onClick={() => { setShowAddDebtorModal(true); setAddDebtorError(""); }}
-                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs whitespace-nowrap"
+                        type="button"
+                        onClick={() => setShowEncargos((v) => !v)}
+                        aria-expanded={showEncargos}
+                        className="px-3 py-2 rounded-lg border border-zinc-800 hover:border-zinc-700 text-xs text-zinc-300 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
+                        title="Multa e juros aplicados aos vencidos"
                       >
-                        <PlusCircle className="w-3.5 h-3.5" /> Adicionar Devedor
+                        <Percent className="w-3.5 h-3.5 text-zinc-500" />
+                        Multa <span className="font-mono text-white">{globalFinePctStr || "0"}%</span>
+                        <span className="text-zinc-600">·</span>
+                        Juros <span className="font-mono text-white">{globalInterestDayPctStr || "0"}%</span>/dia
                       </button>
-
-                      <div className="relative">
-                        <button
-                          onClick={() => setShowExportMenu((v) => !v)}
-                          className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs border border-zinc-700 whitespace-nowrap"
-                        >
-                          <Download className="w-3.5 h-3.5 text-emerald-400" /> Exportar
-                          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showExportMenu ? "rotate-180" : ""}`} />
-                        </button>
-
-                        {showExportMenu && (
-                          <>
-                            <div className="fixed inset-0 z-30" onClick={() => setShowExportMenu(false)} />
-                            <div className="absolute right-0 top-full mt-2 z-40 w-60 rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl overflow-hidden">
-                              <button
-                                onClick={() => { setShowExportMenu(false); downloadExcelFormat(); }}
-                                className="w-full px-4 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-800 transition-colors flex items-center gap-2 cursor-pointer"
-                              >
-                                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" /> Planilha (XLS/CSV)
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setShowExportMenu(false);
-                                  const exportList = selectedDebtorIds.size > 0
-                                    ? filteredDebtors.filter(d => selectedDebtorIds.has(d.id))
-                                    : filteredDebtors;
-                                  // Quando há seleção, os cards de totais também refletem só os selecionados
-                                  const exportBase = selectedDebtorIds.size > 0 ? exportList : debtors;
-                                  exportRelatorio(exportBase, exportList, account?.email ?? "", representatives);
-                                }}
-                                className="w-full px-4 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-800 transition-colors flex items-center gap-2 cursor-pointer"
-                              >
-                                <Download className="w-3.5 h-3.5 text-rose-400" />
-                                {selectedDebtorIds.size > 0 ? `Relatório PDF (${selectedDebtorIds.size} selecionados)` : "Relatório PDF"}
-                              </button>
-                              <button
-                                onClick={() => { setShowExportMenu(false); setSheetsExportResult(null); setExportSheetUrl(sheetUrlInput); setShowExportSheetsModal(true); }}
-                                className="w-full px-4 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-800 transition-colors flex items-center gap-2 cursor-pointer"
-                              >
-                                <CloudLightning className="w-3.5 h-3.5 text-sky-400" /> Sincronizar com Sheets
-                              </button>
+                      {showEncargos && (
+                        <>
+                          <div className="fixed inset-0 z-30" onClick={() => setShowEncargos(false)} />
+                          <div className="absolute left-0 top-full mt-2 z-40 w-72 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl p-4 space-y-3">
+                            <div>
+                              <p className="text-xs font-bold text-white">Encargos dos vencidos</p>
+                              <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">Multa aplicada uma vez e juros por dia de atraso, para toda a carteira.</p>
                             </div>
-                          </>
-                        )}
-                      </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              {[
+                                { rotulo: "Multa", valor: globalFinePctStr, setStr: setGlobalFinePctStr, setNum: setGlobalFinePct },
+                                { rotulo: "Juros ao dia", valor: globalInterestDayPctStr, setStr: setGlobalInterestDayPctStr, setNum: setGlobalInterestDayPct },
+                              ].map(({ rotulo, valor, setStr, setNum }) => (
+                                <div key={rotulo}>
+                                  <label className="block mb-1 text-[10px] font-mono uppercase tracking-widest text-zinc-500">{rotulo}</label>
+                                  <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-2 focus-within:border-emerald-500">
+                                    <input aria-label={`${rotulo} (%)`}
+                                      type="text"
+                                      inputMode="decimal"
+                                      value={valor}
+                                      onChange={(e) => {
+                                        const raw = e.target.value.replace(",", ".");
+                                        setStr(e.target.value);
+                                        if (raw === "" || raw === ".") { setNum(0); return; }
+                                        const n = parseFloat(raw);
+                                        if (!isNaN(n)) setNum(Math.max(0, n));
+                                      }}
+                                      placeholder="0"
+                                      className="w-full bg-transparent focus:outline-none text-sm font-mono text-white placeholder:text-zinc-700"
+                                    />
+                                    <span className="text-xs text-zinc-500">%</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
 
+                    <button
+                      type="button"
+                      onClick={() => setShowRepModal(true)}
+                      className="px-3 py-2 rounded-lg border border-zinc-800 hover:border-zinc-700 text-xs text-zinc-300 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
+                    >
+                      <Users className="w-3.5 h-3.5 text-zinc-500" /> Responsáveis
+                    </button>
+
+                    <div className="relative">
                       <button
-                        onClick={clearOverviewVision}
-                        className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs whitespace-nowrap"
+                        onClick={() => setShowExportMenu((v) => !v)}
+                        className="px-3 py-2 rounded-lg border border-zinc-800 hover:border-zinc-700 text-xs text-zinc-300 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
                       >
-                        <Trash2 className="w-3.5 h-3.5" /> Limpar Visão Geral
+                        <Download className="w-3.5 h-3.5 text-zinc-500" /> Exportar
+                        <ChevronDown className={`w-3 h-3 transition-transform ${showExportMenu ? "rotate-180" : ""}`} />
                       </button>
+
+                      {showExportMenu && (
+                        <>
+                          <div className="fixed inset-0 z-30" onClick={() => setShowExportMenu(false)} />
+                          <div className="absolute right-0 top-full mt-2 z-40 w-60 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden py-1">
+                            <button
+                              onClick={() => { setShowExportMenu(false); downloadExcelFormat(); }}
+                              className="w-full px-4 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-900 transition-colors flex items-center gap-2 cursor-pointer"
+                            >
+                              <FileSpreadsheet className="w-3.5 h-3.5 text-zinc-500" /> Planilha (XLS/CSV)
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowExportMenu(false);
+                                const exportList = selectedDebtorIds.size > 0
+                                  ? filteredDebtors.filter(d => selectedDebtorIds.has(d.id))
+                                  : filteredDebtors;
+                                // Quando há seleção, os cards de totais também refletem só os selecionados
+                                const exportBase = selectedDebtorIds.size > 0 ? exportList : debtors;
+                                exportRelatorio(exportBase, exportList, account?.email ?? "", representatives);
+                              }}
+                              className="w-full px-4 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-900 transition-colors flex items-center gap-2 cursor-pointer"
+                            >
+                              <Download className="w-3.5 h-3.5 text-zinc-500" />
+                              {selectedDebtorIds.size > 0 ? `Relatório PDF (${selectedDebtorIds.size} selecionados)` : "Relatório PDF"}
+                            </button>
+                            <button
+                              onClick={() => { setShowExportMenu(false); setSheetsExportResult(null); setExportSheetUrl(sheetUrlInput); setShowExportSheetsModal(true); }}
+                              className="w-full px-4 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-900 transition-colors flex items-center gap-2 cursor-pointer"
+                            >
+                              <CloudLightning className="w-3.5 h-3.5 text-zinc-500" /> Sincronizar com Sheets
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => { setShowAddDebtorModal(true); setAddDebtorError(""); }}
+                      className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 text-xs whitespace-nowrap"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" /> Adicionar devedor
+                    </button>
+
+                    {/* Ações raras e destrutivas ficam fora da vista. */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowMaisCarteira((v) => !v)}
+                        aria-label="Mais ações"
+                        className="px-2.5 py-2 rounded-lg border border-zinc-800 hover:border-zinc-700 text-xs text-zinc-400 transition-colors cursor-pointer"
+                      >
+                        ⋯
+                      </button>
+                      {showMaisCarteira && (
+                        <>
+                          <div className="fixed inset-0 z-30" onClick={() => setShowMaisCarteira(false)} />
+                          <div className="absolute right-0 top-full mt-2 z-40 w-56 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden py-1">
+                            <button
+                              onClick={() => { setShowMaisCarteira(false); void clearOverviewVision(); }}
+                              className="w-full px-4 py-2.5 text-left text-xs text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-2 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Apagar toda a carteira
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
                   {selectedDebtorIds.size > 0 && (
-                    <div className="p-4 rounded-2xl bg-emerald-500/8 border border-emerald-500/20 flex flex-wrap items-center justify-between gap-3">
+                    <div className="px-4 py-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <span className="text-emerald-300 text-xs font-bold">
                           {selectedDebtorIds.size} devedor{selectedDebtorIds.size > 1 ? "es" : ""} selecionado{selectedDebtorIds.size > 1 ? "s" : ""}
@@ -3481,7 +3454,7 @@ export default function App() {
                   {debtorSaveError && (
                     <p role="alert" className="text-sm text-rose-400 mb-3">{debtorSaveError}</p>
                   )}
-                  <div className="bg-zinc-900/40 border border-zinc-900 rounded-3xl overflow-hidden shadow-xl">
+                  <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden">
                     <div
                       ref={tableScrollRef}
                       className="overflow-x-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900 cursor-grab active:cursor-grabbing select-none"
@@ -3512,9 +3485,9 @@ export default function App() {
                       }}
                     >
                       <table id="tbl-devedores" className="w-full text-xs text-left text-zinc-300">
-                        <thead className="text-[10px] uppercase font-mono tracking-wider bg-zinc-900/80 border-b border-zinc-800 text-zinc-400">
+                        <thead className="text-[10px] uppercase font-mono tracking-wider bg-zinc-900/60 border-b border-zinc-800 text-zinc-500">
                           <tr>
-                            <th className="px-3 py-4 w-8 sticky left-0 z-10 bg-zinc-900/80 backdrop-blur-sm">
+                            <th className="px-3 py-3 w-8 sticky left-0 z-10 bg-zinc-900/80 backdrop-blur-sm">
                               <button
                                 type="button"
                                 title={filteredDebtors.length > 0 && filteredDebtors.every(d => selectedDebtorIds.has(d.id)) ? "Desmarcar todos" : "Selecionar todos"}
@@ -3543,8 +3516,8 @@ export default function App() {
                                 className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200"
                                 title={sortNameOrder === "asc" ? "Clique para Z-A" : "Clique para A-Z"}
                               >
-                                <span className="text-emerald-400">CLIENTE</span>
-                                <span className="text-[9px] font-bold px-1 py-0.5 rounded transition-colors bg-emerald-500/20 text-emerald-400">
+                                <span className="text-zinc-300">CLIENTE</span>
+                                <span className="text-[9px] font-bold px-1 py-0.5 rounded transition-colors bg-zinc-800 text-zinc-300">
                                   {sortNameOrder === "desc" ? "Z→A ↓" : "A→Z ↑"}
                                 </span>
                               </button>
@@ -3585,7 +3558,7 @@ export default function App() {
                                 </span>
                               </button>
                             </th>
-                            <th className="px-4 py-3 text-center">TELEFONE (WHATSAPP)</th>
+                            <th className="px-4 py-3 text-center">WHATSAPP</th>
                             <th className="px-4 py-3 text-right">
                               <button
                                 type="button"
@@ -3593,7 +3566,7 @@ export default function App() {
                                 className="flex items-center gap-1.5 group transition-colors text-zinc-400 hover:text-zinc-200 ml-auto"
                                 title={sortValueOrder === "desc" ? "Clique para menor primeiro" : sortValueOrder === "asc" ? "Clique para remover ordenação" : "Clique para maior primeiro"}
                               >
-                                <span className={sortValueOrder !== "none" ? "text-emerald-400" : ""}>VALOR BASE (R$)</span>
+                                <span className={sortValueOrder !== "none" ? "text-emerald-400" : ""}>VALOR</span>
                                 <span className={`text-[9px] font-bold px-1 py-0.5 rounded transition-colors ${
                                   sortValueOrder !== "none" ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-600 group-hover:text-zinc-400"
                                 }`}>
@@ -3601,7 +3574,7 @@ export default function App() {
                                 </span>
                               </button>
                             </th>
-                            <th className="px-4 py-3 text-right bg-emerald-500/5 text-emerald-400">TOTAL + MULTA + JUROS (R$)</th>
+                            <th className="px-4 py-3 text-right text-zinc-300" title="Valor com multa e juros">TOTAL CORRIGIDO</th>
                             {/* Tipo / Status — com filtros de categoria e status inline */}
                             <th className="px-4 py-2 text-center">
                               <div className="flex flex-col items-center gap-1.5">
@@ -3641,12 +3614,12 @@ export default function App() {
                                 </select>
                               </div>
                             </th>
-                            <th className="px-4 py-3">OBSERVAÇÕES</th>
-                            <th className="px-4 py-3 text-center">BOLETO PDF</th>
-                            <th className="px-5 py-3 text-right">AÇÃO</th>
+                            <th className="px-4 py-3 text-center">NOTAS</th>
+                            <th className="px-4 py-3 text-center">BOLETO</th>
+                            <th className="px-5 py-3 text-right"><span className="sr-only">Ações</span></th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-zinc-800">
+                        <tbody className="divide-y divide-zinc-900">
                           {filteredDebtors.length === 0 ? (
                             <tr>
                               <td colSpan={13} className="px-6 py-12 text-center text-zinc-500">
@@ -3659,8 +3632,8 @@ export default function App() {
                               const assignedRep = representatives.find(r => r.id === d.representativeId);
                               
                               return (
-                                <tr key={d.id} className={`hover:bg-zinc-900/30 transition-colors ${selectedDebtorIds.has(d.id) ? "bg-emerald-500/5" : ""}`}>
-                                  <td className={`px-3 py-4 sticky left-0 z-[5] ${selectedDebtorIds.has(d.id) ? "bg-emerald-950/60" : "bg-zinc-950"} backdrop-blur-sm`}>
+                                <tr key={d.id} className={`hover:bg-zinc-900/40 transition-colors ${selectedDebtorIds.has(d.id) ? "bg-emerald-500/5" : ""}`}>
+                                  <td className={`px-3 py-3 sticky left-0 z-[5] ${selectedDebtorIds.has(d.id) ? "bg-emerald-950/60" : "bg-zinc-950"} backdrop-blur-sm`}>
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -3679,7 +3652,7 @@ export default function App() {
                                       }
                                     </button>
                                   </td>
-                                  <td className={`px-5 py-4 font-bold text-white min-w-[160px] sticky left-8 z-[5] ${selectedDebtorIds.has(d.id) ? "bg-emerald-950/60" : "bg-zinc-950"} backdrop-blur-sm shadow-[2px_0_8px_rgba(0,0,0,0.4)]`}>
+                                  <td className={`px-5 py-3 font-bold text-white min-w-[160px] sticky left-8 z-[5] ${selectedDebtorIds.has(d.id) ? "bg-emerald-950/60" : "bg-zinc-950"} backdrop-blur-sm shadow-[2px_0_8px_rgba(0,0,0,0.4)]`}>
                                     <input aria-label={`Cliente do registro ${d.document || d.client}`}
                                       type="text"
                                       value={d.client}
@@ -3689,7 +3662,7 @@ export default function App() {
                                       className="w-full bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded p-1 font-bold text-white"
                                     />
                                   </td>
-                                  <td className="px-4 py-4 text-center font-mono text-zinc-400">
+                                  <td className="px-4 py-3 text-center font-mono text-zinc-400">
                                     <input aria-label={`Documento do registro ${d.document || d.client}`}
                                       type="text"
                                       value={d.document}
@@ -3699,7 +3672,7 @@ export default function App() {
                                       className="w-20 text-center bg-transparent focus:bg-zinc-950 rounded p-1 font-mono"
                                     />
                                   </td>
-                                  <td className="px-4 py-4 min-w-[90px]">
+                                  <td className="px-4 py-3 min-w-[90px]">
                                     <input aria-label={`Banco do registro ${d.document || d.client}`}
                                       type="text"
                                       value={d.bank || ""}
@@ -3710,7 +3683,7 @@ export default function App() {
                                       className="w-full bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded px-1.5 py-1 text-zinc-400"
                                     />
                                   </td>
-                                  <td className="px-4 py-4 text-center font-mono">
+                                  <td className="px-4 py-3 text-center font-mono">
                                     <input aria-label={`Vencimento do registro ${d.document || d.client}`}
                                       type="text"
                                       value={d.dueDate}
@@ -3720,7 +3693,7 @@ export default function App() {
                                       className="w-22 text-center bg-transparent focus:bg-zinc-950 rounded p-1 font-mono text-xs"
                                     />
                                   </td>
-                                  <td className="px-4 py-4 text-center font-mono">
+                                  <td className="px-4 py-3 text-center font-mono">
                                     <input aria-label={`Telefone WhatsApp do registro ${d.document || d.client}`}
                                       type="text"
                                       value={d.phone || ""}
@@ -3731,7 +3704,7 @@ export default function App() {
                                       className="w-32 text-center bg-transparent hover:bg-zinc-950/40 focus:bg-zinc-950 rounded p-1 font-mono text-xs text-zinc-300 focus:outline-none"
                                     />
                                   </td>
-                                  <td className="px-4 py-4 text-right font-mono">
+                                  <td className="px-4 py-3 text-right font-mono">
                                     <div className="inline-flex items-center justify-end">
                                       <span className="text-zinc-500 text-xs mr-px">R$</span>
                                       <input aria-label={`Valor do registro ${d.document || d.client}`}
@@ -3756,7 +3729,7 @@ export default function App() {
                                             // porque 1.25 e ambiguo com 1.250 — mas em vez de repetir
                                             // a regra generica, mostramos a forma ja corrigida.
                                             const bruto = editingValueText.trim();
-                                            const pontoDecimal = /^d+.d{1,2}$/.test(bruto);
+                                            const pontoDecimal = /^\d+\.\d{1,2}$/.test(bruto);
                                             setDebtorSaveError(
                                               pontoDecimal
                                                 ? `Valor nao salvo em "${alvo}": use virgula para os centavos — ${bruto.replace(".", ",")}.`
@@ -3773,10 +3746,10 @@ export default function App() {
                                       />
                                     </div>
                                   </td>
-                                  <td className="px-4 py-4 text-right font-mono text-emerald-300 font-bold bg-emerald-500/5">
+                                  <td className="px-4 py-3 text-right font-mono text-white font-semibold tabular-nums">
                                     {formatBRL(d.updatedValue || d.value)}
                                   </td>
-                                  <td className="px-4 py-4 text-center">
+                                  <td className="px-4 py-3 text-center">
                                     <span 
                                       onClick={() => {
                                         // Vencido → A vencer → Recompra → Liquidado. Desabilitado não
@@ -3794,7 +3767,7 @@ export default function App() {
                                       {CATEGORY_LABEL[d.category]}
                                     </span>
                                   </td>
-                                  <td className="px-4 py-4">
+                                  <td className="px-4 py-3">
                                     <select
                                       value={d.representativeId || ""}
                                       onChange={(e) => updateGeneralDebtorField(d.id, "representativeId", e.target.value || undefined)}
@@ -3806,7 +3779,7 @@ export default function App() {
                                       ))}
                                     </select>
                                   </td>
-                                  <td className="px-4 py-4 text-center">
+                                  <td className="px-4 py-3 text-center">
                                     <button
                                       type="button"
                                       onClick={() => setNotesPopover({ debtorId: d.id, draft: d.notes || "" })}
@@ -3827,7 +3800,7 @@ export default function App() {
                                     </button>
                                   </td>
                                   {/* ── Coluna PDF ─────────────────────────── */}
-                                  <td className="px-3 py-4 text-center min-w-[110px]">
+                                  <td className="px-3 py-3 text-center min-w-[110px]">
                                     <div className="flex items-center justify-center gap-1.5">
                                       {uploadingPdfDebtorId === d.id ? (
                                         <span className="flex items-center gap-1 text-[10px] text-zinc-400">
@@ -3886,7 +3859,7 @@ export default function App() {
                                       )}
                                     </div>
                                   </td>
-                                  <td className="px-5 py-4 text-right">
+                                  <td className="px-5 py-3 text-right">
                                     <div className="flex items-center justify-end gap-2 text-zinc-400">
                                       <button
                                         onClick={() => {
@@ -5531,12 +5504,12 @@ export default function App() {
               className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
               onClick={(e) => e.target === e.currentTarget && setShowRepModal(false)}
             >
-              <div className="bg-zinc-900 border border-zinc-700 rounded-3xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+              <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
                 {/* Header */}
                 <div className="flex items-center justify-between p-5 border-b border-zinc-800 flex-shrink-0">
                   <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5 text-emerald-400" />
-                    <h3 className="text-base font-bold text-white">Responsáveis Ativos</h3>
+                    <Users className="w-4 h-4 text-zinc-500" />
+                    <h3 className="text-sm font-bold text-white">Responsáveis</h3>
                   </div>
                   <button onClick={() => setShowRepModal(false)} className="text-zinc-500 hover:text-white transition-colors">
                     <X className="w-5 h-5" />
@@ -5550,7 +5523,7 @@ export default function App() {
                   ) : representatives.map((r) => {
                     const assignedCount = debtors.filter((d) => d.representativeId === r.id).length;
                     return (
-                      <div key={r.id} className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800 gap-3">
+                      <div key={r.id} className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/60 border border-zinc-800 gap-3">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className={`w-3 h-3 rounded-full flex-shrink-0 ${r.color}`} />
                           <div className="min-w-0">
