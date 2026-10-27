@@ -103,10 +103,10 @@ eq(canUseSubscription({ status: "active" }, new Date("2030-01-01T00:00:00Z")), t
   "sem billing_provider (Asaas antigo): não sofre o prazo");
 
 console.log("\n══ Plano pelo valor ════════════════════════════════════════");
-eq(planFromValue(49), "basic", "49 → Básico");
-eq(planFromValue(97), "pro", "97 → Pro");
-eq(planFromValue(197), "premium", "197 → Premium");
-eq(planFromValue(199), null, "valor fora da tabela → null (não rebaixa)");
+eq(planFromValue(149), "basic", "149 → Básico");
+eq(planFromValue(197), "pro", "197 → Pro");
+eq(planFromValue(297), "premium", "297 → Premium");
+eq(planFromValue(97), null, "preço antigo (97) → null: mantém o plano gravado");
 eq(planFromValue(undefined), null, "sem valor");
 
 console.log(`\n══════════════════════════════════════════════════════════`);

@@ -292,20 +292,30 @@ export async function saveUserZApiCredentials(
   userId: string,
   credentials: { instanceId: string; token: string; clientToken: string; label?: string },
 ): Promise<void> {
-  await admin
+  const base = {
+    user_id:      userId,
+    instance_id:  credentials.instanceId,
+    token:        credentials.token,
+    client_token: credentials.clientToken,
+    label:        credentials.label ?? null,
+    is_active:    true,
+    status:       "inactive",
+    connected:    false,
+    updated_at:   new Date().toISOString(),
+  };
+
+  // Instância do suporte substitui uma automática que existisse: zera o ciclo de
+  // vida para a verificação diária não tentar assinar/cancelar pela API de
+  // parceiro uma instância que não foi criada por ela.
+  const { error } = await admin
     .from("user_zapi_config")
     .upsert(
-      {
-        user_id:      userId,
-        instance_id:  credentials.instanceId,
-        token:        credentials.token,
-        client_token: credentials.clientToken,
-        label:        credentials.label ?? null,
-        is_active:    true,
-        status:       "inactive",
-        connected:    false,
-        updated_at:   new Date().toISOString(),
-      },
+      { ...base, auto_provisioned: false, provisioned_at: null, subscribed_at: null, canceled_at: null },
       { onConflict: "user_id" },
     );
+
+  // Antes da migration 20261026150000 essas colunas não existem.
+  if (error) {
+    await admin.from("user_zapi_config").upsert(base, { onConflict: "user_id" });
+  }
 }

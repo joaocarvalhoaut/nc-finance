@@ -4,18 +4,20 @@
  * FONTE ÚNICA: o checkout do Asaas cobra estes valores e a tela de planos os
  * exibe. Puro (sem Deno, sem DOM): roda nas Edge Functions e no front.
  *
- * Os preços da landing page (LandingPage.tsx) são escritos à mão — ao mudar
- * um valor aqui, mude lá também.
+ * A landing page (LandingPage.tsx) e a tela de planos leem daqui.
  */
 
 export type PlanId = "basic" | "pro" | "premium";
 
 export const PLAN_IDS: readonly PlanId[] = ["basic", "pro", "premium"];
 
+// Cada cliente custa ~R$ 93/mês: instância Z-API do próprio número (R$ 89,99 no
+// programa Partner, faixa de 10 a 49 instâncias) + taxa do Asaas. Os preços
+// cobrem esse custo com margem — revisar se a tabela da Z-API mudar.
 export const PLAN_PRICE_BRL: Record<PlanId, number> = {
-  basic: 49,
-  pro: 97,
-  premium: 197,
+  basic: 149,
+  pro: 197,
+  premium: 297,
 };
 
 export const isPlanId = (value: unknown): value is PlanId =>

@@ -101,19 +101,33 @@ export const whatsappGatewayService = {
     token:        string;
     clientToken:  string;
     adminToken:   string;
+    /** E-mail da conta do cliente que vai usar a instância. Vazio = a própria conta. */
+    targetEmail?: string;
   }): Promise<GatewaySaveResult> {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.functions.invoke<GatewaySaveResult>(
       "whatsapp-gateway",
       {
         method: "POST",
-        body:   { action: "save", instanceId: params.instanceId, token: params.token, clientToken: params.clientToken },
+        body:   {
+          action: "save", instanceId: params.instanceId, token: params.token, clientToken: params.clientToken,
+          ...(params.targetEmail ? { targetEmail: params.targetEmail } : {}),
+        },
         headers: { "X-Admin-Token": params.adminToken },
       },
     );
 
     if (error || !data) {
-      return { ok: false, message: error?.message ?? "Falha ao salvar credenciais." };
+      // Corpo real da resposta non-2xx (ex.: "Nenhuma conta com esse e-mail").
+      let message = "Falha ao salvar credenciais.";
+      try {
+        const ctx = (error as unknown as { context?: Response })?.context;
+        if (ctx) {
+          const body = await ctx.json() as { error?: string };
+          if (body.error) message = body.error;
+        }
+      } catch { /* corpo não-JSON */ }
+      return { ok: false, message };
     }
     return data;
   },

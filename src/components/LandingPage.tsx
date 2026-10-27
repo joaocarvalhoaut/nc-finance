@@ -23,9 +23,9 @@ import {
   Check,
   Send,
   Zap,
-  PhoneCall
 } from "lucide-react";
 import type { AuthCredentials, SignUpPayload } from "../types";
+import { PLAN_PRICE_BRL } from "../../supabase/functions/_shared/billingPlans.ts";
 // Static import — Vite resolves this at build time and outputs a hashed URL.
 // DO NOT use /src/... URL paths for assets (breaks in production/Vercel).
 
@@ -85,9 +85,6 @@ export default function LandingPage({
   const [demoTone, setDemoTone] = useState<"amigavel" | "neutro" | "firme" | "juridico">("amigavel");
   const [activeTab, setActiveTab] = useState<"features" | "pricing" | "simulation" | "about">("features");
 
-  // Add-on: número próprio por plano
-  const [ownNumber, setOwnNumber] = useState<{ lite: boolean; pro: boolean; premium: boolean }>({ lite: false, pro: false, premium: false });
-  const SUPPORT_WHATSAPP = "https://wa.me/5500000000000?text=Olá!%20Quero%20ativar%20o%20add-on%20de%20número%20próprio%20na%20NC%20Finance.";
 
   // Get message output for simulation
   const getDemoMessage = () => {
@@ -923,12 +920,8 @@ export default function LandingPage({
               <div className="mb-6">
                 <p className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-2">Starter</p>
                 <div className="flex items-baseline gap-1">
-                  {ownNumber.lite
-                    ? <><span className="text-4xl font-black text-white">R$ 199</span><span className="text-zinc-500 text-sm ml-1">/mês</span></>
-                    : <><span className="text-4xl font-black text-white">R$ 49</span><span className="text-zinc-500 text-sm ml-1">/mês</span></>
-                  }
+                  <span className="text-4xl font-black text-white">R$ {PLAN_PRICE_BRL.basic}</span><span className="text-zinc-500 text-sm ml-1">/mês</span>
                 </div>
-                {ownNumber.lite && <p className="text-[10px] text-zinc-600 font-mono mt-1">R$49 + R$150 (nº próprio)</p>}
                 <p className="text-zinc-500 text-sm mt-3 leading-relaxed">Para pequenas carteiras que querem sair do processo manual.</p>
               </div>
 
@@ -937,6 +930,7 @@ export default function LandingPage({
               <ul className="space-y-3 text-sm text-zinc-400 flex-1">
                 {[
                   "Até 300 cobranças / mês",
+                  "WhatsApp com o seu próprio número",
                   "Importação PDF, Excel e CSV",
                   "Juros e multas automáticos",
                   "4 tons de cobrança via WhatsApp",
@@ -955,27 +949,9 @@ export default function LandingPage({
                 ))}
               </ul>
 
-              <div className={`mt-6 rounded-none border p-3 cursor-pointer transition-all ${ownNumber.lite ? "border-amber-500/40 bg-amber-500/5" : "border-zinc-800 hover:border-zinc-700"}`}
-                onClick={() => setOwnNumber(p => ({ lite: !p.lite, pro: false, premium: false }))}>
-                <div className="flex items-center gap-2.5">
-                  <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-all ${ownNumber.lite ? "bg-amber-500 border-amber-500" : "border-zinc-600"}`}>
-                    {ownNumber.lite && <Check className="w-2.5 h-2.5 text-black" strokeWidth={3} />}
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-zinc-300">Número próprio <span className="text-zinc-500 font-normal">+R$150/mês</span></p>
-                  </div>
-                </div>
-              </div>
-
-              {ownNumber.lite
-                ? <a href={SUPPORT_WHATSAPP} target="_blank" rel="noopener noreferrer"
-                    className="mt-5 px-4 py-2.5 rounded-none border border-amber-500/40 text-amber-400 bg-amber-500/5 hover:bg-amber-500/10 transition-all text-center flex items-center justify-center gap-2 text-sm font-semibold">
-                    <PhoneCall className="w-4 h-4" /> Falar com Suporte
-                  </a>
-                : <a href="#auth-panel" className="mt-5 px-4 py-2.5 rounded-none border border-zinc-700 text-zinc-300 font-semibold hover:bg-zinc-900 hover:border-zinc-600 transition-all text-center block text-sm">
-                    Começar no Starter
-                  </a>
-              }
+              <a href="#auth-panel" className="mt-5 px-4 py-2.5 rounded-none border border-zinc-700 text-zinc-300 font-semibold hover:bg-zinc-900 hover:border-zinc-600 transition-all text-center block text-sm">
+                Começar no Starter
+              </a>
             </motion.div>
 
             {/* Professional — destaque */}
@@ -992,12 +968,8 @@ export default function LandingPage({
               <div className="mb-6">
                 <p className="text-xs font-mono uppercase tracking-widest text-emerald-400 mb-2">Professional</p>
                 <div className="flex items-baseline gap-1">
-                  {ownNumber.pro
-                    ? <><span className="text-4xl font-black text-emerald-300">R$ 247</span><span className="text-zinc-500 text-sm ml-1">/mês</span></>
-                    : <><span className="text-4xl font-black text-emerald-300">R$ 97</span><span className="text-zinc-500 text-sm ml-1">/mês</span></>
-                  }
+                  <span className="text-4xl font-black text-emerald-300">R$ {PLAN_PRICE_BRL.pro}</span><span className="text-zinc-500 text-sm ml-1">/mês</span>
                 </div>
-                {ownNumber.pro && <p className="text-[10px] text-zinc-600 font-mono mt-1">R$97 + R$150 (nº próprio)</p>}
                 <p className="text-zinc-400 text-sm mt-3 leading-relaxed">Automação completa para empresas que querem crescer sem precisar contratar mais gente.</p>
               </div>
 
@@ -1025,25 +997,9 @@ export default function LandingPage({
                 ))}
               </ul>
 
-              <div className={`mt-6 rounded-none border p-3 cursor-pointer transition-all ${ownNumber.pro ? "border-amber-500/40 bg-amber-500/5" : "border-emerald-500/10 hover:border-amber-500/30"}`}
-                onClick={() => setOwnNumber(p => ({ lite: false, pro: !p.pro, premium: false }))}>
-                <div className="flex items-center gap-2.5">
-                  <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-all ${ownNumber.pro ? "bg-amber-500 border-amber-500" : "border-zinc-500"}`}>
-                    {ownNumber.pro && <Check className="w-2.5 h-2.5 text-black" strokeWidth={3} />}
-                  </div>
-                  <p className="text-xs font-semibold text-zinc-300">Número próprio <span className="text-zinc-500 font-normal">+R$150/mês</span></p>
-                </div>
-              </div>
-
-              {ownNumber.pro
-                ? <a href={SUPPORT_WHATSAPP} target="_blank" rel="noopener noreferrer"
-                    className="mt-5 px-4 py-3 rounded-none border border-amber-500/60 text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-all text-center flex items-center justify-center gap-2 text-sm font-extrabold">
-                    <PhoneCall className="w-4 h-4" /> Falar com Suporte
-                  </a>
-                : <a href="#auth-panel" className="mt-5 px-4 py-3 rounded-none bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold shadow-[0_4px_20px_rgba(16,185,129,0.3)] transition-all text-center block text-sm">
-                    Assinar Professional
-                  </a>
-              }
+              <a href="#auth-panel" className="mt-5 px-4 py-3 rounded-none bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold shadow-[0_4px_20px_rgba(16,185,129,0.3)] transition-all text-center block text-sm">
+                Assinar Professional
+              </a>
             </motion.div>
 
             {/* Enterprise */}
@@ -1056,12 +1012,8 @@ export default function LandingPage({
               <div className="mb-6">
                 <p className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-2">Enterprise</p>
                 <div className="flex items-baseline gap-1">
-                  {ownNumber.premium
-                    ? <><span className="text-4xl font-black text-white">R$ 347</span><span className="text-zinc-500 text-sm ml-1">/mês</span></>
-                    : <><span className="text-4xl font-black text-white">R$ 197</span><span className="text-zinc-500 text-sm ml-1">/mês</span></>
-                  }
+                  <span className="text-4xl font-black text-white">R$ {PLAN_PRICE_BRL.premium}</span><span className="text-zinc-500 text-sm ml-1">/mês</span>
                 </div>
-                {ownNumber.premium && <p className="text-[10px] text-zinc-600 font-mono mt-1">R$197 + R$150 (nº próprio)</p>}
                 <p className="text-zinc-500 text-sm mt-3 leading-relaxed">Para grandes carteiras com controle granular de horários, limites e prioridades.</p>
               </div>
 
@@ -1083,25 +1035,9 @@ export default function LandingPage({
                 ))}
               </ul>
 
-              <div className={`mt-6 rounded-none border p-3 cursor-pointer transition-all ${ownNumber.premium ? "border-amber-500/40 bg-amber-500/5" : "border-zinc-800 hover:border-zinc-700"}`}
-                onClick={() => setOwnNumber(p => ({ lite: false, pro: false, premium: !p.premium }))}>
-                <div className="flex items-center gap-2.5">
-                  <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-all ${ownNumber.premium ? "bg-amber-500 border-amber-500" : "border-zinc-600"}`}>
-                    {ownNumber.premium && <Check className="w-2.5 h-2.5 text-black" strokeWidth={3} />}
-                  </div>
-                  <p className="text-xs font-semibold text-zinc-300">Número próprio <span className="text-zinc-500 font-normal">+R$150/mês</span></p>
-                </div>
-              </div>
-
-              {ownNumber.premium
-                ? <a href={SUPPORT_WHATSAPP} target="_blank" rel="noopener noreferrer"
-                    className="mt-5 px-4 py-2.5 rounded-none border border-amber-500/40 text-amber-400 bg-amber-500/5 hover:bg-amber-500/10 transition-all text-center flex items-center justify-center gap-2 text-sm font-semibold">
-                    <PhoneCall className="w-4 h-4" /> Falar com Suporte
-                  </a>
-                : <a href="#auth-panel" className="mt-5 px-4 py-2.5 rounded-none border border-emerald-500/20 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-all text-center block text-sm font-semibold">
-                    Assinar Enterprise
-                  </a>
-              }
+              <a href="#auth-panel" className="mt-5 px-4 py-2.5 rounded-none border border-emerald-500/20 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-all text-center block text-sm font-semibold">
+                Assinar Enterprise
+              </a>
             </motion.div>
 
           </div>
@@ -1131,7 +1067,7 @@ export default function LandingPage({
 
           {/* Rodapé da seção */}
           <p className="text-center text-xs text-zinc-600 mt-6">
-            Todos os planos incluem número compartilhado NC Finance. Add-on de número próprio disponível em qualquer plano.
+            Todos os planos enviam pelo seu próprio número de WhatsApp — você conecta em menos de um minuto, lendo um QR Code.
           </p>
 
         </div>

@@ -146,6 +146,28 @@ async function fetchZApiQR(instanceId: string, token: string, clientToken: strin
   }
 }
 
+/**
+ * user_id da conta com este e-mail. A Admin API do Supabase não filtra por
+ * e-mail, então percorre as páginas — suficiente enquanto a base tiver poucos
+ * milhares de contas (só o suporte chama, ao ligar uma instância a um cliente).
+ */
+async function findUserIdByEmail(
+  // Genéricos explícitos pelo mesmo motivo de platformIntegrations.ts.
+  // deno-lint-ignore no-explicit-any
+  admin: ReturnType<typeof createClient<any, any, any>>,
+  email: string,
+): Promise<string | null> {
+  const POR_PAGINA = 200;
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: POR_PAGINA });
+    if (error) throw error;
+    const achado = data.users.find((u) => (u.email ?? "").toLowerCase() === email);
+    if (achado) return achado.id;
+    if (data.users.length < POR_PAGINA) break;
+  }
+  return null;
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -268,12 +290,19 @@ Deno.serve(async (req: Request) => {
     const token       = String(body.token        ?? "").trim();
     const clientToken = String(body.clientToken  ?? "").trim();
     const label       = String(body.label        ?? "").trim();
-    // Conta destino: o suporte provisiona para um cliente informando targetUserId;
-    // sem ele, grava na propria conta de quem chamou.
-    const targetUserId = String(body.targetUserId ?? "").trim() || user.id;
-
     if (!instanceId || !token || !clientToken) {
       return err(400, "Campos obrigatórios: instanceId, token, clientToken.");
+    }
+
+    // Conta destino: o suporte liga uma instância comprada à mão na Z-API à conta
+    // de um cliente pelo e-mail dele (ou pelo targetUserId). Sem nenhum dos
+    // dois, grava na própria conta de quem chamou.
+    let targetUserId = String(body.targetUserId ?? "").trim() || user.id;
+    const targetEmail = String(body.targetEmail ?? "").trim().toLowerCase();
+    if (targetEmail) {
+      const encontrado = await findUserIdByEmail(admin, targetEmail);
+      if (!encontrado) return err(404, "Nenhuma conta com esse e-mail.");
+      targetUserId = encontrado;
     }
 
     await saveUserZApiCredentials(admin, targetUserId, {
@@ -283,7 +312,12 @@ Deno.serve(async (req: Request) => {
     // Safe log: mask token values
     console.log(`[whatsapp-gateway] credentials saved — instanceId=${maskToken(instanceId)} token=${maskToken(token)}`);
 
-    return ok({ ok: true, message: "Credenciais salvas. Use action=validate para testar a conexão." });
+    return ok({
+      ok: true,
+      message: targetUserId === user.id
+        ? "Salvo com sucesso. Agora conecte o número pelo \"Conectar WhatsApp\"."
+        : `Salvo com sucesso na conta ${targetEmail || "do cliente"}. Ele já pode conectar o número pelo "Conectar WhatsApp".`,
+    });
   }
 
   // ── POST { action: "validate" } ───────────────────────────────────────────

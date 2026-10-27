@@ -44,6 +44,8 @@ export default function WhatsappGatewayCard() {
   const [token,        setToken]        = useState("");
   const [clientToken,  setClientToken]  = useState("");
   const [adminToken,   setAdminToken]   = useState("");
+  // Conta do cliente que vai usar a instância (vazio = a própria conta).
+  const [clienteEmail, setClienteEmail] = useState("");
   const [showSecrets,  setShowSecrets]  = useState(false);
   const [isSaving,     setIsSaving]     = useState(false);
   const [saveMsg,      setSaveMsg]      = useState("");
@@ -94,6 +96,7 @@ export default function WhatsappGatewayCard() {
         token:      token.trim(),
         clientToken: clientToken.trim(),
         adminToken:  adminToken.trim(),
+        targetEmail: clienteEmail.trim() || undefined,
       });
 
       setSaveMsg(result.message ?? (result.ok ? "Salvo com sucesso!" : "Erro ao salvar."));
@@ -104,6 +107,7 @@ export default function WhatsappGatewayCard() {
         setToken("");
         setClientToken("");
         setAdminToken("");
+        setClienteEmail("");
         // Reload status to show updated state
         await loadStatus();
       }
@@ -372,6 +376,24 @@ export default function WhatsappGatewayCard() {
               />
             </div>
           ))}
+
+          <div>
+            <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block mb-0.5">
+              E-mail da conta do cliente (opcional)
+            </label>
+            <input
+              type="email"
+              value={clienteEmail}
+              onChange={(e) => setClienteEmail(e.target.value)}
+              placeholder="vazio = esta conta"
+              autoComplete="off"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-200 font-mono focus:outline-none focus:border-emerald-500 transition-all"
+            />
+            <p className="text-[10px] text-zinc-600 mt-1">
+              Liga uma instância comprada à mão na Z-API à conta do cliente. Ele depois conecta o
+              número sozinho, pelo &quot;Conectar WhatsApp&quot;.
+            </p>
+          </div>
 
           {saveMsg && (
             <p className={`text-xs p-2 rounded-lg ${

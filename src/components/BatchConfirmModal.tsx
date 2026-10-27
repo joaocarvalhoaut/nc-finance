@@ -111,7 +111,7 @@ export default function BatchConfirmModal({
               <div>
                 <p className="font-semibold text-rose-300">WhatsApp Desconectado</p>
                 <p className="text-sm text-rose-400/80 mt-0.5">
-                  A instância Z-API não está conectada. Contate o suporte para reativar.
+                  Seu número não está conectado. Em Minha Conta, clique em &quot;Conectar WhatsApp&quot; e escaneie o QR Code.
                 </p>
               </div>
             </div>

@@ -38,7 +38,7 @@ const FAQS: FAQ[] = [
   {
     category: "WhatsApp e Cobranças",
     question: "Como o envio pelo WhatsApp funciona?",
-    answer: "O NC Finance utiliza a Z-API como gateway de WhatsApp. A plataforma já está configurada com uma instância global — você não precisa conectar seu próprio número. As mensagens são enviadas a partir da instância da plataforma para os números dos seus devedores.",
+    answer: "As cobranças saem pelo SEU número de WhatsApp. Em Minha Conta, clique em 'Conectar WhatsApp' e escaneie o QR Code com o celular desse número (WhatsApp > Aparelhos conectados > Conectar um aparelho). Leva menos de um minuto e está incluído em todos os planos.",
   },
   {
     category: "WhatsApp e Cobranças",
@@ -48,7 +48,7 @@ const FAQS: FAQ[] = [
   {
     category: "WhatsApp e Cobranças",
     question: "O devedor vai receber a mensagem de qual número?",
-    answer: "As mensagens são enviadas pelo número WhatsApp configurado na instância global da plataforma NC Finance. O devedor receberá a mensagem como se fosse de um contato da empresa.",
+    answer: "Do número de WhatsApp que você conectou em Minha Conta. O devedor recebe a mensagem como se fosse de um contato da sua empresa — porque é.",
   },
   {
     category: "WhatsApp e Cobranças",
