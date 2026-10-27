@@ -639,8 +639,9 @@ export default function ClientDashboard({
                       aria-checked={ativo}
                       onClick={() => setImportCategory(cat.value)}
                       className={`px-3 py-2.5 rounded-lg border text-left transition-colors cursor-pointer ${
-                        ativo ? "border-emerald-500/40 bg-emerald-500/10" : "border-zinc-800 hover:border-zinc-700"
+                        ativo ? "" : "border-zinc-800 hover:border-zinc-700"
                       }`}
+                      style={ativo ? { borderColor: `${cat.cor}99`, background: `${cat.cor}1f` } : undefined}
                     >
                       <span className="flex items-center gap-2 text-xs font-semibold text-white">
                         <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: cat.cor }} />
