@@ -402,6 +402,8 @@ export default function App() {
   // Representatives modal
   const [showRepModal, setShowRepModal] = useState(false);
   const [expandedRepId, setExpandedRepId] = useState<string | null>(null);
+  // Dashboard em duas visões para não lotar a tela: o dia a dia e a divisão por responsável.
+  const [dashView, setDashView] = useState<"geral" | "responsaveis">("geral");
   const [repModalForm, setRepModalForm] = useState({ name: "", phone: "", role: "", color: "bg-emerald-500" });
   const [isSavingRep, setIsSavingRep] = useState(false);
   const [repModalError, setRepModalError] = useState("");
@@ -2382,6 +2384,21 @@ export default function App() {
                 return (
                 <div className="space-y-6">
 
+                  <div className="flex rounded-lg border border-zinc-800 overflow-hidden w-fit" role="tablist" aria-label="Visão do dashboard">
+                    {([["geral", "Visão geral"], ["responsaveis", "Por responsável"]] as const).map(([v, txt]) => (
+                      <button
+                        key={v}
+                        role="tab"
+                        aria-selected={dashView === v}
+                        onClick={() => setDashView(v)}
+                        className={`px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${dashView === v ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-300"}`}
+                      >
+                        {txt}
+                      </button>
+                    ))}
+                  </div>
+
+                  {dashView === "geral" && (<>
                   {/* ── Indicadores ─────────────────────────────────────────── */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className={`${card} p-5`}>
@@ -2558,15 +2575,61 @@ export default function App() {
                           <div className="h-10 rounded-lg bg-zinc-900 animate-pulse" />
                         )}
                       </div>
-                      <footer className="px-5 py-3 border-t border-zinc-800/80 flex items-center justify-between gap-3 text-xs">
-                        <span className="text-zinc-500">Plano <span className="text-zinc-200">{getPlanDefinition(plan).name}</span></span>
-                        <button onClick={handleOpenBillingPortal} className="text-zinc-400 hover:text-white transition-colors cursor-pointer">
-                          Gerenciar assinatura
-                        </button>
+                      <footer className="px-5 py-3 border-t border-zinc-800/80 space-y-2 text-xs">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-zinc-500">
+                            Automações{" "}
+                            <span className="text-zinc-200">
+                              {isLoadingAutomation ? "…"
+                                : automationRules.length === 0 ? "nenhuma configurada"
+                                : `${automationRules.filter(r => r.enabled).length} de ${automationRules.length} ativas`}
+                            </span>
+                          </span>
+                          <button onClick={() => setCurrentTab("automacoes")} className="text-zinc-400 hover:text-white transition-colors cursor-pointer">
+                            Gerenciar
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-zinc-500">Plano <span className="text-zinc-200">{getPlanDefinition(plan).name}</span></span>
+                          <button onClick={handleOpenBillingPortal} className="text-zinc-400 hover:text-white transition-colors cursor-pointer">
+                            Gerenciar assinatura
+                          </button>
+                        </div>
                       </footer>
                     </section>
                   </div>
 
+                  {/* Primeiros passos: só enquanto a carteira está vazia. */}
+                  {debtors.length === 0 && (
+                  <>
+                  {/* ── Como funciona ───────────────────────────────────────── */}
+                  <section className={card}>
+                    <header className={cabecalho}>
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Como funciona</h4>
+                        <p className="text-xs text-zinc-500 mt-0.5">Da planilha ao WhatsApp do cliente em quatro passos</p>
+                      </div>
+                    </header>
+                    <ol className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-zinc-900">
+                      {[
+                        { t: "Importe", d: "Envie o relatório, a planilha ou o PDF. O sistema lê os vencimentos sozinho." },
+                        { t: "Corrija os valores", d: "Defina multa e juros ao dia. Os valores atualizados aparecem na hora." },
+                        { t: "Escolha o tom", d: "Amigável, neutro, firme ou notificação jurídica, conforme o atraso." },
+                        { t: "Dispare", d: "Envie pelo seu WhatsApp, com o boleto do Google Drive anexado, ou deixe automático." },
+                      ].map((p, i) => (
+                        <li key={p.t} className="px-5 py-4">
+                          <p className="text-[10px] font-mono text-emerald-400">{String(i + 1).padStart(2, "0")}</p>
+                          <p className="mt-1.5 text-xs font-bold text-white">{p.t}</p>
+                          <p className="mt-1 text-[11px] text-zinc-500 leading-relaxed">{p.d}</p>
+                        </li>
+                      ))}
+                    </ol>
+                  </section>
+                  </>
+                  )}
+                  </>)}
+
+                  {dashView === "responsaveis" && (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
                     {/* ── Responsáveis ────────────────────────────────────────── */}
@@ -2702,72 +2765,7 @@ export default function App() {
                       })()}
                     </section>
                   </div>
-
-                  {/* ── Regras de automação ─────────────────────────────────── */}
-                  <section className={card}>
-                    <header className={cabecalho}>
-                      <div>
-                        <h4 className="text-sm font-bold text-white flex items-center gap-2"><Bot className="w-3.5 h-3.5 text-zinc-500" /> Regras de automação</h4>
-                        <p className="text-xs text-zinc-500 mt-0.5">Disparos automáticos de cobrança</p>
-                      </div>
-                      <button
-                        onClick={() => setCurrentTab("automacoes")}
-                        className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
-                      >
-                        Gerenciar <ArrowRight className="w-3 h-3" />
-                      </button>
-                    </header>
-                    {isLoadingAutomation ? (
-                      <div className="px-5 py-4 flex items-center gap-2 text-xs text-zinc-500">
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Carregando regras…
-                      </div>
-                    ) : automationRules.length === 0 ? (
-                      <div className="px-5 py-6 text-center">
-                        <p className="text-xs font-semibold text-zinc-300">Nenhuma regra configurada</p>
-                        <p className="text-[11px] text-zinc-500 mt-1">Em "Gerenciar", crie a primeira automação para cobrar sozinho.</p>
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-zinc-900">
-                        {automationRules.map((rule) => (
-                          <div key={rule.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold text-zinc-200 truncate">{rule.name}</p>
-                              <p className="text-[10px] text-zinc-500">{RULE_TYPE_LABELS[rule.ruleType] ?? rule.ruleType} · tom {rule.messageTone}</p>
-                            </div>
-                            <span className={`text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border flex-shrink-0 ${
-                              rule.enabled ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10" : "text-zinc-400 border-zinc-700 bg-zinc-900"
-                            }`}>
-                              {rule.enabled ? "Ativa" : "Pausada"}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-
-                  {/* ── Como funciona ───────────────────────────────────────── */}
-                  <section className={card}>
-                    <header className={cabecalho}>
-                      <div>
-                        <h4 className="text-sm font-bold text-white">Como funciona</h4>
-                        <p className="text-xs text-zinc-500 mt-0.5">Da planilha ao WhatsApp do cliente em quatro passos</p>
-                      </div>
-                    </header>
-                    <ol className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-zinc-900">
-                      {[
-                        { t: "Importe", d: "Envie o relatório, a planilha ou o PDF. O sistema lê os vencimentos sozinho." },
-                        { t: "Corrija os valores", d: "Defina multa e juros ao dia. Os valores atualizados aparecem na hora." },
-                        { t: "Escolha o tom", d: "Amigável, neutro, firme ou notificação jurídica, conforme o atraso." },
-                        { t: "Dispare", d: "Envie pelo seu WhatsApp, com o boleto do Google Drive anexado, ou deixe automático." },
-                      ].map((p, i) => (
-                        <li key={p.t} className="px-5 py-4">
-                          <p className="text-[10px] font-mono text-emerald-400">{String(i + 1).padStart(2, "0")}</p>
-                          <p className="mt-1.5 text-xs font-bold text-white">{p.t}</p>
-                          <p className="mt-1 text-[11px] text-zinc-500 leading-relaxed">{p.d}</p>
-                        </li>
-                      ))}
-                    </ol>
-                  </section>
+                  )}
 
                 </div>
                 );
