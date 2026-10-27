@@ -46,6 +46,10 @@ const SUPABASE_URL        = Deno.env.get("SUPABASE_URL")             ?? "";
 const SUPABASE_ANON_KEY   = Deno.env.get("SUPABASE_ANON_KEY")        ?? "";
 const SERVICE_ROLE_KEY    = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const GATEWAY_ADMIN_SECRET= Deno.env.get("GATEWAY_ADMIN_SECRET")     ?? "";
+// Contas do suporte NC Finance (e-mails separados por vírgula). Só elas veem e
+// usam a configuração manual de instâncias.
+const ADMIN_EMAILS = (Deno.env.get("ADMIN_EMAILS") ?? "")
+  .split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
 
 const ZAPI_BASE = "https://api.z-api.io";
 const TIMEOUT_MS = 10_000;
@@ -209,6 +213,8 @@ Deno.serve(async (req: Request) => {
   const action = url.searchParams.get("action") ?? "";
 
   // ── GET ?action=status ─────────────────────────────────────────────────────
+  const isAdmin = ADMIN_EMAILS.includes((user.email ?? "").toLowerCase());
+
   if (req.method === "GET" && (action === "status" || action === "")) {
     const status = await loadUserZApiStatus(admin, user.id);
     if (!status) {
@@ -219,9 +225,10 @@ Deno.serve(async (req: Request) => {
         connected_pending_phone: false,
         phone_number_masked: null,
         updated_at: null,
+        can_manage_instances: isAdmin,
       });
     }
-    return ok({ ok: true, ...status });
+    return ok({ ok: true, ...status, can_manage_instances: isAdmin });
   }
 
   // ── GET ?action=qr ─────────────────────────────────────────────────────────
@@ -293,6 +300,10 @@ Deno.serve(async (req: Request) => {
 
   // ── POST { action: "save" } — requires X-Admin-Token ──────────────────────
   if (postAction === "save") {
+    // Além do token, só contas do suporte (ADMIN_EMAILS) gravam instâncias.
+    if (!isAdmin) {
+      return err(403, "Apenas o suporte NC Finance pode configurar instâncias.");
+    }
     if (!GATEWAY_ADMIN_SECRET) {
       return err(503, "GATEWAY_ADMIN_SECRET não configurado. Defina o secret antes de usar esta ação.");
     }
@@ -415,6 +426,9 @@ Deno.serve(async (req: Request) => {
 
   // ── POST { action: "init" } — bootstrap: reads ZAPI_* env vars into platform_integrations ──
   if (postAction === "init") {
+    if (!isAdmin) {
+      return err(403, "Apenas o suporte NC Finance pode configurar instâncias.");
+    }
     if (!GATEWAY_ADMIN_SECRET) {
       return err(503, "GATEWAY_ADMIN_SECRET não configurado. Defina o secret antes de usar esta ação.");
     }

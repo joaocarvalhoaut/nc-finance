@@ -368,7 +368,7 @@ export default function WhatsappGatewayCard() {
       )}
 
       {/* ── Config tab ───────────────────────────────────────────────────── */}
-      {view === "config" && (
+      {view === "config" && gatewayStatus?.can_manage_instances && (
         <div className="space-y-3">
           <p className="text-xs text-zinc-500">
             As credenciais são enviadas diretamente ao servidor e <strong className="text-zinc-300">nunca ficam
@@ -542,9 +542,10 @@ export default function WhatsappGatewayCard() {
         </div>
       )}
 
-      {/* Credenciais à mão: só para o suporte (exige o Token de Admin). O
-          cliente conecta pelo "Conectar WhatsApp" acima. */}
-      {view !== "config" && (
+      {/* Credenciais à mão: só aparece para contas do suporte (ADMIN_EMAILS no
+          servidor), que ainda precisam do Token de Admin. O cliente conecta
+          pelo "Conectar WhatsApp" acima. */}
+      {view !== "config" && gatewayStatus?.can_manage_instances && (
         <button
           onClick={() => setView("config")}
           className="w-full text-[10px] text-zinc-700 hover:text-zinc-500 transition-colors pt-1"

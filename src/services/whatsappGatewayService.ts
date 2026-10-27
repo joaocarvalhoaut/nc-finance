@@ -22,6 +22,8 @@ export interface GatewayStatus {
   /** Número mascarado, ex: "5511*****321" */
   phone_number_masked:     string | null;
   updated_at:              string | null;
+  /** true só para contas do suporte (ADMIN_EMAILS no servidor) */
+  can_manage_instances?:   boolean;
 }
 
 export interface GatewaySaveResult {
@@ -84,6 +86,7 @@ export const whatsappGatewayService = {
       connected_pending_phone: data.connected_pending_phone ?? false,
       phone_number_masked:     data.phone_number_masked ?? null,
       updated_at:              data.updated_at ?? null,
+      can_manage_instances:    data.can_manage_instances ?? false,
     };
   },
 
