@@ -4356,7 +4356,7 @@ export default function App() {
                           return (
                             <div
                               key={d.id}
-                              className={`rounded-lg border transition-colors ${isSelected ? "border-zinc-600 bg-zinc-900" : "border-transparent hover:bg-zinc-900/50"}`}
+                              className={`rounded-lg border transition-colors ${isSelected ? "border-emerald-500/40 bg-emerald-500/10" : "border-transparent hover:bg-zinc-900/50"}`}
                             >
                               <button
                                 type="button"
