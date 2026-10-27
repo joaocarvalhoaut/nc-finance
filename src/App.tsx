@@ -5406,6 +5406,7 @@ export default function App() {
           {showGerenciarAssinatura && (
             <GerenciarAssinatura
               subscription={subscription}
+              chargesSent={usage?.chargesSent ?? 0}
               onClose={() => setShowGerenciarAssinatura(false)}
               onAction={(action, planId) => subscriptionService.billingAction(action, planId)}
               onCheckout={(planId, cpfCnpj) => subscriptionService.createCheckoutSession(planId, cpfCnpj)}
