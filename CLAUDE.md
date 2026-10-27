@@ -43,6 +43,12 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   `ACCESS_COLUMNS`) — todo guard usa ela. Contas da Stripe sem assinatura no Asaas valem até
   02/11/2026; `billing_provider = 'cortesia'` libera sem cobrança (conta do dono).
   Pix nas faturas depende da verificação da conta Asaas + chave Pix (em andamento).
+- Planos: R$ 149 / 197 / 297 (`_shared/billingPlans.ts`, fonte única — landing lê de lá). Cobrem a
+  instância Z-API (~R$ 90/cliente). Todo plano usa o número do próprio cliente.
+- WhatsApp por conta: "Conectar WhatsApp" cria a instância pela API de parceiro da Z-API
+  (`_shared/zapiProvisioning.ts`); assina ao conectar, cancela quando a assinatura acaba
+  (verificação diária no run-automation-scheduler). Falta o usuário entrar no programa Partner
+  e gravar `ZAPI_PARTNER_TOKEN`; até lá, instância manual via formulário de suporte (e-mail do cliente).
 - PostHog: **ativo**. A `VITE_POSTHOG_KEY` esta no Vercel desde 25/08/2026, mas o CSP
   nao liberava `us.i.posthog.com` — a lib inicializava e o navegador descartava todo
   evento, em silencio. Corrigido no `vercel.json` e no `server.ts`. Ao mexer no CSP,
