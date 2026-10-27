@@ -1439,6 +1439,25 @@ export default function App() {
     setExtractedDebtors(prev => prev.filter(d => d.id !== id));
   };
 
+  // Revisão esvaziada (removeu tudo, um a um ou "remover selecionados"): limpa
+  // também o texto colado, o arquivo e o resumo da leitura — senão o texto
+  // antigo e o selo "N registros" ficavam na tela sem nada para revisar.
+  // Só na passagem de "tinha registros" para "nenhum": uma leitura que não
+  // achou nada mantém o texto para a pessoa corrigir.
+  const extraidosAntesRef = React.useRef(0);
+  useEffect(() => {
+    const antes = extraidosAntesRef.current;
+    extraidosAntesRef.current = extractedDebtors.length;
+    if (antes > 0 && extractedDebtors.length === 0) {
+      setImportText("");
+      setImportFileName("");
+      setLastExtractionResult(null);
+      setLowConfidenceIds(new Set());
+      setExtractedSelectedIds(new Set());
+      setExtractionAlert("");
+    }
+  }, [extractedDebtors.length]);
+
   // Bulk delete selected debtors in Visão Geral
   // Desabilita os devedores selecionados (não exclui): marca category="desabilitado"
   // com o motivo obrigatório salvo em notes. Desabilitados nunca são cobrados.
