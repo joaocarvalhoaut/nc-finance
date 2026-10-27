@@ -31,6 +31,16 @@ const QR_POLL_MS        = 4_000;
 const PREPARO_ESPERA_MS      = 5_000;
 const PREPARO_MAX_TENTATIVAS = 8;
 
+// Prazo prometido ao cliente para o suporte ligar a instância (enquanto a
+// criação automática pelo programa Partner da Z-API não está ativa).
+const PRAZO_ATIVACAO_HORAS = 24;
+const prazoAtivacao = (requestedAt: string) =>
+  new Date(Date.parse(requestedAt) + PRAZO_ATIVACAO_HORAS * 60 * 60 * 1000);
+const formatarPrazo = (d: Date) =>
+  d.toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+  }).replace(", ", " às ");
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function WhatsappGatewayCard() {
@@ -64,8 +74,8 @@ export default function WhatsappGatewayCard() {
   const [qrConectado,  setQrConectado]  = useState(false);
   /** Instância nova subindo — mostra "Preparando seu número". */
   const [preparando,   setPreparando]   = useState(false);
-  /** Conta sem instância: pedido enviado ao suporte. */
-  const [pedidoMsg,    setPedidoMsg]    = useState("");
+  /** Conta sem instância: quando o pedido foi enviado ao suporte. */
+  const [pedidoAt,     setPedidoAt]     = useState<string | null>(null);
 
   // ── Desconectar ────────────────────────────────────────────────────────────
   const [confirmarDesconexao, setConfirmarDesconexao] = useState(false);
@@ -82,6 +92,8 @@ export default function WhatsappGatewayCard() {
     try {
       const s = await whatsappGatewayService.getStatus();
       setGatewayStatus(s);
+      // Cliente que já pediu e voltou: mostra o prazo sem precisar clicar de novo.
+      setPedidoAt(s.connected ? null : s.my_request_at ?? null);
     } finally {
       setIsLoadingStatus(false);
     }
@@ -169,7 +181,7 @@ export default function WhatsappGatewayCard() {
         setQrCode(null);
         setQrTentativa(0);
         setPreparando(false);
-        setPedidoMsg(result.message ?? "Pedido enviado ao suporte. Seu número fica pronto em breve.");
+        setPedidoAt(result.requested_at ?? new Date().toISOString());
       } else if ((result.ok && result.preparing) || (preparo > 0 && preparo < PREPARO_MAX_TENTATIVAS)) {
         setPreparando(true);
         setTimeout(() => void handleLoadQR(1, preparo + 1), PREPARO_ESPERA_MS);
@@ -485,8 +497,17 @@ export default function WhatsappGatewayCard() {
             </p>
           )}
 
-          {pedidoMsg && (
-            <p className="text-xs p-2 rounded-lg bg-amber-500/10 text-amber-300">{pedidoMsg}</p>
+          {pedidoAt && !gatewayStatus?.connected && (
+            <div className="text-xs p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200 space-y-1">
+              <p className="font-semibold">Recebemos seu pedido!</p>
+              <p>
+                Seu número de WhatsApp fica pronto em <strong>até {PRAZO_ATIVACAO_HORAS} horas</strong> — até{" "}
+                <strong>{formatarPrazo(prazoAtivacao(pedidoAt))}</strong>. Muitas vezes fica pronto bem antes disso.
+              </p>
+              <p className="text-amber-300/80">
+                Quando estiver pronto, volte aqui e clique em &quot;Conectar WhatsApp&quot; para escanear o código.
+              </p>
+            </div>
           )}
 
           {disconnectMsg && (
@@ -566,8 +587,10 @@ export default function WhatsappGatewayCard() {
             <div key={(p.email ?? "") + p.requested_at} className="flex items-center justify-between gap-3 text-xs">
               <div className="min-w-0">
                 <div className="text-zinc-200 truncate">{p.email ?? "(sem e-mail)"}</div>
-                <div className="text-[10px] text-zinc-500">
-                  pediu em {new Date(p.requested_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+                {/* Prazo prometido ao cliente; em vermelho quando já passou. */}
+                <div className={`text-[10px] ${prazoAtivacao(p.requested_at).getTime() < Date.now() ? "text-rose-400 font-semibold" : "text-zinc-500"}`}>
+                  {prazoAtivacao(p.requested_at).getTime() < Date.now() ? "prazo vencido em " : "prazo até "}
+                  {formatarPrazo(prazoAtivacao(p.requested_at))}
                 </div>
               </div>
               <button

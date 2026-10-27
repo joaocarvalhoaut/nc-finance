@@ -15,6 +15,9 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 // deno-lint-ignore no-explicit-any
 type AdminClient = ReturnType<typeof createClient<any, any, any>>;
 
+/** Prazo prometido ao cliente para o número ficar pronto. */
+export const PRAZO_ATIVACAO_HORAS = 24;
+
 /** Não repete o e-mail ao suporte se o cliente clicar várias vezes. */
 const REAVISO_MS = 24 * 60 * 60 * 1000;
 
@@ -42,6 +45,7 @@ const avisarSuporte = async (emailCliente: string | null): Promise<boolean> => {
         subject: "Cliente aguardando número de WhatsApp",
         text:
           `A conta ${emailCliente ?? "(sem e-mail)"} clicou em "Conectar WhatsApp" e ainda não tem instância.\n\n` +
+          `Prazo prometido ao cliente: ${PRAZO_ATIVACAO_HORAS} horas.\n\n` +
           `Para liberar: compre uma instância no painel da Z-API e, no NC Finance, vá em ` +
           `Minha Conta > Configuração manual (suporte) > Clientes aguardando número > Ligar instância.`,
       }),
@@ -58,14 +62,14 @@ const avisarSuporte = async (emailCliente: string | null): Promise<boolean> => {
 
 /**
  * Registra (ou mantém) o pedido da conta e avisa o suporte se for novo ou se
- * o último aviso tiver mais de 24 h. Nunca lança — o cliente vê a mesma
- * mensagem mesmo se o registro falhar.
+ * o último aviso tiver mais de 24 h. Devolve quando o pedido foi feito (o
+ * prazo de 24 h conta daí). Nunca lança — se o registro falhar, conta de agora.
  */
 export const registerConnectionRequest = async (
   admin: AdminClient,
   userId: string,
   email: string | null,
-): Promise<void> => {
+): Promise<string> => {
   try {
     const { data: atual } = await admin
       .from("zapi_connection_requests")
@@ -93,12 +97,26 @@ export const registerConnectionRequest = async (
     );
 
     if (novo) console.log(JSON.stringify({ source: "connection-request.created", user_id: userId, emailed: avisou }));
+    return novo ? agora.toISOString() : atual!.requested_at;
   } catch (err) {
     console.log(JSON.stringify({
       source: "connection-request.error", user_id: userId,
       message: err instanceof Error ? err.message : String(err),
     }));
+    return new Date().toISOString();
   }
+};
+
+/** Pedido em aberto da própria conta (para o cliente ver o prazo ao voltar). */
+export const getMyPendingRequest = async (admin: AdminClient, userId: string): Promise<string | null> => {
+  const { data, error } = await admin
+    .from("zapi_connection_requests")
+    .select("requested_at")
+    .eq("user_id", userId)
+    .is("fulfilled_at", null)
+    .maybeSingle();
+  if (error || !data) return null;
+  return (data as { requested_at: string }).requested_at;
 };
 
 /** Pedidos ainda não atendidos, mais antigos primeiro (para o suporte). */

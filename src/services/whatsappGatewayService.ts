@@ -26,6 +26,8 @@ export interface GatewayStatus {
   can_manage_instances?:   boolean;
   /** Só para o suporte: clientes que pediram para conectar e ainda não têm instância */
   pending_requests?:       { email: string | null; requested_at: string }[];
+  /** Pedido de conexão em aberto da própria conta (prazo de 24 h conta daqui) */
+  my_request_at?:          string | null;
 }
 
 export interface GatewaySaveResult {
@@ -48,7 +50,8 @@ export interface GatewayQRResult {
   preparing?: boolean;
   /** true quando a conta ainda não tem instância e o pedido foi para o suporte */
   requested?: boolean;
-  message?: string;
+  /** Quando o pedido foi feito — o prazo de 24 h conta daqui */
+  requested_at?: string;
   error?:  string;
 }
 
@@ -93,6 +96,7 @@ export const whatsappGatewayService = {
       updated_at:              data.updated_at ?? null,
       can_manage_instances:    data.can_manage_instances ?? false,
       pending_requests:        data.pending_requests ?? [],
+      my_request_at:           data.my_request_at ?? null,
     };
   },
 

@@ -34,6 +34,7 @@ import { checkRateLimit }         from "../_shared/rateLimit.ts";
 import { checkSubscription }      from "../_shared/subscriptionGuard.ts";
 import { zapiPartnerConfigured }  from "../_shared/zapiPartner.ts";
 import {
+  getMyPendingRequest,
   listPendingRequests,
   markRequestFulfilled,
   registerConnectionRequest,
@@ -232,11 +233,13 @@ Deno.serve(async (req: Request) => {
         updated_at: null,
         can_manage_instances: isAdmin,
         pending_requests: isAdmin ? await listPendingRequests(admin) : undefined,
+        my_request_at: await getMyPendingRequest(admin, user.id),
       });
     }
     return ok({
       ok: true, ...status, can_manage_instances: isAdmin,
       pending_requests: isAdmin ? await listPendingRequests(admin) : undefined,
+      my_request_at: await getMyPendingRequest(admin, user.id),
     });
   }
 
@@ -251,11 +254,9 @@ Deno.serve(async (req: Request) => {
       // Sem a criação automática (programa Partner da Z-API): vira um pedido que
       // o suporte vê na lista e atende ligando uma instância à conta.
       if (!zapiPartnerConfigured()) {
-        await registerConnectionRequest(admin, user.id, user.email ?? null);
-        return ok({
-          ok: true, requested: true, qrCode: null,
-          message: "Recebemos seu pedido! Estamos preparando seu número de WhatsApp. Volte aqui em algumas horas e clique em \"Conectar WhatsApp\" para escanear o código.",
-        });
+        const requestedAt = await registerConnectionRequest(admin, user.id, user.email ?? null);
+        // O texto do prazo é montado na tela a partir de requested_at.
+        return ok({ ok: true, requested: true, requested_at: requestedAt, qrCode: null });
       }
 
       // Cada instância criada pode virar custo: no máximo 3 por hora por conta.
