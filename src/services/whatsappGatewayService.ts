@@ -24,6 +24,8 @@ export interface GatewayStatus {
   updated_at:              string | null;
   /** true só para contas do suporte (ADMIN_EMAILS no servidor) */
   can_manage_instances?:   boolean;
+  /** Só para o suporte: clientes que pediram para conectar e ainda não têm instância */
+  pending_requests?:       { email: string | null; requested_at: string }[];
 }
 
 export interface GatewaySaveResult {
@@ -44,6 +46,9 @@ export interface GatewayQRResult {
   connected?: boolean;
   /** true logo após criar a instância da conta: o QR fica pronto em segundos */
   preparing?: boolean;
+  /** true quando a conta ainda não tem instância e o pedido foi para o suporte */
+  requested?: boolean;
+  message?: string;
   error?:  string;
 }
 
@@ -87,6 +92,7 @@ export const whatsappGatewayService = {
       phone_number_masked:     data.phone_number_masked ?? null,
       updated_at:              data.updated_at ?? null,
       can_manage_instances:    data.can_manage_instances ?? false,
+      pending_requests:        data.pending_requests ?? [],
     };
   },
 

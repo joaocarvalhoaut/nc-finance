@@ -34,6 +34,11 @@ import { checkRateLimit }         from "../_shared/rateLimit.ts";
 import { checkSubscription }      from "../_shared/subscriptionGuard.ts";
 import { zapiPartnerConfigured }  from "../_shared/zapiPartner.ts";
 import {
+  listPendingRequests,
+  markRequestFulfilled,
+  registerConnectionRequest,
+}                                 from "../_shared/connectionRequests.ts";
+import {
   ensureSubscribed,
   loadAutoInstance,
   needsNewInstance,
@@ -226,9 +231,13 @@ Deno.serve(async (req: Request) => {
         phone_number_masked: null,
         updated_at: null,
         can_manage_instances: isAdmin,
+        pending_requests: isAdmin ? await listPendingRequests(admin) : undefined,
       });
     }
-    return ok({ ok: true, ...status, can_manage_instances: isAdmin });
+    return ok({
+      ok: true, ...status, can_manage_instances: isAdmin,
+      pending_requests: isAdmin ? await listPendingRequests(admin) : undefined,
+    });
   }
 
   // ── GET ?action=qr ─────────────────────────────────────────────────────────
@@ -236,11 +245,18 @@ Deno.serve(async (req: Request) => {
     // Sem instância (ou a automática expirou/foi cancelada): cria uma agora pela
     // API de parceiro da Z-API — o cliente conecta o próprio número sozinho.
     if (needsNewInstance(await loadAutoInstance(admin, user.id))) {
-      if (!zapiPartnerConfigured()) {
-        return err(503, "A conexão do WhatsApp ainda não está disponível. Fale com o suporte.");
-      }
       const sub = await checkSubscription(admin, user.id);
       if (!sub.ok) return err(403, "Ative sua assinatura para conectar o WhatsApp.");
+
+      // Sem a criação automática (programa Partner da Z-API): vira um pedido que
+      // o suporte vê na lista e atende ligando uma instância à conta.
+      if (!zapiPartnerConfigured()) {
+        await registerConnectionRequest(admin, user.id, user.email ?? null);
+        return ok({
+          ok: true, requested: true, qrCode: null,
+          message: "Recebemos seu pedido! Estamos preparando seu número de WhatsApp. Volte aqui em algumas horas e clique em \"Conectar WhatsApp\" para escanear o código.",
+        });
+      }
 
       // Cada instância criada pode virar custo: no máximo 3 por hora por conta.
       const rl = await checkRateLimit(admin, `zapi-provision:${user.id}`, 3, 3600);
@@ -337,6 +353,8 @@ Deno.serve(async (req: Request) => {
     await saveUserZApiCredentials(admin, targetUserId, {
       instanceId, token, clientToken, label: label || undefined,
     });
+    // Tira o cliente da lista "aguardando número".
+    await markRequestFulfilled(admin, targetUserId);
 
     // Safe log: mask token values
     console.log(`[whatsapp-gateway] credentials saved — instanceId=${maskToken(instanceId)} token=${maskToken(token)}`);

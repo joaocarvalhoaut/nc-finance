@@ -64,6 +64,8 @@ export default function WhatsappGatewayCard() {
   const [qrConectado,  setQrConectado]  = useState(false);
   /** Instância nova subindo — mostra "Preparando seu número". */
   const [preparando,   setPreparando]   = useState(false);
+  /** Conta sem instância: pedido enviado ao suporte. */
+  const [pedidoMsg,    setPedidoMsg]    = useState("");
 
   // ── Desconectar ────────────────────────────────────────────────────────────
   const [confirmarDesconexao, setConfirmarDesconexao] = useState(false);
@@ -163,6 +165,11 @@ export default function WhatsappGatewayCard() {
         setQrCode(result.qrCode);
         setQrTentativa(tentativa);
         setPreparando(false);
+      } else if (result.ok && result.requested) {
+        setQrCode(null);
+        setQrTentativa(0);
+        setPreparando(false);
+        setPedidoMsg(result.message ?? "Pedido enviado ao suporte. Seu número fica pronto em breve.");
       } else if ((result.ok && result.preparing) || (preparo > 0 && preparo < PREPARO_MAX_TENTATIVAS)) {
         setPreparando(true);
         setTimeout(() => void handleLoadQR(1, preparo + 1), PREPARO_ESPERA_MS);
@@ -478,6 +485,10 @@ export default function WhatsappGatewayCard() {
             </p>
           )}
 
+          {pedidoMsg && (
+            <p className="text-xs p-2 rounded-lg bg-amber-500/10 text-amber-300">{pedidoMsg}</p>
+          )}
+
           {disconnectMsg && (
             <p className="text-xs p-2 rounded-lg bg-zinc-800 text-zinc-300">{disconnectMsg}</p>
           )}
@@ -545,6 +556,31 @@ export default function WhatsappGatewayCard() {
       {/* Credenciais à mão: só aparece para contas do suporte (ADMIN_EMAILS no
           servidor), que ainda precisam do Token de Admin. O cliente conecta
           pelo "Conectar WhatsApp" acima. */}
+      {/* Suporte: clientes que pediram para conectar e ainda não têm instância. */}
+      {gatewayStatus?.can_manage_instances && (gatewayStatus.pending_requests?.length ?? 0) > 0 && (
+        <div className="border border-amber-700/40 rounded-xl p-3 space-y-2">
+          <p className="text-[10px] font-mono uppercase tracking-widest text-amber-400">
+            Clientes aguardando número ({gatewayStatus.pending_requests!.length})
+          </p>
+          {gatewayStatus.pending_requests!.map((p) => (
+            <div key={(p.email ?? "") + p.requested_at} className="flex items-center justify-between gap-3 text-xs">
+              <div className="min-w-0">
+                <div className="text-zinc-200 truncate">{p.email ?? "(sem e-mail)"}</div>
+                <div className="text-[10px] text-zinc-500">
+                  pediu em {new Date(p.requested_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+                </div>
+              </div>
+              <button
+                onClick={() => { setClienteEmail(p.email ?? ""); setSaveMsg(""); setView("config"); }}
+                className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold transition-colors"
+              >
+                Ligar instância
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {view !== "config" && gatewayStatus?.can_manage_instances && (
         <button
           onClick={() => setView("config")}
