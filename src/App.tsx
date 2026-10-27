@@ -31,6 +31,7 @@ import { googleDriveService, DRIVE_STATUS_LABELS, type DriveMatchResult, type Dr
 import { driveFolderService, type DriveFolderStatus } from "./services/driveMatching/driveFolderService";
 import { whatsappBatchService, BATCH_TOP_STATUS_LABELS, type BatchChargeResult, type BatchTopStatus } from "./services/whatsappBatchService";
 import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type AutomationRule, type AutomationRun, type AutomationRuleCreate } from "./services/automationService";
+import { validateNewAutomationRule } from "./utils/automationValidation";
 import { isBrazilHoliday, getBrazilHolidayName, isBusinessDay } from "./utils/brazilHolidays";
 import { getMessageTemplate, fillMessageTemplate } from "./utils/messageTemplates";
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
@@ -373,6 +374,8 @@ export default function App() {
   const [isLoadingAutomation, setIsLoadingAutomation] = useState<boolean>(false);
   const [automationError, setAutomationError] = useState<string>("");
   const [showCreateRuleForm, setShowCreateRuleForm] = useState<boolean>(false);
+  // Regra aberta no formulário para edição; null = formulário de nova regra.
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [newRuleForm, setNewRuleForm] = useState<Partial<AutomationRuleCreate>>({
     name: "",
     ruleType: "overdue",
@@ -428,6 +431,7 @@ export default function App() {
   // Billing Tab specific interactive properties
   const [selectedDebtorForMessage, setSelectedDebtorForMessage] = useState<Debtor | null>(null);
   const [buscaEnvio, setBuscaEnvio] = useState("");
+  const [verTodasExecucoes, setVerTodasExecucoes] = useState(false);
   const [selectedTone, setSelectedTone] = useState<MessageTone>(DEFAULT_USER_CONFIG.selectedTone);
   const [customMessageDraft, setCustomMessageDraft] = useState<string>("");
   const [isSendingMessage, setIsSendingMessage] = useState<boolean>(false);
@@ -1079,28 +1083,87 @@ export default function App() {
     }
   }, [currentTab, isLoggedIn]);
 
+  const regraVazia = (): Partial<AutomationRuleCreate> => ({
+    name: "", ruleType: "overdue", daysBefore: 3, messageTone: "neutro", customMessage: getMessageTemplate("neutro"),
+  });
+
+  // Cria a regra ou, com editingRuleId, salva as alterações da regra aberta.
   const handleCreateRule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRuleForm.name?.trim()) return;
+    const payload: AutomationRuleCreate = {
+      name: newRuleForm.name,
+      ruleType: newRuleForm.ruleType ?? "overdue",
+      daysBefore: newRuleForm.ruleType === "due_in_days" ? (newRuleForm.daysBefore ?? 3) : null,
+      messageTone: newRuleForm.messageTone ?? "neutro",
+      customMessage: newRuleForm.customMessage ?? null,
+      sendWindowStart: newRuleForm.sendWindowStart ?? null,
+      sendWindowEnd: newRuleForm.sendWindowEnd ?? null,
+      maxDailySends: newRuleForm.maxDailySends ?? null,
+      scheduleMode: newRuleForm.scheduleMode ?? "daily",
+      skipHolidays: newRuleForm.skipHolidays ?? false,
+    };
     try {
-      const created = await automationService.createRule({
-        name: newRuleForm.name,
-        ruleType: newRuleForm.ruleType ?? "overdue",
-        daysBefore: newRuleForm.ruleType === "due_in_days" ? (newRuleForm.daysBefore ?? 3) : null,
-        messageTone: newRuleForm.messageTone ?? "neutro",
-        customMessage: newRuleForm.customMessage ?? null,
-        sendWindowStart: newRuleForm.sendWindowStart ?? null,
-        sendWindowEnd: newRuleForm.sendWindowEnd ?? null,
-        maxDailySends: newRuleForm.maxDailySends ?? null,
-        scheduleMode: newRuleForm.scheduleMode ?? "daily",
-        skipHolidays: newRuleForm.skipHolidays ?? false,
-      });
-      setAutomationRules((prev) => [...prev, created]);
+      if (editingRuleId) {
+        const erro = validateNewAutomationRule(payload);
+        if (erro) throw new Error(erro);
+        await automationService.updateRule(editingRuleId, payload);
+        setAutomationRules((prev) => prev.map((r) => (r.id === editingRuleId ? {
+          ...r,
+          name: payload.name,
+          ruleType: payload.ruleType,
+          daysBefore: payload.daysBefore ?? null,
+          messageTone: payload.messageTone ?? r.messageTone,
+          customMessage: payload.customMessage ?? null,
+          sendWindowStart: payload.sendWindowStart ?? null,
+          sendWindowEnd: payload.sendWindowEnd ?? null,
+          maxDailySends: payload.maxDailySends ?? null,
+          scheduleMode: payload.scheduleMode ?? r.scheduleMode,
+          skipHolidays: payload.skipHolidays ?? r.skipHolidays,
+        } : r)));
+      } else {
+        const created = await automationService.createRule(payload);
+        setAutomationRules((prev) => [...prev, created]);
+      }
       setShowCreateRuleForm(false);
-      setNewRuleForm({ name: "", ruleType: "overdue", daysBefore: 3, messageTone: "neutro", customMessage: getMessageTemplate("neutro") });
+      setEditingRuleId(null);
+      setNewRuleForm(regraVazia());
     } catch (e) {
-      setAutomationError(e instanceof Error ? e.message : "Falha ao criar regra.");
+      setAutomationError(e instanceof Error ? e.message : editingRuleId ? "Falha ao salvar a regra." : "Falha ao criar regra.");
     }
+  };
+
+  const abrirNovaRegra = () => {
+    // Clicar de novo em "Nova regra" com o formulário de criação aberto fecha.
+    if (showCreateRuleForm && !editingRuleId) { setShowCreateRuleForm(false); return; }
+    setEditingRuleId(null);
+    setNewRuleForm(regraVazia());
+    setShowCreateRuleForm(true);
+  };
+
+  const abrirEdicaoRegra = (rule: AutomationRule) => {
+    setEditingRuleId(rule.id);
+    setNewRuleForm({
+      name: rule.name,
+      ruleType: rule.ruleType,
+      daysBefore: rule.daysBefore ?? 3,
+      messageTone: rule.messageTone,
+      // Sem texto próprio, a regra usa o padrão do tom — mostramos esse padrão.
+      customMessage: rule.customMessage ?? getMessageTemplate(rule.messageTone),
+      sendWindowStart: rule.sendWindowStart,
+      sendWindowEnd: rule.sendWindowEnd,
+      maxDailySends: rule.maxDailySends,
+      scheduleMode: rule.scheduleMode,
+      skipHolidays: rule.skipHolidays,
+    });
+    setShowCreateRuleForm(true);
+    setTimeout(() => document.getElementById("form-regra")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  };
+
+  const fecharFormRegra = () => {
+    setShowCreateRuleForm(false);
+    setEditingRuleId(null);
+    setNewRuleForm(regraVazia());
   };
 
   const handleToggleRule = async (id: string, enabled: boolean) => {
@@ -2292,7 +2355,7 @@ export default function App() {
                   {currentTab === "visao_geral"&& "Carteira"}
                   {currentTab === "cobranca"   && "Preparar envios"}
                   {currentTab === "historico"  && "Histórico de Cobrança"}
-                  {currentTab === "automacoes" && "Automações de Cobrança"}
+                  {currentTab === "automacoes" && "Automações"}
                   {currentTab === "minha_conta"&& "Minha Conta"}
                 </h2>
               </div>
@@ -4840,252 +4903,223 @@ export default function App() {
                 </div>
               )}
 
-              {currentTab === "automacoes" && (
-                <div className="space-y-6">
+              {currentTab === "automacoes" && (() => {
+                // ── Automações ─────────────────────────────────────────────
+                // Padrão das telas novas: regras numa seção (uma por linha),
+                // formulário de nova regra em seção própria, execuções recentes.
+                const card = "bg-zinc-950 border border-zinc-800 rounded-xl";
+                const cabecalho = "flex items-start justify-between gap-3 px-5 py-4 border-b border-zinc-800/80";
+                const rotulo = "block text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1.5";
+                const campo = "w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors";
+                const selecionavel = (ativo: boolean) =>
+                  `px-3 py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                    ativo ? "border-zinc-500 bg-zinc-900 text-white" : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                  }`;
+                const nomeTom = (t: string) => t === "amigavel" ? "Amigável" : t === "neutro" ? "Neutro" : t === "firme" ? "Firme" : "Jurídico";
+                const execucoes = verTodasExecucoes ? automationRuns : automationRuns.slice(0, 7);
+                const ativas = automationRules.filter(r => r.enabled).length;
+
+                return (
+                <div className="space-y-4">
 
                   {plan === "basic" && (
-                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-6 flex items-start gap-4">
-                      <Bot className="w-8 h-8 text-amber-400 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-bold text-amber-300 text-sm">Automação indisponível no plano Basic</p>
-                        <p className="text-xs text-zinc-400 mt-1">
-                          Faça upgrade para o plano <span className="text-emerald-400 font-semibold">Pro</span> ou{" "}
-                          <span className="text-purple-400 font-semibold">Premium</span> para criar regras de disparo
-                          automático. Pro permite regras simples; Premium desbloqueia janela de envio, limite diário e
-                          prioridade na fila.
+                    <div className={`${card} border-amber-700/40 px-5 py-4 flex flex-wrap items-center justify-between gap-3`}>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-white">Automação disponível nos planos Pro e Premium</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">
+                          Com a automação o sistema cobra sozinho, todo dia. O Premium ainda permite janela de envio, limite diário e prioridade na fila.
                         </p>
-                        <button
-                          onClick={handleOpenBillingPortal}
-                          className="mt-3 px-4 py-1.5 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl transition-all cursor-pointer"
-                        >
-                          Fazer upgrade agora
-                        </button>
                       </div>
+                      <button
+                        onClick={handleOpenBillingPortal}
+                        className="flex-shrink-0 px-3.5 py-2 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black rounded-lg transition-colors cursor-pointer"
+                      >
+                        Trocar de plano
+                      </button>
                     </div>
                   )}
 
                   {automationError && (
-                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-3 text-sm text-rose-200 flex items-center justify-between gap-3">
+                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-4 py-3 text-xs text-rose-200 flex items-center justify-between gap-3">
                       <span>{automationError}</span>
-                      <button onClick={() => setAutomationError("")} className="text-rose-400 hover:text-rose-200 cursor-pointer"><X className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => setAutomationError("")} className="text-rose-400 hover:text-rose-200 cursor-pointer" aria-label="Fechar aviso"><X className="w-3.5 h-3.5" /></button>
                     </div>
                   )}
 
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <h3 className="text-base font-bold text-white flex items-center gap-2">
-                        <Bot className="w-5 h-5 text-emerald-400" /> Regras de Automação
-                      </h3>
-                      <p className="text-xs text-zinc-500 mt-0.5">
-                        As cobranças automáticas são enviadas todos os dias às 08h (horário de Brasília), conforme as regras ativas abaixo.
-                      </p>
-                    </div>
+                  {/* ── Barra ───────────────────────────────────────────────── */}
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs text-zinc-500 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" />
+                      As regras ativas disparam todo dia às 8h (horário de Brasília).
+                    </p>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => void loadAutomationData()}
                         disabled={isLoadingAutomation}
-                        className="px-3 py-1.5 text-xs border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                        className="px-3 py-2 text-xs border border-zinc-800 text-zinc-300 hover:border-zinc-700 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                       >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isLoadingAutomation ? "animate-spin" : ""}`} />
+                        <RefreshCw className={`w-3.5 h-3.5 text-zinc-500 ${isLoadingAutomation ? "animate-spin" : ""}`} />
                         Atualizar
                       </button>
                       {plan !== "basic" && (
                         <button
-                          onClick={() => setShowCreateRuleForm((v) => !v)}
-                          className="px-3.5 py-1.5 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                          onClick={abrirNovaRegra}
+                          className="px-3.5 py-2 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
                         >
                           <PlusCircle className="w-3.5 h-3.5" />
-                          Nova Regra
+                          Nova regra
                         </button>
                       )}
                     </div>
                   </div>
 
+                  {/* ── Nova regra ──────────────────────────────────────────── */}
                   {showCreateRuleForm && plan !== "basic" && (
-                    <form
-                      onSubmit={(e) => void handleCreateRule(e)}
-                      className="bg-zinc-900/60 border border-emerald-500/20 rounded-2xl p-5 space-y-4 shadow-xl"
-                    >
-                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                        <CalendarClock className="w-4 h-4 text-emerald-400" /> Nova Regra de Automação
-                      </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <form id="form-regra" onSubmit={(e) => void handleCreateRule(e)} className={`${card} scroll-mt-20`}>
+                      <header className={cabecalho}>
+                        <div>
+                          <h4 className="text-sm font-bold text-white">{editingRuleId ? "Editar regra" : "Nova regra"}</h4>
+                          <p className="text-xs text-zinc-500 mt-0.5">Quem cobrar, com qual tom e em quais dias</p>
+                        </div>
+                        <button type="button" onClick={fecharFormRegra} className="p-1 text-zinc-500 hover:text-white cursor-pointer" aria-label="Fechar">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </header>
+
+                      <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="sm:col-span-2">
-                          <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">Nome da Regra *</label>
-                          <input aria-label="Nome da Regra *"
+                          <label htmlFor="regra-nome" className={rotulo}>Nome</label>
+                          <input id="regra-nome"
                             type="text"
                             required
                             value={newRuleForm.name ?? ""}
                             onChange={(e) => setNewRuleForm((p) => ({ ...p, name: e.target.value }))}
                             placeholder="Ex: Cobrar vencidos todo dia"
-                            className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500"
+                            className={campo}
                           />
                         </div>
 
-                        <div>
-                          <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">Tipo de Regra *</label>
-                          <select aria-label="Tipo de Regra *"
-                            value={newRuleForm.ruleType ?? "overdue"}
-                            onChange={(e) => setNewRuleForm((p) => ({ ...p, ruleType: e.target.value as AutomationRuleCreate["ruleType"] }))}
-                            className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
-                          >
-                            <option value="overdue">Vencidos</option>
-                            <option value="due_today">Vencem hoje</option>
-                            <option value="due_in_days">Vencem em X dias</option>
-                          </select>
-                        </div>
-
-                        {newRuleForm.ruleType === "due_in_days" && (
-                          <div>
-                            <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">Dias antes do vencimento</label>
-                            <input aria-label="Dias antes do vencimento"
-                              type="number"
-                              min={1}
-                              max={30}
-                              value={newRuleForm.daysBefore ?? 3}
-                              onChange={(e) => setNewRuleForm((p) => ({ ...p, daysBefore: Number(e.target.value) }))}
-                              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                            />
-                          </div>
-                        )}
-
-                        <div>
-                          <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">Tom da Mensagem</label>
-                          <select aria-label="Tom da Mensagem"
-                            value={newRuleForm.messageTone ?? "neutro"}
-                            onChange={(e) => {
-                              const tone = e.target.value as AutomationRuleCreate["messageTone"];
-                              setNewRuleForm((p) => ({ ...p, messageTone: tone, customMessage: getMessageTemplate(tone ?? "neutro") }));
-                            }}
-                            className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
-                          >
-                            <option value="amigavel">Amigável</option>
-                            <option value="neutro">Neutro</option>
-                            <option value="firme">Firme</option>
-                            <option value="juridico">Jurídico</option>
-                          </select>
-                        </div>
-
-                        {plan === "premium" && (
-                          <>
-                            <div>
-                              <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
-                                Janela de Envio — Início (UTC−3) <span className="text-purple-400">(Premium)</span>
-                              </label>
-                              <input
-                                type="time"
-                                value={newRuleForm.sendWindowStart ?? ""}
-                                onChange={(e) => setNewRuleForm((p) => ({ ...p, sendWindowStart: e.target.value || null }))}
-                                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
-                                Janela de Envio — Fim (UTC−3) <span className="text-purple-400">(Premium)</span>
-                              </label>
-                              <input
-                                type="time"
-                                value={newRuleForm.sendWindowEnd ?? ""}
-                                onChange={(e) => setNewRuleForm((p) => ({ ...p, sendWindowEnd: e.target.value || null }))}
-                                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] text-zinc-400 mb-1 uppercase tracking-wider">
-                                Máx. envios/dia <span className="text-purple-400">(Premium)</span>
-                              </label>
-                              <input
-                                type="number"
-                                min={1}
-                                max={500}
-                                placeholder="Sem limite"
-                                value={newRuleForm.maxDailySends ?? ""}
-                                onChange={(e) => setNewRuleForm((p) => ({ ...p, maxDailySends: e.target.value ? Number(e.target.value) : null }))}
-                                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 placeholder-zinc-600"
-                              />
-                            </div>
-                          </>
-                        )}
-
-                        {/* Frequência de envio */}
-                        <div className="sm:col-span-2">
-                          <label className="block text-[11px] text-zinc-400 mb-2 uppercase tracking-wider">Dias de Envio</label>
-                          <div className="flex gap-2">
-                            {([ ["daily", "Todos os dias"], ["weekdays", "Só dias úteis (Seg–Sex)"] ] as const).map(([val, label]) => (
-                              <button
-                                key={val}
-                                type="button"
-                                onClick={() => setNewRuleForm((p) => ({ ...p, scheduleMode: val }))}
-                                className={`flex-1 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                                  (newRuleForm.scheduleMode ?? "daily") === val
-                                    ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300"
-                                    : "bg-zinc-950 border-zinc-700 text-zinc-400 hover:text-zinc-200"
-                                }`}
-                              >
-                                {label}
+                        <div className={newRuleForm.ruleType === "due_in_days" ? "" : "sm:col-span-2"}>
+                          <span className={rotulo}>Quem cobrar</span>
+                          <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Tipo de regra">
+                            {([["overdue", "Vencidos"], ["due_today", "Vencem hoje"], ["due_in_days", "Vencem em X dias"]] as const).map(([val, txt]) => (
+                              <button key={val} type="button" role="radio" aria-checked={(newRuleForm.ruleType ?? "overdue") === val}
+                                onClick={() => setNewRuleForm((p) => ({ ...p, ruleType: val }))}
+                                className={selecionavel((newRuleForm.ruleType ?? "overdue") === val)}>
+                                {txt}
                               </button>
                             ))}
                           </div>
                         </div>
 
-                        {/* Pular feriados */}
+                        {newRuleForm.ruleType === "due_in_days" && (
+                          <div>
+                            <label htmlFor="regra-dias" className={rotulo}>Dias antes do vencimento</label>
+                            <input id="regra-dias"
+                              type="number"
+                              min={1}
+                              max={30}
+                              value={newRuleForm.daysBefore ?? 3}
+                              onChange={(e) => setNewRuleForm((p) => ({ ...p, daysBefore: Number(e.target.value) }))}
+                              className={campo}
+                            />
+                          </div>
+                        )}
+
                         <div className="sm:col-span-2">
-                          <label className="block text-[11px] text-zinc-400 mb-2 uppercase tracking-wider">Feriados Nacionais</label>
-                          <button
-                            type="button"
-                            onClick={() => setNewRuleForm((p) => ({ ...p, skipHolidays: !(p.skipHolidays ?? false) }))}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                              (newRuleForm.skipHolidays ?? false)
-                                ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
-                                : "bg-zinc-950 border-zinc-700 text-zinc-400 hover:text-zinc-200"
-                            }`}
-                          >
-                            <span className={`w-2 h-2 rounded-full ${(newRuleForm.skipHolidays ?? false) ? "bg-amber-400" : "bg-zinc-600"}`} />
-                            {(newRuleForm.skipHolidays ?? false) ? "Pular feriados ativado" : "Enviar também em feriados"}
-                          </button>
-                          {/* Aviso se hoje for feriado */}
-                          {isBrazilHoliday() && (
-                            <p className="mt-1.5 text-[10px] text-amber-400/80">
-                              Hoje é feriado nacional: {getBrazilHolidayName()}.
-                              {(newRuleForm.skipHolidays ?? false) ? " Esta regra não disparará hoje." : " Esta regra disparará normalmente."}
-                            </p>
-                          )}
-                          {!isBrazilHoliday() && (newRuleForm.scheduleMode ?? "daily") === "weekdays" && !isBusinessDay() && (
-                            <p className="mt-1.5 text-[10px] text-zinc-500">
-                              Hoje é fim de semana — esta regra não disparará hoje.
-                            </p>
-                          )}
+                          <span className={rotulo}>Tom da mensagem</span>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-label="Tom da mensagem">
+                            {(["amigavel", "neutro", "firme", "juridico"] as const).map((tone) => (
+                              <button key={tone} type="button" role="radio" aria-checked={(newRuleForm.messageTone ?? "neutro") === tone}
+                                onClick={() => setNewRuleForm((p) => ({ ...p, messageTone: tone, customMessage: getMessageTemplate(tone) }))}
+                                className={selecionavel((newRuleForm.messageTone ?? "neutro") === tone)}>
+                                {nomeTom(tone)}
+                              </button>
+                            ))}
+                          </div>
                         </div>
 
                         <div className="sm:col-span-2">
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-[11px] text-zinc-400 uppercase tracking-wider">
-                              Mensagem
-                            </label>
+                          <span className={rotulo}>Dias de envio</span>
+                          <div className="flex flex-wrap gap-2">
+                            {([["daily", "Todos os dias"], ["weekdays", "Só dias úteis (seg–sex)"]] as const).map(([val, txt]) => (
+                              <button key={val} type="button" aria-pressed={(newRuleForm.scheduleMode ?? "daily") === val}
+                                onClick={() => setNewRuleForm((p) => ({ ...p, scheduleMode: val }))}
+                                className={selecionavel((newRuleForm.scheduleMode ?? "daily") === val)}>
+                                {txt}
+                              </button>
+                            ))}
+                            <button type="button" aria-pressed={newRuleForm.skipHolidays ?? false}
+                              onClick={() => setNewRuleForm((p) => ({ ...p, skipHolidays: !(p.skipHolidays ?? false) }))}
+                              className={`${selecionavel(newRuleForm.skipHolidays ?? false)} flex items-center gap-1.5`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${(newRuleForm.skipHolidays ?? false) ? "bg-emerald-400" : "bg-zinc-600"}`} />
+                              Pular feriados nacionais
+                            </button>
+                          </div>
+                          {isBrazilHoliday() && (
+                            <p className="mt-1.5 text-[11px] text-amber-300/80">
+                              Hoje é feriado nacional ({getBrazilHolidayName()}).
+                              {(newRuleForm.skipHolidays ?? false) ? " Esta regra não dispara hoje." : " Esta regra dispara normalmente."}
+                            </p>
+                          )}
+                          {!isBrazilHoliday() && (newRuleForm.scheduleMode ?? "daily") === "weekdays" && !isBusinessDay() && (
+                            <p className="mt-1.5 text-[11px] text-zinc-500">Hoje é fim de semana — esta regra não dispara hoje.</p>
+                          )}
+                        </div>
+
+                        {plan === "premium" && (
+                          <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                              <label htmlFor="regra-janela-ini" className={rotulo}>Janela — início</label>
+                              <input id="regra-janela-ini" type="time" value={newRuleForm.sendWindowStart ?? ""}
+                                onChange={(e) => setNewRuleForm((p) => ({ ...p, sendWindowStart: e.target.value || null }))}
+                                className={campo} />
+                            </div>
+                            <div>
+                              <label htmlFor="regra-janela-fim" className={rotulo}>Janela — fim</label>
+                              <input id="regra-janela-fim" type="time" value={newRuleForm.sendWindowEnd ?? ""}
+                                onChange={(e) => setNewRuleForm((p) => ({ ...p, sendWindowEnd: e.target.value || null }))}
+                                className={campo} />
+                            </div>
+                            <div>
+                              <label htmlFor="regra-max" className={rotulo}>Máx. envios por dia</label>
+                              <input id="regra-max" type="number" min={1} max={500} placeholder="Sem limite"
+                                value={newRuleForm.maxDailySends ?? ""}
+                                onChange={(e) => setNewRuleForm((p) => ({ ...p, maxDailySends: e.target.value ? Number(e.target.value) : null }))}
+                                className={campo} />
+                            </div>
+                            <p className="sm:col-span-3 -mt-2 text-[10px] text-zinc-600">Recursos do plano Premium · horários de Brasília.</p>
+                          </div>
+                        )}
+
+                        <div className="sm:col-span-2">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label htmlFor="regra-mensagem" className={`${rotulo} mb-0`}>Mensagem</label>
                             <button
                               type="button"
                               onClick={() => setNewRuleForm((p) => ({ ...p, customMessage: getMessageTemplate(p.messageTone ?? "neutro") }))}
-                              className="text-[10px] text-zinc-500 hover:text-emerald-400 transition-colors underline underline-offset-2"
+                              className="text-[11px] text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
                             >
-                              Restaurar template padrão
+                              Restaurar texto padrão
                             </button>
                           </div>
                           <textarea
+                            id="regra-mensagem"
                             rows={7}
                             value={newRuleForm.customMessage ?? ""}
                             onChange={(e) => setNewRuleForm((p) => ({ ...p, customMessage: e.target.value || null }))}
                             placeholder="Olá {nome_cliente}, ..."
-                            className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 resize-none font-mono text-xs leading-relaxed"
+                            className={`${campo} resize-none text-xs leading-relaxed`}
                           />
                         </div>
+                      </div>
 
-                        {/* Matching clients preview */}
-                        <div className="sm:col-span-2">
+                      <footer className="px-5 py-3 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-3">
+                        <span className="text-[11px] text-zinc-500">
                           {(() => {
                             const ruleType = newRuleForm.ruleType ?? "overdue";
                             const daysBefore = newRuleForm.daysBefore ?? 3;
                             let matchCount = 0;
-
                             if (ruleType === "overdue") {
                               matchCount = debtors.filter(d => cobraComoVencido(d.category) && d.status !== "sent").length;
                             } else if (ruleType === "due_in_days") {
@@ -5104,229 +5138,207 @@ export default function App() {
                               const todayStr = new Date().toLocaleDateString("pt-BR");
                               matchCount = debtors.filter(d => d.category === "a_vencer" && d.dueDate === todayStr).length;
                             }
-
-                            return (
-                              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/8 border border-emerald-500/20 text-xs text-emerald-300">
-                                <span><strong>{matchCount}</strong> cliente(s) se enquadram nesta regra atualmente</span>
-                              </div>
-                            );
+                            return <><span className="font-mono text-zinc-200">{matchCount}</span> cliente{matchCount !== 1 ? "s" : ""} se encaixa{matchCount !== 1 ? "m" : ""} nesta regra hoje</>;
                           })()}
+                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={fecharFormRegra}
+                            className="px-3.5 py-2 text-xs border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 rounded-lg transition-colors cursor-pointer"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="submit"
+                            className="px-3.5 py-2 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black rounded-lg transition-colors cursor-pointer"
+                          >
+                            {editingRuleId ? "Salvar alterações" : "Criar regra"}
+                          </button>
                         </div>
-                      </div>
-
-                      <div className="flex gap-3 justify-end pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setShowCreateRuleForm(false)}
-                          className="px-4 py-1.5 text-xs border border-zinc-700 text-zinc-400 hover:text-white rounded-xl transition-all cursor-pointer"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-4 py-1.5 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl transition-all cursor-pointer"
-                        >
-                          Criar Regra
-                        </button>
-                      </div>
+                      </footer>
                     </form>
                   )}
 
-                  {isLoadingAutomation ? (
-                    <div className="py-10 text-center text-zinc-500 flex items-center justify-center gap-2">
-                      <RefreshCw className="w-4 h-4 animate-spin" /> Carregando regras...
-                    </div>
-                  ) : automationRules.length === 0 ? (
-                    <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-10 text-center space-y-2">
-                      <Bot className="w-10 h-10 text-zinc-700 mx-auto" />
-                      <p className="text-sm font-semibold text-white">Nenhuma regra configurada</p>
-                      <p className="text-xs text-zinc-600 max-w-sm mx-auto">
-                        Crie uma regra para que o sistema dispare cobranças automaticamente todos os dias.
-                        Requer plano Pro ou Premium.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {automationRules.map((rule) => (
-                        <div
-                          key={rule.id}
-                          className={`bg-zinc-900/50 border rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4 transition-all ${
-                            rule.enabled ? "border-emerald-500/20" : "border-zinc-800"
-                          }`}
-                        >
-                          {/* Animated slide toggle */}
-                          <button
-                            onClick={() => void handleToggleRule(rule.id, !rule.enabled)}
-                            title={rule.enabled ? "Desativar regra" : "Ativar regra"}
-                            className="flex-shrink-0 cursor-pointer focus:outline-none group"
-                            role="switch"
-                            aria-checked={rule.enabled}
-                          >
-                            <div className={`relative w-11 h-6 rounded-full transition-colors duration-300 ease-in-out ${
-                              rule.enabled ? "bg-emerald-500" : "bg-zinc-700 group-hover:bg-zinc-600"
-                            }`}>
-                              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ease-in-out ${
-                                rule.enabled ? "translate-x-5" : "translate-x-0"
-                              }`} />
-                            </div>
-                          </button>
+                  {/* ── Regras ──────────────────────────────────────────────── */}
+                  <section className={card}>
+                    <header className={cabecalho}>
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Regras</h4>
+                        <p className="text-xs text-zinc-500 mt-0.5">
+                          {automationRules.length === 0 ? "Nenhuma regra ainda" : `${ativas} de ${automationRules.length} ativa${automationRules.length !== 1 ? "s" : ""}`}
+                        </p>
+                      </div>
+                    </header>
 
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-semibold text-white text-sm truncate">{rule.name}</span>
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border ${
-                                rule.enabled
-                                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                                  : "bg-zinc-800 border-zinc-700 text-zinc-500"
-                              }`}>
-                                {rule.enabled ? "ATIVA" : "PAUSADA"}
+                    {isLoadingAutomation ? (
+                      <div className="px-5 py-8 text-center text-xs text-zinc-500 flex items-center justify-center gap-2">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Carregando regras…
+                      </div>
+                    ) : automationRules.length === 0 ? (
+                      <div className="px-5 py-8 text-center">
+                        <p className="text-xs font-semibold text-zinc-300">Nenhuma regra configurada</p>
+                        <p className="text-[11px] text-zinc-500 mt-1 max-w-sm mx-auto">
+                          Crie uma regra e o sistema passa a cobrar sozinho, todo dia, quem se encaixar nela.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-zinc-900">
+                        {automationRules.map((rule) => (
+                          <div key={rule.id} className="flex items-center gap-4 px-5 py-3.5">
+                            <button
+                              onClick={() => void handleToggleRule(rule.id, !rule.enabled)}
+                              title={rule.enabled ? "Pausar regra" : "Ativar regra"}
+                              aria-label={`${rule.enabled ? "Pausar" : "Ativar"} a regra ${rule.name}`}
+                              className="flex-shrink-0 cursor-pointer focus:outline-none group"
+                              role="switch"
+                              aria-checked={rule.enabled}
+                            >
+                              <span className={`relative block w-9 h-5 rounded-full transition-colors duration-200 ${rule.enabled ? "bg-emerald-500" : "bg-zinc-700 group-hover:bg-zinc-600"}`}>
+                                <span className={`absolute top-[3px] left-[3px] w-3.5 h-3.5 bg-white rounded-full transition-transform duration-200 ${rule.enabled ? "translate-x-4" : "translate-x-0"}`} />
                               </span>
-                              {plan === "basic" && rule.enabled && (
-                                <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border bg-amber-500/10 border-amber-500/30 text-amber-400" title="Automações requerem plano Pro ou Premium. Esta regra não será executada.">
-                                  BLOQUEADA · upgrade necessário
-                                </span>
-                              )}
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-400 font-mono">
+                            </button>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <span className={`text-sm font-semibold truncate ${rule.enabled ? "text-white" : "text-zinc-400"}`}>{rule.name}</span>
+                                {plan === "basic" && rule.enabled && (
+                                  <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded border text-amber-300 border-amber-500/30 bg-amber-500/10" title="Automações exigem plano Pro ou Premium. Esta regra não será executada.">
+                                    Bloqueada no plano atual
+                                  </span>
+                                )}
+                              </div>
+                              <p className="mt-0.5 text-[11px] text-zinc-500">
                                 {RULE_TYPE_LABELS[rule.ruleType]}
-                                {rule.ruleType === "due_in_days" && rule.daysBefore != null && ` (${rule.daysBefore}d)`}
-                              </span>
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-400 capitalize">
-                                {rule.messageTone === "amigavel" ? "Amigável" : rule.messageTone === "neutro" ? "Neutro" : rule.messageTone === "firme" ? "Firme" : "Jurídico"}
-                              </span>
+                                {rule.ruleType === "due_in_days" && rule.daysBefore != null && ` (${rule.daysBefore} dia${rule.daysBefore !== 1 ? "s" : ""})`}
+                                {" · "}tom {nomeTom(rule.messageTone).toLowerCase()}
+                                {" · "}{rule.scheduleMode === "weekdays" ? "seg–sex" : "todo dia"}
+                                {rule.skipHolidays && " · pula feriados"}
+                                {rule.sendWindowStart && rule.sendWindowEnd && ` · ${rule.sendWindowStart}–${rule.sendWindowEnd}`}
+                                {rule.maxDailySends != null && ` · máx ${rule.maxDailySends}/dia`}
+                              </p>
                             </div>
-                            <div className="flex flex-wrap gap-x-4 mt-1.5 text-[11px] text-zinc-500 font-mono">
-                              <span>{rule.scheduleMode === "weekdays" ? "Seg–Sex" : "Todo dia"}</span>
-                              {rule.skipHolidays && <span>Pula feriados</span>}
-                              {rule.sendWindowStart && rule.sendWindowEnd && (
-                                <span>Janela (UTC−3): {rule.sendWindowStart}–{rule.sendWindowEnd}</span>
-                              )}
-                              {rule.maxDailySends != null && (
-                                <span>Limite: máx {rule.maxDailySends}/dia</span>
-                              )}
-                            </div>
+
+                            <button
+                              onClick={() => abrirEdicaoRegra(rule)}
+                              title="Editar regra"
+                              aria-label={`Editar a regra ${rule.name}`}
+                              className={`flex-shrink-0 p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                editingRuleId === rule.id ? "text-emerald-400 bg-emerald-500/10" : "text-zinc-500 hover:text-white hover:bg-zinc-800"
+                              }`}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => void handleDeleteRule(rule.id)}
+                              title="Excluir regra"
+                              aria-label={`Excluir a regra ${rule.name}`}
+                              className="flex-shrink-0 p-1.5 rounded-lg text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
+                        ))}
+                      </div>
+                    )}
 
-                          <button
-                            onClick={() => void handleDeleteRule(rule.id)}
-                            title="Excluir regra"
-                            className="flex-shrink-0 p-2 rounded-xl text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                    <footer className="px-5 py-3 border-t border-zinc-800/80 text-[11px] text-zinc-500">
+                      O mesmo cliente nunca recebe duas cobranças em menos de 20 horas, mesmo com a regra rodando todo dia.
+                    </footer>
+                  </section>
 
+                  {/* ── Execuções ───────────────────────────────────────────── */}
                   {automationRuns.length > 0 && (
-                    <div className="bg-zinc-900/40 border border-zinc-900 rounded-3xl p-6 space-y-4 shadow-xl">
-                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <History className="w-4 h-4 text-emerald-400" /> Histórico
-                      </h3>
+                    <section className={card}>
+                      <header className={cabecalho}>
+                        <div>
+                          <h4 className="text-sm font-bold text-white">Execuções</h4>
+                          <p className="text-xs text-zinc-500 mt-0.5">O que cada disparo diário fez</p>
+                        </div>
+                      </header>
                       <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse text-xs">
+                        <table className="w-full text-left text-xs">
                           <thead>
                             <tr className="border-b border-zinc-800 text-[10px] uppercase font-mono text-zinc-500 tracking-wider">
-                              <th className="px-4 py-3">Executado em</th>
-                              <th className="px-4 py-3">Status</th>
-                              <th className="px-4 py-3 text-right">Devedores Elegíveis</th>
-                              <th className="px-4 py-3 text-right">Cobranças Criadas</th>
-                              <th className="px-4 py-3 text-right">Ignorados</th>
-                              <th className="px-4 py-3 text-right">Enviados</th>
-                              <th className="px-4 py-3 text-right">Erros</th>
+                              <th className="px-5 py-2.5 font-medium">Data</th>
+                              <th className="px-3 py-2.5 font-medium">Status</th>
+                              <th className="px-3 py-2.5 font-medium text-right" title="Devedores que se encaixavam nas regras">Elegíveis</th>
+                              <th className="px-3 py-2.5 font-medium text-right">Criadas</th>
+                              <th className="px-3 py-2.5 font-medium text-right" title="Puladas: cliente já cobrado nas últimas horas, título pago ou desabilitado, ou acima do limite diário">Puladas</th>
+                              <th className="px-3 py-2.5 font-medium text-right">Enviadas</th>
+                              <th className="px-5 py-2.5 font-medium text-right">Erros</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-zinc-800/60 text-zinc-300">
-                            {automationRuns.map((run) => (
-                              <tr key={run.id} className="hover:bg-zinc-900/25 transition-colors">
-                                <td className="px-4 py-3 font-mono text-zinc-500 text-[11px]">
-                                  {new Date(run.startedAt).toLocaleString("pt-BR")}
+                          <tbody className="divide-y divide-zinc-900 text-zinc-300">
+                            {execucoes.map((run) => (
+                              <tr key={run.id} className="hover:bg-zinc-900/40 transition-colors">
+                                <td className="px-5 py-2.5 font-mono text-zinc-400 text-[11px] whitespace-nowrap">
+                                  {new Date(run.startedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                                 </td>
-                                <td className="px-4 py-3">
-                                  <span className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded-full ${
+                                <td className="px-3 py-2.5">
+                                  <span className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded border ${
                                     run.status === "success"
-                                      ? "bg-emerald-500/10 text-emerald-400"
+                                      ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10"
                                       : run.status === "running"
-                                      ? "bg-amber-500/10 text-amber-400"
-                                      : "bg-rose-500/10 text-rose-400"
+                                      ? "text-amber-300 border-amber-500/30 bg-amber-500/10"
+                                      : "text-rose-300 border-rose-500/30 bg-rose-500/10"
                                   }`}>
-                                    {run.status === "success" ? "CONCLUÍDO" : run.status === "running" ? "RODANDO" : run.status === "failed" ? "FALHOU" : run.status.toUpperCase()}
+                                    {run.status === "success" ? "Concluída" : run.status === "running" ? "Rodando" : run.status === "failed" ? "Falhou" : run.status}
                                   </span>
                                 </td>
-                                <td className="px-4 py-3 text-right font-mono">{run.totalCandidates}</td>
-                                <td className="px-4 py-3 text-right font-mono">{run.jobsCreated}</td>
-                                <td className="px-4 py-3 text-right font-mono text-zinc-500">{run.jobsSkipped}</td>
-                                <td className="px-4 py-3 text-right font-mono text-emerald-400">{run.sent}</td>
-                                <td className="px-4 py-3 text-right font-mono text-rose-400">{run.failed}</td>
+                                <td className="px-3 py-2.5 text-right font-mono tabular-nums">{run.totalCandidates}</td>
+                                <td className="px-3 py-2.5 text-right font-mono tabular-nums">{run.jobsCreated}</td>
+                                <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-500">{run.jobsSkipped}</td>
+                                <td className="px-3 py-2.5 text-right font-mono tabular-nums text-white">{run.sent}</td>
+                                <td className={`px-5 py-2.5 text-right font-mono tabular-nums ${run.failed > 0 ? "text-rose-300" : "text-zinc-600"}`}>{run.failed}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
-                    </div>
+                      {automationRuns.length > 7 && (
+                        <footer className="px-5 py-2.5 border-t border-zinc-800/80">
+                          <button
+                            type="button"
+                            onClick={() => setVerTodasExecucoes(v => !v)}
+                            className="text-[11px] text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                          >
+                            {verTodasExecucoes ? "Mostrar só as 7 últimas" : `Ver todas (${automationRuns.length})`}
+                          </button>
+                        </footer>
+                      )}
+                    </section>
                   )}
 
-                  {/* ── Como usar Automações ── */}
-                  <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-2xl p-6 space-y-5">
-                    <div className="space-y-1">
-                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-emerald-400" /> Como usar as Automações
-                      </h4>
-                      <p className="text-xs text-zinc-500">
-                        Configure uma vez e o sistema cobra seus clientes automaticamente todos os dias.
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                      {[
-                        {
-                          step: "1",
-                          icon: <Upload className="w-4 h-4 text-emerald-400" />,
-                          title: "Importe seus devedores",
-                          desc: "Vá em Importar e carregue seu PDF ou planilha. O sistema extrai cliente, título, vencimento e valor automaticamente.",
-                        },
-                        {
-                          step: "2",
-                          icon: <Bot className="w-4 h-4 text-emerald-400" />,
-                          title: "Crie uma regra",
-                          desc: 'Clique em "Nova Regra", escolha o tipo (Vencidos, A Vencer…), o tom da mensagem e salve.',
-                        },
-                        {
-                          step: "3",
-                          icon: <Clock className="w-4 h-4 text-emerald-400" />,
-                          title: "O robô age sozinho",
-                          desc: "Todos os dias às 08h o scheduler verifica suas regras e envia cobranças via WhatsApp para os clientes elegíveis.",
-                        },
-                        {
-                          step: "4",
-                          icon: <History className="w-4 h-4 text-emerald-400" />,
-                          title: "Acompanhe em Histórico",
-                          desc: "Cada mensagem enviada aparece na aba Histórico com status, tom e dados do cliente para auditoria completa.",
-                        },
-                      ].map(({ step, icon, title, desc }) => (
-                        <div key={step} className="bg-zinc-950/60 border border-zinc-800/60 rounded-xl p-4 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold shrink-0">
-                              {step}
-                            </span>
-                            {icon}
-                            <span className="text-xs font-semibold text-white">{title}</span>
-                          </div>
-                          <p className="text-[11px] text-zinc-500 leading-relaxed">{desc}</p>
+                  {/* ── Como funciona: só enquanto não há regra ─────────────── */}
+                  {automationRules.length === 0 && !isLoadingAutomation && (
+                    <section className={card}>
+                      <header className={cabecalho}>
+                        <div>
+                          <h4 className="text-sm font-bold text-white">Como funciona</h4>
+                          <p className="text-xs text-zinc-500 mt-0.5">Configure uma vez e o sistema cobra sozinho</p>
                         </div>
-                      ))}
-                    </div>
-
-                    <div className="flex items-start gap-2.5 bg-emerald-500/5 border border-emerald-500/15 rounded-xl px-4 py-3">
-                      <CheckCircle className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                      <p className="text-[11px] text-zinc-400 leading-relaxed">
-                        <span className="text-emerald-400 font-medium">Deduplicação automática:</span> o sistema nunca envia duas cobranças para o mesmo cliente dentro de 20 horas, evitando spam mesmo que a regra rode todos os dias.
-                      </p>
-                    </div>
-                  </div>
+                      </header>
+                      <ol className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-zinc-900">
+                        {[
+                          { t: "Importe os devedores", d: "Em Importar carteira, envie o PDF ou a planilha." },
+                          { t: "Crie uma regra", d: "Escolha quem cobrar (vencidos, a vencer), o tom e os dias." },
+                          { t: "O sistema dispara", d: "Todo dia às 8h, pelo seu WhatsApp, para quem se encaixar." },
+                          { t: "Acompanhe", d: "Cada envio aparece no Histórico de envios, com status e tom." },
+                        ].map((p, i) => (
+                          <li key={p.t} className="px-5 py-4">
+                            <p className="text-[10px] font-mono text-emerald-400">{String(i + 1).padStart(2, "0")}</p>
+                            <p className="mt-1.5 text-xs font-bold text-white">{p.t}</p>
+                            <p className="mt-1 text-[11px] text-zinc-500 leading-relaxed">{p.d}</p>
+                          </li>
+                        ))}
+                      </ol>
+                    </section>
+                  )}
 
                 </div>
-              )}
+                );
+              })()}
 
             </div>
 
