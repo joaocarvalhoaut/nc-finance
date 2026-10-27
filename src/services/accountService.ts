@@ -1,6 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 import type { AccountProfile } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
+import { isValidCPF } from "../utils/cpf";
 
 export interface UserProfileData {
   full_name: string;
@@ -23,6 +24,63 @@ export async function getMyProfile(userId: string): Promise<UserProfileData | nu
     .maybeSingle();
   if (error) return null;
   return (data as UserProfileData) ?? null;
+}
+
+/**
+ * Como getMyProfile, mas distingue "não tem perfil" (null) de "não deu para
+ * ler" (lança) — falha de rede não pode mandar a conta preencher tudo de novo.
+ */
+export async function fetchMyProfileOrThrow(userId: string): Promise<UserProfileData | null> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .select("full_name, cpf, phone, cep, address, city, state, created_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message || "Falha ao carregar o cadastro.");
+  return (data as UserProfileData) ?? null;
+}
+
+/**
+ * Cadastro completo = os dados que o formulário de cadastro exige. Conta sem
+ * eles (criada antes da correção do cadastro, ou sem perfil) precisa completar
+ * antes de usar o sistema.
+ */
+export const isProfileComplete = (p: UserProfileData | null): boolean => {
+  if (!p) return false;
+  const digitos = (v: string | null | undefined) => (v ?? "").replace(/\D/g, "");
+  return Boolean(
+    p.full_name?.trim() &&
+    isValidCPF(digitos(p.cpf)) &&
+    digitos(p.phone).length >= 10 &&
+    digitos(p.cep).length === 8 &&
+    p.address?.trim() && p.city?.trim() && p.state?.trim(),
+  );
+};
+
+/** Grava (ou completa) o perfil do usuário logado. */
+export async function saveMyProfile(userId: string, data: {
+  full_name: string; cpf: string; phone: string; cep: string; address: string; city: string; state: string;
+}): Promise<void> {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from("user_profiles").upsert(
+    {
+      user_id: userId,
+      full_name: data.full_name.trim(),
+      cpf: data.cpf.replace(/\D/g, ""),
+      phone: data.phone.replace(/\D/g, ""),
+      cep: data.cep.replace(/\D/g, ""),
+      address: data.address.trim(),
+      city: data.city.trim(),
+      state: data.state.trim().toUpperCase(),
+    },
+    { onConflict: "user_id" },
+  );
+  if (error) {
+    // 23505 = CPF já usado em outra conta (índice único user_profiles_cpf_unique).
+    if (error.code === "23505") throw new Error("Este CPF já está cadastrado em outra conta. Fale com o suporte.");
+    throw new Error("Não foi possível salvar seus dados. Tente novamente.");
+  }
 }
 
 const buildDisplayName = (user: User | null) => {

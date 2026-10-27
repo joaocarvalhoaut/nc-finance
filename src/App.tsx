@@ -1,6 +1,6 @@
 import { isValidDueDate, parseManualAmount } from "./utils/manualDebtorValidation";
 import { CATEGORY_BADGE, CATEGORY_CYCLE, CATEGORY_LABEL, CATEGORY_TINT, cobraComoVencido } from "./config/categories";
-import React, { useState, useEffect, useMemo, lazy } from "react";
+import React, { useState, useEffect, useMemo, useCallback, lazy } from "react";
 import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
 import CountUp from "./components/CountUp";
@@ -13,6 +13,8 @@ import LandingPage from "./components/LandingPage";
 import SubscriptionGate from "./components/SubscriptionGate";
 import SubscriptionStatusCard from "./components/SubscriptionStatusCard";
 import GerenciarAssinatura from "./components/GerenciarAssinatura";
+import CompletarCadastro from "./components/CompletarCadastro";
+import { fetchMyProfileOrThrow, isProfileComplete, type UserProfileData } from "./services/accountService";
 const ClientDashboard = lazy(() => import("./components/ClientDashboard"));
 import { PLAN_LIST, getPlanDefinition } from "./config/plans";
 import { useAccount } from "./hooks/useAccount";
@@ -251,6 +253,23 @@ export default function App() {
   // Plano à espera do CPF/CNPJ (cadastro sem documento) e modal de gerenciar.
   const [documentPromptPlanId, setDocumentPromptPlanId] = useState<PlanId | null>(null);
   const [showGerenciarAssinatura, setShowGerenciarAssinatura] = useState(false);
+  // Cadastro (CPF, telefone, endereço): conta sem esses dados completa antes de
+  // usar o sistema. Falha ao ler o perfil não obriga a preencher de novo.
+  const [perfilCadastro, setPerfilCadastro] = useState<{ carregado: boolean; completo: boolean; perfil: UserProfileData | null }>(
+    { carregado: false, completo: true, perfil: null },
+  );
+  const carregarPerfilCadastro = useCallback(async (uid: string) => {
+    try {
+      const perfil = await fetchMyProfileOrThrow(uid);
+      setPerfilCadastro({ carregado: true, completo: isProfileComplete(perfil), perfil });
+    } catch {
+      setPerfilCadastro({ carregado: true, completo: true, perfil: null });
+    }
+  }, []);
+  useEffect(() => {
+    if (!userId) { setPerfilCadastro({ carregado: false, completo: true, perfil: null }); return; }
+    void carregarPerfilCadastro(userId);
+  }, [userId, carregarPerfilCadastro]);
 
   // Temporary seed data is now persisted by user_id on first authenticated access.
   const [debtors, setDebtors] = useState<Debtor[]>([]);
@@ -2171,7 +2190,7 @@ export default function App() {
           isAuthLoading={isAuthenticating}
           authConfigError={authConfigError}
         />
-      ) : (isSubscriptionLoading && !isSubscriptionSyncing) ? (
+      ) : ((isSubscriptionLoading && !isSubscriptionSyncing) || (userId && !perfilCadastro.carregado)) ? (
         <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
           <div className="text-center space-y-3">
             <div className="w-10 h-10 mx-auto rounded-full border-2 border-emerald-500/30 border-t-emerald-400 animate-spin" />
@@ -2179,6 +2198,15 @@ export default function App() {
             <p className="text-xs text-zinc-500">Preparando acesso seguro ao painel NC Finance.</p>
           </div>
         </div>
+      ) : (userId && !perfilCadastro.completo) ? (
+        <CompletarCadastro
+          userId={userId}
+          email={account?.email || user?.email || ""}
+          displayName={account?.displayName || ""}
+          perfil={perfilCadastro.perfil}
+          onSaved={() => void carregarPerfilCadastro(userId)}
+          onLogout={() => void handleSignOut()}
+        />
       ) : !canUseApp ? (
         <SubscriptionGate
           email={account?.email || user?.email || ""}
