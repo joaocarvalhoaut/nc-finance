@@ -4343,7 +4343,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="max-h-[520px] overflow-y-auto divide-y divide-zinc-900">
+                      <div className="max-h-[520px] overflow-y-auto p-2 space-y-1">
                         {listaEnvio.length === 0 && (
                           <p className="px-5 py-8 text-xs text-zinc-500 text-center">
                             {debtors.length === 0 ? "A carteira está vazia." : "Nenhum devedor encontrado."}
@@ -4356,13 +4356,13 @@ export default function App() {
                           return (
                             <div
                               key={d.id}
-                              className={`border-l-2 transition-colors ${isSelected ? "border-emerald-400 bg-emerald-500/5" : "border-transparent hover:bg-zinc-900/50"}`}
+                              className={`rounded-lg border transition-colors ${isSelected ? "border-zinc-600 bg-zinc-900" : "border-transparent hover:bg-zinc-900/50"}`}
                             >
                               <button
                                 type="button"
                                 onClick={() => setSelectedDebtorForMessage(d)}
                                 aria-pressed={isSelected}
-                                className="w-full flex items-start justify-between gap-3 px-4 pt-3 pb-1.5 text-left cursor-pointer"
+                                className="w-full flex items-start justify-between gap-3 px-3 pt-2.5 pb-1.5 text-left cursor-pointer"
                               >
                                 <span className="min-w-0">
                                   <span className="block text-xs font-semibold text-white truncate">{d.client}</span>
@@ -4384,7 +4384,7 @@ export default function App() {
                               </button>
 
                               {/* Telefone e boleto */}
-                              <div className="px-4 pb-3 space-y-1.5">
+                              <div className="px-3 pb-2.5 space-y-1.5">
                                 <div className="flex items-center gap-2">
                                   {isEditingPhone ? (
                                     <>
