@@ -1,304 +1,432 @@
-import React, { useState } from "react";
-import { X, ChevronDown, ChevronUp, MessageCircle, Mail } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronDown, Copy, Mail, Search, X } from "lucide-react";
+import { CONTATO_EMAIL, DIAS_TESTE } from "../content/landing";
+
+/**
+ * Central de ajuda (perguntas frequentes). Abre no app e na landing.
+ *
+ * Regra do conteúdo: só descrever o que o produto faz hoje, com os nomes das
+ * telas como aparecem no menu (Resumo, Carteira, Importar carteira, Cobranças,
+ * Preparar envios, Histórico de envios, Automações, Configurações). Ao mudar uma
+ * tela ou uma regra, atualize a resposta correspondente.
+ *
+ * Respostas: "\n" separa parágrafos; linha começando com "• " vira item de lista.
+ */
 
 interface Props {
   onClose: () => void;
 }
 
-interface FAQ {
-  question: string;
-  answer: string;
-  category: string;
+interface Pergunta {
+  tema: Tema;
+  pergunta: string;
+  resposta: string;
 }
 
-const FAQS: FAQ[] = [
-  // Primeiros passos
+const TEMAS = ["Primeiros passos", "WhatsApp e envios", "Importação", "Carteira", "Assinatura", "Privacidade"] as const;
+type Tema = (typeof TEMAS)[number];
+
+const PERGUNTAS: Pergunta[] = [
+  // ── Primeiros passos ────────────────────────────────────────────────────────
   {
-    category: "Primeiros Passos",
-    question: "Como faço para começar a usar o NC Finance?",
-    answer: "Após criar sua conta e ativar o plano, acesse a aba 'Importar' para carregar sua lista de devedores (PDF, TXT ou Excel). Após revisar os dados extraídos, clique em 'Enviar para a Visão Geral'. Na aba 'Cobrar' você pode selecionar os devedores e disparar as mensagens pelo WhatsApp.",
+    tema: "Primeiros passos",
+    pergunta: "Como começo a usar?",
+    resposta:
+      "Três passos:\n" +
+      "• Em Configurações, conecte o WhatsApp do número que vai enviar as cobranças.\n" +
+      "• Em Cobranças, importe a lista de quem está em atraso, confira os registros e envie — tudo num passo a passo.\n" +
+      "• Para cobrar sozinho todo dia, crie uma regra em Automações (planos Pro e Premium).",
   },
   {
-    category: "Primeiros Passos",
-    question: "Preciso instalar alguma coisa?",
-    answer: "Não. O NC Finance é 100% baseado em navegador — basta acessar pelo link e fazer login. Nenhum download ou instalação é necessário.",
+    tema: "Primeiros passos",
+    pergunta: "Preciso instalar alguma coisa?",
+    resposta: "Não. O NC Finance funciona no navegador, no computador ou no celular. Só o WhatsApp que envia as cobranças fica no seu celular, conectado ao sistema.",
   },
   {
-    category: "Primeiros Passos",
-    question: "Qual é o período de avaliação gratuita?",
-    answer: "Novos usuários têm um trial gratuito de 7 dias ao se cadastrar. Durante o trial você tem acesso completo às funcionalidades do plano escolhido. Ao término, a cobrança é iniciada automaticamente — você pode cancelar antes do fim do trial sem custo.",
+    tema: "Primeiros passos",
+    pergunta: "Como funciona o teste grátis?",
+    resposta: `Escolha um plano e use ${DIAS_TESTE} dias de graça, sem cartão de crédito. A primeira fatura vence no fim do teste, por boleto ou cartão. Se cancelar antes, não paga nada.`,
   },
   {
-    category: "Primeiros Passos",
-    question: "Esqueci minha senha. Como recupero?",
-    answer: "Na tela de login, clique em 'Esqueci minha senha' e informe o e-mail da sua conta. Enviaremos um link para você criar uma nova senha — verifique sua caixa de entrada e também a pasta de spam.",
+    tema: "Primeiros passos",
+    pergunta: "Esqueci minha senha. Como recupero?",
+    resposta: "Na tela de entrada, clique em “Esqueci minha senha” e informe o e-mail da conta. Enviamos um link para criar uma senha nova — confira também a caixa de spam.",
   },
 
-  // WhatsApp
+  // ── WhatsApp e envios ───────────────────────────────────────────────────────
   {
-    category: "WhatsApp e Cobranças",
-    question: "Como o envio pelo WhatsApp funciona?",
-    answer: "As cobranças saem pelo SEU número de WhatsApp. Em Minha Conta, clique em 'Conectar WhatsApp' e escaneie o QR Code com o celular desse número (WhatsApp > Aparelhos conectados > Conectar um aparelho). Leva menos de um minuto e está incluído em todos os planos.",
+    tema: "WhatsApp e envios",
+    pergunta: "Como conecto meu WhatsApp?",
+    resposta:
+      "Em Configurações, clique em “Conectar WhatsApp” e escaneie o código com o celular do número (WhatsApp › Aparelhos conectados › Conectar um aparelho). Leva menos de um minuto e está incluído em todos os planos.\n" +
+      "Se aparecer “Recebemos seu pedido”, o número está sendo preparado: a tela mostra o prazo, e depois é só voltar e escanear o código.",
   },
   {
-    category: "WhatsApp e Cobranças",
-    question: "Qual é o limite de cobranças que posso enviar?",
-    answer: "O limite depende do seu plano mensal:\n• Básico: 300 cobranças/mês\n• Pro: 1.500 cobranças/mês\n• Premium: 5.000 cobranças/mês\nO contador é resetado todo dia 1º do mês.",
+    tema: "WhatsApp e envios",
+    pergunta: "O cliente recebe a mensagem de qual número?",
+    resposta: "Do seu: o WhatsApp que você conectou. A mensagem é assinada com o nome da sua empresa, que você cadastra em Configurações › Nome nas mensagens. A NC Finance não aparece.",
   },
   {
-    category: "WhatsApp e Cobranças",
-    question: "O devedor vai receber a mensagem de qual número?",
-    answer: "Do número de WhatsApp que você conectou em Minha Conta. O devedor recebe a mensagem como se fosse de um contato da sua empresa — porque é.",
+    tema: "WhatsApp e envios",
+    pergunta: "Quantas cobranças posso enviar por mês?",
+    resposta: "Depende do plano:\n• Básico: até 300\n• Pro: até 1.500\n• Premium: até 5.000\nA contagem recomeça todo dia 1º.",
   },
   {
-    category: "WhatsApp e Cobranças",
-    question: "Posso enviar para qualquer número de telefone?",
-    answer: "Sim, desde que seja um número válido com WhatsApp ativo. O sistema aceita números com DDI+DDD+número (ex: 5577999887720). Números inválidos ou sem WhatsApp resultarão em erro de envio, registrado no Histórico.",
+    tema: "WhatsApp e envios",
+    pergunta: "Meu número pode ser bloqueado pelo WhatsApp?",
+    resposta:
+      "Pode, como em qualquer envio automatizado: o WhatsApp bloqueia números que recebem muitas denúncias ou que mandam muito volume de repente. Para reduzir o risco:\n" +
+      "• cobre só quem já é seu cliente;\n" +
+      "• num número novo, aumente o volume aos poucos;\n" +
+      "• comece pelos tons amigável e neutro.\n" +
+      "As automações não cobram o mesmo cliente duas vezes em menos de 20 horas, e no Premium dá para limitar os envios por dia.",
   },
   {
-    category: "WhatsApp e Cobranças",
-    question: "O que são os 4 tons de mensagem?",
-    answer: "O NC Finance oferece 4 estilos de cobrança adaptáveis ao perfil de cada devedor:\n• Amigável: tom cordial e informal\n• Neutro: objetivo e profissional\n• Firme: direto com urgência\n• Jurídico: linguagem formal com aviso de encaminhamento",
+    tema: "WhatsApp e envios",
+    pergunta: "Em que formato preciso colocar o telefone?",
+    resposta: "Em qualquer um: (11) 98765-4321, 11987654321 ou com +55. O sistema acerta o formato e coloca o nono dígito em celular cadastrado no formato antigo. Número sem WhatsApp aparece como erro no Histórico de envios.",
   },
   {
-    category: "WhatsApp e Cobranças",
-    question: "Como anexar automaticamente o boleto de cada cliente?",
-    answer: "Nos planos Pro e Premium, conecte uma pasta do Google Drive com os boletos em PDF. Compartilhe a pasta com o e-mail da service account (mostrado no card 'Boletos do Google Drive', no ícone de ajuda '?') como Leitor, cole a URL da pasta e clique em 'Buscar boletos no Drive'. O sistema anexa o boleto ao cliente certo quando o número do documento aparece no nome do arquivo (ex: 'BOLETO 1382-005 CLIENTE.pdf') OU quando o valor e o vencimento de dentro do PDF batem com o título. Só sugere quando há correspondência segura — se não encontrar, mostra 'Sem boleto' (para nunca anexar o boleto errado).",
+    tema: "WhatsApp e envios",
+    pergunta: "Quais são os tons de mensagem?",
+    resposta:
+      "• Amigável: lembrete leve e cordial.\n" +
+      "• Neutro: direto e profissional.\n" +
+      "• Firme: pede a regularização com prioridade.\n" +
+      "• Jurídico: formal, para registro administrativo.\n" +
+      "O texto pode ser ajustado antes de cada envio e em cada regra de automação.",
   },
   {
-    category: "WhatsApp e Cobranças",
-    question: "As cobranças automáticas seguem o tipo do cliente?",
-    answer: "Sim. Cada regra de automação respeita a categoria atual do cliente: a regra 'Vencidos' só cobra quem está como Vencido; as regras 'Vencem hoje' e 'Vencem em X dias' só cobram quem está como 'A vencer'. Se você mudar o tipo de um cliente, a automação passa a seguir o novo tipo. Clientes Liquidados e Desabilitados nunca são cobrados por nenhuma regra.",
-  },
-
-  // Importação
-  {
-    category: "Importação de Dados",
-    question: "Quais formatos de arquivo posso importar?",
-    answer: "O sistema aceita arquivos PDF, TXT e Excel (XLSX/XLS). O extrator local identifica automaticamente clientes, vencimentos, valores, banco e números de documento. Para melhores resultados, use arquivos de relatório ERP com CNPJ dos fornecedores no texto.",
+    tema: "WhatsApp e envios",
+    pergunta: "Qual valor vai na mensagem?",
+    resposta: "O valor original do título. Multa e juros aparecem no painel para a sua gestão, mas não entram no valor cobrado na mensagem.",
   },
   {
-    category: "Importação de Dados",
-    question: "O banco é detectado automaticamente?",
-    answer: "Sim. O sistema usa duas fontes para identificar o banco:\n1. Nome do arquivo — se o nome contiver o nome de um banco conhecido (ex: 'BRADESCO_vencidos.pdf'), ele é usado automaticamente para todos os registros.\n2. Coluna 'Banco' no arquivo — se o arquivo tiver uma coluna dedicada ao banco, o valor dela tem prioridade.\nCaso nenhum banco seja encontrado, o campo fica em branco para preenchimento manual.",
+    tema: "WhatsApp e envios",
+    pergunta: "Como anexar o boleto de cada cliente?",
+    resposta:
+      "Nos planos Pro e Premium, aponte a pasta do Google Drive onde ficam os boletos em PDF. Na barra do Google Drive (na Carteira ou em Preparar envios), o “?” mostra o e-mail com que a pasta deve ser compartilhada (como Leitor); depois é só colar o link da pasta.\n" +
+      "O sistema encontra o PDF de cada cliente pelo número do título no nome do arquivo ou pelos dados de dentro do boleto (linha digitável, CPF/CNPJ, valor e vencimento). Só sugere quando a correspondência é segura — para nunca anexar o boleto de outra pessoa.",
   },
   {
-    category: "Importação de Dados",
-    question: "Alguns registros foram marcados como 'baixa confiança' — o que faço?",
-    answer: "Registros com confiança abaixo de 75% tiveram algum campo extraído de forma incerta. Revise os campos diretamente na tabela antes de enviar para a Visão Geral — você pode editar qualquer campo clicando nele. Campos em branco precisam ser preenchidos manualmente.",
-  },
-  {
-    category: "Importação de Dados",
-    question: "Posso importar o mesmo arquivo duas vezes?",
-    answer: "Sim. O sistema usa o número do documento como chave de deduplicação. Se você importar o mesmo arquivo novamente, os registros existentes serão atualizados (não duplicados). Caso existam documentos duplicados dentro do mesmo arquivo, o sistema exibirá um aviso perguntando se deseja manter todos ou somente o primeiro de cada.",
-  },
-  {
-    category: "Importação de Dados",
-    question: "Como funciona a integração com o Google Sheets?",
-    answer: "Nos planos Pro e Premium, você pode importar dados diretamente de uma planilha Google Sheets. Para isso, compartilhe sua planilha com o e-mail da service account da plataforma (visível no painel de importação) como 'Visualizador' e cole o link da planilha no campo indicado.",
-  },
-
-  // Visão Geral
-  {
-    category: "Visão Geral",
-    question: "Como ordenar os registros na tabela?",
-    answer: "A tabela possui filtros de ordenação em várias colunas:\n• Cliente — alterna entre A→Z e Z→A (padrão: A→Z)\n• Vencimento — ordena do mais antigo para o mais novo (↑) ou do mais novo para o mais antigo (↓)\n• Banco — agrupa registros do mesmo banco em ordem alfabética\n• Valor Base — ordena do maior para o menor ou do menor para o maior\nAo ativar um sort, os demais são desativados automaticamente.",
-  },
-  {
-    category: "Visão Geral",
-    question: "Como navegar pela tabela quando há muitas colunas?",
-    answer: "Você pode arrastar a tabela lateralmente clicando e segurando o mouse sobre ela. As colunas de checkbox e Cliente ficam fixas à esquerda (sticky) para sempre ficarem visíveis durante a navegação horizontal.",
-  },
-  {
-    category: "Visão Geral",
-    question: "Como adicionar observações a um registro?",
-    answer: "Na coluna 'Obs.' da tabela, clique no ícone de balão de texto. Um campo de texto abrirá para digitar sua observação. Clique em 'Salvar' para confirmar. Registros com observação exibem um ponto âmbar de indicação na linha.",
-  },
-  {
-    category: "Visão Geral",
-    question: "Como impedir que um cliente seja cobrado (desabilitar)?",
-    answer: "Na Visão Geral, marque o(s) cliente(s) na tabela e clique em 'Desabilitar selecionados'. É obrigatório informar um motivo — ele fica salvo nas observações do cliente. O cliente passa para a categoria 'Desabilitado' e não recebe mais nenhuma cobrança (nem manual, nem automática). Para vê-los, use o filtro 'Desabilitados' na coluna Tipo. Clientes 'Liquidados' (já pagos) também nunca são cobrados.",
-  },
-  {
-    category: "Visão Geral",
-    question: "O que é a 'Pendência Crítica' no Dashboard?",
-    answer: "O card Pendência Crítica exibe o total em aberto dos devedores vencidos há pelo menos N dias (configurável). Você pode:\n• Definir o número mínimo de dias de atraso no campo 'dias ≥'\n• Alternar entre 'c/ juros' (usa o valor atualizado com multa e juros) e 's/ juros' (usa o valor original)\nIsso permite identificar rapidamente os casos mais críticos da carteira.",
-  },
-  {
-    category: "Visão Geral",
-    question: "Como funcionam os encargos (multa e juros)?",
-    answer: "Os encargos são calculados automaticamente para devedores na categoria 'Vencidos':\n• Multa: percentual fixo aplicado uma única vez sobre o valor original\n• Juros: percentual diário multiplicado pela quantidade real de dias de atraso (contados a partir da data de vencimento até hoje)\nDevedores 'A Vencer' não recebem encargos. 'Liquidados' mantêm o valor original. Os percentuais são configurados nos Parâmetros de Encargos Globais.",
+    tema: "WhatsApp e envios",
+    pergunta: "As automações respeitam o tipo do cliente?",
+    resposta:
+      "Sim. A regra “Vencidos” só cobra quem está como vencido; “Vencem hoje” e “Vencem em X dias” só cobram quem está como a vencer. As regras rodam todo dia às 8h (horário de Brasília).\n" +
+      "Clientes liquidados ou desabilitados nunca são cobrados por nenhuma regra.",
   },
 
-  // Exportação
+  // ── Importação ──────────────────────────────────────────────────────────────
   {
-    category: "Exportação",
-    question: "Como exportar para PDF ou Excel?",
-    answer: "Na aba Visão Geral, use os botões na parte superior da tabela:\n• 'Exportar Planilha (XLS)' — gera um arquivo Excel com todos os campos, incluindo banco.\n• 'Exportar Relatório (PDF)' — gera um relatório em PDF formatado com cabeçalho, cards de resumo e tabela de registros.\nAmbos exportam os registros filtrados no momento. Se houver clientes selecionados (checkbox), somente eles são exportados.",
+    tema: "Importação",
+    pergunta: "Quais arquivos posso importar?",
+    resposta:
+      "Planilha Excel (XLSX, XLS) ou ODS, CSV, TXT, PDF — inclusive escaneado —, foto ou print do relatório (JPG, PNG) e texto colado. Nos planos Pro e Premium também dá para puxar de uma planilha do Google Sheets.\n" +
+      "Não precisa seguir modelo: o sistema reconhece as colunas pelo título (“Sacado”, “Vencto”, “Vlr”…) e pelo conteúdo, e ignora linhas de total e rodapés.",
   },
   {
-    category: "Exportação",
-    question: "Posso exportar apenas alguns clientes selecionados?",
-    answer: "Sim. Marque os checkboxes dos clientes desejados na tabela e clique em 'Exportar PDF (N)' ou 'Exportar XLS'. O número entre parênteses indica quantos registros serão incluídos. Os cards de resumo do PDF também refletirão apenas os selecionados.",
+    tema: "Importação",
+    pergunta: "Meus arquivos são enviados para algum lugar na leitura?",
+    resposta: "Não. A leitura acontece no seu navegador — inclusive o reconhecimento de texto de fotos e PDFs escaneados. Só os registros que você confirma são salvos na sua carteira.",
   },
   {
-    category: "Exportação",
-    question: "O PDF mostra apenas as categorias presentes?",
-    answer: "Sim. Se os registros exportados pertencem a uma única categoria (ex: apenas Vencidos), o PDF exibe somente o card 'Total de Registros'. Se houver mais de uma categoria, os cards de cada categoria presente são exibidos automaticamente ao lado do Total.",
-  },
-
-  // Planos e Pagamentos
-  {
-    category: "Planos e Pagamentos",
-    question: "Como faço para mudar de plano?",
-    answer: "Em Minha Conta, clique em 'Gerenciar assinatura' e escolha o novo plano. O limite de cobranças muda na hora, e a fatura em aberto passa a ter o valor do novo plano.",
+    tema: "Importação",
+    pergunta: "O que significa “revisar” ou “conferir” num registro?",
+    resposta:
+      "Que vale olhar antes de salvar: o registro veio sem algum dado (telefone, vencimento, documento) ou foi lido com dúvida — por exemplo, um número que a leitura da foto não teve certeza. Corrija o campo na revisão.\n" +
+      "Em Cobranças, registro sem valor ou sem vencimento já vem desmarcado, para não sair cobrança de R$ 0,00.",
   },
   {
-    category: "Planos e Pagamentos",
-    question: "Como cancelo minha assinatura?",
-    answer: "Em Minha Conta, clique em 'Gerenciar assinatura' e depois em 'Cancelar assinatura'. O acesso continua até o fim do período já pago (ou até o fim do teste grátis, sem cobrança). Não há taxa de cancelamento.",
+    tema: "Importação",
+    pergunta: "Posso importar o mesmo arquivo de novo?",
+    resposta: "Pode. O número do documento identifica cada título: importar de novo atualiza os registros que já existem, sem duplicar. Se o próprio arquivo tiver documentos repetidos, o sistema pergunta se você quer manter todos ou só o primeiro de cada.",
   },
   {
-    category: "Planos e Pagamentos",
-    question: "E se a fatura vencer sem pagamento?",
-    answer: "A fatura mensal chega por e-mail e pode ser paga por Pix, boleto ou cartão. Depois do vencimento há 3 dias de tolerância (o tempo de compensação do boleto). Passado esse prazo, o envio de cobranças fica suspenso até o pagamento — seus dados continuam guardados. Para pagar, use 'Gerenciar assinatura' > 'Pagar fatura em aberto'.",
+    tema: "Importação",
+    pergunta: "O banco é detectado sozinho?",
+    resposta: "Quando dá: se o arquivo tiver uma coluna de banco, ela vale; senão, um banco no nome do arquivo (ex.: “BRADESCO_vencidos.pdf”) é usado para todos os registros. Sem nenhum dos dois, o campo fica em branco para você preencher.",
   },
   {
-    category: "Planos e Pagamentos",
-    question: "Os dados ficam salvos se eu cancelar?",
-    answer: "Sim. Seus dados ficam armazenados por até 90 dias após o cancelamento. Durante esse período você pode reativar a assinatura e retomar de onde parou. Após 90 dias, os dados são excluídos permanentemente.",
+    tema: "Importação",
+    pergunta: "Como importo do Google Sheets?",
+    resposta: "Nos planos Pro e Premium, compartilhe a planilha com o e-mail mostrado no campo do Google Sheets, como Leitor, e cole o link da planilha.",
   },
 
-  // Segurança e Privacidade
+  // ── Carteira ────────────────────────────────────────────────────────────────
   {
-    category: "Segurança e Privacidade",
-    question: "Os dados dos meus devedores estão seguros?",
-    answer: "Sim. Todos os dados são armazenados com criptografia em trânsito (HTTPS). Os números de telefone são salvos de forma mascarada nos logs. As credenciais de APIs terceiras nunca são expostas no frontend. O banco de dados possui controle de acesso por Row Level Security (RLS).",
+    tema: "Carteira",
+    pergunta: "Como encontro e organizo os clientes?",
+    resposta: "Na Carteira, use a busca, o filtro por tipo e a ordenação por nome, vencimento, valor ou banco. No computador dá para arrastar a tabela para os lados; a seleção e o nome do cliente ficam fixos.",
   },
   {
-    category: "Segurança e Privacidade",
-    question: "A NC Finance tem acesso às mensagens que envio?",
-    answer: "Os logs de cobrança armazenam apenas um preview das primeiras 100 caracteres da mensagem, para fins de auditoria. O conteúdo completo não é armazenado.",
+    tema: "Carteira",
+    pergunta: "Como adiciono uma observação?",
+    resposta: "Clique no ícone de nota na linha do cliente, escreva e salve. Cliente com observação mostra o ícone em amarelo.",
+  },
+  {
+    tema: "Carteira",
+    pergunta: "Como paro de cobrar um cliente?",
+    resposta: "Marque o cliente na Carteira e clique em “Desabilitar selecionados”, informando o motivo (ele fica nas observações). O cliente passa para Desabilitado e não recebe mais cobrança, nem manual nem automática. Títulos liquidados também nunca são cobrados.",
+  },
+  {
+    tema: "Carteira",
+    pergunta: "Como são calculados multa e juros?",
+    resposta:
+      "Você define os percentuais em Encargos, na Carteira:\n" +
+      "• Multa: percentual aplicado uma vez sobre o valor original.\n" +
+      "• Juros: percentual ao dia, multiplicado pelos dias de atraso desde o vencimento.\n" +
+      "Títulos a vencer e liquidados não têm encargos. Os encargos servem para a sua gestão — a mensagem leva o valor original.",
+  },
+  {
+    tema: "Carteira",
+    pergunta: "O que é a “Pendência crítica” no Resumo?",
+    resposta: "O total em aberto dos títulos vencidos há pelo menos N dias — você escolhe o N e se o total considera ou não multa e juros. Serve para enxergar rápido os casos mais graves.",
+  },
+  {
+    tema: "Carteira",
+    pergunta: "Como exporto a carteira?",
+    resposta:
+      "Na Carteira, em Exportar:\n" +
+      "• Planilha (XLS/CSV), com todos os campos;\n" +
+      "• Relatório PDF, com resumo por tipo;\n" +
+      "• Sincronizar com Sheets, numa planilha do Google.\n" +
+      "Sai o que está filtrado na tela — ou só os clientes marcados, se houver seleção.",
+  },
+
+  // ── Assinatura ──────────────────────────────────────────────────────────────
+  {
+    tema: "Assinatura",
+    pergunta: "Como mudo de plano?",
+    resposta: "Em Configurações, clique em “Gerenciar assinatura” e escolha o novo plano. O limite de cobranças muda na hora, e a fatura em aberto passa a ter o valor do novo plano.",
+  },
+  {
+    tema: "Assinatura",
+    pergunta: "Como cancelo a assinatura?",
+    resposta: "Em Configurações › Gerenciar assinatura › Cancelar assinatura. Sem multa e sem fidelidade: o acesso continua até o fim do período já pago (ou do teste grátis, sem cobrança).",
+  },
+  {
+    tema: "Assinatura",
+    pergunta: "E se a fatura vencer sem pagamento?",
+    resposta: "Há 3 dias de tolerância depois do vencimento (o tempo de compensação do boleto). Passado esse prazo, o envio de cobranças fica pausado até o pagamento — seus dados continuam guardados. Para pagar, use Gerenciar assinatura › Pagar fatura em aberto.",
+  },
+  {
+    tema: "Assinatura",
+    pergunta: "Perco meus dados se cancelar?",
+    resposta: "Não. Cancelar a assinatura não apaga nada: carteira, histórico e contatos continuam na sua conta, e o envio fica pausado até você assinar de novo. Se quiser apagar tudo, exclua a conta em Configurações.",
+  },
+
+  // ── Privacidade ─────────────────────────────────────────────────────────────
+  {
+    tema: "Privacidade",
+    pergunta: "Os dados dos meus clientes estão seguros?",
+    resposta:
+      "• Cada conta só enxerga os próprios dados — a separação é feita no próprio banco de dados.\n" +
+      "• As conexões são criptografadas (HTTPS), e as credenciais de integrações nunca passam pelo navegador.\n" +
+      "• Nos registros técnicos, o telefone aparece mascarado.",
+  },
+  {
+    tema: "Privacidade",
+    pergunta: "A NC Finance guarda as mensagens que eu envio?",
+    resposta: "Só um trecho das primeiras 100 letras de cada mensagem, para o Histórico de envios. O texto completo não é guardado.",
+  },
+  {
+    tema: "Privacidade",
+    pergunta: "Como exporto ou apago meus dados (LGPD)?",
+    resposta: "Em Configurações você baixa uma cópia de tudo ou exclui a conta. Os detalhes estão na Política de Privacidade e no Acordo de Tratamento de Dados.",
   },
 ];
 
-const CATEGORIES = [...new Set(FAQS.map((f) => f.category))];
+const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+/** Parágrafos e listas a partir do texto da resposta. */
+function Resposta({ texto }: { texto: string }) {
+  const blocos: React.ReactNode[] = [];
+  let itens: string[] = [];
+  const fecharLista = () => {
+    if (!itens.length) return;
+    blocos.push(
+      <ul key={`l${blocos.length}`} className="space-y-1">
+        {itens.map((t, i) => (
+          <li key={i} className="flex gap-2">
+            <span className="mt-[9px] w-1 h-1 rounded-full bg-zinc-600 flex-shrink-0" aria-hidden="true" />
+            <span>{t}</span>
+          </li>
+        ))}
+      </ul>,
+    );
+    itens = [];
+  };
+  for (const linha of texto.split("\n")) {
+    if (linha.startsWith("• ")) itens.push(linha.slice(2));
+    else {
+      fecharLista();
+      blocos.push(<p key={`p${blocos.length}`}>{linha}</p>);
+    }
+  }
+  fecharLista();
+  return <div className="space-y-2 text-sm text-zinc-400 leading-relaxed">{blocos}</div>;
+}
 
 export default function Suporte({ onClose }: Props) {
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string>("Todos");
-  const [search, setSearch] = useState("");
+  const [tema, setTema] = useState<Tema | "Todas">("Todas");
+  const [busca, setBusca] = useState("");
+  const [aberta, setAberta] = useState<string | null>(null);
+  const [copiado, setCopiado] = useState(false);
+  const listaRef = useRef<HTMLDivElement>(null);
 
-  const filtered = FAQS.filter((faq) => {
-    const matchCat = activeCategory === "Todos" || faq.category === activeCategory;
-    const matchSearch =
-      search.trim() === "" ||
-      faq.question.toLowerCase().includes(search.toLowerCase()) ||
-      faq.answer.toLowerCase().includes(search.toLowerCase());
-    return matchCat && matchSearch;
-  });
+  // Esc fecha; a página atrás não rola.
+  useEffect(() => {
+    const anterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = anterior;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  const termo = semAcento(busca.trim());
+  const visiveis = useMemo(
+    () => PERGUNTAS.filter((p) =>
+      (termo ? true : tema === "Todas" || p.tema === tema) &&
+      (!termo || semAcento(`${p.pergunta} ${p.resposta}`).includes(termo))),
+    [tema, termo],
+  );
+
+  const trocarTema = (t: Tema | "Todas") => {
+    setTema(t);
+    setBusca("");
+    setAberta(null);
+    listaRef.current?.scrollTo({ top: 0 });
+  };
+
+  const copiarEmail = async () => {
+    try {
+      await navigator.clipboard.writeText(CONTATO_EMAIL);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch { /* sem permissão de área de transferência: o e-mail continua visível */ }
+  };
+
+  const chip = (ativo: boolean) =>
+    `px-2.5 py-1 rounded-md border text-xs whitespace-nowrap transition-colors cursor-pointer ${
+      ativo ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300" : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+    }`;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm sm:p-4"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-              <MessageCircle className="w-4 h-4 text-emerald-400" />
-            </div>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ajuda-titulo"
+        className="w-full sm:max-w-2xl h-[92vh] sm:h-auto sm:max-h-[85vh] flex flex-col bg-zinc-950 border border-zinc-800 rounded-t-xl sm:rounded-xl shadow-2xl"
+      >
+        {/* Cabeçalho + busca + temas */}
+        <header className="px-5 pt-4 pb-3 border-b border-zinc-800/80 space-y-3 flex-shrink-0">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-white font-bold text-lg">Central de Suporte</h2>
-              <p className="text-zinc-500 text-xs mt-0.5">Perguntas frequentes · NC Finance</p>
+              <h2 id="ajuda-titulo" className="text-sm font-bold text-white">Ajuda</h2>
+              <p className="text-xs text-zinc-500 mt-0.5">Respostas rápidas sobre o NC Finance</p>
             </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Search */}
-        <div className="px-6 pt-4 flex-shrink-0">
-          <input
-            type="text"
-            placeholder="Pesquisar dúvidas..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setOpenIndex(null); }}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-colors"
-          />
-        </div>
-
-        {/* Category filters */}
-        <div className="px-6 pt-3 pb-1 flex gap-2 flex-wrap flex-shrink-0">
-          {["Todos", ...CATEGORIES].map((cat) => (
-            <button
-              key={cat}
-              onClick={() => { setActiveCategory(cat); setOpenIndex(null); }}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                activeCategory === cat
-                  ? "bg-emerald-500 text-black"
-                  : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
-              }`}
-            >
-              {cat}
+            <button type="button" onClick={onClose} aria-label="Fechar" className="p-1 -mr-1 text-zinc-500 hover:text-white transition-colors cursor-pointer">
+              <X className="w-4 h-4" />
             </button>
-          ))}
-        </div>
+          </div>
 
-        {/* FAQ list */}
-        <div className="overflow-y-auto px-6 py-4 space-y-2 flex-1">
-          {filtered.length === 0 ? (
-            <p className="text-zinc-500 text-sm text-center py-8">Nenhuma resposta encontrada para "{search}".</p>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+            <input
+              type="search"
+              value={busca}
+              onChange={(e) => { setBusca(e.target.value); setAberta(null); }}
+              placeholder="Buscar: boleto, WhatsApp, fatura…"
+              aria-label="Buscar nas perguntas"
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-md pl-9 pr-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
+            />
+          </div>
+
+          {/* Celular: uma linha que rola de lado. Computador: quebra em linhas. */}
+          <nav aria-label="Temas" className="-mx-5 px-5 flex gap-1.5 overflow-x-auto [scrollbar-width:none] sm:flex-wrap sm:overflow-visible">
+            {(["Todas", ...TEMAS] as const).map((t) => (
+              <button key={t} type="button" onClick={() => trocarTema(t)} className={chip(!termo && tema === t)} aria-pressed={!termo && tema === t}>
+                {t}
+              </button>
+            ))}
+          </nav>
+        </header>
+
+        {/* Perguntas */}
+        <div ref={listaRef} className="flex-1 overflow-y-auto px-5">
+          {termo && (
+            <p className="pt-3 text-[11px] font-mono uppercase tracking-widest text-zinc-500">
+              {visiveis.length} {visiveis.length === 1 ? "resposta" : "respostas"} para “{busca.trim()}”
+            </p>
+          )}
+          {visiveis.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-sm text-zinc-300">Nada encontrado.</p>
+              <p className="text-xs text-zinc-500 mt-1">Tente outra palavra ou escreva para o suporte, aqui embaixo.</p>
+            </div>
           ) : (
-            filtered.map((faq, i) => (
-              <div
-                key={i}
-                className="border border-zinc-800 rounded-xl overflow-hidden"
-              >
-                <button
-                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-zinc-900 transition-colors gap-3"
-                  onClick={() => setOpenIndex(openIndex === i ? null : i)}
-                >
-                  <span className="text-sm font-medium text-zinc-200">{faq.question}</span>
-                  {openIndex === i
-                    ? <ChevronUp className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                    : <ChevronDown className="w-4 h-4 text-zinc-500 flex-shrink-0" />
-                  }
-                </button>
-                {openIndex === i && (
-                  <div className="px-4 pb-4 bg-zinc-900/50">
-                    <p className="text-zinc-400 text-sm leading-relaxed whitespace-pre-line">{faq.answer}</p>
-                  </div>
-                )}
-              </div>
-            ))
+            <ul className="divide-y divide-zinc-900">
+              {visiveis.map((p) => {
+                const ativa = aberta === p.pergunta;
+                return (
+                  <li key={p.pergunta}>
+                    <button
+                      type="button"
+                      onClick={() => setAberta(ativa ? null : p.pergunta)}
+                      aria-expanded={ativa}
+                      className="w-full flex items-center justify-between gap-4 py-3.5 text-left cursor-pointer group"
+                    >
+                      <span className={`text-sm transition-colors ${ativa ? "text-white font-semibold" : "text-zinc-200 group-hover:text-white"}`}>
+                        {p.pergunta}
+                      </span>
+                      <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${ativa ? "rotate-180 text-emerald-400" : "text-zinc-600"}`} aria-hidden="true" />
+                    </button>
+                    {ativa && (
+                      <div className="pb-4 -mt-1">
+                        <Resposta texto={p.resposta} />
+                        {(termo || tema === "Todas") && (
+                          <p className="mt-3 text-[10px] font-mono uppercase tracking-widest text-zinc-600">{p.tema}</p>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
 
-        {/* Contact footer */}
-        <div className="px-6 py-4 border-t border-zinc-800 flex-shrink-0">
-          <div className="bg-zinc-900 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <p className="text-zinc-300 text-sm font-medium">Não encontrou o que procurava?</p>
-              <p className="text-zinc-500 text-xs mt-0.5">Nossa equipe responde em até 1 dia útil.</p>
-            </div>
-            <a
-              href="mailto:ncfinance09@gmail.com"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm transition-colors flex-shrink-0"
+        {/* Contato */}
+        <footer className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 border-t border-zinc-800/80 flex-shrink-0">
+          <div className="min-w-0">
+            <p className="text-sm text-zinc-300">Não achou a resposta?</p>
+            <p className="text-xs text-zinc-500">
+              <span className="text-zinc-400 break-all">{CONTATO_EMAIL}</span> · respondemos em até 1 dia útil
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => void copiarEmail()}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-800 hover:border-zinc-700 text-xs text-zinc-300 transition-colors cursor-pointer"
             >
-              <Mail className="w-4 h-4" />
-              Falar com Suporte
+              {copiado ? <><Check className="w-3.5 h-3.5 text-emerald-400" /> Copiado</> : <><Copy className="w-3.5 h-3.5" /> Copiar e-mail</>}
+            </button>
+            <a
+              href={`mailto:${CONTATO_EMAIL}?subject=${encodeURIComponent("Suporte NC Finance")}`}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-colors"
+            >
+              <Mail className="w-3.5 h-3.5" /> Enviar e-mail
             </a>
           </div>
-        </div>
-
+        </footer>
       </div>
     </div>
   );
