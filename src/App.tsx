@@ -1338,6 +1338,9 @@ export default function App() {
     setIsParsingImportFile(true);
     setImportProgresso("");
     setExtractionAlert("");
+    // Trocar de arquivo não é "revisão esvaziada": sem isto o efeito que limpa
+    // a revisão apagava também o nome do arquivo que acabou de ser escolhido.
+    extraidosAntesRef.current = 0;
     setExtractedDebtors([]);
     setLastExtractionResult(null);
     setImportFileName(file.name);
