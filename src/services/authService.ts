@@ -2,7 +2,6 @@ import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import type { AuthCredentials, SignUpPayload } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
 import { identifyUser, resetAnalytics, track } from "../lib/analytics";
-import { isValidCPF } from "../utils/cpf";
 
 export const getSession = async () => {
   const supabase = getSupabaseClient();
@@ -32,71 +31,30 @@ export const signIn = async ({ email, password }: AuthCredentials) => {
   return data;
 };
 
-/** Normaliza CPF removendo pontuação (ex: "123.456.789-09" → "12345678909") */
-const normalizeCPF = (cpf: string) => cpf.replace(/\D/g, "");
-
-export const signUp = async ({ email, password, name, cpf, phone, cep, address, city, state }: SignUpPayload) => {
+/**
+ * Cadastro curto (nome, e-mail, senha). Quem chega aqui já marcou o aceite dos
+ * termos no formulário: a data vai em user_metadata.accepted_terms_at e é
+ * copiada para user_profiles quando o CPF/endereço são preenchidos no primeiro
+ * acesso (CompletarCadastro) — o gatilho on_auth_user_created_profile só cria
+ * o perfil quando o CPF vem no cadastro.
+ */
+export const signUp = async ({ email, password, name }: SignUpPayload) => {
   const supabase = getSupabaseClient();
 
-  const cleanCPF = normalizeCPF(cpf);
-
-  // KYC: rejeita CPF inválido (2ª barreira, caso o formulário seja burlado).
-  // Não há mais consulta prévia de "CPF já cadastrado": ela rodava sem sessão
-  // e a RLS escondia todos os perfis, então nunca achava nada. A unicidade é
-  // garantida pelo banco (ver abaixo).
-  if (!isValidCPF(cleanCPF)) {
-    throw new Error("CPF inválido. Verifique o número informado.");
-  }
-
-  // Os dados do perfil vão junto com o cadastro: o gatilho
-  // on_auth_user_created_profile (migration 20261027150000) cria user_profiles
-  // na mesma transação que cria o usuário — com ou sem confirmação de e-mail —
-  // e tira CPF/endereço dos metadados em seguida. CPF repetido desfaz o
-  // cadastro e o Supabase devolve "Database error saving new user".
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
-        full_name: name,
-        cpf: cleanCPF,
-        phone: phone.replace(/\D/g, ""),
-        cep: cep.replace(/\D/g, ""),
-        address,
-        city,
-        state,
+        full_name: name.trim(),
+        accepted_terms_at: new Date().toISOString(),
       }
     }
   });
 
-  if (error) {
-    if (/database error saving new user/i.test(error.message)) throw new Error("CPF_JA_CADASTRADO");
-    throw new Error(error.message || "Falha ao criar a conta.");
-  }
+  if (error) throw new Error(error.message || "Falha ao criar a conta.");
 
   if (data.user) {
-    // Reserva para quando o gatilho ainda não existe e a conta já nasce com
-    // sessão (sem confirmação de e-mail). Com o gatilho, o perfil já existe e
-    // o "duplicate" abaixo é esperado. Sem sessão a RLS recusaria — e quem
-    // ficar sem perfil completa o cadastro no primeiro acesso.
-    const { error: profileError } = !data.session ? { error: null } : await supabase
-      .from("user_profiles")
-      .insert({
-        user_id: data.user.id,
-        full_name: name,
-        cpf: cleanCPF,
-        phone: phone.replace(/\D/g, ""),
-        cep: cep.replace(/\D/g, ""),
-        address,
-        city,
-        state,
-        accepted_terms_at: new Date().toISOString()
-      });
-
-    if (profileError && !profileError.message.includes("duplicate")) {
-      console.error("[signUp] Erro ao salvar perfil KYC:", profileError.message);
-    }
-
     // Analytics (opt-in): identifica pelo UUID e marca o cadastro — sem PII.
     identifyUser(data.user.id);
     track("signed_up");

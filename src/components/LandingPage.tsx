@@ -1,33 +1,36 @@
-import React, { lazy, useState, useEffect } from "react";
-import CountUp from "./CountUp";
+import React, { lazy, Suspense, useEffect, useState } from "react";
 import PasswordInput from "./PasswordInput";
 import TermosDeUso from "./TermosDeUso";
 import PoliticaPrivacidade from "./PoliticaPrivacidade";
 import AcordoTratamentoDados from "./AcordoTratamentoDados";
-const Suporte = lazy(() => import("./Suporte"));
-import { motion } from "motion/react";
 import PhoneDispatchSimulation from "./PhoneDispatchSimulation";
 import {
-  CheckCircle2,
-  ListChecks,
-  Activity,
-  MessageSquare,
-  ShieldCheck,
-  Clock,
   ArrowRight,
-  FileSpreadsheet,
-  HardDrive,
-  Terminal,
-  FileCheck,
-  Smartphone,
-  Check,
-  Send,
-  Zap,
+  CalendarClock,
+  CheckCheck,
+  CheckCircle2,
+  ChevronDown,
+  FileText,
+  FolderSearch,
+  QrCode,
+  X,
 } from "lucide-react";
 import type { AuthCredentials, SignUpPayload } from "../types";
-import { PLAN_PRICE_BRL } from "../../supabase/functions/_shared/billingPlans.ts";
-// Static import — Vite resolves this at build time and outputs a hashed URL.
-// DO NOT use /src/... URL paths for assets (breaks in production/Vercel).
+import { PLAN_LIST } from "../config/plans";
+import { CONTATO_EMAIL, DEFINICAO, DIAS_TESTE, DIFERENCIAIS, PASSOS, PERGUNTAS } from "../content/landing";
+const Suporte = lazy(() => import("./Suporte"));
+
+/**
+ * Landing pública.
+ *
+ * Pré-renderizada no build (tools/prerender-landing.mjs): o HTML vai pronto no
+ * index.html para buscadores e IAs que não executam JavaScript. Por isso nada
+ * aqui pode tocar em window/document fora de efeitos e handlers.
+ *
+ * Os textos de conteúdo (passos, diferenciais, perguntas) vêm de
+ * src/content/landing.ts e os planos de src/config/plans.ts — a mesma fonte do
+ * JSON-LD e do /llms.txt.
+ */
 
 interface LandingPageProps {
   onLogin: (credentials: AuthCredentials) => Promise<void>;
@@ -37,35 +40,58 @@ interface LandingPageProps {
   authConfigError?: string;
 }
 
+type ModoAcesso = "entrar" | "cadastro" | "senha";
+type Tom = "amigavel" | "neutro" | "firme" | "juridico";
+
+const TONS: Array<{ id: Tom; nome: string }> = [
+  { id: "amigavel", nome: "Amigável" },
+  { id: "neutro", nome: "Neutro" },
+  { id: "firme", nome: "Firme" },
+  { id: "juridico", nome: "Jurídico" },
+];
+
+// Exemplo fictício para o simulador.
+const EXEMPLO = { cliente: "Carlos", empresa: "Móveis Silva", documento: "1082-3", vencimento: "20/10/2026", valor: "1.849,90", dias: 7 };
+
+/**
+ * Corpo das mensagens padrão de cada tom — espelha DEFAULT_PATTERNS (App.tsx)
+ * sem a assinatura, que cada empresa ajusta no texto antes de enviar.
+ */
+const mensagemDoTom = (tom: Tom): string => {
+  const dados = `Documento: ${EXEMPLO.documento}\nVencimento: ${EXEMPLO.vencimento}\nValor: R$ ${EXEMPLO.valor}`;
+  switch (tom) {
+    case "amigavel":
+      return `Olá ${EXEMPLO.cliente}, tudo bem?\nPassando para lembrar de forma tranquila sobre o boleto abaixo, que segue em nosso acompanhamento.\n\n${dados}\n\nSe precisar, posso reenviar os dados do boleto ou te ajudar a localizar as informações.`;
+    case "neutro":
+      return `Olá ${EXEMPLO.cliente},\nSegue o acompanhamento do título abaixo para sua verificação.\n\n${dados}\n\nO título consta em aberto em nosso acompanhamento. Solicitamos a confirmação do pagamento ou o envio do comprovante para atualização do status.`;
+    case "firme":
+      return `Olá ${EXEMPLO.cliente},\nPrecisamos tratar com prioridade a pendência financeira abaixo.\n\n${dados}\n\nO título acumula ${EXEMPLO.dias} dia(s) de atraso e exige uma definição imediata. Pedimos regularização ainda hoje ou retorno com a previsão de pagamento.`;
+    case "juridico":
+      return `Prezado(a) ${EXEMPLO.cliente},\nComunicamos, para fins de registro administrativo, a permanência da pendência descrita abaixo.\n\n${dados}\n\nConsta em sistema atraso de ${EXEMPLO.dias} dia(s), sem regularização identificada até o momento. Solicitamos manifestação formal e a regularização com a maior brevidade possível.`;
+  }
+};
+
+const ICONES_DIFERENCIAIS = [QrCode, FolderSearch, CalendarClock];
+
+const rotulo = "text-[10px] font-mono uppercase tracking-widest text-zinc-500";
+const botaoPrimario = "inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-bold transition-colors cursor-pointer";
+const botaoSecundario = "inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white font-semibold transition-colors cursor-pointer";
+
 export default function LandingPage({
   onLogin,
   onSignUp,
   onForgotPassword,
   isAuthLoading,
-  authConfigError = ""
+  authConfigError = "",
 }: LandingPageProps) {
-  const [authEmail, setAuthEmail] = useState("");
-  const [authPassword, setAuthPassword] = useState("");
-  const [authName, setAuthName] = useState("");
-  const [isRegisterMode, setIsRegisterMode] = useState(false);
-  // Modo "esqueci a senha": pede só o email e envia o link de recuperação
-  const [isForgotMode, setIsForgotMode] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acesso, setAcesso] = useState<ModoAcesso | null>(null);
+  const [tom, setTom] = useState<Tom>("amigavel");
+  const [showTermos, setShowTermos] = useState(false);
+  const [showPrivacidade, setShowPrivacidade] = useState(false);
+  const [showAcordo, setShowAcordo] = useState(false);
+  const [showSuporte, setShowSuporte] = useState(false);
 
-  // Campos de registro expandido
-  const [authCPF, setAuthCPF] = useState("");
-  const [authPhone, setAuthPhone] = useState("");
-  const [authCEP, setAuthCEP] = useState("");
-  const [authAddress, setAuthAddress] = useState("");
-  const [authCity, setAuthCity] = useState("");
-  const [authState, setAuthState] = useState("");
-  const [cpfError, setCpfError] = useState("");
-  const [cepLoading, setCepLoading] = useState(false);
-
-  const [authError, setAuthError] = useState("");
-  const [authInfo, setAuthInfo] = useState("");
-
-  // Barra CTA fixa (mobile): só aparece depois de rolar além do hero.
+  // Barra de CTA fixa (celular): só depois de rolar além do hero.
   const [showStickyCta, setShowStickyCta] = useState(false);
   useEffect(() => {
     const onScroll = () => setShowStickyCta(window.scrollY > 500);
@@ -73,1331 +99,533 @@ export default function LandingPage({
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-  const [isAuthSuccess, setIsAuthSuccess] = useState(false);
-  const [showTermos, setShowTermos] = useState(false);
-  const [showPrivacidade, setShowPrivacidade] = useState(false);
-  const [showAcordo, setShowAcordo] = useState(false);
-  const [showSuporte, setShowSuporte] = useState(false);
 
-  // Live Phone billing demo simulation state
-  const [demoPhoneName, setDemoPhoneName] = useState("Carlos Eduardo");
-  const [demoValue, setDemoValue] = useState("1.849,90");
-  const [demoTone, setDemoTone] = useState<"amigavel" | "neutro" | "firme" | "juridico">("amigavel");
-  const [activeTab, setActiveTab] = useState<"features" | "pricing" | "simulation" | "about">("features");
+  // Links antigos (#auth-panel) e diretos (#entrar, #cadastro) abrem o acesso —
+  // ao carregar a página e quando a âncora muda sem recarregar.
+  useEffect(() => {
+    const abrirPelaAncora = () => {
+      const h = window.location.hash;
+      if (h === "#entrar" || h === "#auth-panel") setAcesso("entrar");
+      else if (h === "#cadastro") setAcesso("cadastro");
+    };
+    abrirPelaAncora();
+    window.addEventListener("hashchange", abrirPelaAncora);
+    return () => window.removeEventListener("hashchange", abrirPelaAncora);
+  }, []);
 
-
-  // Get message output for simulation
-  const getDemoMessage = () => {
-    switch (demoTone) {
-      case "amigavel":
-        return `Olá, ${demoPhoneName}, tudo bem? Passando para lembrar de forma tranquila sobre o boleto da NC Finance no valor de R$ ${demoValue} com vencimento próximo. Se precisar, posso reenviar os dados para facilitar! Abraços.`;
-      case "neutro":
-        return `Olá, ${demoPhoneName}. Segue o acompanhamento do título com vencimento programado. Valor de R$ ${demoValue}. Solicitamos a confirmação ou envio do comprovante correspondente. Atenciosamente, Setor de Cobrança.`;
-      case "firme":
-        return `Atenção, ${demoPhoneName}. Consta em aberto o título correspondente no valor de R$ ${demoValue}. Solicitamos regularização imediata hoje para evitar restrições cadastrais. Responda com a previsão de pagamento.`;
-      case "juridico":
-        return `Prezado(a) ${demoPhoneName}, notificamos para fins de registro administrativo a pendência descrita no valor de R$ ${demoValue}. Na ausência de posicionamento voluntário, o caso seguirá ao rito de cobrança administrativa extrajudicial.`;
-    }
-  };
-
-  const handleAuthentication = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!authEmail || !authPassword) {
-      setAuthError("Por favor, preencha todos os campos obrigatórios.");
-      return;
-    }
-    if (isRegisterMode && !authName) {
-      setAuthError("Por favor, digite seu nome completo para cadastro.");
-      return;
-    }
-
-    setAuthError("");
-    setIsAuthSuccess(true);
-    setTimeout(() => {
-      void 0;
-    }, 1200);
-  };
-
-  const handleAuthenticationSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (authConfigError) {
-      setAuthError(authConfigError);
-      return;
-    }
-
-    // ── Modo "esqueci a senha": só precisa do email ──
-    if (isForgotMode) {
-      if (!authEmail.trim()) {
-        setAuthError("Digite seu e-mail para receber o link de recuperação.");
-        return;
-      }
-      setAuthError("");
-      setAuthInfo("");
-      try {
-        await onForgotPassword(authEmail);
-        setIsAuthSuccess(false);
-        setAuthInfo("Se este e-mail tiver conta, enviamos um link para redefinir a senha. Verifique sua caixa de entrada e o spam.");
-      } catch {
-        // Mensagem genérica para não revelar se o e-mail existe
-        setIsAuthSuccess(false);
-        setAuthInfo("Se este e-mail tiver conta, enviamos um link para redefinir a senha. Verifique sua caixa de entrada e o spam.");
-      }
-      return;
-    }
-
-    if (!authEmail || !authPassword) {
-      setAuthError("Por favor, preencha todos os campos obrigatorios.");
-      return;
-    }
-    if (isRegisterMode && !authName) {
-      setAuthError("Por favor, digite seu nome completo para cadastro.");
-      return;
-    }
-    if (isRegisterMode) {
-      const cpfDigits = authCPF.replace(/\D/g, "");
-      if (cpfDigits.length !== 11) {
-        setAuthError("Digite o CPF completo (11 dígitos).");
-        return;
-      }
-      if (!validateCPF(authCPF)) {
-        setAuthError("CPF inválido. Verifique o número e tente novamente.");
-        return;
-      }
-      if (authPhone.replace(/\D/g, "").length < 10) {
-        setAuthError("Digite um telefone válido com DDD.");
-        return;
-      }
-      if (!authCEP || authCEP.replace(/\D/g, "").length < 8) {
-        setAuthError("Digite o CEP completo.");
-        return;
-      }
-      if (!authAddress || !authCity || !authState) {
-        setAuthError("Preencha o endereço completo.");
-        return;
-      }
-    }
-
-    setAuthError("");
-    setAuthInfo("");
-
-    try {
-      if (isRegisterMode) {
-        const result = await onSignUp({
-          name: authName,
-          email: authEmail,
-          password: authPassword,
-          cpf: authCPF,
-          phone: authPhone,
-          cep: authCEP,
-          address: authAddress,
-          city: authCity,
-          state: authState,
-        });
-
-        if (result.needsEmailConfirmation) {
-          setIsAuthSuccess(false);
-          setAuthInfo(result.message);
-          setIsRegisterMode(false);
-          return;
-        }
-      } else {
-        await onLogin({
-          email: authEmail,
-          password: authPassword
-        });
-      }
-
-      setIsAuthSuccess(true);
-    } catch (error) {
-      const raw = error instanceof Error ? error.message : "";
-      let message = "Não foi possível autenticar. Tente novamente.";
-      if (raw.includes("CPF_JA_CADASTRADO"))
-        message = "Este CPF já possui uma conta cadastrada. Faça login ou entre em contato com o suporte.";
-      else if (raw.includes("Invalid login credentials"))
-        message = "E-mail ou senha incorretos. Verifique seus dados e tente novamente.";
-      else if (raw.includes("Email not confirmed"))
-        message = "E-mail não confirmado. Verifique sua caixa de entrada e clique no link de confirmação.";
-      else if (raw.includes("User already registered") || raw.includes("already been registered"))
-        message = "Este e-mail já está cadastrado. Faça login ou redefina sua senha.";
-      else if (raw.includes("Password should be") || raw.includes("password"))
-        message = "A senha deve ter no mínimo 6 caracteres.";
-      else if (raw.includes("Unable to validate") || raw.includes("session"))
-        message = "Sessão expirada. Faça login novamente.";
-      else if (raw.includes("rate limit") || raw.includes("too many"))
-        message = "Muitas tentativas seguidas. Aguarde alguns minutos e tente novamente.";
-      else if (raw.includes("network") || raw.includes("fetch"))
-        message = "Erro de conexão. Verifique sua internet e tente novamente.";
-      setIsAuthSuccess(false);
-      setAuthError(message);
-    }
-  };
-
-  // ── CPF validation ────────────────────────────────────────────────────────
-  const validateCPF = (cpf: string): boolean => {
-    const d = cpf.replace(/\D/g, "");
-    if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
-    let sum = 0;
-    for (let i = 0; i < 9; i++) sum += parseInt(d[i]) * (10 - i);
-    let r = (sum * 10) % 11;
-    if (r === 10 || r === 11) r = 0;
-    if (r !== parseInt(d[9])) return false;
-    sum = 0;
-    for (let i = 0; i < 10; i++) sum += parseInt(d[i]) * (11 - i);
-    r = (sum * 10) % 11;
-    if (r === 10 || r === 11) r = 0;
-    return r === parseInt(d[10]);
-  };
-
-  const formatCPF = (v: string) => {
-    const d = v.replace(/\D/g, "").slice(0, 11);
-    return d.replace(/(\d{3})(\d)/, "$1.$2")
-            .replace(/(\d{3})(\d)/, "$1.$2")
-            .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-  };
-
-  const formatPhone = (v: string) => {
-    const d = v.replace(/\D/g, "").slice(0, 11);
-    if (d.length <= 2) return d;
-    if (d.length <= 6) return `(${d.slice(0,2)}) ${d.slice(2)}`;
-    if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
-    return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
-  };
-
-  const formatCEP = (v: string) => {
-    const d = v.replace(/\D/g, "").slice(0, 8);
-    return d.length > 5 ? `${d.slice(0,5)}-${d.slice(5)}` : d;
-  };
-
-  const handleCEPChange = async (raw: string) => {
-    const formatted = formatCEP(raw);
-    setAuthCEP(formatted);
-    const digits = formatted.replace(/\D/g, "");
-    if (digits.length === 8) {
-      setCepLoading(true);
-      try {
-        const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
-        const data = await res.json() as { logradouro?: string; localidade?: string; uf?: string; erro?: boolean };
-        if (!data.erro) {
-          setAuthAddress(data.logradouro ?? "");
-          setAuthCity(data.localidade ?? "");
-          setAuthState(data.uf ?? "");
-        }
-      } catch { /* ignora */ }
-      setCepLoading(false);
-    }
-  };
-
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const handleDemoPreset = (name: string, val: string) => {
-    setDemoPhoneName(name);
-    setDemoValue(val);
-  };
+  const abrirCadastro = () => setAcesso("cadastro");
+  const abrirEntrar = () => setAcesso("entrar");
+  const documentoLegalAberto = showTermos || showPrivacidade || showAcordo;
 
   return (
-    <div className="bg-black text-zinc-100 min-h-screen font-sansselection:bg-emerald-500 selection:text-black">
-      {/* Dynamic Grid Overlay Background element */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.08),transparent_50%)] pointer-events-none" />
-      <div className="absolute top-[30%] left-[-10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(16,185,129,0.03),transparent_70%)] pointer-events-none" />
-
-      {/* Landing Header */}
-      <header className="border-b border-zinc-900/80 backdrop-blur-md bg-black/60 sticky top-0 z-50 transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
-          <div className="flex items-center">
-            <span className="font-display font-extrabold text-xl sm:text-2xl tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-zinc-100 via-white to-emerald-400 uppercase select-none drop-shadow-[0_0_10px_rgba(52,211,153,0.15)]">
-              NC Finance
-            </span>
-          </div>
-
-          <nav className="hidden md:flex items-center gap-4 relative py-1">
-            <button 
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveTab("features");
-                document.getElementById("recursos")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`relative px-3 py-1.5 text-xs font-semibold select-none transition-all cursor-pointer ${activeTab === "features" ? "text-emerald-400 font-bold" : "text-zinc-400 hover:text-white"}`}
-            >
-              {activeTab === "features" && (
-                <motion.div 
-                  layoutId="activeLandingTabLine" 
-                  className="absolute bottom-0 left-1 right-1 h-0.5 bg-emerald-400" 
-                  transition={{ type: "spring", stiffness: 220, damping: 25 }}
-                />
-              )}
-              Recursos
-            </button>
-            <button 
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveTab("pricing");
-                document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`relative px-3 py-1.5 text-xs font-semibold select-none transition-all cursor-pointer ${activeTab === "pricing" ? "text-emerald-400 font-bold" : "text-zinc-400 hover:text-white"}`}
-            >
-              {activeTab === "pricing" && (
-                <motion.div 
-                  layoutId="activeLandingTabLine" 
-                  className="absolute bottom-0 left-1 right-1 h-0.5 bg-emerald-400" 
-                  transition={{ type: "spring", stiffness: 220, damping: 25 }}
-                />
-              )}
-              Planos & Preços
-            </button>
-            <button 
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveTab("simulation");
-                document.getElementById("demo-celular")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`relative px-3 py-1.5 text-xs font-semibold select-none transition-all cursor-pointer ${activeTab === "simulation" ? "text-emerald-400 font-bold" : "text-zinc-400 hover:text-white"}`}
-            >
-              {activeTab === "simulation" && (
-                <motion.div 
-                  layoutId="activeLandingTabLine" 
-                  className="absolute bottom-0 left-1 right-1 h-0.5 bg-emerald-400" 
-                  transition={{ type: "spring", stiffness: 220, damping: 25 }}
-                />
-              )}
-              Simulação
-            </button>
+    <div className="bg-zinc-950 text-zinc-100 min-h-screen font-sans overflow-x-clip selection:bg-emerald-500 selection:text-black">
+      {/* ── Cabeçalho ─────────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-40 border-b border-zinc-900 bg-zinc-950/85 backdrop-blur">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+          <a href="#inicio" className="font-display font-black text-lg tracking-tight text-white">
+            NC <span className="text-emerald-400">Finance</span>
+          </a>
+          <nav aria-label="Seções" className="hidden md:flex items-center gap-6 text-sm text-zinc-400">
+            <a href="#como-funciona" className="hover:text-white transition-colors">Como funciona</a>
+            <a href="#planos" className="hover:text-white transition-colors">Planos</a>
+            <a href="#perguntas" className="hover:text-white transition-colors">Perguntas</a>
           </nav>
-
-          <div className="flex items-center gap-3">
-            <a 
-              href="#auth-panel" 
-              className="btn-shine text-xs sm:text-sm font-medium text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 px-4 py-2 rounded-none bg-emerald-500/5 hover:bg-emerald-500/10 transition-all hover:border-emerald-500/40"
-            >
-              Entrar ou Cadastrar
-            </a>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={abrirEntrar} className="px-3 py-2 text-sm font-semibold text-zinc-300 hover:text-white transition-colors cursor-pointer">
+              Entrar
+            </button>
+            <button type="button" onClick={abrirCadastro} className={`${botaoPrimario} px-4 py-2 text-sm`}>
+              Testar grátis
+            </button>
           </div>
         </div>
       </header>
 
-      {/* HERO SECTION */}
-      <section className="relative pt-12 pb-20 sm:pb-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+      <main id="inicio">
+        {/* ── Hero ────────────────────────────────────────────────────────── */}
+        <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 pb-16 sm:pb-20 grid lg:grid-cols-12 gap-12 items-center">
+          <div className="lg:col-span-7 text-center lg:text-left">
+            <p className={`${rotulo} text-emerald-400`}>Software de cobrança pelo WhatsApp</p>
+            <h1 className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-[1.05] tracking-tight">
+              Cobre seus clientes pelo WhatsApp, no automático.
+            </h1>
+            <p className="mt-6 text-base sm:text-lg text-zinc-400 leading-relaxed max-w-xl mx-auto lg:mx-0">
+              Importe a lista de quem está em atraso, revise e envie do seu próprio número de WhatsApp, com o boleto anexado.
+            </p>
+            <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+              <button type="button" onClick={abrirCadastro} className={`${botaoPrimario} px-6 py-3.5 text-base`}>
+                Testar {DIAS_TESTE} dias grátis <ArrowRight className="w-4 h-4" />
+              </button>
+              <a href="#mensagem" className={`${botaoSecundario} px-6 py-3.5 text-base`}>
+                Ver como a mensagem chega
+              </a>
+            </div>
+            <p className="mt-4 text-xs text-zinc-500">Sem cartão de crédito · Cancele quando quiser</p>
+          </div>
+          <div className="lg:col-span-5 flex justify-center">
+            <PhoneDispatchSimulation />
+          </div>
+        </section>
 
-            {/* Left Column: CTA Pitch */}
-            <div className="lg:col-span-7 flex flex-col space-y-6 text-center lg:text-left">
+        {/* Faixa de confiança (uma só) */}
+        <div className="border-y border-zinc-900">
+          <ul className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-xs text-zinc-400">
+            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Conforme a LGPD</li>
+            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Sem fidelidade</li>
+            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Envio pelo seu número</li>
+          </ul>
+        </div>
 
+        {/* ── Como funciona ───────────────────────────────────────────────── */}
+        <section id="como-funciona" aria-labelledby="titulo-como-funciona" className="scroll-mt-20 max-w-6xl mx-auto px-4 sm:px-6 py-20">
+          <div className="max-w-2xl">
+            <h2 id="titulo-como-funciona" className="text-3xl sm:text-4xl font-black text-white tracking-tight">Como funciona</h2>
+            <p className="mt-4 text-zinc-400 leading-relaxed">{DEFINICAO}</p>
+          </div>
+          <ol className="mt-12 grid md:grid-cols-3 gap-4">
+            {PASSOS.map((p, i) => (
+              <li key={p.titulo} className="bg-zinc-950 border border-zinc-800 rounded-xl p-6">
+                <span className="font-mono text-xs text-emerald-400">{String(i + 1).padStart(2, "0")}</span>
+                <h3 className="mt-3 text-lg font-bold text-white">{p.titulo}</h3>
+                <p className="mt-2 text-sm text-zinc-400 leading-relaxed">{p.texto}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
 
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-tight tracking-tight">
-                Automatize suas cobranças.{" "}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-200 drop-shadow-[0_2px_10px_rgba(52,211,153,0.15)]">Recupere o que é seu.</span>
-              </h1>
-
-              <p className="text-zinc-400 text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed font-light">
-                Importe relatórios de clientes em atraso ou faturas pendentes. A NC Finance extrai e organiza as parcelas automaticamente, calcula juros e multas atualizados, e dispara notificações nos tons ideais de abordagem.
+        {/* ── Como a mensagem chega ───────────────────────────────────────── */}
+        <section id="mensagem" aria-labelledby="titulo-mensagem" className="scroll-mt-20 border-t border-zinc-900">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20 grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <h2 id="titulo-mensagem" className="text-3xl sm:text-4xl font-black text-white tracking-tight">Veja como a mensagem chega</h2>
+              <p className="mt-4 text-zinc-400 leading-relaxed">
+                O cliente recebe do seu número, com os dados do título e o boleto em PDF. Escolha o tom de acordo com o atraso e o relacionamento — o texto pode ser ajustado antes de cada envio.
               </p>
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start pt-4">
-                <a
-                  href="#auth-panel"
-                  className="px-6 py-3.5 rounded-none bg-emerald-500 hover:bg-emerald-400 text-black font-bold flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_20px_rgba(16,185,129,0.3)] hover:-translate-y-0.5 transition-all text-sm sm:text-base"
-                >
-                  Comece grátis <ArrowRight className="w-4 h-4" />
-                </a>
-                <a
-                  href="#demo-celular"
-                  className="px-6 py-3.5 rounded-none bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 font-medium flex items-center justify-center gap-2 transition-all text-sm sm:text-base"
-                >
-                  Ver simulação ao vivo
-                </a>
+              <p className={`${rotulo} mt-8 mb-2`}>Tom da mensagem</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-label="Tom da mensagem">
+                {TONS.map((t) => {
+                  const ativo = tom === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={ativo}
+                      onClick={() => setTom(t.id)}
+                      className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                        ativo ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300" : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                      }`}
+                    >
+                      {t.nome}
+                    </button>
+                  );
+                })}
               </div>
+              <p className="mt-3 text-xs text-zinc-500">Exemplo com dados fictícios: título vencido há {EXEMPLO.dias} dias.</p>
             </div>
 
-            {/* Right Column: looping mass-dispatch simulation on a new-gen iPhone */}
-            <div className="lg:col-span-5 flex justify-center">
-              <PhoneDispatchSimulation />
+            {/* Conversa como o cliente vê */}
+            <div className="flex justify-center">
+              <div className="w-full max-w-sm rounded-[2.5rem] bg-black p-2 border border-zinc-800">
+                <div className="rounded-[2rem] overflow-hidden bg-[#0b141a]">
+                  <div className="flex items-center gap-3 px-4 pt-5 pb-3 bg-[#1f2c34]">
+                    <div className="w-9 h-9 rounded-full bg-zinc-600 text-white text-xs font-bold flex items-center justify-center">MS</div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white truncate">{EXEMPLO.empresa}</p>
+                      <p className="text-[11px] text-zinc-400">conta comercial</p>
+                    </div>
+                  </div>
+                  <div className="px-3 py-4 min-h-[380px] flex flex-col justify-end">
+                    <div className="self-end max-w-[88%] rounded-lg rounded-tr-none bg-[#005c4b] px-3 py-2 text-[13px] leading-snug text-zinc-50 shadow">
+                      <p className="whitespace-pre-line">{mensagemDoTom(tom)}</p>
+                      <div className="mt-2 flex items-center gap-2 rounded-md bg-black/20 px-2.5 py-2">
+                        <FileText className="w-4 h-4 text-zinc-200 flex-shrink-0" />
+                        <span className="text-xs truncate">boleto-{EXEMPLO.documento}.pdf</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-end gap-1 text-[10px] text-zinc-300">
+                        08:00 <CheckCheck className="w-3.5 h-3.5 text-sky-400" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Trust strip — logo abaixo do hero, fora do "momento" do hero */}
-      <div className="border-y border-zinc-900 bg-zinc-950/40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-xs text-zinc-400">
-          <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Conforme a LGPD</span>
-          <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Sem contrato de fidelidade</span>
-          <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-emerald-400" /> Importação com revisão</span>
-        </div>
-      </div>
-
-      {/* RESULTS STRIP */}
-      <motion.section
-        className="py-16 overflow-hidden"
-        initial={{ opacity: 0, y: 60 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: false, amount: 0.2 }}
-        transition={{ type: "spring", stiffness: 55, damping: 14 }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {/* Pilar 1 */}
-            <motion.div
-              className="relative rounded-none border border-zinc-800/60 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: false, amount: 0.3 }}
-              transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0 }}
-            >
-              <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-emerald-500/60 to-transparent" />
-              <div>
-                <div className="text-4xl font-black text-white tracking-tight">Menos tarefas</div>
-                <div className="text-emerald-400 font-bold text-sm mt-1">menos tempo operacional em cobranças</div>
-              </div>
-              <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                O que levava horas de ligações e mensagens manuais passa a rodar em segundo plano, automaticamente, todos os dias.
-              </p>
-            </motion.div>
-
-            {/* Pilar 2 */}
-            <motion.div
-              className="relative rounded-none border border-zinc-800/60 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: false, amount: 0.3 }}
-              transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0.1 }}
-            >
-              <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-emerald-500/60 to-transparent" />
-              <div>
-                <div className="text-4xl font-black text-white tracking-tight">Mais controle</div>
-                <div className="text-emerald-400 font-bold text-sm mt-1">da carteira e dos recebimentos</div>
-              </div>
-              <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                Organize vencimentos, acompanhe os envios e registre os pagamentos. Os resultados dependem da sua carteira e da sua operação.
-              </p>
-            </motion.div>
-
-            {/* Pilar 3 */}
-            <motion.div
-              className="relative rounded-none border border-zinc-800/60 p-7 flex flex-col gap-4 overflow-hidden hover:border-emerald-500/30 transition-all"
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: false, amount: 0.3 }}
-              transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0.2 }}
-            >
-              <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-emerald-500/60 to-transparent" />
-              <div>
-                <div className="text-4xl font-black text-white tracking-tight">Passo a passo</div>
-                <div className="text-emerald-400 font-bold text-sm mt-1">da importação ao primeiro disparo</div>
-              </div>
-              <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                Importe sua planilha ou PDF, revise os dados e dispare. Sem instalação, sem treinamento, sem contrato.
-              </p>
-            </motion.div>
+        {/* ── Diferenciais ────────────────────────────────────────────────── */}
+        <section id="recursos" aria-labelledby="titulo-recursos" className="scroll-mt-20 border-t border-zinc-900">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
+            <h2 id="titulo-recursos" className="text-3xl sm:text-4xl font-black text-white tracking-tight max-w-2xl">O que faz diferença no dia a dia</h2>
+            <div className="mt-12 grid md:grid-cols-3 gap-4">
+              {DIFERENCIAIS.map((d, i) => {
+                const Icone = ICONES_DIFERENCIAIS[i] ?? CheckCircle2;
+                return (
+                  <article key={d.titulo} className="bg-zinc-950 border border-zinc-800 rounded-xl p-6 flex flex-col">
+                    <Icone className="w-5 h-5 text-emerald-400" aria-hidden="true" />
+                    <h3 className="mt-4 text-lg font-bold text-white">{d.titulo}</h3>
+                    <p className="mt-2 text-sm text-zinc-400 leading-relaxed flex-1">{d.texto}</p>
+                    <p className={`${rotulo} mt-5`}>{d.planos}</p>
+                  </article>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </motion.section>
+        </section>
 
-      {/* COMO FUNCIONA */}
-      <motion.section
-        className="py-24 overflow-hidden"
-        initial={{ opacity: 0, y: 40 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: false, amount: 0.1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="text-center max-w-2xl mx-auto mb-20">
-            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Como funciona</h2>
+        {/* ── Planos ──────────────────────────────────────────────────────── */}
+        <section id="planos" aria-labelledby="titulo-planos" className="scroll-mt-20 border-t border-zinc-900">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
+            <div className="max-w-2xl">
+              <h2 id="titulo-planos" className="text-3xl sm:text-4xl font-black text-white tracking-tight">Planos e preços</h2>
+              <p className="mt-4 text-zinc-400 leading-relaxed">
+                Todos com {DIAS_TESTE} dias grátis, sem cartão. Sem fidelidade e sem taxa por boleto pago.
+              </p>
+            </div>
+            <div className="mt-12 grid md:grid-cols-3 gap-4 items-stretch">
+              {PLAN_LIST.map((p) => {
+                const destaque = p.id === "pro";
+                return (
+                  <article
+                    key={p.id}
+                    className={`relative rounded-xl p-6 flex flex-col border ${destaque ? "border-emerald-500/50 bg-emerald-500/[0.04]" : "border-zinc-800 bg-zinc-950"}`}
+                  >
+                    {destaque && (
+                      <span className="absolute -top-2.5 left-6 rounded-md bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black">
+                        Recomendado
+                      </span>
+                    )}
+                    <h3 className="text-lg font-bold text-white">{p.name}</h3>
+                    <p className="mt-1 text-sm text-zinc-500 leading-relaxed">{p.description}</p>
+                    <p className="mt-5 flex items-baseline gap-1">
+                      <span className="text-4xl font-black text-white tabular-nums">R$ {p.priceBRL}</span>
+                      <span className="text-sm text-zinc-500">/mês</span>
+                    </p>
+                    <ul className="mt-6 space-y-2.5 text-sm text-zinc-300 flex-1">
+                      {p.features.map((f) => (
+                        <li key={f} className="flex items-start gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={abrirCadastro}
+                      className={`mt-6 px-4 py-3 text-sm ${destaque ? botaoPrimario : botaoSecundario}`}
+                    >
+                      Testar o {p.name} grátis
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+            <p className="mt-6 text-xs text-zinc-500">
+              A assinatura é cobrada pelo Asaas, por boleto ou cartão. Todos os planos enviam pelo seu próprio número de WhatsApp.
+            </p>
           </div>
+        </section>
 
-          {/* Steps */}
-          <div className="relative">
-            {/* Linha conectora horizontal — visível só em desktop */}
-            <div className="hidden lg:block absolute top-8 left-[calc(12.5%+1.5rem)] right-[calc(12.5%+1.5rem)] h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent z-0" />
-
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-10 lg:gap-6 relative z-10">
-              {[
-                {
-                  step: "01",
-                  icon: <FileSpreadsheet className="w-6 h-6" />,
-                  title: "Importe sua carteira",
-                  desc: "Carregue um PDF, planilha Excel, CSV ou conecte direto ao Google Sheets. Nenhum modelo padrão necessário.",
-                  delay: 0,
-                },
-                {
-                  step: "02",
-                  icon: <ListChecks className="w-6 h-6" />,
-                  title: "Organização automática",
-                  desc: "Nome do cliente, documento, vencimento e valor são extraídos automaticamente. Juros e multas calculados em tempo real.",
-                  delay: 0.12,
-                },
-                {
-                  step: "03",
-                  icon: <MessageSquare className="w-6 h-6" />,
-                  title: "Revise e dispare",
-                  desc: "Escolha o tom — amigável, neutro, firme ou jurídico — e envie centenas de cobranças pelo WhatsApp em segundos.",
-                  delay: 0.24,
-                },
-                {
-                  step: "04",
-                  icon: <Activity className="w-6 h-6" />,
-                  title: "Acompanhe em tempo real",
-                  desc: "Cada mensagem enviada fica registrada com status, data e dados do cliente. Histórico completo para auditoria.",
-                  delay: 0.36,
-                },
-              ].map(({ step, icon, title, desc, delay }) => (
-                <motion.div
-                  key={step}
-                  className="flex flex-col items-center text-center gap-5"
-                  initial={{ opacity: 0, y: 32 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: false, amount: 0.3 }}
-                  transition={{ type: "spring", stiffness: 60, damping: 14, delay }}
-                >
-                  {/* Número + ícone */}
-                  <div className="relative">
-                    <div className="w-16 h-16 rounded-none bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.08)]">
-                      {icon}
-                    </div>
-                    <div className="absolute -top-3 -right-3 w-6 h-6 rounded-full bg-emerald-500 text-black text-[10px] font-black flex items-center justify-center shadow-md">
-                      {step.replace("0", "")}
-                    </div>
-                  </div>
-
-                  {/* Texto */}
-                  <div className="space-y-2">
-                    <h4 className="text-base font-bold text-white">{title}</h4>
-                    <p className="text-zinc-400 text-sm font-light leading-relaxed max-w-[220px] mx-auto">{desc}</p>
-                  </div>
-                </motion.div>
+        {/* ── Perguntas frequentes ────────────────────────────────────────── */}
+        <section id="perguntas" aria-labelledby="titulo-perguntas" className="scroll-mt-20 border-t border-zinc-900">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-20">
+            <h2 id="titulo-perguntas" className="text-3xl sm:text-4xl font-black text-white tracking-tight">Perguntas frequentes</h2>
+            <div className="mt-10 divide-y divide-zinc-900 border-y border-zinc-900">
+              {PERGUNTAS.map((q) => (
+                <details key={q.pergunta} className="group py-5">
+                  <summary className="flex items-center justify-between gap-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                    <h3 className="text-base font-semibold text-white">{q.pergunta}</h3>
+                    <ChevronDown className="w-4 h-4 text-zinc-500 flex-shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+                  </summary>
+                  <p className="mt-3 text-sm text-zinc-400 leading-relaxed">{q.resposta}</p>
+                </details>
               ))}
             </div>
           </div>
-        </div>
-      </motion.section>
+        </section>
 
-      {/* PRODUCT PREVIEW — dashboard inside a browser frame */}
-      <motion.section
-        className="py-20 overflow-hidden"
-        initial={{ opacity: 0, y: 40 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: false, amount: 0.15 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-      >
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto space-y-4 mb-12">
-            <h3 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Tudo em uma tela só</h3>
-            <p className="text-zinc-400 font-light">
-              Faturamento, fluxo de recuperação e disparos automáticos — sem planilhas paralelas.
-            </p>
-          </div>
-
-          {/* Browser frame */}
-          <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-emerald-300/10 to-emerald-500/20 rounded-none blur opacity-40 group-hover:opacity-60 transition duration-1000" />
-            <div className="relative rounded-none border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden">
-              {/* Browser top bar */}
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 border-b border-zinc-800">
-                <span className="w-2.5 h-2.5 rounded-full bg-zinc-700" />
-                <span className="w-2.5 h-2.5 rounded-full bg-zinc-700" />
-                <span className="w-2.5 h-2.5 rounded-full bg-zinc-700" />
-                <div className="ml-3 flex-1 max-w-sm rounded-none bg-zinc-950 border border-zinc-800 px-3 py-1 text-[10px] text-zinc-500 font-mono truncate">
-                  app.ncfinance.com.br/dashboard
-                </div>
-              </div>
-
-              {/* Dashboard mock */}
-              <div className="p-4 sm:p-6 space-y-4 bg-zinc-950">
-                {/* KPI row */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  {[
-                    { label: "FATURAMENTO BASE", value: 48230.00, accent: "text-white" },
-                    { label: "FATURAMENTO CORRIGIDO", value: 51984.12, accent: "text-emerald-400" },
-                    { label: "VENCIDOS (30+ DIAS)", value: 9417.55, accent: "text-rose-400" },
-                    { label: "RECUPERADO NO MÊS", value: 12730.80, accent: "text-emerald-300" },
-                  ].map((kpi) => (
-                    <div key={kpi.label} className="rounded-none border border-zinc-900 bg-zinc-900/50 p-3 sm:p-4">
-                      <div className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-zinc-500">{kpi.label}</div>
-                      <div className={`mt-1.5 text-sm sm:text-lg font-extrabold font-mono ${kpi.accent}`}>
-                        <CountUp to={kpi.value} decimals={2} prefix="R$ " />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
-                  {/* Bar chart mock */}
-                  <div className="lg:col-span-3 rounded-none border border-zinc-900 bg-zinc-900/50 p-4">
-                    <div className="text-[10px] font-bold text-white mb-3">Fluxo Projetado de Recuperação</div>
-                    <div className="flex items-end gap-2 h-28">
-                      {[42, 65, 38, 80, 55, 92, 70, 60, 85, 48, 74, 95].map((h, i) => (
-                        <motion.div
-                          key={i}
-                          className="flex-1 rounded-t-sm bg-gradient-to-t from-emerald-600/40 to-emerald-400/80 origin-bottom"
-                          initial={{ scaleY: 0 }}
-                          whileInView={{ scaleY: 1 }}
-                          viewport={{ once: true, amount: 0.4 }}
-                          transition={{ duration: 0.6, delay: i * 0.05, ease: "easeOut" }}
-                          style={{ height: `${h}%` }}
-                        />
-                      ))}
-                    </div>
-                    <div className="flex justify-between mt-2 text-[8px] font-mono text-zinc-600">
-                      <span>JAN</span><span>MAR</span><span>MAI</span><span>JUL</span><span>SET</span><span>NOV</span>
-                    </div>
-                  </div>
-
-                  {/* Dispatch feed mock */}
-                  <div className="lg:col-span-2 rounded-none border border-zinc-900 bg-zinc-900/50 p-4 space-y-2.5">
-                    <div className="text-[10px] font-bold text-white mb-1">Disparos recentes</div>
-                    {[
-                      { name: "Carlos Mendes", value: "R$ 715,66" },
-                      { name: "Distrib. Alfa LTDA", value: "R$ 1.240,00" },
-                      { name: "Menezes & Batista", value: "R$ 982,40" },
-                    ].map((row) => (
-                      <div key={row.name} className="flex items-center justify-between rounded-none bg-zinc-950/60 border border-zinc-900 px-3 py-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                          <span className="text-[10px] text-zinc-300 truncate">{row.name}</span>
-                        </div>
-                        <span className="text-[10px] font-mono text-emerald-300 shrink-0">{row.value}</span>
-                      </div>
-                    ))}
-                    <div className="flex items-center gap-1.5 text-[9px] text-zinc-500 pt-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Entregues via WhatsApp com boleto anexado
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Security / trust strip */}
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs text-zinc-400">
-            <span className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-400" /> Dados protegidos conforme a LGPD</span>
-            <span className="flex items-center gap-2"><FileCheck className="w-4 h-4 text-emerald-400" /> Criptografia em trânsito e em repouso</span>
-            <span className="flex items-center gap-2"><Smartphone className="w-4 h-4 text-emerald-400" /> Envio por integração com WhatsApp</span>
-          </div>
-        </div>
-      </motion.section>
-
-      {/* CORE FEATURES bento style */}
-      <motion.section
-        id="recursos"
-        className="py-20 bg-zinc-950/30 overflow-hidden"
-        initial={{ x: -120, opacity: 0 }}
-        whileInView={{ x: 0, opacity: 1 }}
-        viewport={{ once: false, amount: 0.15 }}
-        transition={{ type: "spring", stiffness: 60, damping: 15 }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto space-y-4 mb-16">
-            <h3 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Desenvolvido para times financeiros ágeis</h3>
-            <p className="text-zinc-400 font-light">
-              Esqueça tabelas bagunçadas e o envio manual e tenso de cobranças indesejadas pelo celular pessoal. Com a NC Finance, o processo é estruturado.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Box 1: File Extractor */}
-            <div className="bg-zinc-950 border border-zinc-900 rounded-none p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-none">
-                <FileCheck className="w-6 h-6" />
-              </div>
-              <h4 className="text-lg font-bold text-white">Importação Inteligente</h4>
-              <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                Envie relatórios bagunçados, PDFs, txt, boletos brutos ou extratos. Nossa engenharia extrai o nome do cliente, documento, vencimento e valores automaticamente — sem nenhum cadastro manual prévio.
-              </p>
-            </div>
-
-            {/* Box 2: Calculating Engine */}
-            <div className="bg-zinc-950 border border-zinc-900 rounded-none p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-none">
-                <Terminal className="w-6 h-6" />
-              </div>
-              <h4 className="text-lg font-bold text-white">Atualização de Juros e Multas</h4>
-              <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                Configure globalmente na visão geral a multa padrão (%) e os juros adicionais acumulados por dia de atraso. O sistema atualiza os valores reais pendentes de cada devedor em tempo real.
-              </p>
-            </div>
-
-            {/* Box 3: WhatsApp Dispatchers */}
-            <div className="bg-zinc-950 border border-zinc-900 rounded-none p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-none">
-                <MessageSquare className="w-6 h-6" />
-              </div>
-              <h4 className="text-lg font-bold text-white">Escala de 4 Tons de Abordagem</h4>
-              <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                Varie a abordagem baseado em nível de relacionamento: Amigável (preventivo), Neutro (institucional), Firme (prioritário) ou Jurídico (registro administrativo/extrajudicial), evitando atritos na comunicação.
-              </p>
-            </div>
-
-            {/* Box 4: Google Workspace */}
-            <div className="bg-zinc-950 border border-zinc-900 rounded-none p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-none">
-                <FileSpreadsheet className="w-6 h-6" />
-              </div>
-              <h4 className="text-lg font-bold text-white">Conexão com Google Sheets</h4>
-              <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                Importe parcelas diretamente de uma planilha Google Sheets. Basta configurar o ID da planilha e os dados dos devedores são carregados automaticamente, prontos para revisão e envio de cobranças.
-              </p>
-            </div>
-
-            {/* Box 5: Auto-schedulers */}
-            <div className="bg-zinc-950 border border-zinc-900 rounded-none p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-none">
-                <Clock className="w-6 h-6" />
-              </div>
-              <h4 className="text-lg font-bold text-white">Agendamento de Disparos</h4>
-              <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                Defina o fuso e horário padrão das cobranças automáticas. O sistema analisa quem possui pendências ativas nos prazos determinados e envia no momento programado sem atraso operacional.
-              </p>
-            </div>
-
-            {/* Box 6: Z-API Integration */}
-            <div className="bg-zinc-950 border border-zinc-900 rounded-none p-6 hover:border-emerald-500/20 transition-all flex flex-col gap-4">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-none">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <h4 className="text-lg font-bold text-white">Escolha o Número dos Disparos</h4>
-              <p className="text-zinc-400 text-sm font-light leading-relaxed">
-                Use o número corporativo global da NC Finance e comece a cobrar sem configuração, ou cadastre o seu próprio número WhatsApp para disparar em nome da sua empresa. Cada envio é rastreado com status de entrega e registrado no histórico da conta.
-              </p>
-            </div>
-          </div>
-        </div>
-      </motion.section>
-
-      {/* DYNAMIC INTERACTIVE WHATSAPP DEMO SECTION */}
-      <motion.section 
-        id="demo-celular" 
-        className="py-20 bg-black overflow-hidden"
-        initial={{ x: 120, opacity: 0 }}
-        whileInView={{ x: 0, opacity: 1 }}
-        viewport={{ once: false, amount: 0.15 }}
-        transition={{ type: "spring", stiffness: 60, damping: 15 }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            
-            {/* Left: Settings Panel */}
-            <div className="space-y-6">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-zinc-900/80 border border-zinc-800 text-emerald-400 text-xs font-semibold leading-none uppercase tracking-wide">
-                Simulador Interativo
-              </div>
-              <h3 className="text-3xl sm:text-4xl font-black text-white">Visualize como o seu cliente irá receber</h3>
-              <p className="text-zinc-400 font-light leading-relaxed">
-                Escolha o tom desejado e veja como a mensagem se adapta dinamicamente com os dados fictícios de exemplo: nome, valor atualizado, vencimento e documento.
-              </p>
-
-              {/* Interaction controllers */}
-              <div className="p-5 rounded-none bg-zinc-900 border border-zinc-800 space-y-4">
-                <label className="text-xs font-bold uppercase tracking-widest text-zinc-500">Preset do Devedor:</label>
-                <div className="flex flex-wrap gap-2">
-                  <button 
-                    onClick={() => handleDemoPreset("Carlos Eduardo", "1.849,90")}
-                    className={`px-3 py-1.5 rounded-none text-xs font-semibold transition-all cursor-pointer ${demoPhoneName === "Carlos Eduardo" ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300"}`}
-                  >
-                    Carlos (Vencido há 5 dias - R$ 1.849,90)
-                  </button>
-                  <button 
-                    onClick={() => handleDemoPreset("Mariana Silva", "425,00")}
-                    className={`px-3 py-1.5 rounded-none text-xs font-semibold transition-all cursor-pointer ${demoPhoneName === "Mariana Silva" ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300"}`}
-                  >
-                    Mariana (A vencer amanhã - R$ 425,00)
-                  </button>
-                  <button 
-                    onClick={() => handleDemoPreset("Empresa Souza S/A", "14.220,00")}
-                    className={`px-3 py-1.5 rounded-none text-xs font-semibold transition-all cursor-pointer ${demoPhoneName === "Empresa Souza S/A" ? "bg-emerald-500 text-black shadow-md" : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300"}`}
-                  >
-                    Souza S/A (R$ 14.220,00)
-                  </button>
-                </div>
-
-                <div className="pt-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-500 block mb-2">Selecione o Tom de Cobrança:</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {(["amigavel", "neutro", "firme", "juridico"] as const).map((tone) => (
-                      <button
-                        key={tone}
-                        onClick={() => setDemoTone(tone)}
-                        className={`py-2 rounded-none text-xs capitalize font-bold transition-all cursor-pointer border ${demoTone === tone ? "bg-emerald-500/15 text-emerald-400 border-emerald-500" : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"}`}
-                      >
-                        {tone}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Phone Frame Simulator */}
-            <div className="flex justify-center">
-              <div className="w-full max-w-sm bg-zinc-950 border-[5px] border-zinc-900 rounded-[3rem] p-3 shadow-2xl relative overflow-hidden aspect-[9/18]">
-                {/* Camera punch */}
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-5 bg-black rounded-full z-10 flex items-center justify-center">
-                  <div className="w-2.5 h-2.5 rounded-full bg-zinc-900" />
-                </div>
-
-                {/* Simulated Screen */}
-                <div className="bg-zinc-900 h-full rounded-[2.6rem] overflow-hidden flex flex-col justify-between">
-                  {/* Whatsapp Header */}
-                  <div className="bg-[#075e54] p-3 pt-7 text-white flex items-center justify-between shadow">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-emerald-700 font-bold flex items-center justify-center text-xs">
-                        NC
-                      </div>
-                      <div>
-                        <h5 className="font-bold text-xs">Acompanhamento NC Finance</h5>
-                        <p className="text-[10px] text-emerald-200">Online & Automatizado</p>
-                      </div>
-                    </div>
-                    <span className="text-xs text-emerald-100">Conectado</span>
-                  </div>
-
-                  {/* Bubble Space */}
-                  <div className="flex-1 p-3 flex flex-col justify-end space-y-3 bg-[#e5ddd5] overflow-y-auto">
-                    {/* Incoming customer response balloon */}
-                    <div className="self-start max-w-[85%] bg-white text-zinc-800 p-2.5 rounded-none rounded-tl-none shadow-sm text-xs">
-                      Bom dia, qual o status da minha fatura de boleto em aberto? Consigo o link do boleto?
-                    </div>
-
-                    {/* Automatic Reply Balloon */}
-                    <div className="self-end max-w-[85%] bg-[#dcf8c6] text-zinc-800 p-2.5 rounded-none rounded-tr-none shadow-sm text-xs flex flex-col gap-1.5 border border-emerald-900/10">
-                      <p className="whitespace-pre-wrap">{getDemoMessage()}</p>
-                      <div className="p-1.5 rounded bg-black/5 border border-black/10 flex items-center gap-1.5">
-                        <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
-                        <span className="text-[10px] text-zinc-700 underline font-semibold">Boleto_NC_Pendencias.pdf (PDF)</span>
-                      </div>
-                      <div className="flex items-center justify-end gap-1 text-[9px] text-zinc-500 font-mono mt-0.5">
-                        <span>14:03</span>
-                        <Check className="w-3 h-3 text-blue-500" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Input line simulating keyboard */}
-                  <div className="p-2 bg-zinc-950 flex items-center gap-2">
-                    <div className="flex-1 bg-zinc-900 rounded-full px-3 py-1.5 text-xs text-zinc-500 flex items-center italic">
-                      Conversa de Cobrança Iniciada...
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-emerald-500 text-black flex items-center justify-center select-none shadow">
-                      <Send className="w-3.5 h-3.5" />
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </motion.section>
-
-      {/* PLANS MATRIX */}
-      <motion.section
-        id="planos"
-        className="py-24 overflow-hidden"
-        initial={{ opacity: 0, y: 60 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: false, amount: 0.1 }}
-        transition={{ type: "spring", stiffness: 55, damping: 14 }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-
-          {/* Header */}
-          <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
-            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Escolha o plano certo para o seu volume</h2>
-            <p className="text-zinc-400 font-light text-sm">Sem taxa por boleto quitado. Sem surpresas na fatura.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-
-            {/* Starter */}
-            <motion.div
-              className="relative bg-zinc-950 border border-zinc-800 rounded-none p-8 flex flex-col hover:border-zinc-700 transition-all"
-              initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: false, amount: 0.2 }}
-              transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0 }}
-            >
-              <div className="mb-6">
-                <p className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-2">Starter</p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-white">R$ {PLAN_PRICE_BRL.basic}</span><span className="text-zinc-500 text-sm ml-1">/mês</span>
-                </div>
-                <p className="text-zinc-500 text-sm mt-3 leading-relaxed">Para pequenas carteiras que querem sair do processo manual.</p>
-              </div>
-
-              <hr className="border-zinc-800 mb-6" />
-
-              <ul className="space-y-3 text-sm text-zinc-400 flex-1">
-                {[
-                  "Até 300 cobranças / mês",
-                  "WhatsApp com o seu próprio número",
-                  "Importação PDF, Excel e CSV",
-                  "Juros e multas automáticos",
-                  "4 tons de cobrança via WhatsApp",
-                  "Exportação Excel e PDF",
-                ].map(f => (
-                  <li key={f} className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                    {f}
-                  </li>
-                ))}
-                {["Envio em lote", "Automação de cobranças"].map(f => (
-                  <li key={f} className="flex items-start gap-2.5 text-zinc-700 line-through">
-                    <CheckCircle2 className="w-4 h-4 text-zinc-800 flex-shrink-0 mt-0.5" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-
-              <a href="#auth-panel" className="mt-5 px-4 py-2.5 rounded-none border border-zinc-700 text-zinc-300 font-semibold hover:bg-zinc-900 hover:border-zinc-600 transition-all text-center block text-sm">
-                Começar no Starter
-              </a>
-            </motion.div>
-
-            {/* Professional — destaque */}
-            <motion.div
-              className="relative bg-zinc-950 border-2 border-emerald-500 rounded-none p-8 flex flex-col shadow-[0_0_40px_rgba(16,185,129,0.12)] md:-translate-y-3"
-              initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: false, amount: 0.2 }}
-              transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0.1 }}
-            >
-              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-emerald-500 text-black px-4 py-1 rounded-none text-[10px] font-extrabold uppercase tracking-widest shadow-md whitespace-nowrap">
-                Mais popular
-              </div>
-
-              <div className="mb-6">
-                <p className="text-xs font-mono uppercase tracking-widest text-emerald-400 mb-2">Professional</p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-emerald-300">R$ {PLAN_PRICE_BRL.pro}</span><span className="text-zinc-500 text-sm ml-1">/mês</span>
-                </div>
-                <p className="text-zinc-400 text-sm mt-3 leading-relaxed">Automação completa para empresas que querem crescer sem precisar contratar mais gente.</p>
-              </div>
-
-              <hr className="border-emerald-500/20 mb-6" />
-
-              <ul className="space-y-3 text-sm text-zinc-300 flex-1">
-                {[
-                  "Até 1.500 cobranças / mês",
-                  "Tudo do Starter",
-                  "Envio em lote via WhatsApp",
-                  "Automação de cobranças diárias",
-                  "Importação via Google Sheets",
-                  "Boleto PDF anexado na mensagem",
-                ].map(f => (
-                  <li key={f} className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                    {f}
-                  </li>
-                ))}
-                {["Janela de envio personalizada", "Prioridade na fila"].map(f => (
-                  <li key={f} className="flex items-start gap-2.5 text-zinc-700 line-through">
-                    <CheckCircle2 className="w-4 h-4 text-zinc-800 flex-shrink-0 mt-0.5" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-
-              <a href="#auth-panel" className="mt-5 px-4 py-3 rounded-none bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold shadow-[0_4px_20px_rgba(16,185,129,0.3)] transition-all text-center block text-sm">
-                Assinar Professional
-              </a>
-            </motion.div>
-
-            {/* Enterprise */}
-            <motion.div
-              className="relative bg-zinc-950 border border-zinc-800 rounded-none p-8 flex flex-col hover:border-zinc-700 transition-all"
-              initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: false, amount: 0.2 }}
-              transition={{ type: "spring", stiffness: 60, damping: 14, delay: 0.2 }}
-            >
-              <div className="mb-6">
-                <p className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-2">Enterprise</p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-white">R$ {PLAN_PRICE_BRL.premium}</span><span className="text-zinc-500 text-sm ml-1">/mês</span>
-                </div>
-                <p className="text-zinc-500 text-sm mt-3 leading-relaxed">Para grandes carteiras com controle granular de horários, limites e prioridades.</p>
-              </div>
-
-              <hr className="border-zinc-800 mb-6" />
-
-              <ul className="space-y-3 text-sm text-zinc-400 flex-1">
-                {[
-                  "Até 5.000 cobranças / mês",
-                  "Tudo do Professional",
-                  "Janela de envio personalizada",
-                  "Limite diário de disparos por regra",
-                  "Prioridade na fila de automação",
-                  "Suporte dedicado via WhatsApp",
-                ].map(f => (
-                  <li key={f} className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-
-              <a href="#auth-panel" className="mt-5 px-4 py-2.5 rounded-none border border-emerald-500/20 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-all text-center block text-sm font-semibold">
-                Assinar Enterprise
-              </a>
-            </motion.div>
-
-          </div>
-
-          {/* Garantia + métodos de pagamento — reduz atrito na assinatura */}
-          <div className="mt-12 flex flex-col items-center gap-5">
-            <p className="text-center text-[15px] text-zinc-400 max-w-md leading-relaxed">
-              <span className="text-white font-semibold">Comece grátis.</span> Cancele quando quiser, sem multa e sem fidelidade.
-            </p>
-
-            <div className="flex flex-col items-center gap-2.5">
-              <div className="flex items-center gap-1.5" aria-label="Bandeiras aceitas: Visa, Mastercard, Elo">
-                <span className="h-[22px] px-1.5 flex items-center rounded-[4px] bg-white text-[#1434cb] text-[10px] font-black italic tracking-tighter">VISA</span>
-                <span className="h-[22px] w-[30px] flex items-center justify-center rounded-[4px] bg-white">
-                  <svg viewBox="0 0 32 20" className="h-3.5" aria-hidden="true">
-                    <circle cx="13" cy="10" r="7" fill="#EB001B" />
-                    <circle cx="19" cy="10" r="7" fill="#F79E1B" fillOpacity="0.9" />
-                  </svg>
-                </span>
-                <span className="h-[22px] px-1.5 flex items-center rounded-[4px] bg-black border border-zinc-600 text-[10px] font-extrabold lowercase tracking-tight">
-                  <span style={{ color: "#FFCB05" }}>e</span><span style={{ color: "#EF4123" }}>l</span><span style={{ color: "#00A4E0" }}>o</span>
-                </span>
-              </div>
-              <p className="text-xs text-zinc-500">Pagamento processado com segurança pelo Asaas — Pix, boleto ou cartão.</p>
-            </div>
-          </div>
-
-          {/* Rodapé da seção */}
-          <p className="text-center text-xs text-zinc-600 mt-6">
-            Todos os planos enviam pelo seu próprio número de WhatsApp — você conecta em menos de um minuto, lendo um QR Code.
-          </p>
-
-        </div>
-      </motion.section>
-
-      {/* AUTHENTICATION CONTROL CORE PANEL */}
-      <section id="auth-panel" className="py-20 border-t border-zinc-900/60 bg-zinc-950/40">
-        <div className="max-w-md mx-auto px-4">
-          <div className="bg-zinc-950 border border-zinc-900 p-6 sm:p-8 rounded-none shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-300" />
-            
-            <div className="text-center mb-8">
-              <h3 className="text-2xl font-black text-white">
-                {isRegisterMode ? "Crie sua Conta" : "Controle seu Faturamento"}
-              </h3>
-              <p className="text-zinc-400 text-xs font-light mt-1">
-                {isRegisterMode ? "Preencha seus dados para obter acesso imediato" : "Acesse o painel do cliente NC Finance"}
-              </p>
-            </div>
-
-            {authError && (
-              <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-none text-center">
-                {authError}
-              </div>
-            )}
-
-            {authInfo && (
-              <div className="mb-4 p-3 bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs rounded-none text-center">
-                {authInfo}
-              </div>
-            )}
-
-            {isAuthSuccess && (
-              <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-none text-center font-bold">
-                ✓ Autenticacao validada. Redirecionando para o painel...
-              </div>
-            )}
-
-            <form onSubmit={handleAuthenticationSubmit} className="space-y-4">
-              {isRegisterMode && (
-                <div>
-                  <label htmlFor="auth-name" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Nome Completo</label>
-                  <input
-                    id="auth-name"
-                    autoComplete="name"
-                    type="text"
-                    required
-                    value={authName}
-                    onChange={(e) => {
-                      setAuthName(e.target.value);
-                      setAuthError("");
-                    }}
-                    className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light"
-                    placeholder="NC Empreendimentos"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label htmlFor="auth-email" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">E-mail Corporativo</label>
-                <input
-                  id="auth-email"
-                  autoComplete="email"
-                  type="email"
-                  required
-                  value={authEmail}
-                  onChange={(e) => {
-                    setAuthEmail(e.target.value);
-                    setAuthError("");
-                  }}
-                  className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light"
-                  placeholder="admin@ncfinance.com.br"
-                />
-              </div>
-
-              {!isForgotMode && (
-                <div>
-                  <label htmlFor="auth-password" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Senha de Acesso</label>
-                  <PasswordInput
-                    id="auth-password"
-                    autoComplete={isRegisterMode ? "new-password" : "current-password"}
-                    required={!isForgotMode}
-                    value={authPassword}
-                    onChange={(e) => {
-                      setAuthPassword(e.target.value);
-                      setAuthError("");
-                    }}
-                    className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light font-mono"
-                    placeholder="••••••••"
-                  />
-                  {!isRegisterMode && (
-                    <button
-                      type="button"
-                      onClick={() => { setIsForgotMode(true); setAuthError(""); setAuthInfo(""); }}
-                      className="mt-2 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-                    >
-                      Esqueci minha senha
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {isForgotMode && (
-                <p className="text-xs text-zinc-400 -mt-1">
-                  Digite o e-mail da sua conta e enviaremos um link para você criar uma nova senha.
-                </p>
-              )}
-
-              {isRegisterMode && (
-                <>
-                  {/* CPF */}
-                  <div>
-                    <label htmlFor="auth-cpf" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">CPF</label>
-                    <input
-                      id="auth-cpf"
-                      type="text"
-                      required
-                      value={authCPF}
-                      onChange={(e) => {
-                        const formatted = formatCPF(e.target.value);
-                        setAuthCPF(formatted);
-                        const digits = formatted.replace(/\D/g, "");
-                        if (digits.length === 11) {
-                          setCpfError(validateCPF(formatted) ? "" : "CPF inválido.");
-                        } else {
-                          setCpfError("");
-                        }
-                        setAuthError("");
-                      }}
-                      className={`w-full bg-zinc-900/80 border rounded-none px-4 py-3 text-sm text-white focus:outline-none transition-all font-mono ${cpfError ? "border-rose-500 focus:border-rose-500" : "border-zinc-800 focus:border-emerald-500"}`}
-                      placeholder="000.000.000-00"
-                    />
-                    {cpfError && <p className="text-rose-400 text-[11px] mt-1">{cpfError}</p>}
-                  </div>
-
-                  {/* Telefone */}
-                  <div>
-                    <label htmlFor="auth-phone" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Telefone / WhatsApp</label>
-                    <input
-                      id="auth-phone"
-                      autoComplete="tel"
-                      type="text"
-                      required
-                      value={authPhone}
-                      onChange={(e) => { setAuthPhone(formatPhone(e.target.value)); setAuthError(""); }}
-                      className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-mono"
-                      placeholder="(00) 00000-0000"
-                    />
-                  </div>
-
-                  {/* CEP + endereço */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label htmlFor="auth-cep" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">
-                        CEP {cepLoading && <span className="text-emerald-400 font-normal normal-case">buscando...</span>}
-                      </label>
-                      <input
-                        id="auth-cep"
-                        autoComplete="postal-code"
-                        type="text"
-                        required
-                        value={authCEP}
-                        onChange={(e) => { void handleCEPChange(e.target.value); setAuthError(""); }}
-                        className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-mono"
-                        placeholder="00000-000"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="auth-state" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Estado</label>
-                      <input
-                        id="auth-state"
-                        autoComplete="address-level1"
-                        type="text"
-                        value={authState}
-                        onChange={(e) => setAuthState(e.target.value.toUpperCase().slice(0,2))}
-                        className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-mono uppercase"
-                        placeholder="SP"
-                        maxLength={2}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="auth-address" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Endereço</label>
-                    <input
-                      id="auth-address"
-                      autoComplete="street-address"
-                      type="text"
-                      required
-                      value={authAddress}
-                      onChange={(e) => { setAuthAddress(e.target.value); setAuthError(""); }}
-                      className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light"
-                      placeholder="Rua, número, bairro"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="auth-city" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Cidade</label>
-                    <input
-                      id="auth-city"
-                      autoComplete="address-level2"
-                      type="text"
-                      required
-                      value={authCity}
-                      onChange={(e) => { setAuthCity(e.target.value); setAuthError(""); }}
-                      className="w-full bg-zinc-900/80 border border-zinc-800 rounded-none px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-light"
-                      placeholder="São Paulo"
-                    />
-                  </div>
-                </>
-              )}
-
-              {isRegisterMode && (
-                <div className="flex items-start gap-2.5 mt-1">
-                  <button
-                    type="button"
-                    onClick={() => setAcceptedTerms(p => !p)}
-                    className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-all ${acceptedTerms ? "bg-emerald-500 border-emerald-500" : "border-zinc-600 hover:border-zinc-400"}`}
-                  >
-                    {acceptedTerms && <Check className="w-2.5 h-2.5 text-black" strokeWidth={3} />}
-                  </button>
-                  <p className="text-xs text-zinc-400 leading-relaxed">
-                    Li e aceito os{" "}
-                    <button type="button" onClick={() => setShowTermos(true)} className="text-emerald-400 hover:underline font-semibold">
-                      Termos de Uso
-                    </button>
-                    {" "}e a{" "}
-                    <button type="button" onClick={() => setShowPrivacidade(true)} className="text-emerald-400 hover:underline font-semibold">
-                      Política de Privacidade
-                    </button>
-                    {", "}incluindo o{" "}
-                    <button type="button" onClick={() => setShowAcordo(true)} className="text-emerald-400 hover:underline font-semibold">
-                      Acordo de Tratamento de Dados
-                    </button>
-                    {" "}da NC Finance.
-                  </p>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isAuthLoading || isAuthSuccess || Boolean(authConfigError) || (isRegisterMode && !acceptedTerms)}
-                className={`w-full py-3.5 rounded-none font-extrabold shadow-[0_4px_15px_rgba(16,185,129,0.3)] transition-all text-sm mt-2 ${
-                  isRegisterMode && !acceptedTerms
-                    ? "bg-zinc-700 text-zinc-500 cursor-not-allowed"
-                    : "bg-emerald-500 hover:bg-emerald-400 text-black hover:-translate-y-0.5 cursor-pointer"
-                }`}
-              >
-                {isAuthLoading
-                  ? "Validando acesso..."
-                  : isForgotMode
-                    ? "Enviar link de recuperação"
-                    : isRegisterMode
-                      ? "Registrar e Entrar"
-                      : "Validar Acesso e Conectar"}
+        {/* ── Chamada final ───────────────────────────────────────────────── */}
+        <section className="border-t border-zinc-900">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20 text-center">
+            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Comece a cobrar ainda hoje</h2>
+            <p className="mt-4 text-zinc-400">{DIAS_TESTE} dias grátis, sem cartão. Você conecta o WhatsApp e importa a carteira em poucos minutos.</p>
+            <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+              <button type="button" onClick={abrirCadastro} className={`${botaoPrimario} px-6 py-3.5 text-base`}>
+                Criar conta grátis <ArrowRight className="w-4 h-4" />
               </button>
-            </form>
-
-            <div className="mt-8 flex items-center justify-end text-xs text-zinc-500 border-t border-zinc-900 pt-5">
-              {isForgotMode ? (
-                <button
-                  type="button"
-                  onClick={() => { setIsForgotMode(false); setAuthError(""); setAuthInfo(""); }}
-                  className="text-emerald-400 font-bold hover:underline"
-                >
-                  Voltar ao login
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsRegisterMode(!isRegisterMode);
-                    setAcceptedTerms(false);
-                    setAuthCPF(""); setAuthPhone(""); setAuthCEP("");
-                    setAuthAddress(""); setAuthCity(""); setAuthState("");
-                    setCpfError("");
-                    setAuthError("");
-                    setAuthInfo("");
-                  }}
-                  className="text-emerald-400 font-bold hover:underline"
-                >
-                  {isRegisterMode ? "Já possuo conta (Entrar)" : "Criar uma conta grátis"}
-                </button>
-              )}
+              <button type="button" onClick={abrirEntrar} className={`${botaoSecundario} px-6 py-3.5 text-base`}>
+                Já tenho conta
+              </button>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      {/* FOOTER */}
-      <footer className="border-t border-zinc-900/80 bg-black/90 py-12 text-zinc-500 text-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center sm:text-left">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 border-b border-zinc-900/60 pb-8">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-sm text-zinc-300">NC Finance Ltda.</span>
-            </div>
-            <p className="max-w-md text-center sm:text-right text-[11px] leading-relaxed">
-              NC Finance é uma plataforma tecnológica de gestão de cobranças e faturamento automatizado via WhatsApp.
-            </p>
+      {/* ── Rodapé ──────────────────────────────────────────────────────────── */}
+      <footer className="border-t border-zinc-900 text-xs text-zinc-500">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col sm:flex-row gap-6 sm:items-end justify-between">
+          <div className="space-y-2 max-w-sm">
+            <p className="font-display font-black text-sm text-white">NC <span className="text-emerald-400">Finance</span></p>
+            <p className="leading-relaxed">Software de cobrança pelo WhatsApp para pequenas e médias empresas.</p>
+            <p>Contato: <a href={`mailto:${CONTATO_EMAIL}`} className="text-zinc-300 hover:text-white">{CONTATO_EMAIL}</a></p>
           </div>
-          <div className="flex flex-col sm:flex-row items-center justify-between pt-8 gap-4 text-[10px]">
-            <span>© 2026 NC Finance Ltda. · Todos os direitos reservados.</span>
-            <div className="flex gap-4">
-              <span className="hover:text-emerald-400 cursor-pointer" onClick={() => setShowTermos(true)}>Termos de Uso</span>
-              <span className="hover:text-emerald-400 cursor-pointer" onClick={() => setShowPrivacidade(true)}>Privacidade e Dados</span>
-              <span className="hover:text-emerald-400 cursor-pointer" onClick={() => setShowSuporte(true)}>Suporte</span>
-
-            </div>
+          <div className="space-y-3 sm:text-right">
+            <nav aria-label="Documentos" className="flex flex-wrap gap-x-4 gap-y-2 sm:justify-end">
+              <button type="button" onClick={() => setShowTermos(true)} className="hover:text-white cursor-pointer">Termos de Uso</button>
+              <button type="button" onClick={() => setShowPrivacidade(true)} className="hover:text-white cursor-pointer">Privacidade</button>
+              <button type="button" onClick={() => setShowAcordo(true)} className="hover:text-white cursor-pointer">Tratamento de dados</button>
+              <button type="button" onClick={() => setShowSuporte(true)} className="hover:text-white cursor-pointer">Suporte</button>
+            </nav>
+            <p>© 2026 NC Finance. Todos os direitos reservados.</p>
           </div>
         </div>
       </footer>
 
+      {/* CTA fixo no celular, só depois do hero */}
+      <div
+        className={`lg:hidden fixed bottom-0 inset-x-0 z-30 p-3 bg-zinc-950/90 backdrop-blur border-t border-zinc-800 transition-all duration-300 ${
+          showStickyCta && !acesso ? "opacity-100 translate-y-0" : "opacity-0 translate-y-full pointer-events-none"
+        }`}
+        aria-hidden={!showStickyCta || Boolean(acesso)}
+      >
+        <button
+          type="button"
+          onClick={abrirCadastro}
+          tabIndex={showStickyCta && !acesso ? 0 : -1}
+          className={`${botaoPrimario} w-full px-6 py-3.5 text-sm`}
+        >
+          Testar {DIAS_TESTE} dias grátis <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {acesso && (
+        <PainelAcesso
+          modo={acesso}
+          setModo={setAcesso}
+          onClose={() => setAcesso(null)}
+          bloqueado={documentoLegalAberto}
+          onLogin={onLogin}
+          onSignUp={onSignUp}
+          onForgotPassword={onForgotPassword}
+          isAuthLoading={isAuthLoading}
+          authConfigError={authConfigError}
+          abrirTermos={() => setShowTermos(true)}
+          abrirPrivacidade={() => setShowPrivacidade(true)}
+          abrirAcordo={() => setShowAcordo(true)}
+        />
+      )}
+
       {showTermos && <TermosDeUso onClose={() => setShowTermos(false)} />}
       {showAcordo && <AcordoTratamentoDados onClose={() => setShowAcordo(false)} />}
       {showPrivacidade && <PoliticaPrivacidade onClose={() => setShowPrivacidade(false)} />}
-      {showSuporte && <Suporte onClose={() => setShowSuporte(false)} />}
-
-      {/* Sticky CTA — só no mobile; aparece ao rolar além do hero (não fica fixo o tempo todo) */}
-      <div
-        className={`lg:hidden fixed bottom-0 inset-x-0 z-40 p-3 bg-zinc-950/90 backdrop-blur border-t border-zinc-800 transition-all duration-300
-          ${showStickyCta ? "opacity-100 translate-y-0" : "opacity-0 translate-y-full pointer-events-none"}`}
-        aria-hidden={!showStickyCta}
-      >
-        <a
-          href="#auth-panel"
-          className="w-full px-6 py-3.5 rounded-none bg-emerald-500 hover:bg-emerald-400 text-black font-bold flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(16,185,129,0.3)] transition-all text-sm"
-          tabIndex={showStickyCta ? 0 : -1}
-        >
-          Comece grátis <ArrowRight className="w-4 h-4" />
-        </a>
-      </div>
+      {showSuporte && (
+        <Suspense fallback={null}>
+          <Suporte onClose={() => setShowSuporte(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }
 
+// ─── Entrar / criar conta / recuperar senha ──────────────────────────────────
+
+interface PainelAcessoProps {
+  modo: ModoAcesso;
+  setModo: (m: ModoAcesso) => void;
+  onClose: () => void;
+  /** Termos/privacidade abertos por cima: Esc fecha só eles. */
+  bloqueado: boolean;
+  onLogin: LandingPageProps["onLogin"];
+  onSignUp: LandingPageProps["onSignUp"];
+  onForgotPassword: LandingPageProps["onForgotPassword"];
+  isAuthLoading: boolean;
+  authConfigError: string;
+  abrirTermos: () => void;
+  abrirPrivacidade: () => void;
+  abrirAcordo: () => void;
+}
+
+const campoAcesso = "w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors";
+
+function PainelAcesso({
+  modo, setModo, onClose, bloqueado,
+  onLogin, onSignUp, onForgotPassword, isAuthLoading, authConfigError,
+  abrirTermos, abrirPrivacidade, abrirAcordo,
+}: PainelAcessoProps) {
+  const [nome, setNome] = useState("");
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [aceitou, setAceitou] = useState(false);
+  const [erro, setErro] = useState("");
+  const [info, setInfo] = useState("");
+  const [entrou, setEntrou] = useState(false);
+
+  // Trava a rolagem da página atrás e fecha com Esc.
+  useEffect(() => {
+    const anterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = anterior; };
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !bloqueado) onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [bloqueado, onClose]);
+
+  const trocarModo = (m: ModoAcesso) => {
+    setModo(m);
+    setErro("");
+    setInfo("");
+  };
+
+  const titulo = modo === "cadastro" ? "Criar conta" : modo === "senha" ? "Recuperar senha" : "Entrar";
+  const subtitulo = modo === "cadastro"
+    ? `${DIAS_TESTE} dias grátis, sem cartão. CPF e endereço são pedidos depois, no primeiro acesso.`
+    : modo === "senha"
+      ? "Digite o e-mail da sua conta e enviaremos um link para criar uma nova senha."
+      : "Acesse o painel da NC Finance.";
+
+  const enviar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (authConfigError) { setErro(authConfigError); return; }
+    setErro("");
+    setInfo("");
+
+    if (modo === "senha") {
+      if (!email.trim()) { setErro("Digite seu e-mail."); return; }
+      // Mesma mensagem com ou sem conta: não revela quais e-mails existem.
+      try { await onForgotPassword(email.trim()); } catch { /* idem */ }
+      setInfo("Se este e-mail tiver conta, enviamos um link para redefinir a senha. Confira a caixa de entrada e o spam.");
+      return;
+    }
+
+    if (!email.trim() || !senha) { setErro("Preencha e-mail e senha."); return; }
+    if (modo === "cadastro") {
+      if (nome.trim().length < 2) { setErro("Digite seu nome."); return; }
+      if (senha.length < 6) { setErro("A senha precisa ter pelo menos 6 caracteres."); return; }
+      if (!aceitou) { setErro("Para criar a conta, aceite os Termos de Uso e a Política de Privacidade."); return; }
+    }
+
+    try {
+      if (modo === "cadastro") {
+        const r = await onSignUp({ name: nome.trim(), email: email.trim(), password: senha });
+        if (r.needsEmailConfirmation) {
+          setModo("entrar");
+          setSenha("");
+          setInfo(r.message);
+          return;
+        }
+      } else {
+        await onLogin({ email: email.trim(), password: senha });
+      }
+      setEntrou(true);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : "";
+      let msg = modo === "cadastro" ? "Não foi possível criar a conta. Tente de novo." : "Não foi possível entrar. Tente de novo.";
+      if (/invalid login credentials/i.test(raw)) msg = "E-mail ou senha incorretos.";
+      else if (/email not confirmed/i.test(raw)) msg = "Confirme seu e-mail pelo link que enviamos antes de entrar.";
+      else if (/already (been )?registered/i.test(raw)) msg = "Este e-mail já tem conta. Entre ou recupere a senha.";
+      else if (/password/i.test(raw)) msg = "A senha precisa ter pelo menos 6 caracteres.";
+      else if (/rate limit|too many/i.test(raw)) msg = "Muitas tentativas seguidas. Aguarde alguns minutos.";
+      else if (/network|fetch/i.test(raw)) msg = "Sem conexão. Verifique a internet e tente de novo.";
+      setErro(msg);
+    }
+  };
+
+  const textoBotao = isAuthLoading
+    ? "Aguarde…"
+    : modo === "cadastro" ? "Criar conta grátis" : modo === "senha" ? "Enviar link" : "Entrar";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/80 backdrop-blur-sm px-4 py-8 overflow-y-auto"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div role="dialog" aria-modal="true" aria-labelledby="acesso-titulo" className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-xl">
+        <header className="flex items-start justify-between gap-3 px-6 py-5 border-b border-zinc-800/80">
+          <div>
+            <h2 id="acesso-titulo" className="text-xl font-black text-white tracking-tight">{titulo}</h2>
+            <p className="mt-1 text-xs text-zinc-500 leading-relaxed">{subtitulo}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fechar" className="p-1 text-zinc-500 hover:text-white cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </header>
+
+        <form onSubmit={(e) => void enviar(e)} className="px-6 py-5 space-y-4">
+          {erro && <p role="alert" className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">{erro}</p>}
+          {info && <p role="status" className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs text-sky-300">{info}</p>}
+          {entrou && <p role="status" className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">Tudo certo. Abrindo o painel…</p>}
+
+          {modo === "cadastro" && (
+            <div>
+              <label htmlFor="acesso-nome" className={`${rotulo} block mb-1.5`}>Seu nome</label>
+              <input id="acesso-nome" autoComplete="name" autoFocus value={nome}
+                onChange={(e) => { setNome(e.target.value); setErro(""); }}
+                className={campoAcesso} placeholder="Nome e sobrenome" />
+            </div>
+          )}
+
+          <div>
+            <label htmlFor="acesso-email" className={`${rotulo} block mb-1.5`}>E-mail</label>
+            <input id="acesso-email" type="email" autoComplete="email" autoFocus={modo !== "cadastro"} value={email}
+              onChange={(e) => { setEmail(e.target.value); setErro(""); }}
+              className={campoAcesso} placeholder="voce@suaempresa.com.br" />
+          </div>
+
+          {modo !== "senha" && (
+            <div>
+              <label htmlFor="acesso-senha" className={`${rotulo} block mb-1.5`}>Senha</label>
+              <PasswordInput
+                id="acesso-senha"
+                autoComplete={modo === "cadastro" ? "new-password" : "current-password"}
+                value={senha}
+                onChange={(e) => { setSenha(e.target.value); setErro(""); }}
+                className={campoAcesso}
+                placeholder={modo === "cadastro" ? "Pelo menos 6 caracteres" : "Sua senha"}
+              />
+              {modo === "entrar" && (
+                <button type="button" onClick={() => trocarModo("senha")} className="mt-2 text-xs text-emerald-400 hover:text-emerald-300 cursor-pointer">
+                  Esqueci minha senha
+                </button>
+              )}
+            </div>
+          )}
+
+          {modo === "cadastro" && (
+            <label className="flex items-start gap-2.5 text-xs text-zinc-400 leading-relaxed">
+              <input type="checkbox" checked={aceitou} onChange={(e) => { setAceitou(e.target.checked); setErro(""); }}
+                className="mt-0.5 w-4 h-4 accent-emerald-500 flex-shrink-0" />
+              <span>
+                Li e aceito os{" "}
+                <button type="button" onClick={abrirTermos} className="text-emerald-400 hover:underline">Termos de Uso</button>, a{" "}
+                <button type="button" onClick={abrirPrivacidade} className="text-emerald-400 hover:underline">Política de Privacidade</button> e o{" "}
+                <button type="button" onClick={abrirAcordo} className="text-emerald-400 hover:underline">Acordo de Tratamento de Dados</button>.
+              </span>
+            </label>
+          )}
+
+          <button
+            type="submit"
+            disabled={isAuthLoading || entrou || Boolean(authConfigError)}
+            className={`${botaoPrimario} w-full py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            {textoBotao}
+          </button>
+        </form>
+
+        <footer className="px-6 py-4 border-t border-zinc-800/80 text-xs text-zinc-500">
+          {modo === "entrar" && (
+            <>Não tem conta? <button type="button" onClick={() => trocarModo("cadastro")} className="font-semibold text-emerald-400 hover:underline cursor-pointer">Teste {DIAS_TESTE} dias grátis</button></>
+          )}
+          {modo === "cadastro" && (
+            <>Já tem conta? <button type="button" onClick={() => trocarModo("entrar")} className="font-semibold text-emerald-400 hover:underline cursor-pointer">Entrar</button></>
+          )}
+          {modo === "senha" && (
+            <button type="button" onClick={() => trocarModo("entrar")} className="font-semibold text-emerald-400 hover:underline cursor-pointer">Voltar para o login</button>
+          )}
+        </footer>
+      </div>
+    </div>
+  );
+}

@@ -48,8 +48,9 @@ import {
   PlanId,
   UserConfig,
 
-  MessageTone, 
-  PatternMessage
+  MessageTone,
+  PatternMessage,
+  SignUpPayload
 } from "./types";
 import { 
   Users, 
@@ -493,10 +494,10 @@ export default function App() {
     }
   };
 
-  const handleSignUp = async ({ name, email, password, cpf, phone, cep, address, city, state }: { name: string; email: string; password: string; cpf: string; phone: string; cep: string; address: string; city: string; state: string }) => {
+  const handleSignUp = async ({ name, email, password }: SignUpPayload) => {
     setIsAuthenticating(true);
     try {
-      const authResult = await signUp({ name, email, password, cpf, phone, cep, address, city, state });
+      const authResult = await signUp({ name, email, password });
       const needsEmailConfirmation = !authResult.session;
 
       if (!needsEmailConfirmation) {
@@ -506,7 +507,7 @@ export default function App() {
       return {
         needsEmailConfirmation,
         message: needsEmailConfirmation
-          ? "Conta criada com sucesso. Confira seu email para confirmar o acesso antes de entrar."
+          ? "Conta criada. Enviamos um link de confirmação para o seu e-mail — abra e depois entre aqui."
           : "Conta criada com sucesso. Redirecionando para o painel..."
       };
     } finally {
@@ -2238,7 +2239,13 @@ export default function App() {
     alert("Copiado com sucesso! Agora você pode colar diretamente nos campos de texto.");
   };
 
-  if (isSessionLoading) {
+  // public/session-hint.js marca <html class="tem-sessao"> antes da primeira
+  // pintura quando há sessão salva neste navegador. Sem ela não há o que
+  // validar: a landing (já pré-renderizada no HTML) segue na tela, sem piscar
+  // o spinner entre o HTML estático e o React.
+  const temSessaoSalva = typeof document !== "undefined" && document.documentElement.classList.contains("tem-sessao");
+
+  if (isSessionLoading && temSessaoSalva) {
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
         <div className="text-center space-y-3">
@@ -2330,6 +2337,7 @@ export default function App() {
           userId={userId}
           email={account?.email || user?.email || ""}
           displayName={account?.displayName || ""}
+          termsAcceptedAt={typeof user?.user_metadata?.accepted_terms_at === "string" ? user.user_metadata.accepted_terms_at : null}
           perfil={perfilCadastro.perfil}
           onSaved={() => void carregarPerfilCadastro(userId)}
           onLogout={() => void handleSignOut()}

@@ -58,9 +58,13 @@ export const isProfileComplete = (p: UserProfileData | null): boolean => {
   );
 };
 
-/** Grava (ou completa) o perfil do usuário logado. */
+/**
+ * Grava (ou completa) o perfil do usuário logado. `accepted_terms_at` vem do
+ * aceite marcado no cadastro (user_metadata); sem ele, o valor já gravado fica.
+ */
 export async function saveMyProfile(userId: string, data: {
   full_name: string; cpf: string; phone: string; cep: string; address: string; city: string; state: string;
+  accepted_terms_at?: string;
 }): Promise<void> {
   const supabase = getSupabaseClient();
   const { error } = await supabase.from("user_profiles").upsert(
@@ -73,6 +77,7 @@ export async function saveMyProfile(userId: string, data: {
       address: data.address.trim(),
       city: data.city.trim(),
       state: data.state.trim().toUpperCase(),
+      ...(data.accepted_terms_at ? { accepted_terms_at: data.accepted_terms_at } : {}),
     },
     { onConflict: "user_id" },
   );

@@ -53,14 +53,13 @@ export interface AuthCredentials {
   password: string;
 }
 
+/**
+ * Cadastro curto: nome, e-mail e senha. CPF, telefone e endereço continuam
+ * obrigatórios — são pedidos no primeiro acesso (CompletarCadastro), antes de
+ * usar o sistema.
+ */
 export interface SignUpPayload extends AuthCredentials {
   name: string;
-  cpf: string;
-  phone: string;
-  cep: string;
-  address: string;
-  city: string;
-  state: string;
 }
 
 export interface BillingLog {

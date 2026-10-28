@@ -15,6 +15,8 @@ interface Props {
   displayName: string;
   /** Perfil incompleto já existente: os campos vêm preenchidos. */
   perfil: UserProfileData | null;
+  /** Aceite dos termos marcado no cadastro (user_metadata), para gravar no perfil. */
+  termsAcceptedAt?: string | null;
   onSaved: () => void;
   onLogout: () => void;
 }
@@ -46,7 +48,7 @@ const Rotulo = ({ htmlFor, children }: { htmlFor: string; children: React.ReactN
   <label htmlFor={htmlFor} className="block mb-1.5 text-[10px] font-mono uppercase tracking-widest text-zinc-500">{children}</label>
 );
 
-export default function CompletarCadastro({ userId, email, displayName, perfil, onSaved, onLogout }: Props) {
+export default function CompletarCadastro({ userId, email, displayName, perfil, termsAcceptedAt, onSaved, onLogout }: Props) {
   // CPF válido já gravado não muda por aqui (é a identidade da conta).
   const cpfTravado = Boolean(perfil?.cpf && isValidCPF(perfil.cpf));
 
@@ -93,6 +95,7 @@ export default function CompletarCadastro({ userId, email, displayName, perfil, 
     try {
       await saveMyProfile(userId, {
         full_name: nome, cpf, phone: telefone, cep, address: endereco, city: cidade, state: uf,
+        accepted_terms_at: termsAcceptedAt ?? undefined,
       });
       onSaved();
     } catch (err) {

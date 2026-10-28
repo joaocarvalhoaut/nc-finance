@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig(({ isSsrBuild }) => {
   return {
     plugins: [react(), tailwindcss()],
     // Remove console.log/info/debug do bundle de produção (minificado), mantendo
@@ -22,11 +22,15 @@ export default defineConfig(() => {
       // Do not modify — file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      // Saídas de build ficam fora do watch: rodar `npm run build` com o dev
+      // aberto criava e apagava dist-ssr/ e o watcher caía com EBUSY (Windows).
+      watch: process.env.DISABLE_HMR === 'true' ? null : { ignored: ['**/dist/**', '**/dist-ssr/**'] },
     },
     build: {
       // Raise warning threshold slightly; vendor splitting handles the main chunk
       chunkSizeWarningLimit: 600,
+      // O build SSR só gera o HTML da landing; public/ já vai no build normal.
+      copyPublicDir: !isSsrBuild,
       rollupOptions: {
         // tesseract.js is an optional OCR dependency.  It is NOT installed by
         // default — users who need scanned-PDF support can add it manually:
@@ -34,7 +38,9 @@ export default defineConfig(() => {
         // Marking it external prevents Rollup from erroring on the dynamic
         // import; the try/catch in ocrFallback.ts handles runtime absence.
         external: ["tesseract.js"],
-        output: {
+        // Build SSR (pré-render da landing, tools/prerender-landing.mjs): as
+        // dependências ficam externas, então não há vendor para separar.
+        output: isSsrBuild ? {} : {
           manualChunks: {
             // Vendor: React runtime — stable, infrequently changes
             'vendor-react': ['react', 'react-dom'],

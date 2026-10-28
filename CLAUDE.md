@@ -26,6 +26,12 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
 - **WhatsApp por trás de flag de provider:** `_shared/zapi.ts` (atual) e `_shared/whatsappCloud.ts`
   (Cloud API oficial, pronto mas não ligado) têm o mesmo shape de retorno. Trocar via
   `WHATSAPP_PROVIDER=zapi|cloud`. Ver `MIGRACAO-WHATSAPP-CLOUD.md`.
+- **Landing pré-renderizada (SEO + GEO):** o `npm run build` gera o HTML da landing no `index.html`
+  (robôs de IA não executam JS), mais JSON-LD, `/llms.txt` e `sitemap.xml` — ver
+  `tools/prerender-landing.mjs`. Fonte única do texto: `src/content/landing.ts` (passos, diferenciais,
+  perguntas) e `src/config/plans.ts` (planos). Só prometer o que o código faz. A `LandingPage` não pode
+  usar `window`/`document` fora de efeitos. `public/session-hint.js` esconde o HTML pré-renderizado
+  para quem já tem sessão salva.
 
 ## Quality gate (CI)
 `.github/workflows/ci.yml` roda em todo push/PR: `npm run lint` (tsc), `npm run test:parser`

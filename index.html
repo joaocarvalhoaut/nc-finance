@@ -3,40 +3,58 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NC Finance — Cobrança automatizada por WhatsApp</title>
+    <title>NC Finance: cobrança automática pelo WhatsApp, do seu número</title>
     <meta
       name="description"
-      content="Recupere o que é seu. Importe devedores, calcule juros e multa automaticamente e envie cobranças por WhatsApp em segundos. Comece grátis."
+      content="Software de cobrança pelo WhatsApp: importe a planilha de clientes em atraso, calcule juros e multa e envie do seu próprio número, com o boleto anexado. 7 dias grátis, sem cartão."
     />
-    <meta name="theme-color" content="#0c0f0d" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="theme-color" content="#09090b" />
     <link rel="canonical" href="https://ncfinance.com.br/" />
 
     <!-- Open Graph (preview ao compartilhar por WhatsApp, redes, etc.) -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="NC Finance" />
-    <meta property="og:title" content="NC Finance — Cobrança automatizada por WhatsApp" />
+    <meta property="og:title" content="NC Finance: cobrança automática pelo WhatsApp" />
     <meta
       property="og:description"
-      content="Importe devedores, calcule juros e multa e dispare cobranças por WhatsApp automaticamente. Comece grátis."
+      content="Importe a carteira, revise e envie as cobranças do seu próprio número de WhatsApp, com o boleto anexado. 7 dias grátis, sem cartão."
     />
     <meta property="og:url" content="https://ncfinance.com.br/" />
     <meta property="og:locale" content="pt_BR" />
+    <meta property="og:image" content="https://ncfinance.com.br/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="NC Finance — cobrança automática pelo WhatsApp" />
 
     <!-- Twitter/X card -->
-    <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="NC Finance — Cobrança automatizada por WhatsApp" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="NC Finance: cobrança automática pelo WhatsApp" />
     <meta
       name="twitter:description"
-      content="Importe devedores, calcule juros e multa e dispare cobranças por WhatsApp automaticamente. Comece grátis."
+      content="Importe a carteira, revise e envie as cobranças do seu próprio número de WhatsApp, com o boleto anexado. 7 dias grátis, sem cartão."
     />
+    <meta name="twitter:image" content="https://ncfinance.com.br/og.png" />
+
+    <!-- Resumo para buscadores de IA (gerado no build a partir do conteúdo da landing) -->
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt" />
 
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/favicon.png" />
+
+    <!-- Fundo escuro antes do CSS e do React: sem flash branco. -->
+    <style>
+      html { background: #09090b; color-scheme: dark; }
+      html.tem-sessao [data-prerender] { display: none; }
+    </style>
+    <!-- Marca se há sessão salva (esconde a landing pré-renderizada para quem já está logado). -->
+    <script src="/session-hint.js"></script>
+
     <!-- Inter font — pré-conecta ao Google Fonts para reduzir latência -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;1,14..32,400;1,14..32,500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900;1,14..32,400;1,14..32,500&display=swap"
       rel="stylesheet"
     />
   </head>
@@ -45,4 +63,3 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
