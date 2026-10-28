@@ -78,7 +78,7 @@
       ]
     },
     {
-      "source": "/((?!api/|assets/|favicon.ico).*)",
+      "source": "/((?!api/|assets/)[^.]*)",
       "headers": [
         {
           "key": "Content-Type",
