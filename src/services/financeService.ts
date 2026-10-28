@@ -1,6 +1,7 @@
 import type { Debtor } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
 import { ensureNinthDigit } from "../../supabase/functions/_shared/brPhone.ts";
+import { normalizarDigitosTelefone } from "./localDocumentExtraction/regexExtractors";
 
 type FinancialCategory = "vencidos" | "a_vencer" | "recompra" | "liquidado" | "desabilitado";
 type FinancialStatus = "pending" | "sent" | "failed";
@@ -126,9 +127,12 @@ const mapDebtorToRow = (userId: string, debtor: Debtor) => ({
   due_date: normalizeDateToStorage(debtor.dueDate),
   amount: Number(debtor.value || 0),
   // Funil único de gravação: cadastro, importação (Visão Geral e Cobrar) e
-  // edição na tabela passam por aqui. Celular no formato antigo ganha o 9;
-  // fixo e número já correto ficam como foram digitados.
-  phone: debtor.phone ? ensureNinthDigit(debtor.phone) || null : null,
+  // edição na tabela passam por aqui. Telefone brasileiro válido vira só
+  // dígitos (DDD + número: "77 9 9932 3232" → "77999323232") e celular no
+  // formato antigo ganha o 9; o que não for reconhecido fica como digitado.
+  phone: debtor.phone
+    ? ensureNinthDigit(normalizarDigitosTelefone(debtor.phone) ?? debtor.phone) || null
+    : null,
   category: debtor.category,
   interest_applied: debtor.interestApplied ?? 0,
   fine_applied: debtor.fineApplied ?? 0,

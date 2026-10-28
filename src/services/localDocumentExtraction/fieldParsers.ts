@@ -7,7 +7,7 @@
  * e a resposta vem normalizada ou null.
  */
 
-import { parseBRLAmount } from "./regexExtractors";
+import { normalizarDigitosTelefone, parseBRLAmount } from "./regexExtractors";
 
 // ── Datas ─────────────────────────────────────────────────────────────────────
 
@@ -133,19 +133,10 @@ export function parseMoney(raw: string): number | null {
 
 /**
  * DDD + número (10 ou 11 dígitos), sem DDI 55 e sem o 0 de discagem; null se
- * não for um telefone brasileiro com DDD.
+ * não for um telefone brasileiro com DDD. Mesma regra do leitor de texto
+ * corrido (regexExtractors) — uma só fonte.
  */
-export function normalizarTelefone(digitos: string): string | null {
-  let d = (digitos ?? "").replace(/\D/g, "");
-  if (d.startsWith("55") && (d.length === 12 || d.length === 13)) d = d.slice(2);
-  if (d.startsWith("0") && (d.length === 11 || d.length === 12)) d = d.slice(1);
-  if (d.length !== 10 && d.length !== 11) return null;
-  // DDD válido: 11 a 99, sem zero no segundo dígito.
-  if (!/^[1-9][1-9]/.test(d)) return null;
-  // Com 11 dígitos, o número local é celular e começa com 9.
-  if (d.length === 11 && d[2] !== "9") return null;
-  return d;
-}
+export const normalizarTelefone = normalizarDigitosTelefone;
 
 const ehCelular = (tel: string) =>
   (tel.length === 11 && tel[2] === "9") || (tel.length === 10 && /[6-9]/.test(tel[2]));

@@ -13,6 +13,7 @@ import {
   findAllDates,
   findAllCurrencies,
   findFirstPhone,
+  findFirstPhoneMatch,
   parseBRLAmount,
   CURRENCY_RE,
   DATE_RE,
@@ -279,12 +280,15 @@ export function parseErpFormat(text: string): RecordCandidate[] {
     const supplier = cleanSupplierName(beforeCnpj).slice(0, 120) || null;
 
     // ── Phone ────────────────────────────────────────────────────────────────
-    const phone = findFirstPhone(tail);
+    // Pela POSIÇÃO no texto: procurar os dígitos com indexOf falhava com
+    // número formatado ("77 9 9932 3232"), e o nome engolia o resto da linha.
+    const phoneMatch = findFirstPhoneMatch(tail);
+    const phone = phoneMatch?.phone ?? null;
 
     // ── Client name (text before phone, or before first date) ────────────────
     let clientEnd = tail.length;
-    if (phone) {
-      clientEnd = tail.indexOf(phone);
+    if (phoneMatch) {
+      clientEnd = phoneMatch.start;
     } else {
       const firstDateMatch = tail.match(new RegExp(DATE_RE.source));
       if (firstDateMatch) clientEnd = tail.indexOf(firstDateMatch[0]);
@@ -295,9 +299,7 @@ export function parseErpFormat(text: string): RecordCandidate[] {
     const bank = bankErp || null;
 
     // ── Text after phone ─────────────────────────────────────────────────────
-    const afterPhone = phone
-      ? tail.slice(tail.indexOf(phone) + phone.length)
-      : tail.slice(clientEnd);
+    const afterPhone = phoneMatch ? tail.slice(phoneMatch.end) : tail.slice(clientEnd);
 
     // ── Document type ────────────────────────────────────────────────────────
     const docTypeMatch = afterPhone.match(new RegExp(DOC_TYPE_RE.source, "i"));
@@ -387,11 +389,16 @@ export function parseLineByLine(text: string): RecordCandidate[] {
     const currencies = findAllCurrencies(line);
     if (dates.length === 0 || currencies.length === 0) continue;
 
-    const phone = findFirstPhone(line);
+    const phoneMatch = findFirstPhoneMatch(line);
+    const phone = phoneMatch?.phone ?? null;
     const statusMatch = line.match(new RegExp(STATUS_RE.source, "i"));
 
+    // Sem o telefone: os grupos de "(77) 9 9932 3232" não podem virar número
+    // do documento nem pedaço do nome do cliente.
+    const semTelefone = phoneMatch ? `${line.slice(0, phoneMatch.start)} ${line.slice(phoneMatch.end)}` : line;
+
     // Client = longest run of words before the first date
-    const beforeDate = line.slice(0, line.indexOf(dates[0]));
+    const beforeDate = semTelefone.slice(0, semTelefone.indexOf(dates[0]));
 
     // Documento = número do título (coluna "Número"), que fica logo ANTES da
     // data de vencimento. Em relatórios o código do cedente (ex: "1127 -") vem

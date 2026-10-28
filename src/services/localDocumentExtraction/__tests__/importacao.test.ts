@@ -11,6 +11,7 @@ import { decodificarTexto, dividirDelimitado, comoTabela } from "../textoDelimit
 import { interpretarTabela } from "../tableInterpreter";
 import { agruparLinhas, detectarTabelas, juntarItens, type ItemPosicionado } from "../layout";
 import { palavrasDoTsv } from "../ocr";
+import { findFirstPhone } from "../regexExtractors";
 import { extrairDeTexto, interpretarDocumento } from "../index";
 
 let passed = 0;
@@ -59,6 +60,20 @@ eq(pickPhone("(11) 3333-4444 / (11) 98765-4321"), "11987654321", "dois números:
 eq(pickPhone("33 9913-7848"), "3399137848", "celular antigo de 8 dígitos");
 eq(pickPhone("98765-4321"), null, "sem DDD não serve");
 eq(pickPhone("123.456.789-01"), null, "CPF não é telefone");
+
+// Telefone com espaço no meio, no texto corrido (relatório, TXT, texto colado).
+// Antes nenhum destes era lido e o relatório vinha todo sem telefone.
+section("Telefones com espaço (texto corrido)");
+for (const [formato, esperado] of [
+  ["77 9 9932 3232", "77999323232"], ["77 99932 3232", "77999323232"], ["(77) 9 9932 3232", "77999323232"],
+  ["+55 77 9 9932 3232", "77999323232"], ["0 77 9 9932 3232", "77999323232"], ["77.99932.3232", "77999323232"],
+  ["77 9932 3232", "7799323232"],
+] as const) {
+  eq(findFirstPhone(`JOAO DA SILVA ${formato} 4254-2 10/05/2026 R$ 715,66`), esperado, `“${formato}” no meio da linha`);
+}
+const relatorioTexto = extrairDeTexto("JOAO DA SILVA 77 9 9932 3232 4254-2 10/05/2026 R$ 715,66\nMARIA SOUZA (77) 99932 3233 4255-1 11/05/2026 R$ 100,00");
+eq(relatorioTexto.records.map((r) => [r.client, r.phone, r.document]), [["JOAO DA SILVA", "77999323232", "4254-2"], ["MARIA SOUZA", "77999323233", "4255-1"]], "relatório: nome, telefone e documento separados certo");
+eq(findFirstPhone("EMPRESA 51.382.654/0001-68 vence 10 05 2026 R$ 715,66"), null, "CNPJ e data com espaço não viram telefone");
 
 // ── Totais ────────────────────────────────────────────────────────────────────
 section("Linhas de total");

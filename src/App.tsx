@@ -44,6 +44,7 @@ import {
   type DocumentoImportado,
   type LocalExtractionResult,
 } from "./services/localDocumentExtraction";
+import { normalizarDigitosTelefone } from "./services/localDocumentExtraction/regexExtractors";
 import { exportRelatorio } from "./services/exportRelatorio";
 const Suporte = lazy(() => import("./components/Suporte"));
 import { PdfPreviewModal, openPdfPreview } from "./components/PdfPreviewModal";
@@ -317,7 +318,11 @@ export default function App() {
   const [isExtracting, setIsExtracting] = useState<boolean>(false);
   const [extractedDebtors, setExtractedDebtors] = useState<Debtor[]>([]);
   const [extractedSelectedIds, setExtractedSelectedIds] = useState<Set<string>>(new Set());
-  const [lowConfidenceIds, setLowConfidenceIds] = useState<Set<string>>(new Set());
+  // Revisão da importação: leitura com dúvida (vem da extração) e registros
+  // que a pessoa já conferiu ou corrigiu. O que precisa de revisão é calculado
+  // ao vivo (pendenciasRevisao), então o contador baixa a cada correção.
+  const [duvidaLeituraIds, setDuvidaLeituraIds] = useState<Set<string>>(new Set());
+  const [conferidosIds, setConferidosIds] = useState<Set<string>>(new Set());
   const [flashedLowConfId, setFlashedLowConfId] = useState<string | null>(null);
   const lowConfCursorRef = React.useRef(0);
   const tableScrollRef = React.useRef<HTMLDivElement>(null);
@@ -325,6 +330,9 @@ export default function App() {
   const [extractionAlert, setExtractionAlert] = useState<string>("");
   const [dupDocModal, setDupDocModal] = useState<{ pending: typeof extractedDebtors; dupes: { doc: string; count: number }[] } | null>(null);
   const [revisaoModal, setRevisaoModal] = useState<{ pending: typeof extractedDebtors; duvidosos: number } | null>(null);
+  // Exclusão sempre confirmada: um cliente, ou a carteira inteira (com "EXCLUIR" digitado).
+  const [excluirConfirm, setExcluirConfirm] = useState<{ tipo: "um"; debtor: Debtor } | { tipo: "todos"; total: number } | null>(null);
+  const [excluirTexto, setExcluirTexto] = useState("");
   const [addDupModal, setAddDupModal] = useState<{ novo: Debtor; existente: Debtor } | null>(null);
   const [notesPopover, setNotesPopover] = useState<{ debtorId: string; draft: string } | null>(null);
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
@@ -1427,15 +1435,17 @@ export default function App() {
           status: "pending" as const,
         }));
 
-        // Marca para revisao todo registro que nao veio completo. O limiar
-        // antigo (75) nao pegava nem registro sem valor, que marca 80 — so a
-        // ausencia do nome do cliente disparava revisao.
-        const lowIds = new Set(
-          result.records
-            .map((item, index) => item.confidenceScore < 100 ? `ext-${ts}-${index}` : null)
-            .filter(Boolean) as string[]
-        );
-        setLowConfidenceIds(lowIds);
+        // Leitura com dúvida (OCR incerto, valor ilegível): a nota veio abaixo
+        // do que os campos presentes justificariam. O que FALTA (telefone,
+        // vencimento…) é calculado ao vivo em pendenciasRevisao — assim o
+        // contador "para revisar" baixa conforme a pessoa corrige.
+        const presenca = (r: typeof result.records[number]) =>
+          (r.client.trim().length >= 3 ? 25 : 0) + (r.document && !/^DOC-\d+$/.test(r.document) ? 20 : 0) +
+          (r.dueDate ? 20 : 0) + (r.value > 0 ? 20 : 0) + (r.phone ? 15 : 0);
+        setDuvidaLeituraIds(new Set(
+          result.records.flatMap((item, index) => item.confidenceScore < presenca(item) ? [`ext-${ts}-${index}`] : [])
+        ));
+        setConferidosIds(new Set());
         setExtractedDebtors(parsedList);
 
         if (result.warnings.length > 0) {
@@ -1481,6 +1491,26 @@ export default function App() {
       setIsExtracting(false);
     }
   };
+  /**
+   * O que ainda falta num registro da revisão. Calculado ao vivo a partir dos
+   * campos: corrigir o telefone, o vencimento ou o valor tira o registro da
+   * contagem na hora. "Documento" e "leitura" (dúvida do OCR) saem quando a
+   * pessoa edita o registro ou clica em "Conferido".
+   */
+  const pendenciasRevisao = (d: { id: string; client: string; document: string; dueDate: string; value: number; phone: string; category: Debtor["category"] }): string[] => {
+    const falta: string[] = [];
+    if (d.client.trim().length < 2) falta.push("cliente");
+    if (!isValidDueDate(d.dueDate)) falta.push("vencimento");
+    if (!(Number(d.value) > 0)) falta.push("valor");
+    if (d.category !== "liquidado" && !normalizarDigitosTelefone(d.phone || "")) falta.push("WhatsApp");
+    if (!conferidosIds.has(d.id)) {
+      if (!d.document.trim() || /^DOC-\d+$/.test(d.document)) falta.push("documento");
+      if (duvidaLeituraIds.has(d.id)) falta.push("leitura");
+    }
+    return falta;
+  };
+  const paraRevisarIds = new Set(extractedDebtors.filter(d => pendenciasRevisao(d).length > 0).map(d => d.id));
+
   // Appends parsed extraction items back to the general central view state
   const sendExtractedToOverview = async (revisaoConfirmada = false) => {
     if (extractedDebtors.length === 0 || !currentOwnerUserId) return;
@@ -1495,7 +1525,7 @@ export default function App() {
     // entram na Visao Geral sem confirmacao. Depois da importacao eles viram
     // devedores cobraveis com id novo do banco, e a marcacao se perde — por
     // isso a revisao tem de acontecer AQUI, enquanto ainda da para distinguir.
-    const duvidosos = toSend.filter(d => lowConfidenceIds.has(d.id));
+    const duvidosos = toSend.filter(d => pendenciasRevisao(d).length > 0);
     if (duvidosos.length > 0 && !revisaoConfirmada) {
       setRevisaoModal({ pending: toSend, duvidosos: duvidosos.length });
       return;
@@ -1553,6 +1583,10 @@ export default function App() {
 
   // Individual editable text change handler on the parsed list
   const updateExtractedField = (id: string, field: keyof Debtor, val: Debtor[keyof Debtor]) => {
+    // Mexeu no registro = olhou para ele: a dúvida de leitura sai da contagem.
+    // O que falta de fato (telefone, vencimento, valor) continua contando até
+    // ser preenchido.
+    setConferidosIds(prev => (prev.has(id) ? prev : new Set(prev).add(id)));
     setExtractedDebtors(prev => prev.map(d => {
       if (d.id === id) {
         return { ...d, [field]: val };
@@ -1629,7 +1663,8 @@ export default function App() {
       setImportFileName("");
       setImportDoc(null);
       setLastExtractionResult(null);
-      setLowConfidenceIds(new Set());
+      setDuvidaLeituraIds(new Set());
+      setConferidosIds(new Set());
       setExtractedSelectedIds(new Set());
       setExtractionAlert("");
     }
@@ -2089,19 +2124,17 @@ export default function App() {
     XLSX.writeFile(wb, fileName);
   };
 
-  // Clear visual matrix debtors
+  // Apaga a carteira inteira — só depois da confirmação (modal excluirConfirm).
   const clearOverviewVision = async () => {
-    if (window.confirm("Você tem certeza de que deseja apagar absolutamente todos os devedores da visão geral?")) {
-      if (!currentOwnerUserId) return;
-      const currentIds = debtors.map((debtor) => debtor.id);
-      setDebtors([]);
-      setSelectedDebtorForMessage(null);
+    if (!currentOwnerUserId) return;
+    const currentIds = debtors.map((debtor) => debtor.id);
+    setDebtors([]);
+    setSelectedDebtorForMessage(null);
 
-      try {
-        await Promise.all(currentIds.map((debtorId) => financeService.remove(currentOwnerUserId, debtorId)));
-      } catch (error) {
-        console.error('[workspace]', error instanceof Error ? error.message : 'Falha ao limpar registros financeiros.');
-      }
+    try {
+      await Promise.all(currentIds.map((debtorId) => financeService.remove(currentOwnerUserId, debtorId)));
+    } catch (error) {
+      console.error('[workspace]', error instanceof Error ? error.message : 'Falha ao limpar registros financeiros.');
     }
   };
 
@@ -3136,11 +3169,11 @@ export default function App() {
                             <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border text-zinc-300 border-zinc-700 bg-zinc-900">
                               {lastExtractionResult.records.length} registro{lastExtractionResult.records.length !== 1 ? "s" : ""}
                             </span>
-                            {lowConfidenceIds.size > 0 && (
+                            {paraRevisarIds.size > 0 && (
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const ids = [...lowConfidenceIds];
+                                  const ids = [...paraRevisarIds];
                                   if (!ids.length) return;
                                   // Cicla pelo próximo item de baixa confiança a cada clique
                                   lowConfCursorRef.current = lowConfCursorRef.current % ids.length;
@@ -3153,7 +3186,7 @@ export default function App() {
                                 className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border text-amber-300 border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 transition-colors cursor-pointer inline-flex items-center gap-1"
                                 title="Ir para o próximo registro a revisar"
                               >
-                                <AlertTriangle className="w-3 h-3" /> {lowConfidenceIds.size} para revisar
+                                <AlertTriangle className="w-3 h-3" /> {paraRevisarIds.size} para revisar
                               </button>
                             )}
                             {lastExtractionResult.missingDocCount > 0 && (
@@ -3199,7 +3232,10 @@ export default function App() {
                           <div className="max-h-[480px] overflow-y-auto divide-y divide-zinc-900">
                             {extractedDebtors.map((item) => {
                               const marcado = extractedSelectedIds.has(item.id);
-                              const revisar = lowConfidenceIds.has(item.id);
+                              const pendencias = pendenciasRevisao(item);
+                              const revisar = pendencias.length > 0;
+                              // Só sobra o que dá para confirmar olhando (documento, dúvida de leitura)?
+                              const soConferir = revisar && pendencias.every(p => p === "documento" || p === "leitura");
                               return (
                                 <div
                                   key={item.id}
@@ -3229,9 +3265,25 @@ export default function App() {
                                       className={`${campo} text-xs font-semibold`}
                                     />
                                     {revisar && (
-                                      <span className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-amber-300" title="A leitura pode ter errado algum campo">
-                                        <AlertTriangle className="w-3 h-3" /> Revisar
-                                      </span>
+                                      soConferir ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => setConferidosIds(prev => new Set(prev).add(item.id))}
+                                          className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border border-amber-500/30 bg-amber-500/10 text-[10px] font-mono uppercase tracking-wider text-amber-300 hover:bg-amber-500/20 transition-colors cursor-pointer"
+                                          title={pendencias.includes("leitura")
+                                            ? "A leitura pode ter errado algum campo. Confira e clique para tirar da revisão."
+                                            : "Sem número de documento: o sistema gerou um. Clique se estiver certo assim."}
+                                        >
+                                          <Check className="w-3 h-3" /> Conferido
+                                        </button>
+                                      ) : (
+                                        <span
+                                          className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-amber-300"
+                                          title="Preencha para tirar da revisão"
+                                        >
+                                          <AlertTriangle className="w-3 h-3" /> Falta {pendencias.filter(p => p !== "documento" && p !== "leitura").join(", ")}
+                                        </span>
+                                      )
                                     )}
                                     <button
                                       onClick={() => removeExtractedRow(item.id)}
@@ -3500,7 +3552,7 @@ export default function App() {
                           <div className="fixed inset-0 z-30 bg-black/50 sm:bg-transparent" onClick={() => setShowMaisCarteira(false)} />
                           <div className="fixed inset-x-3 bottom-3 sm:absolute sm:inset-x-auto sm:bottom-auto sm:top-full sm:mt-2 sm:right-0 z-40 sm:w-56 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden py-1">
                             <button
-                              onClick={() => { setShowMaisCarteira(false); void clearOverviewVision(); }}
+                              onClick={() => { setShowMaisCarteira(false); setExcluirConfirm({ tipo: "todos", total: debtors.length }); }}
                               className="w-full px-4 py-2.5 text-left text-xs text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-2 cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" /> Apagar toda a carteira
@@ -3896,7 +3948,7 @@ export default function App() {
                                     )}
                                     <button
                                       type="button"
-                                      onClick={() => deleteGeneralDebtor(d.id)}
+                                      onClick={() => setExcluirConfirm({ tipo: "um", debtor: d })}
                                       aria-label="Excluir devedor"
                                       className="ml-auto px-2.5 py-2 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer"
                                     >
@@ -4307,7 +4359,7 @@ export default function App() {
                                         Cobrar
                                       </button>
                                       <button
-                                        onClick={() => deleteGeneralDebtor(d.id)}
+                                        onClick={() => setExcluirConfirm({ tipo: "um", debtor: d })}
                                         className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                                         title="Eliminar devedor"
                                       >
@@ -5892,6 +5944,77 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {excluirConfirm && (() => {
+            const todos = excluirConfirm.tipo === "todos";
+            const liberado = !todos || excluirTexto.trim().toUpperCase() === "EXCLUIR";
+            const fechar = () => { setExcluirConfirm(null); setExcluirTexto(""); };
+            const confirmar = () => {
+              if (!liberado) return;
+              if (excluirConfirm.tipo === "um") void deleteGeneralDebtor(excluirConfirm.debtor.id);
+              else void clearOverviewVision();
+              fechar();
+            };
+            return (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+                onMouseDown={e => e.target === e.currentTarget && fechar()}
+                onKeyDown={e => e.key === "Escape" && fechar()}
+              >
+                <div role="alertdialog" aria-modal="true" aria-labelledby="excluir-titulo" className="w-full max-w-sm bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl">
+                  <div className="px-5 pt-5 pb-4 space-y-2">
+                    <h3 id="excluir-titulo" className="text-sm font-bold text-white">
+                      {todos ? `Apagar a carteira inteira (${excluirConfirm.total} clientes)?` : "Excluir este cliente?"}
+                    </h3>
+                    {excluirConfirm.tipo === "um" ? (
+                      <p className="text-xs text-zinc-400 leading-relaxed">
+                        <strong className="text-zinc-200">{excluirConfirm.debtor.client}</strong>
+                        {excluirConfirm.debtor.document ? ` · doc. ${excluirConfirm.debtor.document}` : ""}
+                        {" · "}{excluirConfirm.debtor.value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                        {" "}sai da carteira de vez. Não dá para desfazer.
+                      </p>
+                    ) : (
+                      <>
+                        <p className="text-xs text-zinc-400 leading-relaxed">
+                          Todos os clientes saem da carteira de vez. Não dá para desfazer.
+                        </p>
+                        <label htmlFor="excluir-confirmacao" className="block pt-1 text-[11px] text-zinc-500">
+                          Para confirmar, digite <span className="font-mono text-zinc-300">EXCLUIR</span>
+                        </label>
+                        <input
+                          id="excluir-confirmacao"
+                          autoFocus
+                          autoComplete="off"
+                          value={excluirTexto}
+                          onChange={e => setExcluirTexto(e.target.value)}
+                          onKeyDown={e => e.key === "Enter" && confirmar()}
+                          className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-sm text-white font-mono uppercase focus:outline-none focus:border-rose-500 transition-colors"
+                        />
+                      </>
+                    )}
+                  </div>
+                  <footer className="flex items-center justify-end gap-2 px-5 py-4 border-t border-zinc-800/80">
+                    <button
+                      type="button"
+                      autoFocus={!todos}
+                      onClick={fechar}
+                      className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={confirmar}
+                      disabled={!liberado}
+                      className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold flex items-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> {todos ? "Apagar tudo" : "Excluir"}
+                    </button>
+                  </footer>
+                </div>
+              </div>
+            );
+          })()}
 
           {revisaoModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">

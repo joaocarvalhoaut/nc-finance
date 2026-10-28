@@ -33,6 +33,31 @@ export const PHONE_FORMATTED_RE =
 export const PHONE_PARENS_RE = /\(\d{2}\)[\s-]?\d{8,9}/g;
 
 /**
+ * Telefone com espaço ou ponto entre os grupos, sem hífen — comum em planilha
+ * digitada à mão e em relatório: "77 9 9932 3232", "(77) 99932 3232",
+ * "+55 77 9 9932 3232", "0 77 9932 3232", "77.99932.3232".
+ * Antes nenhum desses era reconhecido no texto corrido, e o relatório inteiro
+ * vinha sem telefone. Exige separador depois do DDD (o número colado já é
+ * coberto pelo PHONE_RE) e não pode estar grudado em outro número, data ou valor.
+ */
+export const PHONE_SPACED_RE =
+  /(?<![\d/,.])(?:\+?\s?55[\s.-]+)?(?:0[\s.-]?)?(?:\(\s*\d{2}\s*\)|\d{2})[\s.-]+(?:9[\s.-]?)?\d{4}[\s.-]?\d{4}(?![\d/,]|\.\d)/g;
+
+/**
+ * Dígitos de um telefone → DDD + número (10 ou 11 dígitos), sem DDI 55 e sem o
+ * 0 de discagem; null se não for um telefone brasileiro com DDD válido.
+ */
+export function normalizarDigitosTelefone(raw: string): string | null {
+  let d = (raw ?? "").replace(/\D/g, "");
+  if (d.startsWith("55") && (d.length === 12 || d.length === 13)) d = d.slice(2);
+  if (d.startsWith("0") && (d.length === 11 || d.length === 12)) d = d.slice(1);
+  if (d.length !== 10 && d.length !== 11) return null;
+  if (!/^[1-9][1-9]/.test(d)) return null; // DDD 11 a 99, sem zero
+  if (d.length === 11 && d[2] !== "9") return null; // 11 dígitos: celular, começa com 9
+  return d;
+}
+
+/**
  * Datas em formatos comuns de relatórios brasileiros e exportações de sistema:
  *   DD/MM/YYYY · DD/MM/YY · DD-MM-YYYY · DD-MM-YY · DD.MM.YYYY · DD.MM.YY ·
  *   YYYY-MM-DD (ISO, comum em CSV exportado por sistemas)
@@ -103,6 +128,16 @@ export function findAllCurrencies(text: string): number[] {
  * Always returns digits only (non-digit chars stripped).
  */
 export function findFirstPhone(text: string): string | null {
+  return findFirstPhoneMatch(text)?.phone ?? null;
+}
+
+/**
+ * Como findFirstPhone, mas diz também ONDE o telefone está no texto. Os
+ * parsers usam a posição para saber onde termina o nome do cliente — procurar
+ * os dígitos com indexOf falhava sempre que o número vinha formatado
+ * ("(77) 99988-7766" não contém "77999887766").
+ */
+export function findFirstPhoneMatch(text: string): { phone: string; start: number; end: number } | null {
   // Build exclusion zones from CNPJ/CPF matches
   const exclusions: Array<[number, number]> = [
     ...text.matchAll(new RegExp(CNPJ_RE.source, "g")),
@@ -124,7 +159,7 @@ export function findFirstPhone(text: string): string | null {
       const phone = (digits.length === 12 || digits.length === 13) && digits.startsWith("55")
         ? digits.slice(2)
         : digits.length > 11 ? digits.slice(digits.length - 11) : digits;
-      if (phone.length >= 10 && phone.length <= 11) return phone;
+      if (phone.length >= 10 && phone.length <= 11) return { phone, start, end };
     }
   }
 
@@ -134,18 +169,29 @@ export function findFirstPhone(text: string): string | null {
     const end = start + m[0].length;
     if (!inExclusion(start, end)) {
       const digits = m[0].replace(/\D/g, "");
-      if (digits.length >= 10 && digits.length <= 11) return digits;
+      if (digits.length >= 10 && digits.length <= 11) return { phone: digits, start, end };
     }
   }
 
-  // Pass 3: raw 10-11 digit sequence (original behaviour)
+  // Pass 3: grupos separados por espaço ou ponto ("77 9 9932 3232") ou
+  // dígitos colados (10-11) — vale o que aparecer primeiro no texto.
+  let melhor: { phone: string; start: number; end: number } | null = null;
+  for (const m of text.matchAll(new RegExp(PHONE_SPACED_RE.source, "g"))) {
+    const start = m.index!;
+    const end = start + m[0].length;
+    if (inExclusion(start, end)) continue;
+    const phone = normalizarDigitosTelefone(m[0]);
+    if (phone) { melhor = { phone, start, end }; break; }
+  }
   for (const m of text.matchAll(new RegExp(PHONE_RE.source, "g"))) {
     const start = m.index!;
     const end = start + m[0].length;
-    if (!inExclusion(start, end)) return m[0];
+    if (inExclusion(start, end)) continue;
+    if (!melhor || start < melhor.start) melhor = { phone: m[0], start, end };
+    break;
   }
 
-  return null;
+  return melhor;
 }
 
 /**
