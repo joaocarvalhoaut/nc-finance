@@ -108,13 +108,24 @@ const fracao = (valores: string[], teste: (s: string) => boolean) =>
 
 // ── Cabeçalho ─────────────────────────────────────────────────────────────────
 
+/**
+ * Pontuação do título para o campo, tolerando as trocas típicas do OCR: I
+ * maiúsculo por l minúsculo ("Vlr" lido "VIr"), 1 por l, 0 por o.
+ */
+function pontuarTitulo(titulo: string, f: Campo): number {
+  const direto = scoreHeader(titulo, f);
+  if (direto > 0 || !/[I10]/.test(titulo)) return direto;
+  const variantes = [titulo.replace(/I/g, "l"), titulo.replace(/1/g, "l"), titulo.replace(/0/g, "o")];
+  return Math.max(0, ...variantes.map((v) => scoreHeader(v, f)));
+}
+
 /** Linha de títulos: 2+ células que, sozinhas, nomeiam um campo, e nenhum dado. */
 export function ehLinhaDeCabecalho(row: string[]): boolean {
   const texto = row.filter(Boolean).join(" ");
   if (!texto || !isHeaderLine(texto)) return false;
   let titulos = 0;
   for (const c of row) {
-    if (c && CAMPOS.some((f) => scoreHeader(c, f) >= 85)) titulos++;
+    if (c && CAMPOS.some((f) => pontuarTitulo(c, f) >= 85)) titulos++;
   }
   return titulos >= 2;
 }
@@ -126,7 +137,7 @@ function mapearPorTitulo(cabecalho: string[], perfis: PerfilColuna[]): Partial<R
   cabecalho.forEach((titulo, c) => {
     if (!titulo) return;
     for (const f of CAMPOS) {
-      const st = scoreHeader(titulo, f);
+      const st = pontuarTitulo(titulo, f);
       if (st < 50) continue;
       const v = fracao(perfis[c].valores, valido[f]) * perfis[c].preenchimento;
       opcoes.push({ c, f, s: st * (0.4 + 0.6 * v) });
@@ -161,9 +172,10 @@ function inferirColuna(f: Campo, livres: number[], cabecalho: string[], perfis: 
     }
     case "value": {
       // Exige centavos ou R$ em boa parte: senão "Dias" (0, 5, 12) virava o valor.
+      // Tolerância para uma célula ilegível (OCR) numa tabela pequena.
       const cands = aptas.filter((c) =>
-        fracao(perfis[c].valores, valido.value) >= 0.8 &&
-        fracao(perfis[c].valores, pareceValor) >= 0.3 &&
+        fracao(perfis[c].valores, valido.value) >= 0.65 &&
+        fracao(perfis[c].valores, pareceValor) >= 0.4 &&
         fracao(perfis[c].valores, pareceTelefone) < 0.5);
       // A mais à esquerda: em relatório, o valor original vem antes de juros e total.
       return cands.length ? Math.min(...cands) : null;
@@ -273,8 +285,13 @@ export function interpretarTabela(rowsBrutas: string[][], duvidosasBrutas?: bool
 
       // Continuação de nome quebrado em duas linhas: só texto na coluna do cliente.
       const soCliente = clienteBruto && row.every((c, i) => !c || i === mapa.client);
+      // Duvidosa: palavra lida com pouca confiança pelo OCR, ou valor/vencimento
+      // preenchido que não deu para ler ("1.18O,35") — nunca vira zero calado.
       const duvidas = duvidasPorLinha.get(row);
-      const linhaDuvidosa = Boolean(duvidas && [...colunasMapeadas].some((c) => duvidas[c]));
+      const linhaDuvidosa =
+        Boolean(duvidas && [...colunasMapeadas].some((c) => duvidas[c])) ||
+        (cel("value") !== "" && valor === null) ||
+        (cel("dueDate") !== "" && dueDate === null);
 
       if (soCliente && anterior && !pareceLinhaDeTotal(clienteBruto)) {
         anterior.client = limparNome(`${anterior.client ?? ""} ${clienteBruto}`);

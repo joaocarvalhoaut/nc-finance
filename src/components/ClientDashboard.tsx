@@ -134,6 +134,10 @@ export default function ClientDashboard({
   const [phoneSuggestIds, setPhoneSuggestIds] = useState<Set<string>>(new Set());
   const [phoneSuggestDismissed, setPhoneSuggestDismissed] = useState(false);
 
+  // Registros lidos com dúvida (OCR incerto, valor ou vencimento ilegível):
+  // marcados na lista para conferir antes de enviar.
+  const [conferirIds, setConferirIds] = useState<Set<string>>(new Set());
+
   // ── PDF attachments (keyed by debtor document number) ────────────────────────
   // Stored locally before send; uploaded to Storage after createMany
   const [attachedPdfs,    setAttachedPdfs]    = useState<Map<string, File>>(new Map());
@@ -292,8 +296,19 @@ export default function ClientDashboard({
         return;
       }
 
+      // A conferir: lido com dúvida, sem valor ou sem vencimento. Sem valor ou
+      // sem vencimento vem desmarcado — não dá para cobrar R$ 0,00.
+      const conferir = new Set<string>();
+      const incompletos = new Set<string>();
+      extraction.records.forEach((r, i) => {
+        const id = extracted[i].id;
+        const incompleto = !(r.value > 0) || !/^\d{2}\/\d{2}\/\d{4}$/.test(r.dueDate);
+        if (incompleto) incompletos.add(id);
+        if (incompleto || r.confidenceScore < 75) conferir.add(id);
+      });
+      setConferirIds(conferir);
       setDebtors(extracted);
-      setSelectedIds(new Set(extracted.map(d => d.id)));
+      setSelectedIds(new Set(extracted.filter(d => !incompletos.has(d.id)).map(d => d.id)));
 
       // Detecta registros sem telefone cujo cliente já está cadastrado
       const suggestIds = new Set<string>();
@@ -834,9 +849,19 @@ export default function ClientDashboard({
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{d.client}</p>
+                      <p className="text-sm font-medium text-white truncate">
+                        {d.client}
+                        {conferirIds.has(d.id) && (
+                          <span
+                            className="ml-2 align-middle text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border text-amber-300 border-amber-500/30 bg-amber-500/10"
+                            title="Lido com dúvida ou incompleto: confira documento, vencimento e valor antes de enviar"
+                          >
+                            conferir
+                          </span>
+                        )}
+                      </p>
                       <p className="text-xs text-zinc-500 truncate">
-                        Doc: {d.document} · Venc: {d.dueDate}
+                        Doc: {d.document} · Venc: {d.dueDate || "—"}
                       </p>
                       {/* PDF attachment inline */}
                       {!isLiquidacao && (() => {

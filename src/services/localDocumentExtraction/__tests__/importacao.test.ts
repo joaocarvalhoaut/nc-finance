@@ -197,6 +197,27 @@ const lidaPorOcr = interpretarTabela(
 );
 eq(lidaPorOcr.candidates.map((c) => c.confidenceScore < 75), [true, false], "célula duvidosa do OCR manda o registro para revisão");
 
+// Caso real do OCR: título "Vlr" lido "VIr", valor "1.180,35" lido "1180/35" e
+// um valor ilegível. Antes os três valores saíam R$ 0,00 sem aviso.
+eq(parseMoney("1180/35"), 1180.35, "barra no lugar da vírgula (OCR)");
+const ocrReal = interpretarTabela([
+  ["Sacado", "Fone", "Título", "Vencto", "VIr"],
+  ["MARIA DA CONCEIÇÃO", "(21) 98123-4567", "5521-1", "15/09/2026", "420,00"],
+  ["PADARIA PÃO QUENTE", "21 3555-1234", "5522-1", "18/09/2026", "1180/35"],
+  ["OFICINA DO JOSÉ", "(21) 99777-1100", "5530-3", "20/09/2026", "2.99O,0O"],
+]);
+eq(ocrReal.candidates.map((c) => c.value), [420, 1180.35, null], "“VIr” reconhecido como valor");
+eq(ocrReal.candidates.map((c) => c.confidenceScore < 75), [false, false, true], "valor ilegível vai para revisão, não vira zero calado");
+
+// A disputa tabela × texto não pode ser decidida pela marcação de revisão.
+const docOcr = interpretarDocumento({
+  nomeArquivo: "scan.pdf", tipo: "pdf-ocr", avisos: [],
+  tabelas: [{ origem: "pdf", rows: [["Cliente", "Documento", "Vencimento", "Valor"], ["MARIA SOUZA", "55211", "15/09/2026", "420,00"], ["JOSE LIMA", "5522-1", "18/09/2026", "80,00"]], duvidosas: [[false, false, false, false], [false, true, false, false], [false, false, false, false]] }],
+  texto: "Cliente Documento Vencimento Valor\nMARIA SOUZA 55211 15/09/2026 420,00\nJOSE LIMA 5522-1 18/09/2026 80,00",
+});
+assert(docOcr.method === "tabela-pdf-ocr", `tabela continua escolhida com registro a revisar (got ${docOcr.method})`);
+eq(docOcr.records.map((r) => r.confidenceScore < 75), [true, false], "a marcação de revisão chega ao resultado");
+
 console.log(`\n${"═".repeat(62)}`);
 console.log(`  Tests: ${passed + failed}  ✓ passed: ${passed}  ✗ failed: ${failed}`);
 console.log(`${"═".repeat(62)}\n`);

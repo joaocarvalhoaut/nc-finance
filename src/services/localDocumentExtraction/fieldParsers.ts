@@ -118,6 +118,8 @@ export function dataComparavel(dataBR: string): number {
 export function parseMoney(raw: string): number | null {
   const s = (raw ?? "")
     .replace(/ /g, " ")
+    // OCR lê a vírgula dos centavos como barra: "1180/35" é 1.180,35.
+    .replace(/^([\d.\s]+)\/(\d{2})$/, "$1,$2")
     .replace(/R\$|BRL|reais/gi, "")
     .replace(/\s+[DC]$/i, "")
     .replace(/[()\s-]/g, "")

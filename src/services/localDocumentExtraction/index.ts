@@ -18,6 +18,7 @@ import {
   parseErpFormat,
   parseDelimitedFormat,
   parseLineByLine,
+  score,
   RecordCandidate,
   BANK_INSTITUTION_KEYWORDS,
 } from "./heuristics";
@@ -153,8 +154,13 @@ function heuristicasDeTexto(text: string): { candidates: RecordCandidate[]; meth
   return { candidates: parseLineByLine(text), method: "line-by-line" };
 }
 
-/** Soma das notas: favorece a leitura que achou mais registros E mais completos. */
-const qualidade = (cs: RecordCandidate[]) => cs.reduce((s, c) => s + c.confidenceScore, 0);
+/**
+ * Soma das notas de PRESENÇA dos campos: favorece a leitura que achou mais
+ * registros e mais completos. Usa score() e não confidenceScore, que na tabela
+ * já vem rebaixado nos registros a revisar (OCR duvidoso) — senão a tabela
+ * perdia para o texto justamente quando tinha algo a avisar.
+ */
+const qualidade = (cs: RecordCandidate[]) => cs.reduce((s, c) => s + score(c), 0);
 
 const ROTULO_TIPO: Record<TipoDocumento | "colado", string> = {
   planilha: "Planilha",
