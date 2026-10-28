@@ -99,7 +99,8 @@ import {
   Eye,
   ChevronDown,
   UserCheck,
-  HardDrive
+  HardDrive,
+  Menu
 } from "lucide-react";
 
 // Default Pattern message templates following user specification
@@ -401,6 +402,9 @@ export default function App() {
   // Carteira: encargos (multa/juros) e "mais ações" abrem no lugar, sem ocupar a tela.
   const [showEncargos, setShowEncargos] = useState(false);
   const [showMaisCarteira, setShowMaisCarteira] = useState(false);
+  // Celular: gaveta de navegação e cartão da carteira aberto para edição.
+  const [menuMobileAberto, setMenuMobileAberto] = useState(false);
+  const [cartaoAbertoId, setCartaoAbertoId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [repFilter, setRepFilter] = useState<string>("all");
@@ -1258,6 +1262,33 @@ export default function App() {
   };
 
   // Build simulated message template replacements dynamically
+  // Confirma o valor digitado na Carteira — tabela e cartões do celular usam a
+  // mesma regra (vírgula nos centavos, valor positivo, aviso por registro).
+  const confirmarValorEditado = (d: Debtor) => {
+    setEditingValueDebtorId(null);
+    const amount = parseManualAmount(editingValueText);
+    if (Number.isNaN(amount)) {
+      // Identifica a linha: sem isso o usuario nao descobre
+      // qual edicao foi descartada.
+      const alvo = d.client || d.document || "registro";
+      // Ponto no lugar da virgula e o erro mais comum (teclado
+      // numerico, colagem de planilha). O valor segue recusado,
+      // porque 1.25 e ambiguo com 1.250 — mas em vez de repetir
+      // a regra generica, mostramos a forma ja corrigida.
+      const bruto = editingValueText.trim();
+      const pontoDecimal = /^\d+\.\d{1,2}$/.test(bruto);
+      setDebtorSaveError(
+        pontoDecimal
+          ? `Valor nao salvo em "${alvo}": use virgula para os centavos — ${bruto.replace(".", ",")}.`
+          : `Valor nao salvo em "${alvo}": use um valor positivo, como 1.250,00.`
+      );
+      return;
+    }
+    // Sem isto o alerta ficava na tela para sempre, ate recarregar.
+    setDebtorSaveError("");
+    void saveDebtorFieldToDB(d.id, amount);
+  };
+
   const buildMessageText = (debtor: Debtor, tone: MessageTone): string => {
     const pat = patternTemplates.find(p => p.id === tone);
     if (!pat) return "";
@@ -2382,12 +2413,24 @@ export default function App() {
             onSupportClick={() => setShowSuporte(true)}
             userLabel={account?.displayName || "Conta autenticada"}
             userEmail={account?.email || user?.email || ""}
+            mobileOpen={menuMobileAberto}
+            onMobileClose={() => setMenuMobileAberto(false)}
           />
 
-          <main className="transition-all duration-300 pl-14 md:pl-16 min-h-screen flex flex-col justify-between">
+          <main className="transition-all duration-300 pl-0 md:pl-16 min-h-screen flex flex-col justify-between">
             
             <div className="border-b border-zinc-800/60 bg-zinc-950 p-4 sticky top-0 z-20 flex flex-wrap gap-4 items-center justify-between">
               <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setMenuMobileAberto(true)}
+                  aria-label="Abrir menu"
+                  aria-controls="sidebar"
+                  aria-expanded={menuMobileAberto}
+                  className="md:hidden -ml-1 w-10 h-10 flex items-center justify-center rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors cursor-pointer"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
                 <h2 className="text-lg font-bold text-white">
                   {currentTab === "cobrar"     && "Enviar Cobranças"}
                   {currentTab === "dashboard"  && "Dashboard & Métricas"}
@@ -3275,7 +3318,7 @@ export default function App() {
                       Configurações (encargos, responsáveis) viram botões que abrem
                       no lugar, para a tabela ser o foco da tela. */}
                   <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 flex-1 min-w-[200px] focus-within:border-zinc-600">
+                    <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 w-full sm:w-auto sm:flex-1 sm:min-w-[200px] focus-within:border-zinc-600">
                       <Search className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
                       <input aria-label="Buscar por cliente ou documento"
                         type="text"
@@ -3302,8 +3345,8 @@ export default function App() {
                       </button>
                       {showEncargos && (
                         <>
-                          <div className="fixed inset-0 z-30" onClick={() => setShowEncargos(false)} />
-                          <div className="absolute left-0 top-full mt-2 z-40 w-72 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl p-4 space-y-3">
+                          <div className="fixed inset-0 z-30 bg-black/50 sm:bg-transparent" onClick={() => setShowEncargos(false)} />
+                          <div className="fixed inset-x-3 bottom-3 sm:absolute sm:inset-x-auto sm:bottom-auto sm:top-full sm:mt-2 sm:left-0 z-40 sm:w-72 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl p-4 space-y-3">
                             <div>
                               <p className="text-xs font-bold text-white">Encargos dos vencidos</p>
                               <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">Multa aplicada uma vez e juros por dia de atraso, para toda a carteira.</p>
@@ -3359,8 +3402,8 @@ export default function App() {
 
                       {showExportMenu && (
                         <>
-                          <div className="fixed inset-0 z-30" onClick={() => setShowExportMenu(false)} />
-                          <div className="absolute right-0 top-full mt-2 z-40 w-60 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden py-1">
+                          <div className="fixed inset-0 z-30 bg-black/50 sm:bg-transparent" onClick={() => setShowExportMenu(false)} />
+                          <div className="fixed inset-x-3 bottom-3 sm:absolute sm:inset-x-auto sm:bottom-auto sm:top-full sm:mt-2 sm:right-0 z-40 sm:w-60 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden py-1">
                             <button
                               onClick={() => { setShowExportMenu(false); downloadExcelFormat(); }}
                               className="w-full px-4 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-900 transition-colors flex items-center gap-2 cursor-pointer"
@@ -3412,8 +3455,8 @@ export default function App() {
                       </button>
                       {showMaisCarteira && (
                         <>
-                          <div className="fixed inset-0 z-30" onClick={() => setShowMaisCarteira(false)} />
-                          <div className="absolute right-0 top-full mt-2 z-40 w-56 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden py-1">
+                          <div className="fixed inset-0 z-30 bg-black/50 sm:bg-transparent" onClick={() => setShowMaisCarteira(false)} />
+                          <div className="fixed inset-x-3 bottom-3 sm:absolute sm:inset-x-auto sm:bottom-auto sm:top-full sm:mt-2 sm:right-0 z-40 sm:w-56 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden py-1">
                             <button
                               onClick={() => { setShowMaisCarteira(false); void clearOverviewVision(); }}
                               className="w-full px-4 py-2.5 text-left text-xs text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-2 cursor-pointer"
@@ -3440,7 +3483,7 @@ export default function App() {
                           Limpar seleção
                         </button>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                         {plan === "basic" && (
                           <span className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded font-mono">
                             Plano Basic → upgrade para Pro/Premium
@@ -3581,7 +3624,253 @@ export default function App() {
                   {debtorSaveError && (
                     <p role="alert" className="text-sm text-rose-400 mb-3">{debtorSaveError}</p>
                   )}
-                  <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden">
+                  {/* ── Celular: cartões no lugar da tabela de 13 colunas ─────
+                      Resumo à vista (cliente, valor, vencimento, situação);
+                      tocar abre a edição no próprio cartão. */}
+                  {(() => {
+                    const todosMarcados = filteredDebtors.length > 0 && filteredDebtors.every(d => selectedDebtorIds.has(d.id));
+                    const ordem = sortValueOrder === "desc" ? "valor_desc" : sortValueOrder === "asc" ? "valor_asc"
+                      : sortDateOrder === "asc" ? "venc_asc" : sortDateOrder === "desc" ? "venc_desc"
+                      : sortNameOrder === "desc" ? "nome_desc" : "nome_asc";
+                    const mudarOrdem = (v: string) => {
+                      setSortBankOrder("none");
+                      setSortNameOrder(v === "nome_desc" ? "desc" : v === "nome_asc" ? "asc" : "none");
+                      setSortDateOrder(v === "venc_asc" ? "asc" : v === "venc_desc" ? "desc" : "none");
+                      setSortValueOrder(v === "valor_desc" ? "desc" : v === "valor_asc" ? "asc" : "none");
+                    };
+                    const rotuloCampo = "block mb-1 text-[10px] font-mono uppercase tracking-widest text-zinc-500";
+                    const campoCartao = "w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500";
+                    const filtroCls = "bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-2 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600";
+                    return (
+                      <div className="md:hidden space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <select aria-label="Filtrar por tipo" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={filtroCls}>
+                            <option value="all">Todos os tipos</option>
+                            <option value="vencidos">Vencidos</option>
+                            <option value="a_vencer">A vencer</option>
+                            <option value="recompra">Recompra</option>
+                            <option value="liquidado">Liquidados</option>
+                            <option value="desabilitado">Desabilitados</option>
+                          </select>
+                          <select aria-label="Ordenar" value={ordem} onChange={(e) => mudarOrdem(e.target.value)} className={filtroCls}>
+                            <option value="nome_asc">Nome A→Z</option>
+                            <option value="nome_desc">Nome Z→A</option>
+                            <option value="venc_asc">Vencimento mais antigo</option>
+                            <option value="venc_desc">Vencimento mais novo</option>
+                            <option value="valor_desc">Maior valor</option>
+                            <option value="valor_asc">Menor valor</option>
+                          </select>
+                        </div>
+                        <div className="flex items-center justify-between px-1 py-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDebtorIds(todosMarcados ? new Set() : new Set(filteredDebtors.map(d => d.id)));
+                              setBatchSendResult(null);
+                            }}
+                            className="flex items-center gap-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
+                          >
+                            {todosMarcados ? <CheckSquare className="w-4 h-4 text-emerald-400" /> : <Square className="w-4 h-4" />}
+                            {todosMarcados ? "Desmarcar todos" : "Selecionar todos"}
+                          </button>
+                          <span className="text-[11px] font-mono text-zinc-500">{filteredDebtors.length} título(s)</span>
+                        </div>
+
+                        {filteredDebtors.length === 0 ? (
+                          <p className="rounded-xl border border-zinc-800 px-4 py-10 text-center text-sm text-zinc-500">
+                            Nenhum devedor com esses filtros.
+                          </p>
+                        ) : filteredDebtors.map((d) => {
+                          const aberto = cartaoAbertoId === d.id;
+                          const marcado = selectedDebtorIds.has(d.id);
+                          const corrigido = d.updatedValue && Math.abs(d.updatedValue - d.value) >= 0.01 ? d.updatedValue : null;
+                          return (
+                            <article
+                              key={d.id}
+                              className={`rounded-xl border transition-colors ${marcado ? "border-emerald-500/40 bg-emerald-500/10" : "border-zinc-800 bg-zinc-950"}`}
+                            >
+                              <div className="flex items-start gap-3 p-3">
+                                <button
+                                  type="button"
+                                  aria-label={marcado ? `Desmarcar ${d.client}` : `Selecionar ${d.client}`}
+                                  aria-pressed={marcado}
+                                  onClick={() => {
+                                    setBatchSendResult(null);
+                                    setSelectedDebtorIds((prev) => {
+                                      const next = new Set(prev);
+                                      next.has(d.id) ? next.delete(d.id) : next.add(d.id);
+                                      return next;
+                                    });
+                                  }}
+                                  className="mt-0.5 -m-1 p-1 text-zinc-500 hover:text-emerald-400 cursor-pointer"
+                                >
+                                  {marcado ? <CheckSquare className="w-5 h-5 text-emerald-400" /> : <Square className="w-5 h-5" />}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setCartaoAbertoId(aberto ? null : d.id)}
+                                  aria-expanded={aberto}
+                                  className="min-w-0 flex-1 text-left cursor-pointer"
+                                >
+                                  <span className="flex items-start justify-between gap-3">
+                                    <span className="text-sm font-semibold text-white truncate">{d.client || "Sem nome"}</span>
+                                    <span className="text-sm font-mono text-white tabular-nums flex-shrink-0">{formatBRL(d.value)}</span>
+                                  </span>
+                                  <span className="mt-0.5 flex items-start justify-between gap-3 text-[11px] text-zinc-500">
+                                    <span className="font-mono truncate">{d.document || "—"} · {d.dueDate || "sem vencimento"}</span>
+                                    {corrigido !== null && <span className="font-mono flex-shrink-0">corrigido {formatBRL(corrigido)}</span>}
+                                  </span>
+                                  <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${CATEGORY_BADGE[d.category]}`}>{CATEGORY_LABEL[d.category]}</span>
+                                    {d.phone
+                                      ? <span className="text-[11px] font-mono text-zinc-400">{d.phone}</span>
+                                      : <span className="text-[11px] text-amber-400">sem WhatsApp</span>}
+                                    {d.driveFileId && <span className="text-[11px] text-emerald-400">boleto anexado</span>}
+                                    {d.notes && <MessageSquare className="w-3.5 h-3.5 text-amber-300" aria-label="Tem observação" />}
+                                  </span>
+                                </button>
+                              </div>
+
+                              {aberto && (
+                                <div className="border-t border-zinc-800/80 p-3 space-y-3">
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div className="col-span-2">
+                                      <label htmlFor={`c-cli-${d.id}`} className={rotuloCampo}>Cliente</label>
+                                      <input id={`c-cli-${d.id}`} value={d.client}
+                                        onChange={(e) => updateDebtorFieldLocal(d.id, "client", e.target.value)}
+                                        onBlur={() => saveDebtorFieldToDB(d.id)} className={campoCartao} />
+                                    </div>
+                                    <div>
+                                      <label htmlFor={`c-doc-${d.id}`} className={rotuloCampo}>Documento</label>
+                                      <input id={`c-doc-${d.id}`} value={d.document}
+                                        onChange={(e) => updateDebtorFieldLocal(d.id, "document", e.target.value)}
+                                        onBlur={() => saveDebtorFieldToDB(d.id)} className={`${campoCartao} font-mono`} />
+                                    </div>
+                                    <div>
+                                      <label htmlFor={`c-venc-${d.id}`} className={rotuloCampo}>Vencimento</label>
+                                      <input id={`c-venc-${d.id}`} value={d.dueDate} inputMode="numeric" placeholder="DD/MM/AAAA"
+                                        onChange={(e) => updateDebtorFieldLocal(d.id, "dueDate", e.target.value)}
+                                        onBlur={() => saveDebtorFieldToDB(d.id)} className={`${campoCartao} font-mono`} />
+                                    </div>
+                                    <div>
+                                      <label htmlFor={`c-tel-${d.id}`} className={rotuloCampo}>WhatsApp</label>
+                                      <input id={`c-tel-${d.id}`} value={d.phone || ""} inputMode="tel" placeholder="5577999998888"
+                                        onChange={(e) => updateDebtorFieldLocal(d.id, "phone", e.target.value)}
+                                        onBlur={() => saveDebtorFieldToDB(d.id)} className={`${campoCartao} font-mono`} />
+                                    </div>
+                                    <div>
+                                      <label htmlFor={`c-valor-${d.id}`} className={rotuloCampo}>Valor (R$)</label>
+                                      <input id={`c-valor-${d.id}`} inputMode="decimal"
+                                        value={editingValueDebtorId === d.id
+                                          ? editingValueText
+                                          : d.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        onFocus={() => { setEditingValueDebtorId(d.id); setEditingValueText(d.value.toLocaleString("pt-BR", { useGrouping: false, minimumFractionDigits: 2, maximumFractionDigits: 2 })); }}
+                                        onChange={(e) => setEditingValueText(e.target.value)}
+                                        onBlur={() => confirmarValorEditado(d)}
+                                        className={`${campoCartao} font-mono text-right`} />
+                                    </div>
+                                    <div>
+                                      <label htmlFor={`c-tipo-${d.id}`} className={rotuloCampo}>Tipo</label>
+                                      <select id={`c-tipo-${d.id}`} value={d.category} disabled={d.category === "desabilitado"}
+                                        onChange={(e) => updateGeneralDebtorField(d.id, "category", e.target.value as Debtor["category"])}
+                                        className={campoCartao}>
+                                        {d.category === "desabilitado" && <option value="desabilitado">{CATEGORY_LABEL.desabilitado}</option>}
+                                        {CATEGORY_CYCLE.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label htmlFor={`c-banco-${d.id}`} className={rotuloCampo}>Banco</label>
+                                      <input id={`c-banco-${d.id}`} value={d.bank || ""} placeholder="—"
+                                        onChange={(e) => updateDebtorFieldLocal(d.id, "bank", e.target.value)}
+                                        onBlur={() => saveDebtorFieldToDB(d.id)} className={campoCartao} />
+                                    </div>
+                                    <div className="col-span-2">
+                                      <label htmlFor={`c-resp-${d.id}`} className={rotuloCampo}>Responsável</label>
+                                      <select id={`c-resp-${d.id}`} value={d.representativeId || ""}
+                                        onChange={(e) => updateGeneralDebtorField(d.id, "representativeId", e.target.value || undefined)}
+                                        className={campoCartao}>
+                                        <option value="">Não atribuído</option>
+                                        {representatives.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                      </select>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => { setSelectedDebtorForMessage(d); setCurrentTab("cobranca"); }}
+                                      className="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                                    >
+                                      <SendHorizonal className="w-3.5 h-3.5" /> Cobrar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setNotesPopover({ debtorId: d.id, draft: d.notes || "" })}
+                                      className={`px-3 py-2 rounded-lg border text-xs inline-flex items-center gap-1.5 cursor-pointer ${d.notes ? "border-amber-400/40 text-amber-300" : "border-zinc-800 text-zinc-300"}`}
+                                    >
+                                      <MessageSquare className="w-3.5 h-3.5" /> {d.notes ? "Ver nota" : "Nota"}
+                                    </button>
+                                    {uploadingPdfDebtorId === d.id ? (
+                                      <span className="px-3 py-2 text-xs text-zinc-400 inline-flex items-center gap-1.5">
+                                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" /> Enviando…
+                                      </span>
+                                    ) : d.driveFileId ? (
+                                      <>
+                                        {d.driveFileUrl && (
+                                          <button
+                                            type="button"
+                                            onClick={() => openPdfPreview(d.driveFileUrl!, d.driveFileName || "boleto.pdf")}
+                                            className="px-3 py-2 rounded-lg border border-zinc-800 text-xs text-emerald-400 inline-flex items-center gap-1.5 cursor-pointer"
+                                          >
+                                            <Eye className="w-3.5 h-3.5" /> Boleto
+                                          </button>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => void handlePdfRemove(d.id)}
+                                          aria-label="Remover boleto"
+                                          className="px-2.5 py-2 rounded-lg border border-zinc-800 text-xs text-zinc-500 hover:text-rose-400 cursor-pointer"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <label htmlFor={`pdf-card-${d.id}`} className="px-3 py-2 rounded-lg border border-zinc-800 text-xs text-zinc-300 inline-flex items-center gap-1.5 cursor-pointer">
+                                          <Upload className="w-3.5 h-3.5" /> Anexar boleto
+                                        </label>
+                                        <input
+                                          id={`pdf-card-${d.id}`}
+                                          type="file"
+                                          accept=".pdf,application/pdf"
+                                          className="hidden"
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) void handlePdfUpload(d.id, file);
+                                            e.target.value = "";
+                                          }}
+                                        />
+                                      </>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteGeneralDebtor(d.id)}
+                                      aria-label="Excluir devedor"
+                                      className="ml-auto px-2.5 py-2 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </article>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
+                  <div className="hidden md:block bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden">
                     <div
                       ref={tableScrollRef}
                       className="overflow-x-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900 cursor-grab active:cursor-grabbing select-none"
@@ -3844,30 +4133,7 @@ export default function App() {
                                         onChange={(e) => {
                                           setEditingValueText(e.target.value);
                                         }}
-                                        onBlur={() => {
-                                          setEditingValueDebtorId(null);
-                                          const amount = parseManualAmount(editingValueText);
-                                          if (Number.isNaN(amount)) {
-                                            // Identifica a linha: sem isso o usuario nao descobre
-                                            // qual edicao foi descartada.
-                                            const alvo = d.client || d.document || "registro";
-                                            // Ponto no lugar da virgula e o erro mais comum (teclado
-                                            // numerico, colagem de planilha). O valor segue recusado,
-                                            // porque 1.25 e ambiguo com 1.250 — mas em vez de repetir
-                                            // a regra generica, mostramos a forma ja corrigida.
-                                            const bruto = editingValueText.trim();
-                                            const pontoDecimal = /^\d+\.\d{1,2}$/.test(bruto);
-                                            setDebtorSaveError(
-                                              pontoDecimal
-                                                ? `Valor nao salvo em "${alvo}": use virgula para os centavos — ${bruto.replace(".", ",")}.`
-                                                : `Valor nao salvo em "${alvo}": use um valor positivo, como 1.250,00.`
-                                            );
-                                            return;
-                                          }
-                                          // Sem isto o alerta ficava na tela para sempre, ate recarregar.
-                                          setDebtorSaveError("");
-                                          void saveDebtorFieldToDB(d.id, amount);
-                                        }}
+                                        onBlur={() => confirmarValorEditado(d)}
                                         onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
                                         className="w-24 text-right bg-transparent focus:bg-zinc-950 rounded p-1 font-mono text-xs"
                                       />

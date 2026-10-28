@@ -25,6 +25,9 @@ interface SidebarProps {
   onSupportClick?: () => void;
   userLabel?: string;
   userEmail?: string;
+  /** Celular: a barra some e vira gaveta, aberta pelo botão de menu do topo. */
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 export default function Sidebar({
@@ -35,7 +38,9 @@ export default function Sidebar({
   onLoginClick,
   onSupportClick,
   userLabel = "Conta autenticada",
-  userEmail = ""
+  userEmail = "",
+  mobileOpen = false,
+  onMobileClose,
 }: SidebarProps) {
   const [isPinned, setIsPinned] = useState(false);
 
@@ -59,16 +64,20 @@ export default function Sidebar({
   const handleItemClick = (id: string) => {
     if (id.startsWith("separator")) return;
     onTabChange(id);
+    onMobileClose?.();
   };
 
-  const isExpanded = isPinned;
+  // Gaveta aberta no celular mostra os nomes, como a barra expandida.
+  const isExpanded = isPinned || mobileOpen;
+  const fechar = () => { setIsPinned(false); onMobileClose?.(); };
 
   return (
     <>
       {/* Main Container */}
       <aside
         id="sidebar"
-        className={`fixed top-0 left-0 h-full z-40 bg-zinc-950 border-r border-emerald-500/20 text-white flex flex-col justify-between shadow-[4px_0_24px_rgba(0,0,0,0.8)] transition-all duration-300`}
+        className={`fixed top-0 left-0 h-full z-40 bg-zinc-950 border-r border-emerald-500/20 text-white flex flex-col justify-between shadow-[4px_0_24px_rgba(0,0,0,0.8)] transition-all duration-300
+          ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
         style={{ width: isExpanded ? "240px" : "56px" }}
       >
         {/* Brand */}
@@ -89,7 +98,7 @@ export default function Sidebar({
                 aria-expanded={true}
                 aria-controls="nc-navigation"
                 aria-label="Recolher menu"
-                onClick={() => setIsPinned(false)}
+                onClick={fechar}
                 className="w-11 h-11 -mr-2 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-900 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
               >
                 <PanelLeftClose className="w-4 h-4" />
@@ -240,7 +249,7 @@ export default function Sidebar({
       {isExpanded && (
         <div
           className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-30 transition-opacity md:hidden"
-          onClick={() => setIsPinned(false)}
+          onClick={fechar}
         />
       )}
     </>
