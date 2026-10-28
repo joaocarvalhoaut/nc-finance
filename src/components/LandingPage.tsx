@@ -12,7 +12,6 @@ import {
   ChevronDown,
   FileText,
   FolderSearch,
-  QrCode,
   X,
 } from "lucide-react";
 import type { AuthCredentials, SignUpPayload } from "../types";
@@ -50,8 +49,8 @@ const TONS: Array<{ id: Tom; nome: string }> = [
   { id: "juridico", nome: "Jurídico" },
 ];
 
-// Exemplo fictício para o simulador.
-const EXEMPLO = { cliente: "Carlos", empresa: "Móveis Silva", documento: "1082-3", vencimento: "20/10/2026", valor: "1.849,90", dias: 7 };
+// Exemplo fictício para o simulador e os pedaços do produto.
+const EXEMPLO = { cliente: "Carlos", nomeCompleto: "Carlos Mendes", empresa: "Móveis Silva", documento: "1082-3", vencimento: "20/10/2026", valor: "1.849,90", dias: 7 };
 
 /**
  * Mensagens padrão de cada tom — espelha DEFAULT_PATTERNS (App.tsx), com a
@@ -71,9 +70,11 @@ const mensagemDoTom = (tom: Tom): string => {
   }
 };
 
-const ICONES_DIFERENCIAIS = [QrCode, FolderSearch, CalendarClock];
-
 const rotulo = "text-[10px] font-mono uppercase tracking-widest text-zinc-500";
+// Peso máximo só no título principal (h1); os das seções ficam em bold.
+const titulo2 = "text-3xl sm:text-4xl font-bold text-white tracking-tight text-balance";
+// Fundo um pouco mais claro em seções alternadas: dá ritmo sem depender só das linhas.
+const secaoClara = "bg-zinc-900/40 border-y border-zinc-800/60";
 const botaoPrimario = "inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-bold transition-colors cursor-pointer";
 const botaoSecundario = "inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white font-semibold transition-colors cursor-pointer";
 
@@ -146,8 +147,10 @@ export default function LandingPage({
         <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 pb-16 sm:pb-20 grid lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-7 text-center lg:text-left">
             <p className={`${rotulo} text-emerald-400`}>Software de cobrança pelo WhatsApp</p>
-            <h1 className="mt-4 text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-[1.05] tracking-tight">
-              Cobre seus clientes pelo WhatsApp, no automático.
+            {/* Quebras fixas: "no automático." nunca fica partido entre linhas. */}
+            <h1 className="mt-4 text-4xl sm:text-5xl xl:text-6xl font-black text-white leading-[1.05] tracking-tight">
+              Cobre seus clientes{" "}<br className="hidden sm:block" />pelo WhatsApp,{" "}<br />
+              <span className="text-emerald-400 whitespace-nowrap">no automático.</span>
             </h1>
             <p className="mt-6 text-base sm:text-lg text-zinc-400 leading-relaxed max-w-xl mx-auto lg:mx-0">
               Importe a lista de quem está em atraso, revise e envie do seu próprio número de WhatsApp, com o boleto anexado.
@@ -179,14 +182,16 @@ export default function LandingPage({
         {/* ── Como funciona ───────────────────────────────────────────────── */}
         <section id="como-funciona" aria-labelledby="titulo-como-funciona" className="scroll-mt-20 max-w-6xl mx-auto px-4 sm:px-6 py-20">
           <div className="max-w-2xl">
-            <h2 id="titulo-como-funciona" className="text-3xl sm:text-4xl font-black text-white tracking-tight">Como funciona</h2>
+            <h2 id="titulo-como-funciona" className={titulo2}>Como funciona</h2>
             <p className="mt-4 text-zinc-400 leading-relaxed">{DEFINICAO}</p>
           </div>
-          <ol className="mt-12 grid md:grid-cols-3 gap-4">
+          {/* Passos numa linha só, sem caixas: o traço verde marca cada etapa. */}
+          <ol className="mt-12 grid md:grid-cols-3 gap-x-10 gap-y-10">
             {PASSOS.map((p, i) => (
-              <li key={p.titulo} className="bg-zinc-950 border border-zinc-800 rounded-xl p-6">
-                <span className="font-mono text-xs text-emerald-400">{String(i + 1).padStart(2, "0")}</span>
-                <h3 className="mt-3 text-lg font-bold text-white">{p.titulo}</h3>
+              <li key={p.titulo} className="relative border-t border-zinc-800 pt-6">
+                <span className="absolute -top-px left-0 h-px w-10 bg-emerald-400" aria-hidden="true" />
+                <span className="font-mono text-sm text-emerald-400">{String(i + 1).padStart(2, "0")}</span>
+                <h3 className="mt-2 text-lg font-semibold text-white">{p.titulo}</h3>
                 <p className="mt-2 text-sm text-zinc-400 leading-relaxed">{p.texto}</p>
               </li>
             ))}
@@ -194,10 +199,10 @@ export default function LandingPage({
         </section>
 
         {/* ── Como a mensagem chega ───────────────────────────────────────── */}
-        <section id="mensagem" aria-labelledby="titulo-mensagem" className="scroll-mt-20 border-t border-zinc-900">
+        <section id="mensagem" aria-labelledby="titulo-mensagem" className={`scroll-mt-20 ${secaoClara}`}>
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20 grid lg:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 id="titulo-mensagem" className="text-3xl sm:text-4xl font-black text-white tracking-tight">Veja como a mensagem chega</h2>
+              <h2 id="titulo-mensagem" className={titulo2}>Veja como a mensagem chega</h2>
               <p className="mt-4 text-zinc-400 leading-relaxed">
                 O cliente recebe do seu número, assinada com o nome da sua empresa, com os dados do título e o boleto em PDF. Escolha o tom de acordo com o atraso e o relacionamento — o texto pode ser ajustado antes de cada envio.
               </p>
@@ -254,18 +259,21 @@ export default function LandingPage({
         </section>
 
         {/* ── Diferenciais ────────────────────────────────────────────────── */}
-        <section id="recursos" aria-labelledby="titulo-recursos" className="scroll-mt-20 border-t border-zinc-900">
+        <section id="recursos" aria-labelledby="titulo-recursos" className="scroll-mt-20">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
-            <h2 id="titulo-recursos" className="text-3xl sm:text-4xl font-black text-white tracking-tight max-w-2xl">O que faz diferença no dia a dia</h2>
-            <div className="mt-12 grid md:grid-cols-3 gap-4">
+            <h2 id="titulo-recursos" className={`${titulo2} max-w-2xl`}>O que faz diferença no dia a dia</h2>
+            {/* Linhas alternadas: texto de um lado, um pedaço da tela do produto do outro. */}
+            <div className="mt-14 space-y-16 md:space-y-20">
               {DIFERENCIAIS.map((d, i) => {
-                const Icone = ICONES_DIFERENCIAIS[i] ?? CheckCircle2;
+                const Visual = VISUAIS_DIFERENCIAIS[i];
                 return (
-                  <article key={d.titulo} className="bg-zinc-950 border border-zinc-800 rounded-xl p-6 flex flex-col">
-                    <Icone className="w-5 h-5 text-emerald-400" aria-hidden="true" />
-                    <h3 className="mt-4 text-lg font-bold text-white">{d.titulo}</h3>
-                    <p className="mt-2 text-sm text-zinc-400 leading-relaxed flex-1">{d.texto}</p>
-                    <p className={`${rotulo} mt-5`}>{d.planos}</p>
+                  <article key={d.titulo} className="grid md:grid-cols-2 gap-8 md:gap-16 items-center">
+                    <div className={i % 2 === 1 ? "md:order-2" : ""}>
+                      <p className={`${rotulo} text-emerald-400`}>{d.planos}</p>
+                      <h3 className="mt-3 text-2xl font-bold text-white tracking-tight text-balance">{d.titulo}</h3>
+                      <p className="mt-3 text-zinc-400 leading-relaxed">{d.texto}</p>
+                    </div>
+                    {Visual && <Visual />}
                   </article>
                 );
               })}
@@ -274,10 +282,10 @@ export default function LandingPage({
         </section>
 
         {/* ── Planos ──────────────────────────────────────────────────────── */}
-        <section id="planos" aria-labelledby="titulo-planos" className="scroll-mt-20 border-t border-zinc-900">
+        <section id="planos" aria-labelledby="titulo-planos" className={`scroll-mt-20 ${secaoClara}`}>
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
             <div className="max-w-2xl">
-              <h2 id="titulo-planos" className="text-3xl sm:text-4xl font-black text-white tracking-tight">Planos e preços</h2>
+              <h2 id="titulo-planos" className={titulo2}>Planos e preços</h2>
               <p className="mt-4 text-zinc-400 leading-relaxed">
                 Todos com {DIAS_TESTE} dias grátis, sem cartão. Sem fidelidade e sem taxa por boleto pago.
               </p>
@@ -298,7 +306,7 @@ export default function LandingPage({
                     <h3 className="text-lg font-bold text-white">{p.name}</h3>
                     <p className="mt-1 text-sm text-zinc-500 leading-relaxed">{p.description}</p>
                     <p className="mt-5 flex items-baseline gap-1">
-                      <span className="text-4xl font-black text-white tabular-nums">R$ {p.priceBRL}</span>
+                      <span className="text-4xl font-bold text-white tracking-tight tabular-nums">R$ {p.priceBRL}</span>
                       <span className="text-sm text-zinc-500">/mês</span>
                     </p>
                     <ul className="mt-6 space-y-2.5 text-sm text-zinc-300 flex-1">
@@ -327,9 +335,9 @@ export default function LandingPage({
         </section>
 
         {/* ── Perguntas frequentes ────────────────────────────────────────── */}
-        <section id="perguntas" aria-labelledby="titulo-perguntas" className="scroll-mt-20 border-t border-zinc-900">
+        <section id="perguntas" aria-labelledby="titulo-perguntas" className="scroll-mt-20">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-20">
-            <h2 id="titulo-perguntas" className="text-3xl sm:text-4xl font-black text-white tracking-tight">Perguntas frequentes</h2>
+            <h2 id="titulo-perguntas" className={titulo2}>Perguntas frequentes</h2>
             <div className="mt-10 divide-y divide-zinc-900 border-y border-zinc-900">
               {PERGUNTAS.map((q) => (
                 <details key={q.pergunta} className="group py-5">
@@ -347,7 +355,7 @@ export default function LandingPage({
         {/* ── Chamada final ───────────────────────────────────────────────── */}
         <section className="border-t border-zinc-900">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20 text-center">
-            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Comece a cobrar ainda hoje</h2>
+            <h2 className={titulo2}>Comece a cobrar ainda hoje</h2>
             <p className="mt-4 text-zinc-400">{DIAS_TESTE} dias grátis, sem cartão. Você conecta o WhatsApp e importa a carteira em poucos minutos.</p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
               <button type="button" onClick={abrirCadastro} className={`${botaoPrimario} px-6 py-3.5 text-base`}>
@@ -426,6 +434,129 @@ export default function LandingPage({
     </div>
   );
 }
+
+// ─── Pedaços do produto nos diferenciais (ilustrativos, dados fictícios) ─────
+
+const molduraBase = "rounded-lg border border-zinc-800 bg-zinc-900/50";
+const moldura = `${molduraBase} p-5 sm:p-6`;
+
+/**
+ * QR Code ilustrativo — não escaneável. Cantos no padrão real do QR, miolo
+ * pseudoaleatório com semente fixa: o desenho sai igual no pré-render e no
+ * navegador.
+ */
+const QR_MODULOS = 25;
+const QR_CAMINHO = (() => {
+  const n = QR_MODULOS;
+  // Os três quadrados de canto (7x7) com a margem clara de 1 módulo.
+  const doCanto = (x: number, y: number): boolean | null => {
+    for (const [cx, cy] of [[0, 0], [n - 7, 0], [0, n - 7]]) {
+      const lx = x - cx;
+      const ly = y - cy;
+      if (lx >= -1 && lx <= 7 && ly >= -1 && ly <= 7) {
+        if (lx < 0 || lx > 6 || ly < 0 || ly > 6) return false;
+        return lx === 0 || lx === 6 || ly === 0 || ly === 6 || (lx >= 2 && lx <= 4 && ly >= 2 && ly <= 4);
+      }
+    }
+    return null;
+  };
+  let semente = 20261028;
+  let caminho = "";
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      semente = (Math.imul(semente, 1103515245) + 12345) >>> 0;
+      const canto = doCanto(x, y);
+      const escuro = canto ?? (x === 6 || y === 6 ? (x + y) % 2 === 0 : ((semente >>> 16) & 1) === 1);
+      if (escuro) caminho += `M${x} ${y}h1v1h-1z`;
+    }
+  }
+  return caminho;
+})();
+
+function VisualQr() {
+  return (
+    <div className={moldura} aria-hidden="true">
+      <div className="flex items-center gap-5">
+        <div className="rounded-md bg-white p-2 flex-shrink-0">
+          <svg viewBox={`0 0 ${QR_MODULOS} ${QR_MODULOS}`} className="w-24 h-24 sm:w-28 sm:h-28" shapeRendering="crispEdges">
+            <path d={QR_CAMINHO} fill="#09090b" />
+          </svg>
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-white">Conectar WhatsApp</p>
+          <ol className="mt-2 space-y-1.5 text-xs text-zinc-400">
+            <li><span className="font-mono text-zinc-600 mr-1.5">1</span>Abra o WhatsApp no celular da empresa</li>
+            <li><span className="font-mono text-zinc-600 mr-1.5">2</span>Aparelhos conectados › Conectar</li>
+            <li><span className="font-mono text-zinc-600 mr-1.5">3</span>Aponte a câmera para o código</li>
+          </ol>
+        </div>
+      </div>
+      <p className="mt-5 flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+        Conectado · (11) 9 ••••-4321
+      </p>
+    </div>
+  );
+}
+
+function VisualBoleto() {
+  return (
+    <div className={moldura} aria-hidden="true">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-white truncate">{EXEMPLO.nomeCompleto}</p>
+          <p className="mt-0.5 font-mono text-[11px] text-zinc-500">Doc {EXEMPLO.documento} · venc. {EXEMPLO.vencimento}</p>
+        </div>
+        <p className="text-sm font-semibold text-white tabular-nums whitespace-nowrap">R$ {EXEMPLO.valor}</p>
+      </div>
+      <div className="mt-4 rounded-md border border-zinc-800 bg-zinc-950 p-3">
+        <p className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+          <FolderSearch className="w-3.5 h-3.5 flex-shrink-0" /> Google Drive › Boletos
+        </p>
+        <div className="mt-3 flex items-center gap-3">
+          <FileText className="w-7 h-7 text-rose-400 flex-shrink-0" strokeWidth={1.5} />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-zinc-100 truncate">boleto-{EXEMPLO.documento}.pdf</p>
+            <p className="text-[11px] text-emerald-400">Mesmo número do título · sugerido</p>
+          </div>
+          <span className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-bold text-black">Anexar</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const REGRAS_EXEMPLO = [
+  { nome: "Cobrar vencidos", detalhe: "Vencidos · tom amigável · todo dia" },
+  { nome: "Lembrete antes do vencimento", detalhe: "Vencem em 3 dias · tom neutro · seg–sex" },
+];
+
+function VisualRegra() {
+  return (
+    <div className={molduraBase} aria-hidden="true">
+      <div className="divide-y divide-zinc-800/80">
+        {REGRAS_EXEMPLO.map((r) => (
+          <div key={r.nome} className="flex items-center gap-4 px-5 py-4">
+            <span className="relative block w-9 h-5 rounded-full bg-emerald-500 flex-shrink-0">
+              <span className="absolute top-[3px] left-[3px] w-3.5 h-3.5 bg-white rounded-full translate-x-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white truncate">{r.nome}</p>
+              <p className="mt-0.5 text-[11px] text-zinc-500 truncate">{r.detalhe}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="flex items-center gap-2 border-t border-zinc-800/80 px-5 py-3 text-xs text-zinc-400">
+        <CalendarClock className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+        Próximo envio: amanhã, <span className="font-mono text-white">08:00</span>
+      </p>
+    </div>
+  );
+}
+
+// Na ordem de DIFERENCIAIS (src/content/landing.ts).
+const VISUAIS_DIFERENCIAIS = [VisualQr, VisualBoleto, VisualRegra];
 
 // ─── Entrar / criar conta / recuperar senha ──────────────────────────────────
 
@@ -544,7 +675,7 @@ function PainelAcesso({
       <div role="dialog" aria-modal="true" aria-labelledby="acesso-titulo" className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-xl">
         <header className="flex items-start justify-between gap-3 px-6 py-5 border-b border-zinc-800/80">
           <div>
-            <h2 id="acesso-titulo" className="text-xl font-black text-white tracking-tight">{titulo}</h2>
+            <h2 id="acesso-titulo" className="text-xl font-bold text-white tracking-tight">{titulo}</h2>
             <p className="mt-1 text-xs text-zinc-500 leading-relaxed">{subtitulo}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Fechar" className="p-1 text-zinc-500 hover:text-white cursor-pointer">

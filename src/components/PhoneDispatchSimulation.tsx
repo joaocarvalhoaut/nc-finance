@@ -79,7 +79,9 @@ export default function PhoneDispatchSimulation() {
                 </div>
                 <div>
                   <div className="text-[12px] font-bold text-zinc-100 leading-tight">WhatsApp</div>
-                  <div className="text-[9px] text-[#00a884] leading-tight">NC Finance • disparo em massa</div>
+                  <div className="text-[9px] text-[#00a884] leading-tight">
+                    Seu WhatsApp · {allDone ? "cobranças enviadas" : "enviando cobranças"}
+                  </div>
                 </div>
               </div>
               <span
