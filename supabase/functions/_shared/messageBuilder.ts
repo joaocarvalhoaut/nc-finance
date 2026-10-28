@@ -7,6 +7,7 @@
  *   {documento_boleto}→ alias de {documento}
  *   {vencimento}      → data de vencimento (DD/MM/YYYY ou ISO)
  *   {valor_atualizado}→ valor formatado em BRL (ex: 1.250,00)
+ *   {empresa}         → nome da empresa que cobra (sem nome, some da assinatura)
  *
  * Se `driveFileUrl` existir, um link de PDF é acrescentado ao final.
  */
@@ -22,7 +23,11 @@ export interface DebtorForMessage {
   driveFileName?: string | null;
   /** Dias de atraso (para templates que usam {dias_atraso}) */
   daysOverdue?: number | null;
+  /** Nome da empresa que cobra (user_profiles.company_name) — preenche {empresa} */
+  companyName?: string | null;
 }
+
+import { aplicarEmpresa } from "./assinatura.ts";
 
 // ─── Default templates (por tom) ──────────────────────────────────────────────
 
@@ -37,7 +42,7 @@ Valor: R$ {valor_atualizado}
 Se precisar de ajuda ou precisar dos dados para pagamento, é só chamar!
 Estamos à disposição.
 
-Equipe NC Finance.`,
+Equipe financeira {empresa}.`,
 
   neutro: `Prezado(a) {nome_cliente},
 
@@ -50,7 +55,7 @@ Valor: R$ {valor_atualizado}
 Pedimos que verifique e regularize o pagamento o quanto antes para evitar encargos.
 
 Atenciosamente,
-Equipe NC Finance.`,
+Equipe financeira {empresa}.`,
 
   firme: `Caro(a) {nome_cliente},
 
@@ -58,7 +63,7 @@ Consta em nosso sistema o boleto abaixo com vencimento em {vencimento} no valor 
 
 Solicitamos a regularização imediata para evitar a incidência de multa e juros adicionais.
 
-Equipe NC Finance.`,
+Equipe de cobrança {empresa}.`,
 
   juridico: `Sr./Sra. {nome_cliente},
 
@@ -66,7 +71,7 @@ Notificamos V.Sa. acerca do débito referente ao documento {documento}, com venc
 
 Solicitamos manifestação no prazo de 48 horas para evitar medidas administrativas e jurídicas cabíveis.
 
-Equipe NC Finance.`,
+Departamento administrativo {empresa}.`,
 };
 
 const FALLBACK_TONE = "neutro";
@@ -123,6 +128,7 @@ export const buildMessage = (
     .replace(/{vencimento}/g,      dueFormatted)
     .replace(/{valor_atualizado}/g, amountFormatted)
     .replace(/{dias_atraso}/g,     daysOverdueStr);
+  msg = aplicarEmpresa(msg, debtor.companyName);
 
   // NOTE: PDF link is appended by the calling Edge Function (not here),
   // so that it can use the correct public Storage URL with optional shortening.

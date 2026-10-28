@@ -74,7 +74,7 @@ export const PERGUNTAS: Pergunta[] = [
   {
     pergunta: "Quem aparece como remetente da cobrança?",
     resposta:
-      "O seu número. A mensagem sai do WhatsApp que você conectou, e o texto — inclusive a assinatura — pode ser editado antes de cada envio e em cada regra de automação.",
+      "A sua empresa. A mensagem sai do WhatsApp que você conectou e é assinada com o nome da empresa que você cadastrou — a NC Finance não aparece. O texto também pode ser ajustado antes de cada envio e em cada regra de automação.",
   },
   {
     pergunta: "Preciso de cartão de crédito para testar?",

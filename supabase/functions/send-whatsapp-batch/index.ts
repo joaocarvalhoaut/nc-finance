@@ -40,6 +40,7 @@ import { checkSubscription }               from "../_shared/subscriptionGuard.ts
 import { getUsageSnapshot, incrementChargesSent } from "../_shared/usageGuard.ts";
 import { insertBillingLog }                from "../_shared/billingLog.ts";
 import { buildMessage }                    from "../_shared/messageBuilder.ts";
+import { loadCompanyName }                 from "../_shared/empresa.ts";
 import { loadZApiCredentialsForUser }       from "../_shared/platformIntegrations.ts";
 import { sanitizeError }                   from "../_shared/sanitize.ts";
 import { checkPilotGuard, incrementPilotDailyCount } from "../_shared/pilotGuard.ts";
@@ -296,6 +297,9 @@ Deno.serve(async (request: Request) => {
     // Lista não-contatar (opt-out) buscada uma vez — checagem O(1) por devedor.
     const optOutSet = await fetchOptOutSet(admin, userId);
 
+    // Nome da empresa que assina as mensagens ({empresa}), buscado uma vez.
+    const companyName = await loadCompanyName(admin, userId);
+
     // ── 7. Loop de envio ──────────────────────────────────────────────────────
     let sentInLoop = 0;
     for (const debtorId of idsToProcess) {
@@ -412,7 +416,7 @@ Deno.serve(async (request: Request) => {
 
       // c. Monta mensagem
       const message = buildMessage(
-        { clientName, documentNumber, dueDate, amount, driveFileUrl, driveFileName },
+        { clientName, documentNumber, dueDate, amount, driveFileUrl, driveFileName, companyName },
         tone,
         customMessage,
       );

@@ -236,7 +236,8 @@ export default function BatchConfirmModal({
                   <code className="text-zinc-500">{"{nome_cliente}"}</code>{" "}
                   <code className="text-zinc-500">{"{documento}"}</code>{" "}
                   <code className="text-zinc-500">{"{vencimento}"}</code>{" "}
-                  <code className="text-zinc-500">{"{valor_atualizado}"}</code>
+                  <code className="text-zinc-500">{"{valor_atualizado}"}</code>{" "}
+                  <code className="text-zinc-500">{"{empresa}"}</code>
                 </p>
               </div>
             ) : (

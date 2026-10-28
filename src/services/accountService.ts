@@ -11,6 +11,8 @@ export interface UserProfileData {
   address: string | null;
   city: string | null;
   state: string | null;
+  /** Assina as mensagens de cobrança ({empresa}). Opcional para contas antigas. */
+  company_name?: string | null;
   created_at?: string;
 }
 
@@ -19,7 +21,7 @@ export async function getMyProfile(userId: string): Promise<UserProfileData | nu
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("user_profiles")
-    .select("full_name, cpf, phone, cep, address, city, state, created_at")
+    .select("full_name, cpf, phone, cep, address, city, state, company_name, created_at")
     .eq("user_id", userId)
     .maybeSingle();
   if (error) return null;
@@ -34,7 +36,7 @@ export async function fetchMyProfileOrThrow(userId: string): Promise<UserProfile
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("user_profiles")
-    .select("full_name, cpf, phone, cep, address, city, state, created_at")
+    .select("full_name, cpf, phone, cep, address, city, state, company_name, created_at")
     .eq("user_id", userId)
     .maybeSingle();
   if (error) throw new Error(error.message || "Falha ao carregar o cadastro.");
@@ -64,6 +66,7 @@ export const isProfileComplete = (p: UserProfileData | null): boolean => {
  */
 export async function saveMyProfile(userId: string, data: {
   full_name: string; cpf: string; phone: string; cep: string; address: string; city: string; state: string;
+  company_name?: string;
   accepted_terms_at?: string;
 }): Promise<void> {
   const supabase = getSupabaseClient();
@@ -77,6 +80,7 @@ export async function saveMyProfile(userId: string, data: {
       address: data.address.trim(),
       city: data.city.trim(),
       state: data.state.trim().toUpperCase(),
+      ...(data.company_name !== undefined ? { company_name: data.company_name.trim() || null } : {}),
       ...(data.accepted_terms_at ? { accepted_terms_at: data.accepted_terms_at } : {}),
     },
     { onConflict: "user_id" },
@@ -86,6 +90,16 @@ export async function saveMyProfile(userId: string, data: {
     if (error.code === "23505") throw new Error("Este CPF já está cadastrado em outra conta. Fale com o suporte.");
     throw new Error("Não foi possível salvar seus dados. Tente novamente.");
   }
+}
+
+/** Nome da empresa que assina as mensagens de cobrança ({empresa} nos modelos). */
+export async function saveCompanyName(userId: string, nome: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase
+    .from("user_profiles")
+    .update({ company_name: nome.trim() || null })
+    .eq("user_id", userId);
+  if (error) throw new Error("Não foi possível salvar o nome da empresa. Tente novamente.");
 }
 
 const buildDisplayName = (user: User | null) => {

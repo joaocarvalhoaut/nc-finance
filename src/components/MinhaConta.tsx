@@ -3,7 +3,7 @@ import { Download, Trash2, Loader2, CheckCircle2, Lock } from "lucide-react";
 import type { PlanId, UserSubscription } from "../types";
 import { getPlanDefinition } from "../config/plans";
 import { subscriptionBadge } from "../config/subscriptionBadge";
-import { getMyProfile, exportMyData, type UserProfileData } from "../services/accountService";
+import { getMyProfile, exportMyData, saveCompanyName, type UserProfileData } from "../services/accountService";
 import { updatePassword } from "../services/authService";
 import { getConsent, grantAnalyticsConsent, declineAnalyticsConsent } from "../lib/analytics";
 import PasswordInput from "./PasswordInput";
@@ -19,6 +19,8 @@ interface Props {
   chargesSent?: number;
   onManageSubscription: () => void;
   onDeleteAccount: () => void;
+  /** Avisa o app que o perfil mudou (ex.: nome da empresa nas mensagens). */
+  onProfileUpdated?: () => void;
 }
 
 const maskCpf = (cpf: string) => {
@@ -66,7 +68,7 @@ function Campo({ label, value }: { label: string; value: string }) {
 
 export default function MinhaConta({
   userId, email, displayName, plan, subscription, chargesSent = 0,
-  onManageSubscription, onDeleteAccount,
+  onManageSubscription, onDeleteAccount, onProfileUpdated,
 }: Props) {
   const [profile, setProfile] = useState<UserProfileData | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -75,6 +77,10 @@ export default function MinhaConta({
   const [pw2, setPw2] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const [empresa, setEmpresa] = useState("");
+  const [salvandoEmpresa, setSalvandoEmpresa] = useState(false);
+  const [msgEmpresa, setMsgEmpresa] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [exporting, setExporting] = useState(false);
   const [analyticsOn, setAnalyticsOn] = useState(() => getConsent()?.analytics === true);
@@ -86,7 +92,7 @@ export default function MinhaConta({
 
   useEffect(() => {
     let alive = true;
-    getMyProfile(userId).then((p) => { if (alive) { setProfile(p); setLoadingProfile(false); } });
+    getMyProfile(userId).then((p) => { if (alive) { setProfile(p); setEmpresa(p?.company_name ?? ""); setLoadingProfile(false); } });
     return () => { alive = false; };
   }, [userId]);
 
@@ -120,6 +126,21 @@ export default function MinhaConta({
       setPwMsg({ ok: false, text: e instanceof Error ? e.message : "Falha ao atualizar a senha." });
     } finally {
       setPwLoading(false);
+    }
+  };
+
+  const handleSalvarEmpresa = async () => {
+    setSalvandoEmpresa(true);
+    setMsgEmpresa(null);
+    try {
+      await saveCompanyName(userId, empresa);
+      setProfile((p) => (p ? { ...p, company_name: empresa.trim() || null } : p));
+      setMsgEmpresa({ ok: true, text: "Nome salvo. As próximas mensagens já saem com ele." });
+      onProfileUpdated?.();
+    } catch (e) {
+      setMsgEmpresa({ ok: false, text: e instanceof Error ? e.message : "Falha ao salvar." });
+    } finally {
+      setSalvandoEmpresa(false);
     }
   };
 
@@ -196,6 +217,39 @@ export default function MinhaConta({
 
           {/* Número de WhatsApp da conta — o cartão traz a própria moldura */}
           <WhatsappGatewayCard />
+
+          <Secao titulo="Nome nas mensagens" sub="Assina as cobranças que seus clientes recebem">
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="mc-empresa" className="block mb-1.5"><Rotulo>Nome da empresa</Rotulo></label>
+                <input
+                  id="mc-empresa"
+                  value={empresa}
+                  onChange={(e) => { setEmpresa(e.target.value); setMsgEmpresa(null); }}
+                  disabled={loadingProfile}
+                  className={inputCls}
+                  placeholder="Como seus clientes conhecem a empresa"
+                  autoComplete="organization"
+                />
+                <p className="mt-1.5 text-[11px] text-zinc-500">
+                  Exemplo: “Equipe financeira {empresa.trim() || "Móveis Silva"}.” Sem nome, a assinatura sai só “Equipe financeira.”
+                </p>
+              </div>
+              {msgEmpresa && (
+                <p className={`text-xs flex items-center gap-1.5 ${msgEmpresa.ok ? "text-emerald-400" : "text-rose-400"}`}>
+                  {msgEmpresa.ok && <CheckCircle2 className="w-3.5 h-3.5" />}{msgEmpresa.text}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => void handleSalvarEmpresa()}
+                disabled={loadingProfile || salvandoEmpresa || empresa.trim() === (profile?.company_name ?? "")}
+                className="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-bold transition-colors inline-flex items-center gap-2 cursor-pointer"
+              >
+                {salvandoEmpresa ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Salvando…</> : "Salvar nome"}
+              </button>
+            </div>
+          </Secao>
 
           <Secao titulo="Segurança" sub="Senha de acesso">
             <div className="space-y-3">

@@ -34,6 +34,7 @@ import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type Automation
 import { validateNewAutomationRule } from "./utils/automationValidation";
 import { isBrazilHoliday, getBrazilHolidayName, isBusinessDay } from "./utils/brazilHolidays";
 import { getMessageTemplate, fillMessageTemplate } from "./utils/messageTemplates";
+import { aplicarEmpresa } from "../supabase/functions/_shared/assinatura.ts";
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
 import { parseImportFile } from "./utils/importFileParser";
 import { extractDocumentLocally, type LocalExtractionResult } from "./services/localDocumentExtraction";
@@ -118,7 +119,7 @@ Valor: R$ {valor_atualizado}
 Quis me adiantar para facilitar sua organização e evitar qualquer correria perto do vencimento.
 Se precisar, posso reenviar os dados do boleto ou te ajudar a localizar as informações mais rapidamente.
 
-Fico à disposição. Equipe NC Finance.`
+Fico à disposição. Equipe financeira {empresa}.`
   },
   {
     id: "neutro",
@@ -135,7 +136,7 @@ Valor: R$ {valor_atualizado}
 O título consta em aberto em nosso acompanhamento.
 Solicitamos a confirmação do pagamento ou o envio do comprovante para atualização do status.
 
-Atenciosamente, equipe financeira NC Finance.`
+Atenciosamente, equipe financeira {empresa}.`
   },
   {
     id: "firme",
@@ -153,7 +154,7 @@ O título acumula {dias_atraso} dia(s) de atraso e exige uma definição imediat
 Pedimos regularização ainda hoje ou retorno objetivo com a previsão de pagamento.
 
 Sem um posicionamento, o caso segue em escalonamento interno para acompanhamento diário.
-Equipe de cobrança NC Finance.`
+Equipe de cobrança {empresa}.`
   },
   {
     id: "juridico",
@@ -172,7 +173,7 @@ Solicitamos manifestação formal e a respectiva regularização financeira com 
 
 Na ausência de retorno, o caso permanece sujeito ao fluxo interno de cobrança administrativa da empresa.
 
-Atenciosamente, departamento administrativo NC Finance.`
+Atenciosamente, departamento administrativo {empresa}.`
   }
 ];
 
@@ -259,6 +260,8 @@ export default function App() {
   const [perfilCadastro, setPerfilCadastro] = useState<{ carregado: boolean; completo: boolean; perfil: UserProfileData | null }>(
     { carregado: false, completo: true, perfil: null },
   );
+  // Nome da empresa que assina as cobranças ({empresa} nos modelos).
+  const empresaAssinatura = perfilCadastro.perfil?.company_name ?? null;
   const carregarPerfilCadastro = useCallback(async (uid: string) => {
     try {
       const perfil = await fetchMyProfileOrThrow(uid);
@@ -1275,7 +1278,7 @@ export default function App() {
     // mas nao entram no que e cobrado do devedor.
     const valStr = debtor.value.toFixed(2);
     
-    return pat.template
+    return aplicarEmpresa(pat.template, empresaAssinatura)
       .replace(/{nome_cliente}/g, debtor.client)
       .replace(/{documento}/g, debtor.document)
       .replace(/{documento_boleto}/g, debtor.document)
@@ -2451,6 +2454,7 @@ export default function App() {
                   chargesSent={usage?.chargesSent ?? 0}
                   onManageSubscription={handleOpenBillingPortal}
                   onDeleteAccount={() => setShowDeleteAccount(true)}
+                  onProfileUpdated={() => { if (userId) void carregarPerfilCadastro(userId); }}
                 />
               )}
 
@@ -2463,6 +2467,7 @@ export default function App() {
                   <ClientDashboard
                     userId={userId}
                     onGoToSettings={() => setCurrentTab("minha_conta")}
+                    companyName={empresaAssinatura}
                     globalFinePct={globalFinePct}
                     globalInterestDayPct={globalInterestDayPct}
                     knownContacts={contactsByKey}
@@ -4924,6 +4929,7 @@ export default function App() {
                                       documentNumber: log.document,
                                       dueDate:        debtor?.dueDate ?? "",
                                       amount:         Number(log.value) || 0,
+                                      companyName:    empresaAssinatura,
                                     });
                                     // Oculta valor e nº do documento com * (mantém a estrutura visível).
                                     let fullMessage = rebuilt.replace(/R\$\s*[\d.,]+/g, (m) => m.replace(/\d/g, "*"));

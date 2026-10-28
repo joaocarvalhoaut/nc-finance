@@ -59,6 +59,7 @@ export default function CompletarCadastro({ userId, email, displayName, perfil, 
   const [endereco, setEndereco] = useState(perfil?.address ?? "");
   const [cidade, setCidade] = useState(perfil?.city ?? "");
   const [uf, setUf] = useState(perfil?.state ?? "");
+  const [empresa, setEmpresa] = useState(perfil?.company_name ?? "");
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -85,6 +86,7 @@ export default function CompletarCadastro({ userId, email, displayName, perfil, 
   const salvar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim()) return setErro("Digite seu nome completo.");
+    if (!empresa.trim()) return setErro("Digite o nome da empresa — ele assina as mensagens de cobrança.");
     if (!isValidCPF(cpf)) return setErro("CPF inválido. Verifique o número.");
     if (digitos(telefone).length < 10) return setErro("Digite um telefone válido com DDD.");
     if (digitos(cep).length !== 8) return setErro("Digite o CEP completo.");
@@ -95,6 +97,7 @@ export default function CompletarCadastro({ userId, email, displayName, perfil, 
     try {
       await saveMyProfile(userId, {
         full_name: nome, cpf, phone: telefone, cep, address: endereco, city: cidade, state: uf,
+        company_name: empresa,
         accepted_terms_at: termsAcceptedAt ?? undefined,
       });
       onSaved();
@@ -123,6 +126,12 @@ export default function CompletarCadastro({ userId, email, displayName, perfil, 
           <div>
             <Rotulo htmlFor="cc-nome">Nome completo</Rotulo>
             <input id="cc-nome" value={nome} onChange={(e) => { setNome(e.target.value); setErro(""); }} className={inputCls} autoComplete="name" placeholder="Seu nome ou razão social" />
+          </div>
+
+          <div>
+            <Rotulo htmlFor="cc-empresa">Nome da empresa</Rotulo>
+            <input id="cc-empresa" value={empresa} onChange={(e) => { setEmpresa(e.target.value); setErro(""); }} className={inputCls} autoComplete="organization" placeholder="Como seus clientes conhecem a empresa" />
+            <p className="mt-1.5 text-[11px] text-zinc-500">Assina as mensagens de cobrança — ex.: “Equipe financeira {empresa.trim() || "Móveis Silva"}.”</p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

@@ -95,6 +95,8 @@ interface ClientDashboardProps {
   onDebtorsImported?: () => void;
   /** Abre Configurações, onde o cliente conecta o próprio WhatsApp. */
   onGoToSettings?: () => void;
+  /** Nome da empresa — assina as mensagens ({empresa}) */
+  companyName?: string | null;
 }
 
 // ─── Step type ────────────────────────────────────────────────────────────────
@@ -112,6 +114,7 @@ export default function ClientDashboard({
   onBatchSent,
   onDebtorsImported,
   onGoToSettings,
+  companyName = null,
 }: ClientDashboardProps) {
   // ── WhatsApp status ──────────────────────────────────────────────────────────
   const [waConnected, setWaConnected]   = useState<boolean | null>(null);
@@ -426,6 +429,7 @@ export default function ClientDashboard({
           documentNumber: sampleDebtor.document,
           dueDate:        sampleDebtor.dueDate,
           amount:         sampleDebtor.value,
+          companyName,
         })
       : template;
 

@@ -54,20 +54,20 @@ const TONS: Array<{ id: Tom; nome: string }> = [
 const EXEMPLO = { cliente: "Carlos", empresa: "Móveis Silva", documento: "1082-3", vencimento: "20/10/2026", valor: "1.849,90", dias: 7 };
 
 /**
- * Corpo das mensagens padrão de cada tom — espelha DEFAULT_PATTERNS (App.tsx)
- * sem a assinatura, que cada empresa ajusta no texto antes de enviar.
+ * Mensagens padrão de cada tom — espelha DEFAULT_PATTERNS (App.tsx), com a
+ * assinatura {empresa} preenchida pelo nome da empresa do exemplo.
  */
 const mensagemDoTom = (tom: Tom): string => {
   const dados = `Documento: ${EXEMPLO.documento}\nVencimento: ${EXEMPLO.vencimento}\nValor: R$ ${EXEMPLO.valor}`;
   switch (tom) {
     case "amigavel":
-      return `Olá ${EXEMPLO.cliente}, tudo bem?\nPassando para lembrar de forma tranquila sobre o boleto abaixo, que segue em nosso acompanhamento.\n\n${dados}\n\nSe precisar, posso reenviar os dados do boleto ou te ajudar a localizar as informações.`;
+      return `Olá ${EXEMPLO.cliente}, tudo bem?\nPassando para lembrar de forma tranquila sobre o boleto abaixo, que segue em nosso acompanhamento.\n\n${dados}\n\nSe precisar, posso reenviar os dados do boleto ou te ajudar a localizar as informações.\n\nFico à disposição. Equipe financeira ${EXEMPLO.empresa}.`;
     case "neutro":
-      return `Olá ${EXEMPLO.cliente},\nSegue o acompanhamento do título abaixo para sua verificação.\n\n${dados}\n\nO título consta em aberto em nosso acompanhamento. Solicitamos a confirmação do pagamento ou o envio do comprovante para atualização do status.`;
+      return `Olá ${EXEMPLO.cliente},\nSegue o acompanhamento do título abaixo para sua verificação.\n\n${dados}\n\nO título consta em aberto em nosso acompanhamento. Solicitamos a confirmação do pagamento ou o envio do comprovante para atualização do status.\n\nAtenciosamente, equipe financeira ${EXEMPLO.empresa}.`;
     case "firme":
-      return `Olá ${EXEMPLO.cliente},\nPrecisamos tratar com prioridade a pendência financeira abaixo.\n\n${dados}\n\nO título acumula ${EXEMPLO.dias} dia(s) de atraso e exige uma definição imediata. Pedimos regularização ainda hoje ou retorno com a previsão de pagamento.`;
+      return `Olá ${EXEMPLO.cliente},\nPrecisamos tratar com prioridade a pendência financeira abaixo.\n\n${dados}\n\nO título acumula ${EXEMPLO.dias} dia(s) de atraso e exige uma definição imediata. Pedimos regularização ainda hoje ou retorno com a previsão de pagamento.\n\nEquipe de cobrança ${EXEMPLO.empresa}.`;
     case "juridico":
-      return `Prezado(a) ${EXEMPLO.cliente},\nComunicamos, para fins de registro administrativo, a permanência da pendência descrita abaixo.\n\n${dados}\n\nConsta em sistema atraso de ${EXEMPLO.dias} dia(s), sem regularização identificada até o momento. Solicitamos manifestação formal e a regularização com a maior brevidade possível.`;
+      return `Prezado(a) ${EXEMPLO.cliente},\nComunicamos, para fins de registro administrativo, a permanência da pendência descrita abaixo.\n\n${dados}\n\nConsta em sistema atraso de ${EXEMPLO.dias} dia(s), sem regularização identificada até o momento. Solicitamos manifestação formal e a regularização com a maior brevidade possível.\n\nAtenciosamente, departamento administrativo ${EXEMPLO.empresa}.`;
   }
 };
 
@@ -199,7 +199,7 @@ export default function LandingPage({
             <div>
               <h2 id="titulo-mensagem" className="text-3xl sm:text-4xl font-black text-white tracking-tight">Veja como a mensagem chega</h2>
               <p className="mt-4 text-zinc-400 leading-relaxed">
-                O cliente recebe do seu número, com os dados do título e o boleto em PDF. Escolha o tom de acordo com o atraso e o relacionamento — o texto pode ser ajustado antes de cada envio.
+                O cliente recebe do seu número, assinada com o nome da sua empresa, com os dados do título e o boleto em PDF. Escolha o tom de acordo com o atraso e o relacionamento — o texto pode ser ajustado antes de cada envio.
               </p>
               <p className={`${rotulo} mt-8 mb-2`}>Tom da mensagem</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-label="Tom da mensagem">

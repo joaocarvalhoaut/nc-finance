@@ -33,6 +33,7 @@ import { getUsageSnapshot, incrementChargesSent } from "../_shared/usageGuard.ts
 import { checkPilotGuard, incrementPilotDailyCount } from "../_shared/pilotGuard.ts";
 import { insertBillingLog }                      from "../_shared/billingLog.ts";
 import { buildMessage }                          from "../_shared/messageBuilder.ts";
+import { loadCompanyName }                       from "../_shared/empresa.ts";
 import { loadZApiCredentialsForUser }             from "../_shared/platformIntegrations.ts";
 import { sanitizeError }                         from "../_shared/sanitize.ts";
 import { isOptedOut }                            from "../_shared/optOut.ts";
@@ -341,8 +342,9 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     }
 
     // ── 8. Monta mensagem (+ link do boleto PDF se disponível) ───────────
+    const companyName = await loadCompanyName(admin, userId);
     let message = buildMessage(
-      { clientName, documentNumber, dueDate, amount, driveFileUrl, driveFileName },
+      { clientName, documentNumber, dueDate, amount, driveFileUrl, driveFileName, companyName },
       tone,
       customMsg,
     );

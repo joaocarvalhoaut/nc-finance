@@ -2,8 +2,10 @@
  * messageTemplates.ts — templates de mensagem por tom (frontend).
  *
  * Mantidos em sincronia com supabase/functions/_shared/messageBuilder.ts.
- * Variáveis suportadas: {nome_cliente}, {documento}, {vencimento}, {valor_atualizado}
+ * Variáveis suportadas: {nome_cliente}, {documento}, {vencimento}, {valor_atualizado}, {empresa}
  */
+
+import { aplicarEmpresa } from "../../supabase/functions/_shared/assinatura.ts";
 
 export const MESSAGE_TEMPLATES: Record<string, string> = {
   amigavel: `Olá {nome_cliente}, tudo bem?
@@ -16,7 +18,7 @@ Valor: R$ {valor_atualizado}
 Se precisar de ajuda ou precisar dos dados para pagamento, é só chamar!
 Estamos à disposição.
 
-Equipe NC Finance.`,
+Equipe financeira {empresa}.`,
 
   neutro: `Prezado(a) {nome_cliente},
 
@@ -29,7 +31,7 @@ Valor: R$ {valor_atualizado}
 Pedimos que verifique e regularize o pagamento o quanto antes para evitar encargos.
 
 Atenciosamente,
-Equipe NC Finance.`,
+Equipe financeira {empresa}.`,
 
   firme: `Caro(a) {nome_cliente},
 
@@ -37,7 +39,7 @@ Consta em nosso sistema o boleto abaixo com vencimento em {vencimento} no valor 
 
 Solicitamos a regularização imediata para evitar a incidência de multa e juros adicionais.
 
-Equipe NC Finance.`,
+Equipe de cobrança {empresa}.`,
 
   juridico: `Sr./Sra. {nome_cliente},
 
@@ -45,7 +47,7 @@ Notificamos V.Sa. acerca do débito referente ao documento {documento}, com venc
 
 Solicitamos manifestação no prazo de 48 horas para evitar medidas administrativas e jurídicas cabíveis.
 
-Equipe NC Finance.`,
+Departamento administrativo {empresa}.`,
 };
 
 export const FALLBACK_TONE = "neutro";
@@ -72,6 +74,8 @@ export interface TemplateFillData {
   documentNumber: string;
   dueDate:        string;
   amount:         number;
+  /** Nome da empresa que cobra — preenche {empresa} na assinatura */
+  companyName?:   string | null;
 }
 
 /**
@@ -82,7 +86,7 @@ export const fillMessageTemplate = (
   template: string,
   debtor: TemplateFillData,
 ): string =>
-  template
+  aplicarEmpresa(template, debtor.companyName)
     .replace(/{nome_cliente}/g,     debtor.clientName     || "Cliente")
     .replace(/{documento}/g,        debtor.documentNumber || "—")
     .replace(/{documento_boleto}/g, debtor.documentNumber || "—")
