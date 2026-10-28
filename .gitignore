@@ -2,6 +2,8 @@ node_modules/
 build/
 dist/
 dist-ssr/
+# OCR (tesseract) copiado de node_modules por tools/ocr-assets.mjs
+public/ocr/
 coverage/
 .DS_Store
 *.log

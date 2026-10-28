@@ -15,6 +15,21 @@ const SKIP_PATTERNS: RegExp[] = [
 ];
 
 /**
+ * Linha de ruído de página: numeração, "impresso/emitido/gerado em", site.
+ * Na tabela de um PDF o rodapé cai na coluna do cliente e seria lido como a
+ * continuação do nome do último cliente da página.
+ */
+export function ehRuidoDePagina(linha: string): boolean {
+  const l = linha.trim();
+  return (
+    SKIP_PATTERNS.some((p) => p.test(l)) ||
+    /^p[áa]g(ina|\.)?\s*\d+(\s*(de|\/)\s*\d+)?$/i.test(l) ||
+    /^(impresso|emitido|gerado|relat[óo]rio gerado)\s+(em|por)\b/i.test(l) ||
+    /^(https?:\/\/|www\.)\S+$/i.test(l)
+  );
+}
+
+/**
  * Normalise raw extracted text:
  * - Collapse horizontal whitespace within a line
  * - Drop known noise lines

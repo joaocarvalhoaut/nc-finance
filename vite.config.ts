@@ -32,12 +32,11 @@ export default defineConfig(({ isSsrBuild }) => {
       // O build SSR só gera o HTML da landing; public/ já vai no build normal.
       copyPublicDir: !isSsrBuild,
       rollupOptions: {
-        // tesseract.js is an optional OCR dependency.  It is NOT installed by
-        // default — users who need scanned-PDF support can add it manually:
-        //   npm install tesseract.js
-        // Marking it external prevents Rollup from erroring on the dynamic
-        // import; the try/catch in ocrFallback.ts handles runtime absence.
-        external: ["tesseract.js"],
+        // O tesseract.js (OCR) entra no bundle como chunk sob demanda, carregado
+        // só quando um PDF escaneado ou uma foto é importada. Ele estava marcado
+        // como externo: o import ficava sem resolver no site publicado e o OCR
+        // nunca rodou em produção. Worker, núcleo e idioma vêm de /ocr
+        // (tools/ocr-assets.mjs).
         // Build SSR (pré-render da landing, tools/prerender-landing.mjs): as
         // dependências ficam externas, então não há vendor para separar.
         output: isSsrBuild ? {} : {

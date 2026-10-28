@@ -205,6 +205,16 @@ const fixTypo = (token: string): string => {
   return candidates.length === 1 ? candidates[0] : token;
 };
 
+/**
+ * O cabeçalho descarta o campo explicitamente? ("Data de Emissão" para o
+ * vencimento, "Valor Pago" para o valor.) Usado ao inferir colunas pelo
+ * conteúdo: uma coluna de datas chamada "Emissão" nunca vira o vencimento.
+ */
+export function headerExcludes(header: string, field: HeaderField): boolean {
+  const tokens = normalizeHeader(header).split(" ").filter(Boolean).map(fixTypo);
+  return Boolean(FIELDS[field].excludes?.some((w) => tokens.includes(w)));
+}
+
 /** Pontuação de 0 a 100 de um cabeçalho para um campo. */
 export function scoreHeader(header: string, field: HeaderField): number {
   const tokens = normalizeHeader(header).split(" ").filter(Boolean).map(fixTypo);

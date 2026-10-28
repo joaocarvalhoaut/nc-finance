@@ -12,6 +12,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["vite", "preview", "--port", "4173", "--strictPort"],
       "port": 4173
+    },
+    {
+      "name": "nc-finance-prod",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["-e", "process.env.NODE_ENV='production';process.env.PORT='4180';require('./dist/server.cjs')"],
+      "port": 4180
     }
   ]
 }

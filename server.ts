@@ -13,6 +13,8 @@ const PORT = Number(process.env.PORT) || 3000;
 // que o preview local reproduza o comportamento de produção. Origens externas:
 //   connect: Supabase (REST + realtime wss) e ViaCEP (autocompletar endereço)
 //   style/font: Google Fonts (Inter)  ·  script: apenas 'self' (bundle Vite)
+// 'wasm-unsafe-eval' libera só compilar WebAssembly (não libera eval de JS): o
+// OCR da importação roda o tesseract em WASM, servido de /ocr pela própria origem.
 // Stripe usa redirect de página (checkout/portal), não iframe nem fetch, então
 // não precisa de frame-src/connect-src próprios.
 // Em dev o Vite injeta um <script type="module"> inline (preamble do React
@@ -24,8 +26,8 @@ const IS_DEV = process.env.NODE_ENV !== "production";
 const CSP = [
   "default-src 'self'",
   IS_DEV
-    ? "script-src 'self' 'unsafe-inline' https://us-assets.i.posthog.com"
-    : "script-src 'self' https://us-assets.i.posthog.com",
+    ? "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://us-assets.i.posthog.com"
+    : "script-src 'self' 'wasm-unsafe-eval' https://us-assets.i.posthog.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: https:",

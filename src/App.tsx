@@ -36,8 +36,14 @@ import { isBrazilHoliday, getBrazilHolidayName, isBusinessDay } from "./utils/br
 import { getMessageTemplate, fillMessageTemplate } from "./utils/messageTemplates";
 import { aplicarEmpresa } from "../supabase/functions/_shared/assinatura.ts";
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
-import { parseImportFile } from "./utils/importFileParser";
-import { extractDocumentLocally, type LocalExtractionResult } from "./services/localDocumentExtraction";
+import {
+  ACEITA_IMPORTACAO,
+  extrairDeTexto,
+  interpretarDocumento,
+  lerArquivo,
+  type DocumentoImportado,
+  type LocalExtractionResult,
+} from "./services/localDocumentExtraction";
 import { exportRelatorio } from "./services/exportRelatorio";
 const Suporte = lazy(() => import("./components/Suporte"));
 import { PdfPreviewModal, openPdfPreview } from "./components/PdfPreviewModal";
@@ -304,8 +310,11 @@ export default function App() {
   const [addDupModal, setAddDupModal] = useState<{ novo: Debtor; existente: Debtor } | null>(null);
   const [notesPopover, setNotesPopover] = useState<{ debtorId: string; draft: string } | null>(null);
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
-  // Original File object — needed for OCR fallback on scanned PDFs
-  const [importFile, setImportFile] = useState<File | null>(null);
+  // Andamento da leitura (páginas do PDF, OCR) mostrado no campo do arquivo.
+  const [importProgresso, setImportProgresso] = useState<string>("");
+  // Arquivo já lido (tabelas + texto). Enquanto o texto da tela for o dele, a
+  // extração usa as tabelas; se a pessoa editar o texto, vale o texto.
+  const [importDoc, setImportDoc] = useState<DocumentoImportado | null>(null);
   // Last extraction result — used for post-import summary UI
   const [lastExtractionResult, setLastExtractionResult] = useState<LocalExtractionResult | null>(null);
   const [importFileName, setImportFileName] = useState<string>("");
@@ -1327,29 +1336,37 @@ export default function App() {
     }
 
     setIsParsingImportFile(true);
+    setImportProgresso("");
     setExtractionAlert("");
     setExtractedDebtors([]);
+    setLastExtractionResult(null);
     setImportFileName(file.name);
-    setImportFile(file); // store for OCR fallback
+    setImportDoc(null);
 
     try {
-      const parsedText = await parseImportFile(file);
+      const doc = await lerArquivo(file, setImportProgresso);
 
-      if (!parsedText.trim()) {
-        throw new Error("O arquivo foi lido, mas não contém texto extraível para a IA.");
+      if (!doc.texto.trim() && !doc.tabelas.length) {
+        throw new Error(
+          doc.tipo === "imagem" || doc.tipo === "pdf-ocr"
+            ? "Não foi possível reconhecer texto na imagem. Use uma foto nítida, de frente, com boa luz."
+            : "O arquivo foi lido, mas não tem texto. Confira se é o arquivo certo.",
+        );
       }
 
-      setImportText(parsedText);
+      setImportDoc(doc);
+      setImportText(doc.texto);
     } catch (error) {
       setImportFileName("");
       setImportText("");
       setExtractionAlert(
         error instanceof Error
           ? error.message
-          : "Não foi possível ler o arquivo enviado. Use PDF, TXT, CSV ou Excel com texto acessível.",
+          : "Não foi possível ler o arquivo enviado. Use PDF, Excel, CSV, TXT ou uma imagem.",
       );
     } finally {
       setIsParsingImportFile(false);
+      setImportProgresso("");
     }
   };
 
@@ -1367,12 +1384,10 @@ export default function App() {
     setLastExtractionResult(null);
 
     try {
-      // ── Primary path: local deterministic extraction ──────────────────────
-      const result = await extractDocumentLocally(
-        importText,
-        importCategory,
-        importFile ?? undefined,
-      );
+      // ── Extração local: o arquivo lido (tabelas + texto) ou o texto da tela ──
+      const result = importDoc && importText === importDoc.texto
+        ? interpretarDocumento(importDoc)
+        : extrairDeTexto(importText, importDoc?.nomeArquivo);
 
       setLastExtractionResult(result);
 
@@ -1506,6 +1521,7 @@ export default function App() {
       if (extractedDebtors.length === toSend.length) {
         setImportText("");
         setImportFileName("");
+        setImportDoc(null);
         setCurrentTab("visao_geral");
       }
     } catch (error) {
@@ -1590,6 +1606,7 @@ export default function App() {
     if (antes > 0 && extractedDebtors.length === 0) {
       setImportText("");
       setImportFileName("");
+      setImportDoc(null);
       setLastExtractionResult(null);
       setLowConfidenceIds(new Set());
       setExtractedSelectedIds(new Set());
@@ -2973,7 +2990,7 @@ export default function App() {
                 return (
                 <div className="space-y-4">
                   <p className="text-xs text-zinc-500">
-                    Ferramenta completa de importação: PDF, Excel, CSV ou texto colado. Para o caminho guiado de
+                    Ferramenta completa de importação: PDF (inclusive escaneado), Excel, CSV, foto do relatório ou texto colado. Para o caminho guiado de
                     importar e enviar, use{" "}
                     <button type="button" onClick={() => setCurrentTab("cobrar")} className="text-zinc-300 hover:text-white underline underline-offset-2 cursor-pointer">
                       Cobranças
@@ -3001,15 +3018,16 @@ export default function App() {
                           </div>
                           <div className="min-w-0">
                             <p className="text-xs font-semibold text-zinc-200 truncate">
-                              {isParsingImportFile ? "Lendo arquivo…" : importFileName ? importFileName : "Clique ou arraste o arquivo aqui"}
+                              {isParsingImportFile ? (importProgresso || "Lendo arquivo…") : importFileName ? importFileName : "Clique ou arraste o arquivo aqui"}
                             </p>
                             <p className="text-[11px] text-zinc-500">
-                              {importFileName ? "Clique para trocar o arquivo" : "PDF, Excel (XLS/XLSX), CSV ou TXT"}
+                              {isParsingImportFile ? importFileName : importFileName ? "Clique para trocar o arquivo" : "PDF, Excel, CSV, TXT ou foto do relatório"}
                             </p>
                           </div>
                           <input
                             type="file"
-                            accept=".pdf,.txt,.xlsx,.xls,.csv"
+                            accept={ACEITA_IMPORTACAO}
+                            disabled={isParsingImportFile}
                             onChange={handleImportFileChange}
                             aria-label="Escolher arquivo para importar"
                             className="absolute inset-0 opacity-0 cursor-pointer"
@@ -3087,7 +3105,9 @@ export default function App() {
                         <div>
                           <p className="text-[10px] font-mono text-emerald-400">02</p>
                           <h4 className="mt-0.5 text-sm font-bold text-white">Revisar e enviar</h4>
-                          <p className="text-xs text-zinc-500 mt-0.5">Corrija o que precisar antes de mandar para a carteira</p>
+                          <p className="text-xs text-zinc-500 mt-0.5">
+                            {lastExtractionResult?.resumo || "Corrija o que precisar antes de mandar para a carteira"}
+                          </p>
                         </div>
                         {lastExtractionResult && (
                           <div className="flex flex-wrap justify-end gap-1.5 flex-shrink-0">

@@ -33,9 +33,17 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   usar `window`/`document` fora de efeitos. `public/session-hint.js` esconde o HTML pré-renderizado
   para quem já tem sessão salva.
 
+- **Importação de arquivos** (`src/services/localDocumentExtraction/`, 100% no navegador, nada sai
+  dele): `leitores.ts` lê cada formato (Excel/ODS com tipos reais, CSV/TXT com detecção de
+  Windows-1252, PDF com colunas reconstruídas pela posição em `layout.ts`, PDF escaneado e foto por
+  OCR em `ocr.ts`); `tableInterpreter.ts` mapeia colunas por título + conteúdo; `index.ts` compara a
+  leitura em tabela com as heurísticas de texto (`heuristics.ts`) e fica com a melhor. O OCR
+  (tesseract) é servido de `/ocr`, copiado de node_modules por `tools/ocr-assets.mjs` no dev/build
+  (gitignored) — por isso o CSP tem `'wasm-unsafe-eval'`. Não apontar o OCR para CDN.
+
 ## Quality gate (CI)
 `.github/workflows/ci.yml` roda em todo push/PR: `npm run lint` (tsc), `npm run test:parser`
-(47 testes), `npm run build`. Não quebrar esses. Rode-os localmente antes de commitar mudança grande.
+(parser + motor de importação), `npm run build`. Não quebrar esses. Rode-os localmente antes de commitar mudança grande.
 
 ## Convenções
 - Código e comentários em **pt-BR**, seguindo o estilo dos arquivos vizinhos.

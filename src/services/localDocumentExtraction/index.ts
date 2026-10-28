@@ -1,11 +1,16 @@
 /**
- * Local document extraction pipeline — free, deterministic, no external APIs.
+ * Extração local de cobranças — gratuita, determinística, sem API externa.
+ * Nada do arquivo sai do navegador.
  *
- * Execution order:
- *   1. Normalise input text
- *   2. Choose strategy: delimited table | ERP CNPJ-anchor | line-by-line
- *   3. OCR fallback (tesseract.js, optional) when text quality is too poor
- *   4. Return records compatible with the existing Debtor / import flow
+ * Fluxo:
+ *   1. lerArquivo (leitores.ts): o arquivo vira tabelas + texto corrido;
+ *   2. interpretarDocumento: as tabelas passam pelo intérprete de colunas
+ *      (tableInterpreter.ts) e o texto pelas heurísticas de relatório
+ *      (heuristics.ts); fica a leitura que extraiu registros mais completos;
+ *   3. os registros saem no formato do Debtor, com nono dígito no celular.
+ *
+ * Texto colado usa extrairDeTexto: se for uma tabela (colagem do Excel, CSV),
+ * vai pelo intérprete de colunas; senão, pelas heurísticas.
  */
 
 import { normalizeText, assessTextQuality, looksLikeDelimited } from "./normalizeText";
@@ -16,7 +21,9 @@ import {
   RecordCandidate,
   BANK_INSTITUTION_KEYWORDS,
 } from "./heuristics";
-import { extractOCRFromPdfFile } from "./ocrFallback";
+import { interpretarTabela, NOME_CAMPO, type Campo } from "./tableInterpreter";
+import { comoTabela } from "./textoDelimitado";
+import type { DocumentoImportado, TipoDocumento } from "./leitores";
 import { maskName } from "./piiUtils";
 import { ensureNinthDigit } from "../../../supabase/functions/_shared/brPhone.ts";
 
@@ -64,7 +71,12 @@ export interface LocalExtractionResult {
   lowConfidenceCount: number;
   /** Records where doc number was missing and a DOC-N placeholder was used */
   missingDocCount: number;
+  /** Uma linha para o usuário: como o arquivo foi lido. */
+  resumo: string;
 }
+
+export type { DocumentoImportado } from "./leitores";
+export { lerArquivo, ACEITA_IMPORTACAO } from "./leitores";
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
@@ -127,119 +139,139 @@ function candidateToRecord(
   };
 }
 
-function choosePrimaryStrategy(
-  text: string,
-): "delimited" | "erp" | "line-by-line" {
-  if (looksLikeDelimited(text)) return "delimited";
-
-  // If there are CNPJ patterns in the text, use the ERP anchor parser
+/** Heurísticas de relatório em texto corrido: tabela delimitada, âncora de CNPJ, linha a linha. */
+function heuristicasDeTexto(text: string): { candidates: RecordCandidate[]; method: string } {
+  if (looksLikeDelimited(text)) {
+    const c = parseDelimitedFormat(text);
+    if (c.length) return { candidates: c, method: "delimited-table" };
+  }
   const cnpjCount = (text.match(/\b\d{2}\.?\d{3}\.?\d{3}[/\\]?\d{4}-?\d{2}\b/g) ?? []).length;
-  if (cnpjCount > 0) return "erp";
-
-  return "line-by-line";
+  if (cnpjCount > 0) {
+    const c = parseErpFormat(text);
+    if (c.length) return { candidates: c, method: "erp-cnpj-anchor" };
+  }
+  return { candidates: parseLineByLine(text), method: "line-by-line" };
 }
 
-// ── Main export ───────────────────────────────────────────────────────────────
+/** Soma das notas: favorece a leitura que achou mais registros E mais completos. */
+const qualidade = (cs: RecordCandidate[]) => cs.reduce((s, c) => s + c.confidenceScore, 0);
 
-/**
- * Extract financial records from a text document.
- *
- * @param rawText    Text already extracted from the file (by importFileParser)
- * @param _category  Import category hint (unused in logic, kept for API compat)
- * @param file       Optional original File for OCR fallback (scanned PDFs)
- */
-export async function extractDocumentLocally(
-  rawText: string,
-  _category?: string,
-  file?: File,
-): Promise<LocalExtractionResult> {
-  const warnings: string[] = [];
-  let method = "unknown";
+const ROTULO_TIPO: Record<TipoDocumento | "colado", string> = {
+  planilha: "Planilha",
+  csv: "CSV",
+  texto: "Texto",
+  pdf: "PDF",
+  "pdf-ocr": "PDF escaneado",
+  imagem: "Imagem",
+  colado: "Texto colado",
+};
 
-  // 1. Normalise
-  let text = normalizeText(rawText);
-  const numPages = file ? 1 : 1; // page count hint (1 = conservative)
-  let quality = assessTextQuality(text, numPages);
+const CAMPOS_DO_RESUMO: Campo[] = ["client", "document", "dueDate", "value", "phone"];
 
-  // 2. OCR fallback when text is nearly empty and we have a PDF file
-  if (quality !== "good" && file?.name.toLowerCase().endsWith(".pdf")) {
-    warnings.push(
-      "Texto extraído insuficiente — tentando OCR local (requer tesseract.js instalado)…",
-    );
-    const ocrText = await extractOCRFromPdfFile(file);
+interface LeituraTabelas {
+  candidates: RecordCandidate[];
+  colunas: Set<Campo>;
+  inferidos: Set<Campo>;
+  origens: string[];
+}
 
-    if (ocrText.trim().length > text.trim().length) {
-      text = normalizeText(ocrText);
-      quality = assessTextQuality(text, numPages);
-      method = "ocr";
-    } else {
-      warnings.push(
-        ocrText.trim()
-          ? "OCR retornou texto menor que o extraído pelo pdfjs — usando extração original."
-          : "OCR não disponível ou falhou. Instale tesseract.js para suporte a PDFs escaneados: npm install tesseract.js",
-      );
-    }
+function lerTabelas(tabelas: { origem: string; rows: string[][]; duvidosas?: boolean[][] }[]): LeituraTabelas {
+  const out: LeituraTabelas = { candidates: [], colunas: new Set(), inferidos: new Set(), origens: [] };
+  for (const t of tabelas) {
+    const r = interpretarTabela(t.rows, t.duvidosas);
+    if (!r.candidates.length) continue;
+    out.candidates.push(...r.candidates);
+    (Object.keys(r.colunas) as Campo[]).forEach((c) => out.colunas.add(c));
+    r.inferidos.forEach((c) => out.inferidos.add(c));
+    out.origens.push(t.origem);
   }
+  return out;
+}
 
-  // 3. Empty guard
-  if (quality === "empty") {
+interface Contexto {
+  tipo: TipoDocumento | "colado";
+  nomeArquivo?: string;
+  avisos: string[];
+  texto: string;
+  tabelas: { origem: string; rows: string[][]; duvidosas?: boolean[][] }[];
+}
+
+function extrair(ctx: Contexto): LocalExtractionResult {
+  const warnings = [...ctx.avisos];
+  const text = normalizeText(ctx.texto);
+  const quality = assessTextQuality(text, 1);
+
+  if (quality === "empty" && !ctx.tabelas.length) {
     return {
       records: [],
       warnings: [
-        "Nenhum texto extraído do documento. Verifique se o PDF contém texto acessível (não escaneado) ou instale tesseract.js.",
+        ...warnings,
+        ctx.tipo === "imagem" || ctx.tipo === "pdf-ocr"
+          ? "Não foi possível reconhecer texto na imagem. Use uma foto nítida, de frente, com boa luz e sem cortar as bordas."
+          : "Nenhum texto encontrado no documento. Se for um PDF escaneado, importe o arquivo (não cole o texto) para que ele seja lido como imagem.",
       ],
       method: "empty",
       totalCandidates: 0,
       lowConfidenceCount: 0,
       missingDocCount: 0,
+      resumo: "",
     };
   }
 
-  // 4a. Tenta extrair banco do nome do arquivo (prioridade máxima)
-  const bankFromFilename = file ? extractBankFromFilename(file.name) : "";
+  // 1. Tabelas (planilha, CSV, colunas do PDF/OCR) e 2. heurísticas de texto.
+  const porTabela = lerTabelas(ctx.tabelas);
+  const deveTentarTexto = ctx.tipo !== "planilha" || porTabela.candidates.length === 0;
+  const porTexto = deveTentarTexto && quality !== "empty" ? heuristicasDeTexto(text) : { candidates: [], method: "" };
+
+  // Fica a melhor leitura. Empate (ou quase) fica com a tabela: nela cada campo
+  // vem da sua coluna, sem adivinhar onde termina o nome e começa o telefone.
+  const usaTabela = porTabela.candidates.length > 0 && qualidade(porTabela.candidates) * 1.1 >= qualidade(porTexto.candidates);
+  const candidates = usaTabela ? porTabela.candidates : porTexto.candidates;
+  const method = usaTabela ? `tabela-${ctx.tipo}` : porTexto.method;
+
+  // Resumo de uma linha: de onde veio e que colunas foram reconhecidas.
+  let resumo = ROTULO_TIPO[ctx.tipo];
+  if (usaTabela) {
+    if (porTabela.origens.length === 1 && porTabela.origens[0].startsWith("aba")) resumo += `, ${porTabela.origens[0]}`;
+    else if (porTabela.origens.length > 1 && ctx.tipo === "planilha") resumo += `, ${porTabela.origens.length} abas`;
+    const reconhecidas = CAMPOS_DO_RESUMO.filter((c) => porTabela.colunas.has(c)).map((c) => NOME_CAMPO[c]);
+    if (reconhecidas.length) resumo += ` · colunas: ${reconhecidas.join(", ")}`;
+  } else if (candidates.length) {
+    resumo += " · lido como relatório de texto";
+  }
+
+  if (usaTabela && candidates.length) {
+    if (!porTabela.colunas.has("phone")) {
+      warnings.push("Nenhuma coluna de telefone encontrada: os números ficam em branco para você preencher.");
+    }
+    if (!porTabela.colunas.has("dueDate")) warnings.push("Nenhuma coluna de vencimento encontrada.");
+    const inferidos = [...porTabela.inferidos].filter((c) => CAMPOS_DO_RESUMO.includes(c)).map((c) => NOME_CAMPO[c]);
+    if (inferidos.length) {
+      warnings.push(`Colunas sem título reconhecido identificadas pelo conteúdo (${inferidos.join(", ")}): confira na revisão.`);
+    }
+  }
+
+  // Banco pelo nome do arquivo (prioridade para registros sem banco).
+  const bankFromFilename = ctx.nomeArquivo ? extractBankFromFilename(ctx.nomeArquivo) : "";
   if (bankFromFilename) {
     warnings.push(`Banco detectado no nome do arquivo: "${bankFromFilename}" — será usado como padrão para todos os registros sem banco definido.`);
   }
 
-  // 4. Choose strategy and parse
-  const strategy = choosePrimaryStrategy(text);
-  let candidates: RecordCandidate[] = [];
-
-  if (strategy === "delimited") {
-    candidates = parseDelimitedFormat(text);
-    method = method === "ocr" ? "ocr+delimited" : "delimited-table";
-  }
-
-  if (strategy === "erp" || (strategy === "delimited" && candidates.length === 0)) {
-    candidates = parseErpFormat(text);
-    method = method === "ocr" ? "ocr+erp" : "erp-cnpj-anchor";
-  }
-
-  if (candidates.length === 0) {
-    candidates = parseLineByLine(text);
-    method = method === "ocr" ? "ocr+line" : "line-by-line";
-  }
-
-  // 5. Build final records
   const conversionResults = candidates
     .map((c, i) => candidateToRecord(c, i))
     .filter((r) => r !== null);
 
   const records = conversionResults.map((r) => r!.record).map((rec) => ({
     ...rec,
-    // Banco do filename tem prioridade; se já veio do documento, mantém
     bank: rec.bank || bankFromFilename,
-    // Nono dígito só aqui, com o registro já montado: o parser usa o número
-    // detectado para achar no texto onde termina o nome do cliente, e um
-    // número alterado antes disso quebraria essa busca.
+    // Nono dígito só aqui, com o registro já montado: o parser de texto usa o
+    // número detectado para achar onde termina o nome do cliente, e um número
+    // alterado antes disso quebraria essa busca.
     phone: rec.phone ? ensureNinthDigit(rec.phone) : rec.phone,
   }));
   const missingDocCount = conversionResults.filter((r) => r!.usedPlaceholder).length;
-
-  // Conta somente registros que chegaram à lista final com baixa confiança
   const lowConfCount = records.filter((r) => r.confidenceScore < 75).length;
 
-  // 6. Warnings
   if (records.length === 0 && candidates.length > 0) {
     warnings.push(
       `${candidates.length} linha(s) com campos parciais detectada(s), mas nenhuma tem ` +
@@ -247,7 +279,6 @@ export async function extractDocumentLocally(
         "Verifique o formato do arquivo.",
     );
   }
-
   if (lowConfCount > 0) {
     warnings.push(
       `${lowConfCount} registro(s) extraídos com confiança baixa (<75%). ` +
@@ -255,18 +286,17 @@ export async function extractDocumentLocally(
     );
   }
 
-  // Safe log — no raw PII values, only metadata
+  // Log seguro — só metadados; prévia do primeiro registro com PII mascarada.
   console.log(
     JSON.stringify({
       source: "localExtraction.result",
-      strategy,
+      tipo: ctx.tipo,
       method,
-      candidates: candidates.length,
+      tabela: porTabela.candidates.length,
+      texto: porTexto.candidates.length,
       records: records.length,
       low_confidence: lowConfCount,
       missing_doc: missingDocCount,
-      quality,
-      // First record preview uses PII-masked values only
       preview: records[0]
         ? {
             client: maskName(records[0].client),
@@ -285,7 +315,35 @@ export async function extractDocumentLocally(
     totalCandidates: candidates.length,
     lowConfidenceCount: lowConfCount,
     missingDocCount,
+    resumo: records.length ? resumo : "",
   };
+}
+
+// ── Main exports ──────────────────────────────────────────────────────────────
+
+/** Interpreta um arquivo já lido por lerArquivo. */
+export function interpretarDocumento(doc: DocumentoImportado): LocalExtractionResult {
+  return extrair({ tipo: doc.tipo, nomeArquivo: doc.nomeArquivo, avisos: doc.avisos, texto: doc.texto, tabelas: doc.tabelas });
+}
+
+/** Texto colado (ou editado) na tela de importação. */
+export function extrairDeTexto(texto: string, nomeArquivo?: string): LocalExtractionResult {
+  const normalizado = (texto ?? "").replace(/\r\n?/g, "\n");
+  const tabela = comoTabela(normalizado.trim());
+  return extrair({ tipo: "colado", nomeArquivo, avisos: [], texto: normalizado, tabelas: tabela ? [{ origem: "texto", rows: tabela }] : [] });
+}
+
+/**
+ * Compatibilidade: extrai de um texto já lido. O arquivo, se vier, só serve
+ * para detectar o banco pelo nome — a leitura de PDF escaneado agora é feita
+ * por lerArquivo.
+ */
+export async function extractDocumentLocally(
+  rawText: string,
+  _category?: string,
+  file?: File,
+): Promise<LocalExtractionResult> {
+  return extrairDeTexto(rawText, file?.name);
 }
 
 export type { RecordCandidate } from "./heuristics";

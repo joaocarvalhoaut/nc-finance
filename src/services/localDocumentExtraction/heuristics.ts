@@ -71,7 +71,7 @@ export interface RecordCandidate {
  * nao e enviavel, e um telefone errado manda a cobranca para um estranho.
  * Antes ele nao pontuava, e um registro sem telefone podia marcar 100.
  */
-function score(r: RecordCandidate): number {
+export function score(r: RecordCandidate): number {
   let s = 0;
   if ((r.client && r.client.length >= 3) || (r.supplier && r.supplier.length >= 3)) s += 25;
   if (r.document) s += 20;

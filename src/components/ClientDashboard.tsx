@@ -47,8 +47,7 @@ import { financeService } from "../services/financeService";
 import { contactsService, contactKeyFromName, type Contact } from "../services/contactsService";
 import { billingLogsService } from "../services/billingLogsService";
 import { pilotService } from "../services/pilotService";
-import { parseImportFile } from "../utils/importFileParser";
-import { extractDocumentLocally } from "../services/localDocumentExtraction";
+import { ACEITA_IMPORTACAO, interpretarDocumento, lerArquivo } from "../services/localDocumentExtraction";
 import { getMessageTemplate, fillMessageTemplate } from "../utils/messageTemplates";
 import BatchConfirmModal, { type BatchConfirmData } from "./BatchConfirmModal";
 import BoletoResponsibilityModal from "./BoletoResponsibilityModal";
@@ -249,10 +248,9 @@ export default function ClientDashboard({
     setProcessingMsg("Lendo arquivo…");
 
     try {
-      setProcessingMsg("Extraindo dados do arquivo…");
-      let rawText: string;
+      let doc: Awaited<ReturnType<typeof lerArquivo>>;
       try {
-        rawText = await parseImportFile(file);
+        doc = await lerArquivo(file, setProcessingMsg);
       } catch (parseErr) {
         setExtractError(
           parseErr instanceof Error
@@ -264,7 +262,7 @@ export default function ClientDashboard({
       }
 
       setProcessingMsg("Identificando registros…");
-      const extraction = await extractDocumentLocally(rawText, importCategory, file);
+      const extraction = interpretarDocumento(doc);
 
       const extracted: Debtor[] = extraction.records.map((d) => ({
         id: crypto.randomUUID(),
@@ -678,7 +676,7 @@ export default function ClientDashboard({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".xlsx,.xls,.csv,.pdf,.txt"
+                  accept={ACEITA_IMPORTACAO}
                   className="hidden"
                   onChange={handleFileSelect}
                 />
@@ -701,11 +699,11 @@ export default function ClientDashboard({
                       <p className="text-xs text-zinc-500">
                         {isLiquidacao
                           ? "Planilha ou PDF com os títulos pagos — conferido com a carteira"
-                          : "Planilha Excel, CSV, PDF ou TXT com os dados dos devedores"}
+                          : "Planilha, CSV, PDF (até escaneado) ou foto do relatório"}
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-mono">
-                      {[".xlsx", ".xls", ".csv", ".pdf", ".txt"].map(ext => (
+                      {[".xlsx", ".csv", ".pdf", ".txt", ".jpg", ".png"].map(ext => (
                         <span key={ext} className="px-1.5 py-0.5 border border-zinc-800 rounded">{ext}</span>
                       ))}
                     </div>
