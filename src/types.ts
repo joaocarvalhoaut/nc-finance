@@ -28,6 +28,8 @@ export interface Debtor {
   driveFileUrl?: string | null;
   driveMatchScore?: number | null;
   driveLastMatchAt?: string | null;
+  /** Arquivado em (ISO). Arquivado sai da lista ativa e nunca é cobrado. */
+  archivedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

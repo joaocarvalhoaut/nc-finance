@@ -77,6 +77,8 @@ import {
   Settings, 
   Search, 
   SlidersHorizontal,
+  Archive,
+  ArchiveRestore,
   Plus,
   PlusCircle,
   HelpCircle,
@@ -333,6 +335,11 @@ export default function App() {
   // Exclusão sempre confirmada: um cliente, ou a carteira inteira (com "EXCLUIR" digitado).
   const [excluirConfirm, setExcluirConfirm] = useState<{ tipo: "um"; debtor: Debtor } | { tipo: "todos"; total: number } | null>(null);
   const [excluirTexto, setExcluirTexto] = useState("");
+  // Arquivados: fora da lista ativa (e de qualquer cobrança), numa área
+  // própria da Carteira, de onde podem ser restaurados ou excluídos.
+  const [arquivados, setArquivados] = useState<Debtor[]>([]);
+  const [verArquivados, setVerArquivados] = useState(false);
+  const [avisoArquivo, setAvisoArquivo] = useState<{ ids: string[]; texto: string; desfazerArquivando: boolean } | null>(null);
   const [addDupModal, setAddDupModal] = useState<{ novo: Debtor; existente: Debtor } | null>(null);
   const [notesPopover, setNotesPopover] = useState<{ debtorId: string; draft: string } | null>(null);
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
@@ -720,7 +727,8 @@ export default function App() {
 
         if (!isMounted) return;
 
-        setDebtors(hydratedRecords);
+        setDebtors(hydratedRecords.filter(d => !d.archivedAt));
+        setArquivados(hydratedRecords.filter(d => d.archivedAt));
         setRepresentatives(hydratedRepresentatives);
         setContactsByKey(new Map(contacts.map((c) => [c.contactKey, c])));
         setBillingLogs(hydratedLogs);
@@ -1805,6 +1813,7 @@ export default function App() {
     if (!currentOwnerUserId) return;
 
     setDebtors((prev) => prev.filter((debtor) => debtor.id !== id));
+    setArquivados((prev) => prev.filter((debtor) => debtor.id !== id));
     if (selectedDebtorForMessage?.id === id) {
       setSelectedDebtorForMessage(null);
     }
@@ -1815,6 +1824,54 @@ export default function App() {
       console.error('[workspace]', error instanceof Error ? error.message : 'Falha ao excluir devedor.');
     }
   };
+
+  /**
+   * Arquiva (arquivar=true) ou restaura clientes. Muda a tela na hora e grava
+   * em seguida; se a gravação falhar, desfaz. Arquivado sai da lista ativa —
+   * e com isso do Resumo, dos envios e das automações (as Edge Functions
+   * também conferem archived_at).
+   */
+  const moverArquivo = async (ids: string[], arquivar: boolean) => {
+    if (!currentOwnerUserId || !ids.length) return;
+    const quando = arquivar ? new Date().toISOString() : null;
+    const origem = arquivar ? debtors : arquivados;
+    const movidos = origem.filter(d => ids.includes(d.id)).map(d => ({ ...d, archivedAt: quando }));
+    if (!movidos.length) return;
+    const idsMovidos = movidos.map(d => d.id);
+
+    if (arquivar) {
+      setDebtors(prev => prev.filter(d => !idsMovidos.includes(d.id)));
+      setArquivados(prev => [...movidos, ...prev]);
+      setSelectedDebtorIds(prev => { const n = new Set(prev); idsMovidos.forEach(i => n.delete(i)); return n; });
+      if (selectedDebtorForMessage && idsMovidos.includes(selectedDebtorForMessage.id)) setSelectedDebtorForMessage(null);
+    } else {
+      setArquivados(prev => prev.filter(d => !idsMovidos.includes(d.id)));
+      setDebtors(prev => mesclarDevedores(prev, movidos, "inicio"));
+    }
+
+    try {
+      await financeService.setArchived(currentOwnerUserId, idsMovidos, quando);
+      const qtd = idsMovidos.length === 1 ? movidos[0].client : `${idsMovidos.length} clientes`;
+      setAvisoArquivo({ ids: idsMovidos, texto: arquivar ? `${qtd} foi para Arquivados.` : `${qtd} voltou para a carteira.`, desfazerArquivando: !arquivar });
+    } catch (err) {
+      // Desfaz na tela: o banco não mudou.
+      if (arquivar) {
+        setArquivados(prev => prev.filter(d => !idsMovidos.includes(d.id)));
+        setDebtors(prev => mesclarDevedores(prev, movidos.map(d => ({ ...d, archivedAt: null })), "inicio"));
+      } else {
+        setDebtors(prev => prev.filter(d => !idsMovidos.includes(d.id)));
+        setArquivados(prev => [...movidos.map(d => ({ ...d, archivedAt: new Date().toISOString() })), ...prev]);
+      }
+      setDebtorSaveError(err instanceof Error ? err.message : "Não foi possível arquivar. Tente de novo.");
+    }
+  };
+
+  // Aviso de arquivamento some sozinho.
+  useEffect(() => {
+    if (!avisoArquivo) return;
+    const t = setTimeout(() => setAvisoArquivo(null), 7000);
+    return () => clearTimeout(t);
+  }, [avisoArquivo]);
 
   // Aprende contatos a partir de devedores com telefone e atualiza o mapa local
   const learnContactsFromDebtors = async (list: Debtor[]) => {
@@ -2040,7 +2097,8 @@ export default function App() {
       if (result.success && currentOwnerUserId) {
         // Recarrega devedores do DB para refletir os dados importados
         const updated = await financeService.listByUser(currentOwnerUserId);
-        setDebtors(updated);
+        setDebtors(updated.filter(d => !d.archivedAt));
+        setArquivados(updated.filter(d => d.archivedAt));
         // Atualiza contadores de uso (sheets_imports foi incrementado no backend)
         void refreshSubscription();
       }
@@ -2601,7 +2659,8 @@ export default function App() {
                       if (!currentOwnerUserId) return;
                       try {
                         const updated = await financeService.listByUser(currentOwnerUserId);
-                        setDebtors(updated);
+                        setDebtors(updated.filter(d => !d.archivedAt));
+                        setArquivados(updated.filter(d => d.archivedAt));
                       } catch {
                         // non-critical — Visão Geral será atualizada no próximo acesso
                       }
@@ -3537,6 +3596,19 @@ export default function App() {
                       <PlusCircle className="w-3.5 h-3.5" /> Adicionar devedor
                     </button>
 
+                    <button
+                      type="button"
+                      onClick={() => setVerArquivados(v => !v)}
+                      aria-pressed={verArquivados}
+                      className={`px-3 py-2 rounded-lg border text-xs transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                        verArquivados ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300" : "border-zinc-800 hover:border-zinc-700 text-zinc-300"
+                      }`}
+                      title="Clientes arquivados: fora da carteira ativa e de qualquer cobrança"
+                    >
+                      <Archive className="w-3.5 h-3.5" /> Arquivados
+                      {arquivados.length > 0 && <span className="font-mono text-[10px] text-zinc-500">{arquivados.length}</span>}
+                    </button>
+
                     {/* Ações raras e destrutivas ficam fora da vista. */}
                     <div className="relative">
                       <button
@@ -3563,6 +3635,87 @@ export default function App() {
                     </div>
                   </div>
 
+                  {avisoArquivo && (
+                    <div role="status" className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg border border-zinc-800 bg-zinc-900 text-xs text-zinc-300">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <Archive className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+                        <span className="truncate">{avisoArquivo.texto}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => { const a = avisoArquivo; setAvisoArquivo(null); void moverArquivo(a.ids, a.desfazerArquivando); }}
+                        className="flex-shrink-0 font-semibold text-emerald-400 hover:text-emerald-300 cursor-pointer"
+                      >
+                        Desfazer
+                      </button>
+                    </div>
+                  )}
+
+                  {verArquivados && (() => {
+                    const termo = searchFilter.trim().toLowerCase();
+                    const lista = termo
+                      ? arquivados.filter(d => d.client.toLowerCase().includes(termo) || (d.document || "").toLowerCase().includes(termo))
+                      : arquivados;
+                    const dataCurta = (iso?: string | null) => iso ? new Date(iso).toLocaleDateString("pt-BR") : "—";
+                    return (
+                      <section className="bg-zinc-950 border border-zinc-800 rounded-xl">
+                        <header className="flex items-center justify-between gap-3 px-5 py-4 border-b border-zinc-800/80">
+                          <div>
+                            <h4 className="text-sm font-bold text-white">Arquivados</h4>
+                            <p className="text-xs text-zinc-500 mt-0.5">Fora da carteira ativa e de qualquer cobrança. Restaure para voltar a cobrar.</p>
+                          </div>
+                          <button type="button" onClick={() => setVerArquivados(false)} className="text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer whitespace-nowrap">
+                            Voltar à carteira
+                          </button>
+                        </header>
+                        {lista.length === 0 ? (
+                          <div className="px-5 py-12 text-center">
+                            <Archive className="w-7 h-7 text-zinc-700 mx-auto mb-3" />
+                            <p className="text-xs font-semibold text-zinc-300">{termo ? "Nenhum arquivado com essa busca" : "Nenhum cliente arquivado"}</p>
+                            <p className="text-[11px] text-zinc-500 mt-1 max-w-xs mx-auto">
+                              Na carteira, use o ícone de arquivar na linha do cliente, ou selecione vários e clique em “Arquivar”.
+                            </p>
+                          </div>
+                        ) : (
+                          <ul className="divide-y divide-zinc-900">
+                            {lista.map(d => (
+                              <li key={d.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
+                                <div className="flex-1 min-w-[180px]">
+                                  <p className="text-sm font-medium text-zinc-200 truncate">{d.client}</p>
+                                  <p className="text-[11px] text-zinc-500 font-mono truncate">
+                                    {d.document ? `Doc. ${d.document} · ` : ""}venc. {d.dueDate || "—"} · arquivado em {dataCurta(d.archivedAt)}
+                                  </p>
+                                </div>
+                                <span className="text-sm font-mono tabular-nums text-zinc-300">
+                                  {d.value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => void moverArquivo([d.id], false)}
+                                    className="px-2.5 py-1.5 rounded-md border border-zinc-800 hover:border-emerald-500/50 hover:text-emerald-300 text-xs text-zinc-300 transition-colors cursor-pointer flex items-center gap-1.5"
+                                  >
+                                    <ArchiveRestore className="w-3.5 h-3.5" /> Restaurar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setExcluirConfirm({ tipo: "um", debtor: d })}
+                                    aria-label={`Excluir ${d.client}`}
+                                    title="Excluir de vez"
+                                    className="p-1.5 rounded-md text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </section>
+                    );
+                  })()}
+
+                  {!verArquivados && (<>
                   {selectedDebtorIds.size > 0 && (
                     <div className="px-4 py-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
@@ -3621,6 +3774,17 @@ export default function App() {
                         >
                           <Ban className="w-3.5 h-3.5" />
                           Desabilitar selecionados ({selectedDebtorIds.size})
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void moverArquivo([...selectedDebtorIds], true)}
+                          disabled={isBatchSending}
+                          title="Arquivar — sai da carteira ativa e de qualquer cobrança; dá para restaurar"
+                          className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xs font-bold rounded-xl transition-all disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                          Arquivar ({selectedDebtorIds.size})
                         </button>
 
                         <button
@@ -3948,9 +4112,16 @@ export default function App() {
                                     )}
                                     <button
                                       type="button"
+                                      onClick={() => void moverArquivo([d.id], true)}
+                                      className="ml-auto px-2.5 py-2 rounded-lg text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 cursor-pointer flex items-center gap-1.5"
+                                    >
+                                      <Archive className="w-4 h-4" /> Arquivar
+                                    </button>
+                                    <button
+                                      type="button"
                                       onClick={() => setExcluirConfirm({ tipo: "um", debtor: d })}
                                       aria-label="Excluir devedor"
-                                      className="ml-auto px-2.5 py-2 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer"
+                                      className="px-2.5 py-2 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer"
                                     >
                                       <Trash2 className="w-4 h-4" />
                                     </button>
@@ -4359,9 +4530,18 @@ export default function App() {
                                         Cobrar
                                       </button>
                                       <button
+                                        onClick={() => void moverArquivo([d.id], true)}
+                                        className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                                        title="Arquivar (sai da carteira ativa; dá para restaurar)"
+                                        aria-label={`Arquivar ${d.client}`}
+                                      >
+                                        <Archive className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
                                         onClick={() => setExcluirConfirm({ tipo: "um", debtor: d })}
                                         className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                                        title="Eliminar devedor"
+                                        title="Excluir devedor"
+                                        aria-label={`Excluir ${d.client}`}
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
                                       </button>
@@ -4376,6 +4556,7 @@ export default function App() {
                     </div>
                   </div>
 
+                  </>)}
                 </div>{/* end space-y-8 */}
 
                 {/* ── Modal: Sincronizar com Google Sheets ─────────────────── */}
@@ -5972,6 +6153,7 @@ export default function App() {
                         {excluirConfirm.debtor.document ? ` · doc. ${excluirConfirm.debtor.document}` : ""}
                         {" · "}{excluirConfirm.debtor.value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                         {" "}sai da carteira de vez. Não dá para desfazer.
+                        {!excluirConfirm.debtor.archivedAt && " Se só quer tirar da lista, arquive: dá para restaurar depois."}
                       </p>
                     ) : (
                       <>
@@ -5994,6 +6176,16 @@ export default function App() {
                     )}
                   </div>
                   <footer className="flex items-center justify-end gap-2 px-5 py-4 border-t border-zinc-800/80">
+                    {/* Quer só tirar da lista? Arquivar guarda o cliente e dá para restaurar. */}
+                    {excluirConfirm.tipo === "um" && !excluirConfirm.debtor.archivedAt && (
+                      <button
+                        type="button"
+                        onClick={() => { const id = excluirConfirm.debtor.id; fechar(); void moverArquivo([id], true); }}
+                        className="mr-auto px-3 py-2 rounded-lg text-sm text-zinc-400 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Archive className="w-3.5 h-3.5" /> Arquivar
+                      </button>
+                    )}
                     <button
                       type="button"
                       autoFocus={!todos}

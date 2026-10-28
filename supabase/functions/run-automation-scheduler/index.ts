@@ -101,8 +101,9 @@ const processRule = async (rule: RuleRow): Promise<void> => {
     const today = new Date().toISOString().slice(0, 10);
     let debtorQuery = admin
       .from("user_registros_financeiros")
-      .select("id, client_name, document_number, due_date, amount, updated_value, phone, drive_file_url, drive_file_name, category, status")
+      .select("id, client_name, document_number, due_date, amount, updated_value, phone, drive_file_url, drive_file_name, category, status, archived_at")
       .eq("user_id", userId)
+      .is("archived_at", null)         // arquivado nunca é cobrado
       .neq("status", "sent")            // não cobrar quem já foi marcado como enviado
       // NUNCA cobrar liquidados (já pagos) nem clientes desabilitados
       .or("category.is.null,category.not.in.(liquidado,desabilitado)")
@@ -162,6 +163,7 @@ const processRule = async (rule: RuleRow): Promise<void> => {
         // Defesa em profundidade: nunca cobrar liquidados (já pagos) nem desabilitados
         d.category !== "liquidado" &&
         d.category !== "desabilitado" &&
+        !d.archived_at &&
         d.status !== "liquidado",
     );
     const limited = maxDaily ? eligible.slice(0, maxDaily) : eligible;

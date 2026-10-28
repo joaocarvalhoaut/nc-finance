@@ -308,7 +308,7 @@ Deno.serve(async (request: Request) => {
         .from("user_registros_financeiros")
         .select(
           "id, client_name, document_number, due_date, amount, phone, " +
-          "updated_value, category, status, drive_file_id, drive_file_url, drive_file_name",
+          "updated_value, category, status, drive_file_id, drive_file_url, drive_file_name, archived_at",
         )
         .eq("id", debtorId)
         .eq("user_id", userId) // garante que o devedor pertence ao usuário
@@ -330,8 +330,8 @@ Deno.serve(async (request: Request) => {
 
       const dr = debtorRow as unknown as Record<string, unknown>;
 
-      // a.1 NUNCA cobrar liquidados (já pagos) nem desabilitados — trava no servidor
-      if (dr.category === "liquidado" || dr.status === "liquidado" || dr.category === "desabilitado") {
+      // a.1 NUNCA cobrar liquidados (já pagos), desabilitados nem arquivados — trava no servidor
+      if (dr.category === "liquidado" || dr.status === "liquidado" || dr.category === "desabilitado" || dr.archived_at) {
         results.push({
           debtorId,
           clientName:  String(dr.client_name ?? ""),
@@ -339,7 +339,9 @@ Deno.serve(async (request: Request) => {
           status:      "bloqueado_liquidado",
           messageId:   null,
           logId:       null,
-          error:       dr.category === "desabilitado"
+          error:       dr.archived_at
+            ? "Cliente arquivado — cobrança bloqueada."
+            : dr.category === "desabilitado"
             ? "Cliente desabilitado — cobrança bloqueada."
             : "Cliente liquidado (já pago) — cobrança bloqueada.",
           sentWithPdf: false,

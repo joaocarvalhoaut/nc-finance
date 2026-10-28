@@ -196,14 +196,16 @@ Deno.serve(async (request: Request) => {
     if (body.debtorId) {
       const { data: debtorChk } = await admin
         .from("user_registros_financeiros")
-        .select("category, status")
+        .select("category, status, archived_at")
         .eq("id", body.debtorId)
         .eq("user_id", userId)
         .maybeSingle();
-      const chk = debtorChk as { category?: string; status?: string } | null;
-      if (chk && (chk.category === "liquidado" || chk.status === "liquidado" || chk.category === "desabilitado")) {
+      const chk = debtorChk as { category?: string; status?: string; archived_at?: string | null } | null;
+      if (chk && (chk.category === "liquidado" || chk.status === "liquidado" || chk.category === "desabilitado" || chk.archived_at)) {
         return errResponse(409, {
-          error:  chk.category === "desabilitado"
+          error:  chk.archived_at
+            ? "Cliente arquivado — cobrança bloqueada."
+            : chk.category === "desabilitado"
             ? "Cliente desabilitado — cobrança bloqueada."
             : "Cliente liquidado (já pago) — cobrança bloqueada.",
           status: "bloqueado_liquidado",

@@ -30,6 +30,7 @@ interface FinancialRecordRow {
   drive_file_url: string | null;
   drive_match_score: number | null;
   drive_last_match_at: string | null;
+  archived_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -63,6 +64,12 @@ const SELECT_FIELDS = `
   created_at,
   updated_at
 `;
+// Com a coluna de arquivamento (migração 20261029120000_arquivar_clientes.sql).
+const SELECT_FIELDS_COM_ARQUIVO = `${SELECT_FIELDS}, archived_at`;
+
+/** A coluna archived_at ainda não existe no banco (migração não rodada). */
+const semColunaDeArquivo = (error: { code?: string; message?: string } | null) =>
+  Boolean(error && (error.code === "42703" || /archived_at/i.test(error.message ?? "")));
 
 const isValidUUID = (value: string | null | undefined) => Boolean(value && UUID_REGEX.test(value));
 
@@ -114,6 +121,7 @@ const mapRowToDebtor = (row: FinancialRecordRow): Debtor => ({
   driveFileUrl: row.drive_file_url ?? null,
   driveMatchScore: row.drive_match_score ?? null,
   driveLastMatchAt: row.drive_last_match_at ?? null,
+  archivedAt: row.archived_at ?? null,
   createdAt: row.created_at,
   updatedAt: row.updated_at
 });
@@ -146,19 +154,43 @@ const mapDebtorToRow = (userId: string, debtor: Debtor) => ({
 });
 
 export const financeService = {
+  /** Todos os registros da conta, ativos e arquivados (archivedAt preenchido). */
   async listByUser(userId: string) {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
+    const consultar = (campos: string) => supabase
       .from(TABLE_NAME)
-      .select(SELECT_FIELDS)
+      .select(campos)
       .eq("user_id", userId)
       .order("created_at", { ascending: true });
+
+    let { data, error } = await consultar(SELECT_FIELDS_COM_ARQUIVO);
+    // Antes da migração de arquivamento a coluna não existe: carrega sem ela
+    // (todos ativos) em vez de deixar a Carteira vazia.
+    if (semColunaDeArquivo(error)) ({ data, error } = await consultar(SELECT_FIELDS));
 
     if (error) {
       throw new Error(error.message || "Falha ao carregar registros financeiros.");
     }
 
-    return (data || []).map((row) => mapRowToDebtor(row as FinancialRecordRow));
+    return (data || []).map((row) => mapRowToDebtor(row as unknown as FinancialRecordRow));
+  },
+
+  /**
+   * Arquiva (data) ou restaura (null) registros. Arquivado sai da lista ativa
+   * e as Edge Functions de envio e automação nunca o cobram.
+   */
+  async setArchived(userId: string, ids: string[], archivedAt: string | null) {
+    if (!ids.length) return;
+    const supabase = getSupabaseClient();
+    const { error } = await supabase
+      .from(TABLE_NAME)
+      .update({ archived_at: archivedAt })
+      .in("id", ids)
+      .eq("user_id", userId);
+    if (semColunaDeArquivo(error)) {
+      throw new Error("Arquivar ainda não está disponível nesta conta. Tente de novo mais tarde.");
+    }
+    if (error) throw new Error(error.message || "Falha ao arquivar.");
   },
 
   async create(userId: string, debtor: Debtor) {
@@ -218,13 +250,18 @@ export const financeService = {
         return row;
       });
 
-      const { data, error } = await supabase
+      // Reimportar um título arquivado o traz de volta para a lista ativa: se ele
+      // está no relatório de novo, voltou a ser cobrável. (Sem a coluna — antes
+      // da migração de arquivamento — grava sem ela.)
+      const gravar = (linhas: typeof payloadWithDoc) => supabase
         .from(TABLE_NAME)
-        .upsert(payloadWithDoc, {
+        .upsert(linhas, {
           onConflict: "user_id,document_number",
           ignoreDuplicates: false,   // atualiza se já existir
         })
         .select(SELECT_FIELDS);
+      let { data, error } = await gravar(payloadWithDoc.map((r) => ({ ...r, archived_at: null })));
+      if (semColunaDeArquivo(error)) ({ data, error } = await gravar(payloadWithDoc));
 
       if (error) throw new Error(error.message || "Falha ao salvar registros com documento.");
       results.push(...((data || []) as FinancialRecordRow[]));
