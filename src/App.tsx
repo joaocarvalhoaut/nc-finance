@@ -76,6 +76,7 @@ import {
   Settings, 
   Search, 
   SlidersHorizontal,
+  Plus,
   PlusCircle,
   HelpCircle,
 
@@ -222,6 +223,23 @@ const mesclarDevedores = (
   if (!novos.length) return atualizados;
 
   return posicao === "inicio" ? [...novos, ...atualizados] : [...atualizados, ...novos];
+};
+
+// Máscaras do cadastro manual: a pessoa digita só números.
+const mascaraData = (v: string) => {
+  const d = v.replace(/\D/g, "").slice(0, 8);
+  if (d.length > 4) return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+  if (d.length > 2) return `${d.slice(0, 2)}/${d.slice(2)}`;
+  return d;
+};
+const mascaraTelefone = (v: string) => {
+  let d = v.replace(/\D/g, "");
+  if (d.length > 11 && d.startsWith("55")) d = d.slice(2); // colado com DDI
+  d = d.slice(0, 11);
+  if (d.length <= 2) return d;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 };
 
 export default function App() {
@@ -1797,7 +1815,8 @@ export default function App() {
       document: addDebtorForm.document.trim() || `M-${Date.now()}`,
       dueDate:  addDebtorForm.dueDate.trim(),
       value:    val,
-      phone:    addDebtorForm.phone.trim(),
+      // Só dígitos: o campo mostra "(11) 98765-4321", mas o envio usa o número.
+      phone:    addDebtorForm.phone.replace(/\D/g, ""),
       category: addDebtorForm.category,
       status:   "pending",
       interestApplied: addDebtorForm.category === "liquidado" ? 0 : globalInterestDayPct,
@@ -4404,185 +4423,215 @@ export default function App() {
                 )}
 
                 {/* ── Modal: Adicionar Devedor Manualmente ──────────────────── */}
-                {showAddDebtorModal && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={e => e.target === e.currentTarget && setShowAddDebtorModal(false)}>
-                    <div className="bg-zinc-900 border border-zinc-700 rounded-3xl shadow-2xl w-full max-w-lg">
-                      <div className="flex items-center justify-between p-5 border-b border-zinc-800">
-                        <div className="flex items-center gap-2">
-                          <PlusCircle className="w-5 h-5 text-emerald-400" />
-                          <h3 className="text-base font-bold text-white">Adicionar Devedor Manualmente</h3>
-                        </div>
-                        <button
-                          onClick={() => setShowAddDebtorModal(false)}
-                          className="text-zinc-500 hover:text-white transition-colors p-1"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
+                {/* Mesmo padrão da Importar carteira: cantos retos, rótulos mono,
+                    cor só no tipo do título. Campos na ordem do que importa:
+                    cliente, valor e vencimento primeiro; o resto é opcional. */}
+                {showAddDebtorModal && (() => {
+                  const rotulo = "block text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1.5";
+                  const opcional = <span className="normal-case tracking-normal text-zinc-600"> · opcional</span>;
+                  const campo = "w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors";
+                  const tipos = [
+                    { value: "vencidos",  label: "Vencidos",   cor: "#e11d48", description: "Multa e juros" },
+                    { value: "a_vencer",  label: "A vencer",   cor: "#d97706", description: "Aviso preventivo" },
+                    { value: "recompra",  label: "Recompra",   cor: "#0284c7", description: "Cobrado como vencido" },
+                    { value: "liquidado", label: "Liquidação", cor: "#059669", description: "Pago, sem cobrança" },
+                  ] as const;
+                  const match = contactsByKey.get(contactKeyFromName(addDebtorForm.client));
+                  const sugerirTelefone = Boolean(
+                    match?.phone && addDebtorForm.phone.replace(/\D/g, "").length < 10 && addDebtorForm.client.trim().length >= 3,
+                  );
+                  const fechar = () => setShowAddDebtorModal(false);
 
-                      <form onSubmit={(e) => void handleAddDebtorManually(e)} className="p-5 space-y-4">
+                  return (
+                    <div
+                      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto"
+                      onMouseDown={e => e.target === e.currentTarget && fechar()}
+                      onKeyDown={e => e.key === "Escape" && fechar()}
+                    >
+                      <div role="dialog" aria-modal="true" aria-labelledby="novo-devedor-titulo" className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl">
+                        <header className="flex items-start justify-between gap-3 px-5 py-4 border-b border-zinc-800/80">
+                          <div>
+                            <h3 id="novo-devedor-titulo" className="text-sm font-bold text-white">Novo devedor</h3>
+                            <p className="text-xs text-zinc-500 mt-0.5">Cadastro manual de um título na carteira</p>
+                          </div>
+                          <button type="button" onClick={fechar} aria-label="Fechar" className="p-1 -mr-1 text-zinc-500 hover:text-white transition-colors cursor-pointer">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </header>
 
-                        {/* Categoria */}
-                        <div className="space-y-2">
-                          <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold flex items-center gap-1.5">
-                            <FileCheck2 className="w-3 h-3" />
-                            Tipo de arquivo
-                          </label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {([
-                              { value: "vencidos",  label: "Vencidos",   description: "Títulos já vencidos — cobráveis com juros e multa", inactive: "border-zinc-700 text-zinc-400 hover:border-rose-500/50 hover:text-rose-300",    active: "border-rose-500 bg-rose-500/10 text-rose-300" },
-                              { value: "a_vencer",  label: "A vencer",   description: "Títulos a vencer — aviso preventivo amigável",       inactive: "border-zinc-700 text-zinc-400 hover:border-amber-500/50 hover:text-amber-300",   active: "border-amber-500 bg-amber-500/10 text-amber-300" },
-                              { value: "recompra",  label: "Recompra",   description: "Títulos recomprados — cobráveis com juros e multa", inactive: "border-zinc-700 text-zinc-400 hover:border-sky-500/50 hover:text-sky-300",     active: "border-sky-500 bg-sky-500/10 text-sky-300" },
-                              { value: "liquidado", label: "Liquidação", description: "Títulos pagos — reconciliação, SEM cobrança",        inactive: "border-zinc-700 text-zinc-400 hover:border-emerald-500/50 hover:text-emerald-300", active: "border-emerald-500 bg-emerald-500/10 text-emerald-300" },
-                            ] as const).map(cat => (
-                              <button
-                                key={cat.value}
-                                type="button"
-                                onClick={() => setAddDebtorForm(f => ({ ...f, category: cat.value }))}
-                                className={`px-2.5 py-2.5 rounded-xl border transition-all text-left ${addDebtorForm.category === cat.value ? cat.active : cat.inactive}`}
-                              >
-                                <div className="font-semibold text-xs">{cat.label}</div>
-                                <div className="text-[9px] opacity-70 mt-0.5 leading-tight">{cat.description}</div>
-                              </button>
-                            ))}
-                          </div>
-                          {addDebtorForm.category === "liquidado" && (
-                            <div className="flex items-start gap-2 text-xs text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-2.5">
-                              <HandCoins className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                              <span>Registro será salvo como <strong>liquidado</strong> — sem cobrança.</span>
-                            </div>
-                          )}
-                        </div>
+                        <form onSubmit={(e) => void handleAddDebtorManually(e)}>
+                          <div className="px-5 py-4 space-y-4">
 
-                        {/* Nome + Fornecedor */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Nome do Cliente *</label>
-                            <input aria-label="Nome do Cliente *"
-                              type="text"
-                              required
-                              value={addDebtorForm.client}
-                              onChange={e => setAddDebtorForm(f => ({ ...f, client: e.target.value }))}
-                              placeholder="João Silva Ltda"
-                              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Fornecedor / S.A.</label>
-                            <input aria-label="Fornecedor / S.A."
-                              type="text"
-                              value={addDebtorForm.supplier}
-                              onChange={e => setAddDebtorForm(f => ({ ...f, supplier: e.target.value }))}
-                              placeholder="Distribuidora Alfa"
-                              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Documento + Vencimento */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Nº Documento</label>
-                            <input aria-label="Nº Documento"
-                              type="text"
-                              value={addDebtorForm.document}
-                              onChange={e => setAddDebtorForm(f => ({ ...f, document: e.target.value }))}
-                              placeholder="1082-3"
-                              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-emerald-500 transition-colors"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Vencimento * (DD/MM/AAAA)</label>
-                            <input aria-label="Vencimento * (DD/MM/AAAA)"
-                              type="text"
-                              required
-                              value={addDebtorForm.dueDate}
-                              onChange={e => setAddDebtorForm(f => ({ ...f, dueDate: e.target.value }))}
-                              placeholder="15/06/2026"
-                              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-emerald-500 transition-colors"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Valor + Telefone */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Valor (R$) *</label>
-                            <input aria-label="Valor (R$) *"
-                              type="text"
-                              required
-                              value={addDebtorForm.value}
-                              onChange={e => setAddDebtorForm(f => ({ ...f, value: e.target.value }))}
-                              placeholder="1.250,00"
-                              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-emerald-500 transition-colors"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] uppercase font-mono text-zinc-500 font-bold block">Telefone WhatsApp</label>
-                            <input aria-label="Telefone WhatsApp"
-                              type="text"
-                              value={addDebtorForm.phone}
-                              onChange={e => setAddDebtorForm(f => ({ ...f, phone: e.target.value }))}
-                              placeholder="5511999990001"
-                              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-emerald-500 transition-colors"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Sugestão: cliente já cadastrado com telefone salvo */}
-                        {(() => {
-                          const match = contactsByKey.get(contactKeyFromName(addDebtorForm.client));
-                          const phoneEmpty = addDebtorForm.phone.replace(/\D/g, "").length < 10;
-                          if (!match || !match.phone || !phoneEmpty || addDebtorForm.client.trim().length < 3) return null;
-                          return (
-                            <div className="flex items-start gap-2.5 text-xs bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
-                              <UserCheck className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-emerald-200">
-                                  <span className="font-bold">{match.clientName}</span> já está cadastrado no sistema. Deseja preencher os dados automaticamente?
+                            {/* Tipo do título */}
+                            <div>
+                              <span className={rotulo}>Tipo do título</span>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-label="Tipo do título">
+                                {tipos.map(cat => {
+                                  const ativo = addDebtorForm.category === cat.value;
+                                  return (
+                                    <button
+                                      key={cat.value}
+                                      type="button"
+                                      role="radio"
+                                      aria-checked={ativo}
+                                      onClick={() => setAddDebtorForm(f => ({ ...f, category: cat.value }))}
+                                      className={`px-2.5 py-2 rounded-md border text-left transition-colors cursor-pointer ${ativo ? "" : "border-zinc-800 hover:border-zinc-700"}`}
+                                      style={ativo ? { borderColor: `${cat.cor}99`, background: `${cat.cor}1f` } : undefined}
+                                    >
+                                      <span className="flex items-center gap-1.5 text-xs font-semibold text-white">
+                                        <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: cat.cor }} />
+                                        {cat.label}
+                                      </span>
+                                      <span className="block mt-0.5 text-[10px] text-zinc-500 leading-snug">{cat.description}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {addDebtorForm.category === "liquidado" && (
+                                <p className="mt-2 flex items-start gap-2 text-[11px] text-emerald-300 bg-emerald-500/5 border border-emerald-500/20 rounded-md px-3 py-2">
+                                  <HandCoins className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
+                                  O título entra como pago na carteira. Nenhuma cobrança é enviada.
                                 </p>
-                                <button
-                                  type="button"
-                                  onClick={() => setAddDebtorForm(f => ({ ...f, phone: match.phone }))}
-                                  className="mt-2 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-[11px] font-bold transition-all cursor-pointer inline-flex items-center gap-1.5"
-                                >
-                                  <Check className="w-3 h-3" strokeWidth={3} /> Preencher telefone ({match.phone})
-                                </button>
+                              )}
+                            </div>
+
+                            {/* Cliente */}
+                            <div>
+                              <label htmlFor="novo-cliente" className={rotulo}>Cliente</label>
+                              <input
+                                id="novo-cliente"
+                                type="text"
+                                required
+                                autoFocus
+                                autoComplete="off"
+                                value={addDebtorForm.client}
+                                onChange={e => setAddDebtorForm(f => ({ ...f, client: e.target.value }))}
+                                placeholder="Nome ou razão social"
+                                className={campo}
+                              />
+                            </div>
+
+                            {/* Valor + Vencimento */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label htmlFor="novo-valor" className={rotulo}>Valor</label>
+                                <div className="relative">
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 pointer-events-none">R$</span>
+                                  <input
+                                    id="novo-valor"
+                                    type="text"
+                                    inputMode="decimal"
+                                    required
+                                    value={addDebtorForm.value}
+                                    onChange={e => setAddDebtorForm(f => ({ ...f, value: e.target.value.replace(/[^\d.,]/g, "") }))}
+                                    placeholder="0,00"
+                                    className={`${campo} pl-9 font-mono tabular-nums`}
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label htmlFor="novo-vencimento" className={rotulo}>Vencimento</label>
+                                <input
+                                  id="novo-vencimento"
+                                  type="text"
+                                  inputMode="numeric"
+                                  required
+                                  value={addDebtorForm.dueDate}
+                                  onChange={e => setAddDebtorForm(f => ({ ...f, dueDate: mascaraData(e.target.value) }))}
+                                  placeholder="DD/MM/AAAA"
+                                  className={`${campo} font-mono tabular-nums`}
+                                />
                               </div>
                             </div>
-                          );
-                        })()}
 
-                        {addDebtorError && (
-                          <div className="flex items-start gap-2 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
-                            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                            {addDebtorError}
+                            {/* Documento + WhatsApp */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label htmlFor="novo-documento" className={rotulo}>Documento{opcional}</label>
+                                <input
+                                  id="novo-documento"
+                                  type="text"
+                                  value={addDebtorForm.document}
+                                  onChange={e => setAddDebtorForm(f => ({ ...f, document: e.target.value }))}
+                                  placeholder="Nº do título ou boleto"
+                                  className={`${campo} font-mono`}
+                                />
+                              </div>
+                              <div>
+                                <label htmlFor="novo-telefone" className={rotulo}>WhatsApp{opcional}</label>
+                                <input
+                                  id="novo-telefone"
+                                  type="tel"
+                                  inputMode="tel"
+                                  value={addDebtorForm.phone}
+                                  onChange={e => setAddDebtorForm(f => ({ ...f, phone: mascaraTelefone(e.target.value) }))}
+                                  placeholder="(00) 00000-0000"
+                                  className={`${campo} font-mono tabular-nums`}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Cliente já cadastrado: oferece o telefone salvo */}
+                            {sugerirTelefone && match && (
+                              <div className="flex items-center justify-between gap-3 text-xs bg-emerald-500/5 border border-emerald-500/20 rounded-md px-3 py-2">
+                                <span className="flex items-center gap-2 min-w-0 text-emerald-200">
+                                  <UserCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                                  <span className="truncate"><strong className="font-semibold">{match.clientName}</strong> já tem telefone salvo</span>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setAddDebtorForm(f => ({ ...f, phone: mascaraTelefone(match.phone) }))}
+                                  className="flex-shrink-0 font-semibold text-emerald-400 hover:text-emerald-300 cursor-pointer"
+                                >
+                                  Usar {mascaraTelefone(match.phone)}
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Fornecedor */}
+                            <div>
+                              <label htmlFor="novo-fornecedor" className={rotulo}>Fornecedor{opcional}</label>
+                              <input
+                                id="novo-fornecedor"
+                                type="text"
+                                value={addDebtorForm.supplier}
+                                onChange={e => setAddDebtorForm(f => ({ ...f, supplier: e.target.value }))}
+                                placeholder="Quem emitiu o título, se não for a sua empresa"
+                                className={campo}
+                              />
+                            </div>
+
+                            {addDebtorError && (
+                              <p role="alert" className="flex items-start gap-2 text-xs text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-md px-3 py-2">
+                                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
+                                {addDebtorError}
+                              </p>
+                            )}
                           </div>
-                        )}
 
-                        <div className="flex gap-3 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => setShowAddDebtorModal(false)}
-                            className="flex-1 py-2.5 rounded-xl border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 text-sm font-medium transition-colors"
-                          >
-                            Cancelar
-                          </button>
-                          <button
-                            type="submit"
-                            disabled={addDebtorSaving}
-                            className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-extrabold text-sm flex items-center justify-center gap-2 transition-colors"
-                          >
-                            {addDebtorSaving
-                              ? <><div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" /> Salvando…</>
-                              : <><PlusCircle className="w-4 h-4" /> Adicionar Devedor</>
-                            }
-                          </button>
-                        </div>
-                      </form>
+                          <footer className="flex items-center justify-end gap-2 px-5 py-4 border-t border-zinc-800/80">
+                            <button
+                              type="button"
+                              onClick={fechar}
+                              className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={addDebtorSaving}
+                              className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black text-sm font-bold flex items-center gap-2 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                            >
+                              {addDebtorSaving
+                                ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Salvando…</>
+                                : <><Plus className="w-4 h-4" /> Adicionar devedor</>}
+                            </button>
+                          </footer>
+                        </form>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
                 </>
               )}
 
