@@ -4433,8 +4433,8 @@ export default function App() {
                   const tipos = [
                     { value: "vencidos",  label: "Vencidos",   cor: "#e11d48", description: "Multa e juros" },
                     { value: "a_vencer",  label: "A vencer",   cor: "#d97706", description: "Aviso preventivo" },
-                    { value: "recompra",  label: "Recompra",   cor: "#0284c7", description: "Cobrado como vencido" },
-                    { value: "liquidado", label: "Liquidação", cor: "#059669", description: "Pago, sem cobrança" },
+                    { value: "recompra",  label: "Recompra",   cor: "#0284c7", description: "Como vencido" },
+                    { value: "liquidado", label: "Liquidação", cor: "#059669", description: "Sem cobrança" },
                   ] as const;
                   const match = contactsByKey.get(contactKeyFromName(addDebtorForm.client));
                   const sugerirTelefone = Boolean(
