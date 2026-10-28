@@ -491,10 +491,6 @@ function VisualQr() {
           </ol>
         </div>
       </div>
-      <p className="mt-5 flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
-        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-        Conectado · (11) 9 ••••-4321
-      </p>
     </div>
   );
 }
