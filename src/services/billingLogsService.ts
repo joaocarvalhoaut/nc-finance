@@ -79,7 +79,11 @@ const mapRowToBillingLog = (row: BillingLogRow): BillingLog => ({
   document: row.document_number,
   phone: row.phone,
   value: Number(row.amount || 0),
-  dateSent: row.sent_at ? new Date(row.sent_at).toLocaleString("pt-BR") : "",
+  // Data crua (ISO), como vem do banco: quem mostra formata. Antes ela já saía
+  // daqui em texto pt-BR ("28/10/2026, 10:15:00"), e o Histórico tentava ler
+  // esse texto de novo como data — o navegador não entende o formato
+  // brasileiro e a coluna mostrava "Invalid Date".
+  dateSent: row.sent_at ?? "",
   tone: (row.tone as BillingLog["tone"]) || "neutro",
   message: row.message,
   status: row.status,

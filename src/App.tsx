@@ -5416,9 +5416,12 @@ export default function App() {
                                 <React.Fragment key={log.id}>
                                   <tr className="hover:bg-zinc-900/25 transition-colors">
                                     <td className="px-5 py-4 font-mono text-zinc-500 text-[11px]">
-                                      {log.dateSent
-                                        ? new Date(log.dateSent).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })
-                                        : "—"}
+                                      {(() => {
+                                        const enviado = log.dateSent ? new Date(log.dateSent) : null;
+                                        return enviado && !Number.isNaN(enviado.getTime())
+                                          ? enviado.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })
+                                          : "—";
+                                      })()}
                                     </td>
                                     <td className="px-5 py-4">
                                       <div className="font-bold text-white text-xs">{log.client}</div>

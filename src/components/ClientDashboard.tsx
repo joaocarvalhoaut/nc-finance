@@ -199,10 +199,13 @@ export default function ClientDashboard({
 
   const refreshTodayCount = useCallback(async () => {
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      // "Hoje" no fuso de quem usa (às 22h em Brasília o UTC já é amanhã).
+      const diaLocal = (d: Date) => d.toLocaleDateString("sv-SE"); // AAAA-MM-DD
+      const today = diaLocal(new Date());
       const logs = await billingLogsService.listByUser(userId);
       const count = logs.filter(l => {
-        const d = l.dateSent?.slice(0, 10) ?? "";
+        const enviado = l.dateSent ? new Date(l.dateSent) : null;
+        const d = enviado && !Number.isNaN(enviado.getTime()) ? diaLocal(enviado) : "";
         return d === today && (l.status === "sent" || l.status === "sucesso");
       }).length;
       setSentToday(count);
