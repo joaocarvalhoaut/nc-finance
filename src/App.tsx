@@ -4898,7 +4898,10 @@ export default function App() {
                 debtors.forEach(d => porTipo.set(d.category, (porTipo.get(d.category) ?? 0) + 1));
                 const listaEnvio = debtors.filter(d =>
                   (tipoEnvio === "todos" || d.category === tipoEnvio) &&
-                  (!termo || d.client.toLowerCase().includes(termo) || (d.document || "").toLowerCase().includes(termo)));
+                  (!termo || d.client.toLowerCase().includes(termo) || (d.document || "").toLowerCase().includes(termo)))
+                  // Quem já recebeu a cobrança desce para o fim; o resto mantém a ordem
+                  // (o sort é estável), então os pendentes ficam sempre no topo.
+                  .sort((a, b) => Number(a.status === "sent") - Number(b.status === "sent"));
                 const sel = selectedDebtorForMessage;
 
                 return (
