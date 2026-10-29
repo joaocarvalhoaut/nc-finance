@@ -1900,6 +1900,13 @@ export default function App() {
       setAddDebtorError("Informe um vencimento válido no formato DD/MM/AAAA.");
       return;
     }
+    // Sem WhatsApp não há cobrança: obrigatório, exceto na Liquidação (sem envio).
+    if (addDebtorForm.category !== "liquidado" && !normalizarDigitosTelefone(addDebtorForm.phone)) {
+      setAddDebtorError(addDebtorForm.phone.trim()
+        ? "WhatsApp inválido: informe DDD + número, ex.: (11) 98765-4321."
+        : "Informe o WhatsApp do cliente — é para ele que a cobrança vai.");
+      return;
+    }
     setAddDebtorError("");
 
     const newDebtor: Debtor = {
@@ -4794,11 +4801,12 @@ export default function App() {
                                 />
                               </div>
                               <div>
-                                <label htmlFor="novo-telefone" className={rotulo}>WhatsApp{opcional}</label>
+                                <label htmlFor="novo-telefone" className={rotulo}>WhatsApp{addDebtorForm.category === "liquidado" && opcional}</label>
                                 <input
                                   id="novo-telefone"
                                   type="tel"
                                   inputMode="tel"
+                                  required={addDebtorForm.category !== "liquidado"}
                                   value={addDebtorForm.phone}
                                   onChange={e => setAddDebtorForm(f => ({ ...f, phone: mascaraTelefone(e.target.value) }))}
                                   placeholder="(00) 00000-0000"
