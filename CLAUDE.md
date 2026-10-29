@@ -63,6 +63,12 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   (`_shared/zapiProvisioning.ts`); assina ao conectar, cancela quando a assinatura acaba
   (verificação diária no run-automation-scheduler). Falta o usuário entrar no programa Partner
   e gravar `ZAPI_PARTNER_TOKEN`; até lá, instância manual via formulário de suporte (e-mail do cliente).
+- **Pendente — proteção contra bloqueio do número (pedido do dono):** (1) limite diário de envios
+  configurável também no envio em lote e nos planos Básico e Pro (hoje só a automação do Premium tem
+  `max_daily_sends`); (2) "aquecimento" sugerido para número novo (começar com 20–50/dia e subir aos
+  poucos); (3) deixar claro na interface o risco de bloqueio, com a orientação de pausar 24–48 h se a
+  entrega cair ou aparecer restrição. A Meta não publica um número fixo para o WhatsApp comum
+  (Z-API): o bloqueio vem de denúncias, pico de volume e envio para quem nunca falou com o número.
 - PostHog: **ativo**. A `VITE_POSTHOG_KEY` esta no Vercel desde 25/08/2026, mas o CSP
   nao liberava `us.i.posthog.com` — a lib inicializava e o navegador descartava todo
   evento, em silencio. Corrigido no `vercel.json` e no `server.ts`. Ao mexer no CSP,
