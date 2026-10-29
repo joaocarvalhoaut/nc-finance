@@ -1,4 +1,4 @@
-import { reserveChargeSend } from "../_shared/sendReservation.ts";
+import { duplicidadeLiberada, reserveChargeSend } from "../_shared/sendReservation.ts";
 /**
  * send-whatsapp-batch — Edge Function para envio em lote de cobranças via Z-API global.
  *
@@ -289,6 +289,7 @@ Deno.serve(async (request: Request) => {
     let duplicateCount= 0;
     let invalidPhone  = 0;
     const today = new Date().toISOString().slice(0, 10);
+    const liberado = duplicidadeLiberada(userId); // temporário — ver _shared/sendReservation.ts
 
     // ── Pre-fetch Drive access token once (for PDF attachment in loop) ────────
     // Non-blocking: if token unavailable, batch continues without attachments
@@ -438,7 +439,7 @@ Deno.serve(async (request: Request) => {
         .maybeSingle();
 
       let reserved = true;
-      if (!dupRow && !dryRun) {
+      if (!dupRow && !dryRun && !liberado) {
         try { reserved = await reserveChargeSend(admin, userId, idempotencyHash); }
         catch {
           results.push({ debtorId, clientName, phone: normalizedPhone, status: "erro", messageId: null, logId: null, error: "Envio pausado: proteção indisponível. Tente novamente mais tarde.", sentWithPdf: false });
@@ -446,7 +447,7 @@ Deno.serve(async (request: Request) => {
           continue;
         }
       }
-      if (dupRow || !reserved) {
+      if (!liberado && (dupRow || !reserved)) {
         results.push({
           debtorId, clientName, phone: normalizedPhone,
           status:      "duplicado",

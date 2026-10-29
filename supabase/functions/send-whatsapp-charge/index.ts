@@ -1,4 +1,4 @@
-import { reserveChargeSend } from "../_shared/sendReservation.ts";
+import { duplicidadeLiberada, reserveChargeSend } from "../_shared/sendReservation.ts";
 /**
  * send-whatsapp-charge — Edge Function segura para envio real via Z-API global.
  *
@@ -364,7 +364,7 @@ Deno.serve(async (request: Request) => {
       .gte("created_at", fiveMinutesAgo)
       .maybeSingle();
 
-    if (recentDuplicate || !(await reserveChargeSend(admin, userId, idempotencyHash))) {
+    if (!duplicidadeLiberada(userId) && (recentDuplicate || !(await reserveChargeSend(admin, userId, idempotencyHash)))) {
       return errResponse(409, {
         error: "Envio duplicado detectado. Aguarde 5 minutos antes de reenviar a mesma mensagem.",
         status: "duplicado",
