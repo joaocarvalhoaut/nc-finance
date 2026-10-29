@@ -3041,7 +3041,8 @@ export default function App() {
                             valorTotal: items.reduce((s, d) => s + (d.updatedValue || d.value), 0),
                           }))
                           .filter(r => r.total > 0)
-                          .sort((a, b) => b.total - a.total);
+                          // Maior valor em carteira primeiro; empate pelo número de clientes.
+                          .sort((a, b) => b.valorTotal - a.valorTotal || b.total - a.total);
 
                         if (rows.length === 0) {
                           return <p className="px-5 py-6 text-xs text-zinc-500 text-center">Nenhum cliente cadastrado ainda.</p>;
