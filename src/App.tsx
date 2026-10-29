@@ -481,6 +481,8 @@ export default function App() {
   // Billing Tab specific interactive properties
   const [selectedDebtorForMessage, setSelectedDebtorForMessage] = useState<Debtor | null>(null);
   const [buscaEnvio, setBuscaEnvio] = useState("");
+  // Filtro por tipo na lista de Preparar envios ("todos" ou uma categoria).
+  const [tipoEnvio, setTipoEnvio] = useState<"todos" | Debtor["category"]>("todos");
   const [verTodasExecucoes, setVerTodasExecucoes] = useState(false);
   const [selectedTone, setSelectedTone] = useState<MessageTone>(DEFAULT_USER_CONFIG.selectedTone);
   const [customMessageDraft, setCustomMessageDraft] = useState<string>("");
@@ -4877,9 +4879,18 @@ export default function App() {
                 const cabecalho = "flex items-start justify-between gap-3 px-5 py-4 border-b border-zinc-800/80";
                 const rotulo = "text-[10px] font-mono uppercase tracking-widest text-zinc-500";
                 const termo = buscaEnvio.trim().toLowerCase();
-                const listaEnvio = termo
-                  ? debtors.filter(d => d.client.toLowerCase().includes(termo) || (d.document || "").toLowerCase().includes(termo))
-                  : debtors;
+                const TIPOS_ENVIO: { id: Debtor["category"]; label: string; cor: string }[] = [
+                  { id: "vencidos", label: "Vencidos", cor: "#e11d48" },
+                  { id: "a_vencer", label: "A vencer", cor: "#d97706" },
+                  { id: "recompra", label: "Recompra", cor: "#0284c7" },
+                  { id: "liquidado", label: "Liquidados", cor: "#059669" },
+                  { id: "desabilitado", label: "Desabilitados", cor: "#71717a" },
+                ];
+                const porTipo = new Map<string, number>();
+                debtors.forEach(d => porTipo.set(d.category, (porTipo.get(d.category) ?? 0) + 1));
+                const listaEnvio = debtors.filter(d =>
+                  (tipoEnvio === "todos" || d.category === tipoEnvio) &&
+                  (!termo || d.client.toLowerCase().includes(termo) || (d.document || "").toLowerCase().includes(termo)));
                 const sel = selectedDebtorForMessage;
 
                 return (
@@ -5046,12 +5057,36 @@ export default function App() {
                             className="w-full text-xs text-zinc-200 bg-transparent focus:outline-none placeholder:text-zinc-600"
                           />
                         </div>
+                        {/* Filtro por tipo: só aparecem os tipos que existem na carteira. */}
+                        <div className="mt-2 flex gap-1.5 overflow-x-auto [scrollbar-width:none]" role="radiogroup" aria-label="Filtrar por tipo">
+                          {[{ id: "todos" as const, label: "Todos", cor: "", n: debtors.length },
+                            ...TIPOS_ENVIO.filter(t => porTipo.get(t.id)).map(t => ({ ...t, n: porTipo.get(t.id) ?? 0 }))].map(t => {
+                            const ativo = tipoEnvio === t.id;
+                            return (
+                              <button
+                                key={t.id}
+                                type="button"
+                                role="radio"
+                                aria-checked={ativo}
+                                onClick={() => setTipoEnvio(t.id)}
+                                className={`flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] whitespace-nowrap transition-colors cursor-pointer ${
+                                  ativo ? (t.cor ? "text-white" : "border-emerald-500/50 bg-emerald-500/10 text-emerald-300") : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                                }`}
+                                style={ativo && t.cor ? { borderColor: `${t.cor}99`, background: `${t.cor}1f` } : undefined}
+                              >
+                                {t.cor && <span className="w-1.5 h-1.5 rounded-sm" style={{ background: t.cor }} />}
+                                {t.label}
+                                <span className="font-mono text-[10px] text-zinc-500">{t.n}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
 
                       <div className="max-h-[520px] overflow-y-auto p-2 space-y-1">
                         {listaEnvio.length === 0 && (
                           <p className="px-5 py-8 text-xs text-zinc-500 text-center">
-                            {debtors.length === 0 ? "A carteira está vazia." : "Nenhum devedor encontrado."}
+                            {debtors.length === 0 ? "A carteira está vazia." : tipoEnvio !== "todos" && !termo ? "Nenhum devedor deste tipo." : "Nenhum devedor encontrado."}
                           </p>
                         )}
                         {listaEnvio.map((d) => {
