@@ -99,7 +99,7 @@ const PERGUNTAS: Pergunta[] = [
   {
     tema: "WhatsApp e envios",
     pergunta: "Qual valor vai na mensagem?",
-    resposta: "O valor original do título. Multa e juros aparecem no painel para a sua gestão, mas não entram no valor cobrado na mensagem.",
+    resposta: "O valor atualizado: o valor do título mais a multa e os juros ao dia que você configurou, contados até o dia do envio — o mesmo valor corrigido que aparece no painel. Títulos a vencer vão pelo valor original.",
   },
   {
     tema: "WhatsApp e envios",
@@ -175,7 +175,7 @@ const PERGUNTAS: Pergunta[] = [
       "Você define os percentuais em Encargos, na Carteira:\n" +
       "• Multa: percentual aplicado uma vez sobre o valor original.\n" +
       "• Juros: percentual ao dia, multiplicado pelos dias de atraso desde o vencimento.\n" +
-      "Títulos a vencer e liquidados não têm encargos. Os encargos servem para a sua gestão — a mensagem leva o valor original.",
+      "Títulos a vencer e liquidados não têm encargos. A mensagem leva o valor já com os encargos.",
   },
   {
     tema: "Carteira",

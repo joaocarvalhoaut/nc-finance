@@ -1,5 +1,6 @@
 import { deferredAutomationStart } from "../_shared/automationClock.ts";
 import { reserveChargeSend } from "../_shared/sendReservation.ts";
+import { lerEncargos, valorAtualizado } from "../_shared/encargos.ts";
 /**
  * process-dispatch-jobs — worker que processa a fila de jobs de disparo.
  *
@@ -317,14 +318,16 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     const documentNumber= String(dr.document_number?? "");
     const rawPhone      = String(dr.phone          ?? "");
     const dueDate       = String(dr.due_date       ?? "");
-    // Cobranca usa o valor base (amount), nao o updated_value com multa e juros.
-    const amount        = Number(dr.amount ?? 0);
+    const valorBase     = Number(dr.amount ?? 0);
     // Enviar "R$ 0,00" a um devedor e pior que nao enviar: confunde e expoe
     // erro de extracao. O front ja filtra, mas o servidor e a autoridade.
-    if (!(amount > 0)) {
+    if (!(valorBase > 0)) {
       await markJob("failed", { last_error: "Valor da cobranca precisa ser maior que zero." });
       return;
     }
+    // Cobranca leva o valor atualizado (multa + juros ao dia), calculado agora:
+    // updated_value no banco so muda quando o painel abre.
+    const amount        = valorAtualizado(valorBase, dueDate, String(dr.category ?? ""), await lerEncargos(admin, userId));
     const driveFileUrl  = (dr.drive_file_url  as string | null) ?? null;
     const driveFileName = (dr.drive_file_name as string | null) ?? null;
     const customMsg     = (meta.custom_message as string | null) ?? null;

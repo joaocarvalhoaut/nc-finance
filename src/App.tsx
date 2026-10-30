@@ -847,7 +847,7 @@ export default function App() {
     if (selectedDebtorForMessage) {
       setCustomMessageDraft(buildMessageText(selectedDebtorForMessage, selectedTone));
     }
-  }, [selectedDebtorForMessage, selectedTone]);
+  }, [selectedDebtorForMessage, selectedTone, globalFinePct, globalInterestDayPct]);
 
   useEffect(() => {
     if (!debtors.length) {
@@ -1115,6 +1115,22 @@ export default function App() {
     void saveDebtorFieldToDB(d.id, amount);
   };
 
+  // Valor cobrado na mensagem: vencidos e recompra com multa + juros ao dia;
+  // a vencer, liquidado e desabilitado no valor original. Calculado aqui e não
+  // lido de updatedValue para não depender de o recálculo já ter rodado.
+  const valorDaMensagem = (debtor: Debtor): number => {
+    if (!cobraComoVencido(debtor.category)) return debtor.value;
+    const m = (debtor.dueDate || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const diasDeAtraso = m
+      ? Math.max(0, Math.floor((hoje.getTime() - new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])).getTime()) / 86_400_000))
+      : 0;
+    const multa = debtor.value * (globalFinePct / 100);
+    const juros = debtor.value * (globalInterestDayPct / 100) * diasDeAtraso;
+    return Math.round((debtor.value + multa + juros) * 100) / 100;
+  };
+
   const buildMessageText = (debtor: Debtor, tone: MessageTone): string => {
     const pat = patternTemplates.find(p => p.id === tone);
     if (!pat) return "";
@@ -1131,9 +1147,9 @@ export default function App() {
       return Math.max(0, Math.floor((hoje.getTime() - venc.getTime()) / 86_400_000));
     })();
     const daysAtraso = cobraComoVencido(debtor.category) ? String(diasDeAtraso) : "0";
-    // Cobranca usa o valor base: multa e juros seguem calculados para gestao,
-    // mas nao entram no que e cobrado do devedor.
-    const valStr = debtor.value.toFixed(2);
+    // A mensagem leva o valor atualizado (multa + juros ao dia), o mesmo do painel
+    // e o que o lote e a automação calculam no servidor (_shared/encargos.ts).
+    const valStr = valorDaMensagem(debtor).toFixed(2);
     
     return aplicarEmpresa(pat.template, empresaAssinatura)
       .replace(/{nome_cliente}/g, debtor.client)
@@ -2021,7 +2037,7 @@ export default function App() {
         tone: selectedTone,
         clientName: selectedDebtorForMessage.client,
         documentNumber: selectedDebtorForMessage.document,
-        amount: selectedDebtorForMessage.value,
+        amount: valorDaMensagem(selectedDebtorForMessage),
       });
 
       if (result.success) {
@@ -4953,8 +4969,10 @@ export default function App() {
                                 className="w-full flex-1 bg-zinc-900 border border-zinc-800 rounded-lg p-4 text-xs text-zinc-100 focus:outline-none focus:border-emerald-500 transition-colors leading-relaxed"
                               />
                               <p className="mt-1.5 text-[11px] text-zinc-500">
-                                Valor na mensagem: <span className="font-mono text-zinc-300">{formatBRL(sel.value)}</span> — o valor original, sem multa e juros
-                                {(sel.updatedValue || sel.value) !== sel.value && <> (corrigido: <span className="font-mono">{formatBRL(sel.updatedValue || sel.value)}</span>)</>}.
+                                Valor na mensagem: <span className="font-mono text-zinc-300">{formatBRL(valorDaMensagem(sel))}</span>
+                                {valorDaMensagem(sel) !== sel.value
+                                  ? <> — atualizado, com multa e juros (original: <span className="font-mono">{formatBRL(sel.value)}</span>).</>
+                                  : <> — sem multa e juros.</>}
                               </p>
                             </div>
 

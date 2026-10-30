@@ -93,7 +93,7 @@ export const PERGUNTAS: Pergunta[] = [
   {
     pergunta: "Os juros e a multa são calculados sozinhos?",
     resposta:
-      "Sim. Você define uma vez a multa e os juros ao dia, e o painel mostra o valor corrigido de cada título pelos dias de atraso. A mensagem leva o valor original do boleto.",
+      "Sim. Você define uma vez a multa e os juros ao dia, e o painel mostra o valor corrigido de cada título pelos dias de atraso. A mensagem leva esse valor atualizado.",
   },
   {
     pergunta: "Como ficam os dados dos meus clientes (LGPD)?",

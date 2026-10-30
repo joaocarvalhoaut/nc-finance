@@ -1,4 +1,5 @@
 import { duplicidadeLiberada, reserveChargeSend } from "../_shared/sendReservation.ts";
+import { lerEncargos, valorAtualizado } from "../_shared/encargos.ts";
 /**
  * send-whatsapp-batch — Edge Function para envio em lote de cobranças via Z-API global.
  *
@@ -296,6 +297,9 @@ Deno.serve(async (request: Request) => {
     // Nome da empresa que assina as mensagens ({empresa}), buscado uma vez.
     const companyName = await loadCompanyName(admin, userId);
 
+    // Multa e juros da conta: a mensagem leva o valor atualizado, como no painel.
+    const encargos = await lerEncargos(admin, userId);
+
     // ── 7. Loop de envio ──────────────────────────────────────────────────────
     let sentInLoop = 0;
     for (const debtorId of idsToProcess) {
@@ -349,10 +353,9 @@ Deno.serve(async (request: Request) => {
       const documentNumber= String(dr.document_number ?? "");
       const rawPhone      = String(dr.phone          ?? "");
       const dueDate       = String(dr.due_date       ?? "");
-      // Cobranca usa o valor base (amount), nao o updated_value com multa e juros.
-      const amount        = Number(dr.amount ?? 0);
+      const valorBase     = Number(dr.amount ?? 0);
       // Valor nao cobravel: bloqueia no servidor, nao so na UI.
-      if (!(amount > 0)) {
+      if (!(valorBase > 0)) {
         results.push({
           debtorId,
           clientName,
@@ -365,6 +368,8 @@ Deno.serve(async (request: Request) => {
         });
         continue;
       }
+      // Cobranca leva o valor atualizado (multa + juros ao dia), calculado agora.
+      const amount        = valorAtualizado(valorBase, dueDate, String(dr.category ?? ""), encargos);
       const driveFileId   = (dr.drive_file_id   as string | null) ?? null;
       const driveFileUrl  = (dr.drive_file_url  as string | null) ?? null;
       const driveFileName = (dr.drive_file_name as string | null) ?? null;
