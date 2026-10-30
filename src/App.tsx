@@ -24,7 +24,7 @@ import { representativesService } from "./services/representativesService";
 import { contactsService, contactKeyFromName, type Contact } from "./services/contactsService";
 import { BillingError, subscriptionService } from "./services/subscriptionService";
 import { isStripeLegacy, STRIPE_LEGACY_CUTOFF } from "../supabase/functions/_shared/billingStatus.ts";
-import { userConfigService } from "./services/userConfigService";
+import { userConfigService, MENSAGEM_PADRAO_KEY } from "./services/userConfigService";
 import { whatsappService, SEND_STATUS_LABELS, type SendChargeStatus } from "./services/whatsappService";
 import { googleSheetsService, type ImportResult as SheetsImportResult, type ExportResult as SheetsExportResult } from "./services/googleSheetsService";
 import { whatsappBatchService, BATCH_TOP_STATUS_LABELS, type BatchChargeResult, type BatchTopStatus } from "./services/whatsappBatchService";
@@ -468,6 +468,16 @@ export default function App() {
   const [verTodasExecucoes, setVerTodasExecucoes] = useState(false);
   const [selectedTone, setSelectedTone] = useState<MessageTone>(DEFAULT_USER_CONFIG.selectedTone);
   const [customMessageDraft, setCustomMessageDraft] = useState<string>("");
+  // Mensagem padrão (Preparar envios): texto do usuário com variáveis, aplicado a
+  // todos os clientes; cada envio continua sendo um por um.
+  const [mensagemPadrao, setMensagemPadrao] = useState<string>("");
+  const [usarPadrao, setUsarPadrao] = useState<boolean>(() => {
+    try { return localStorage.getItem("ncf-usar-padrao") === "1"; } catch { return false; }
+  });
+  const [rascunhoPadrao, setRascunhoPadrao] = useState<string | null>(null); // null = fora de edição
+  const [salvandoPadrao, setSalvandoPadrao] = useState<boolean>(false);
+  const [erroPadrao, setErroPadrao] = useState<string>("");
+  const campoPadraoRef = React.useRef<HTMLTextAreaElement>(null);
   const [isSendingMessage, setIsSendingMessage] = useState<boolean>(false);
   const [messageFeedback, setMessageFeedback] = useState<{success: boolean; text: string} | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<PlanId | null>(PLAN_LIST[1]?.id || "pro");
@@ -705,8 +715,11 @@ export default function App() {
             integrationProvider: null,
             lastConnectionCheck: null
           }));
-        const hydratedTemplates = templates.length
-          ? templates
+        // A mensagem padrão do usuário mora na mesma tabela, mas não é um tom.
+        const padraoSalva = templates.find((t) => (t.templateKey as string) === MENSAGEM_PADRAO_KEY);
+        const tons = templates.filter((t) => (t.templateKey as string) !== MENSAGEM_PADRAO_KEY);
+        const hydratedTemplates = tons.length
+          ? tons
           : await userConfigService.replaceMessageTemplates(currentOwnerUserId, DEFAULT_PATTERNS);
 
         if (!isMounted) return;
@@ -722,6 +735,7 @@ export default function App() {
         setGlobalInterestDayPctStr(String(hydratedConfig.globalInterestDayPct));
         setSelectedTone(hydratedConfig.selectedTone);
         setSheetUrlInput(hydratedConfig.sheetUrlInput || DEFAULT_USER_CONFIG.sheetUrlInput);
+        setMensagemPadrao(padraoSalva?.template ?? "");
         setPatternTemplates(
           hydratedTemplates.map((template) => ({
             id: template.templateKey,
@@ -845,9 +859,52 @@ export default function App() {
   // Sync drafted text message when selected debitor or tone updates
   useEffect(() => {
     if (selectedDebtorForMessage) {
-      setCustomMessageDraft(buildMessageText(selectedDebtorForMessage, selectedTone));
+      setCustomMessageDraft(usarPadrao && mensagemPadrao.trim()
+        ? preencherModelo(mensagemPadrao, selectedDebtorForMessage)
+        : buildMessageText(selectedDebtorForMessage, selectedTone));
     }
-  }, [selectedDebtorForMessage, selectedTone, globalFinePct, globalInterestDayPct]);
+  }, [selectedDebtorForMessage, selectedTone, globalFinePct, globalInterestDayPct, usarPadrao, mensagemPadrao]);
+
+  const escolherPadrao = (ligar: boolean) => {
+    setUsarPadrao(ligar);
+    setErroPadrao("");
+    try { localStorage.setItem("ncf-usar-padrao", ligar ? "1" : "0"); } catch { /* ignore */ }
+    // Sem mensagem salva, abre o editor partindo do tom atual.
+    if (ligar && !mensagemPadrao.trim()) {
+      setRascunhoPadrao(patternTemplates.find((p) => p.id === selectedTone)?.template ?? "");
+    } else if (!ligar) {
+      setRascunhoPadrao(null);
+    }
+  };
+
+  const inserirVariavel = (variavel: string) => {
+    const campo = campoPadraoRef.current;
+    const atual = rascunhoPadrao ?? "";
+    const ini = campo?.selectionStart ?? atual.length;
+    const fim = campo?.selectionEnd ?? atual.length;
+    setRascunhoPadrao(atual.slice(0, ini) + variavel + atual.slice(fim));
+    requestAnimationFrame(() => {
+      campo?.focus();
+      campo?.setSelectionRange(ini + variavel.length, ini + variavel.length);
+    });
+  };
+
+  const salvarMensagemPadrao = async () => {
+    const texto = (rascunhoPadrao ?? "").trim();
+    if (!texto) { setErroPadrao("Escreva a mensagem antes de salvar."); return; }
+    if (!currentOwnerUserId) return;
+    setSalvandoPadrao(true);
+    setErroPadrao("");
+    try {
+      await userConfigService.saveDefaultMessage(currentOwnerUserId, texto);
+      setMensagemPadrao(texto);
+      setRascunhoPadrao(null);
+    } catch {
+      setErroPadrao("Não foi possível salvar a mensagem. Tente de novo.");
+    } finally {
+      setSalvandoPadrao(false);
+    }
+  };
 
   useEffect(() => {
     if (!debtors.length) {
@@ -1134,6 +1191,11 @@ export default function App() {
   const buildMessageText = (debtor: Debtor, tone: MessageTone): string => {
     const pat = patternTemplates.find(p => p.id === tone);
     if (!pat) return "";
+    return preencherModelo(pat.template, debtor);
+  };
+
+  // Troca as variáveis ({nome_cliente}, {valor_atualizado}…) pelos dados do título.
+  const preencherModelo = (modelo: string, debtor: Debtor): string => {
 
     // Dias de atraso reais, contados do vencimento (DD/MM/AAAA). Antes era fixo
     // em "12": os tons Firme e Jurídico diziam a todo vencido que o título
@@ -1151,7 +1213,7 @@ export default function App() {
     // e o que o lote e a automação calculam no servidor (_shared/encargos.ts).
     const valStr = valorDaMensagem(debtor).toFixed(2);
     
-    return aplicarEmpresa(pat.template, empresaAssinatura)
+    return aplicarEmpresa(modelo, empresaAssinatura)
       .replace(/{nome_cliente}/g, debtor.client)
       .replace(/{documento}/g, debtor.document)
       .replace(/{documento_boleto}/g, debtor.document)
@@ -4938,16 +5000,16 @@ export default function App() {
                           <div className="px-5 py-4 space-y-4 flex-1 flex flex-col">
                             <div>
                               <p className={`${rotulo} mb-2`}>Tom</p>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-label="Tom da mensagem">
+                              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2" role="radiogroup" aria-label="Tom da mensagem">
                                 {(["amigavel", "neutro", "firme", "juridico"] as const).map((tone) => {
-                                  const ativo = selectedTone === tone;
+                                  const ativo = !usarPadrao && selectedTone === tone;
                                   return (
                                     <button
                                       key={tone}
                                       type="button"
                                       role="radio"
                                       aria-checked={ativo}
-                                      onClick={() => setSelectedTone(tone)}
+                                      onClick={() => { setSelectedTone(tone); escolherPadrao(false); }}
                                       className={`py-2 px-2 rounded-lg text-xs font-semibold text-center transition-colors border cursor-pointer ${
                                         ativo ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300" : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
                                       }`}
@@ -4956,8 +5018,90 @@ export default function App() {
                                     </button>
                                   );
                                 })}
+                                <button
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={usarPadrao}
+                                  onClick={() => escolherPadrao(true)}
+                                  className={`col-span-2 sm:col-span-1 py-2 px-2 rounded-lg text-xs font-semibold text-center transition-colors border cursor-pointer ${
+                                    usarPadrao ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300" : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                                  }`}
+                                >
+                                  Minha mensagem
+                                </button>
                               </div>
                             </div>
+
+                            {/* Mensagem padrão: escrita uma vez com variáveis, preenchida
+                                para cada cliente; o envio segue um por um. */}
+                            {usarPadrao && (rascunhoPadrao !== null ? (
+                              <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 space-y-2.5">
+                                <div>
+                                  <label htmlFor="mensagem-padrao" className={`${rotulo} block`}>Mensagem padrão</label>
+                                  <p className="text-[11px] text-zinc-500 mt-1">Vale para todos os clientes. Os campos entre chaves são trocados pelos dados de cada título.</p>
+                                </div>
+                                <textarea
+                                  id="mensagem-padrao"
+                                  ref={campoPadraoRef}
+                                  rows={8}
+                                  value={rascunhoPadrao}
+                                  onChange={(e) => setRascunhoPadrao(e.target.value)}
+                                  placeholder="Olá {nome_cliente}, ..."
+                                  className="w-full bg-zinc-950 border border-zinc-800 rounded-md p-3 text-xs text-zinc-100 font-mono focus:outline-none focus:border-emerald-500 transition-colors leading-relaxed"
+                                />
+                                <div className="flex flex-wrap gap-1.5" aria-label="Inserir campo">
+                                  {[
+                                    { v: "{nome_cliente}", l: "Nome" },
+                                    { v: "{documento}", l: "Documento" },
+                                    { v: "{vencimento}", l: "Vencimento" },
+                                    { v: "{valor_atualizado}", l: "Valor" },
+                                    { v: "{dias_atraso}", l: "Dias de atraso" },
+                                    { v: "{empresa}", l: "Empresa" },
+                                  ].map((c) => (
+                                    <button
+                                      key={c.v}
+                                      type="button"
+                                      onClick={() => inserirVariavel(c.v)}
+                                      className="px-2 py-1 rounded-md border border-zinc-800 text-[11px] text-zinc-400 hover:text-zinc-100 hover:border-zinc-600 transition-colors cursor-pointer"
+                                      title={`Inserir ${c.v}`}
+                                    >
+                                      + {c.l}
+                                    </button>
+                                  ))}
+                                </div>
+                                {erroPadrao && <p className="text-[11px] text-rose-300">{erroPadrao}</p>}
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => { setErroPadrao(""); if (mensagemPadrao.trim()) setRascunhoPadrao(null); else escolherPadrao(false); }}
+                                    className="px-3 py-1.5 rounded-md text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                                  >
+                                    Cancelar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void salvarMensagemPadrao()}
+                                    disabled={salvandoPadrao}
+                                    className="px-3 py-1.5 rounded-md bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black text-xs font-bold transition-colors cursor-pointer"
+                                  >
+                                    {salvandoPadrao ? "Salvando…" : "Salvar mensagem padrão"}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2">
+                                <p className="text-[11px] text-emerald-300/90">
+                                  {mensagemPadrao.trim() ? "Usando sua mensagem padrão em todos os clientes." : "Você ainda não salvou uma mensagem padrão."}
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => { setErroPadrao(""); setRascunhoPadrao(mensagemPadrao || (patternTemplates.find((p) => p.id === selectedTone)?.template ?? "")); }}
+                                  className="text-[11px] text-zinc-300 hover:text-white inline-flex items-center gap-1 transition-colors cursor-pointer flex-shrink-0"
+                                >
+                                  <Pencil className="w-3 h-3" /> {mensagemPadrao.trim() ? "Editar" : "Criar"}
+                                </button>
+                              </div>
+                            ))}
 
                             <div className="flex-1 flex flex-col">
                               <label htmlFor="mensagem-envio" className={`${rotulo} mb-2 block`}>Texto (pode editar)</label>

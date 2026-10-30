@@ -200,5 +200,30 @@ export const userConfigService = {
     }
 
     return (data || []).map((row) => mapTemplateRowToRecord(row as MessageTemplateRow));
+  },
+
+  /**
+   * Grava a mensagem padrão do usuário (Preparar envios) sem tocar nos modelos
+   * de tom: linha própria em user_message_templates, template_key "padrao".
+   */
+  async saveDefaultMessage(userId: string, template: string) {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase
+      .from(MESSAGE_TEMPLATES_TABLE)
+      .upsert({
+        user_id: userId,
+        template_key: MENSAGEM_PADRAO_KEY,
+        name: "Mensagem padrão",
+        description: "Texto do usuário aplicado a todos os clientes em Preparar envios",
+        template,
+        is_default: false,
+      }, { onConflict: "user_id,template_key" });
+
+    if (error) {
+      throw new Error(error.message || "Falha ao salvar a mensagem padrão.");
+    }
   }
 };
+
+/** template_key da mensagem padrão do usuário — não é um tom. */
+export const MENSAGEM_PADRAO_KEY = "padrao";

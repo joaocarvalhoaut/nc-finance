@@ -98,6 +98,13 @@ const PERGUNTAS: Pergunta[] = [
   },
   {
     tema: "WhatsApp e envios",
+    pergunta: "Posso usar uma mensagem minha para todos os clientes?",
+    resposta:
+      "Sim. Em Preparar envios, escolha “Minha mensagem”, escreva o texto uma vez e salve. Os botões de campo (Nome, Documento, Vencimento, Valor, Dias de atraso, Empresa) entram no texto e são trocados pelos dados de cada título.\n" +
+      "Ao clicar em cada cliente, a mensagem já aparece preenchida para ele; o envio continua um por um, e dá para ajustar o texto antes de enviar.",
+  },
+  {
+    tema: "WhatsApp e envios",
     pergunta: "Qual valor vai na mensagem?",
     resposta: "O valor atualizado: o valor do título mais a multa e os juros ao dia que você configurou, contados até o dia do envio — o mesmo valor corrigido que aparece no painel. Títulos a vencer vão pelo valor original.",
   },
