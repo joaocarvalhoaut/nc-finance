@@ -483,6 +483,8 @@ export default function App() {
   const [buscaEnvio, setBuscaEnvio] = useState("");
   // Filtro por tipo na lista de Preparar envios ("todos" ou uma categoria).
   const [tipoEnvio, setTipoEnvio] = useState<"todos" | Debtor["category"]>("todos");
+  // Preparar envios: quem ainda falta cobrar hoje x quem já foi cobrado hoje
+  const [abaEnvio, setAbaEnvio] = useState<"faltam" | "hoje">("faltam");
   const [verTodasExecucoes, setVerTodasExecucoes] = useState(false);
   const [selectedTone, setSelectedTone] = useState<MessageTone>(DEFAULT_USER_CONFIG.selectedTone);
   const [customMessageDraft, setCustomMessageDraft] = useState<string>("");
@@ -1127,6 +1129,11 @@ export default function App() {
               successIds.has(d.id) ? { ...d, status: "sent" as const } : d,
             ),
           );
+        }
+        // O lote grava o histórico no servidor; recarrega para "Enviados hoje" e
+        // "Última cobrança" refletirem o envio sem precisar atualizar a página.
+        if (currentOwnerUserId) {
+          billingLogsService.listByUser(currentOwnerUserId).then(setBillingLogs).catch(() => {});
         }
       }
       setSelectedDebtorIds(new Set()); // limpa seleção após envio
@@ -4896,12 +4903,40 @@ export default function App() {
                 ];
                 const porTipo = new Map<string, number>();
                 debtors.forEach(d => porTipo.set(d.category, (porTipo.get(d.category) ?? 0) + 1));
-                const listaEnvio = debtors.filter(d =>
+                // Última cobrança de cada título, tirada do Histórico (só envios que
+                // saíram). O log não guarda o id do devedor: casa por cliente + documento.
+                const chaveLog = (cliente: string, doc: string) => `${cliente.trim().toLowerCase()}|${(doc || "").trim().toLowerCase()}`;
+                const ENVIO_OK = new Set(["sucesso", "sent", "recebido", "entregue", "lido"]);
+                const ultimaCobranca = new Map<string, number>();
+                billingLogs.forEach(l => {
+                  if (!ENVIO_OK.has(l.status)) return;
+                  const t = Date.parse(l.dateSent);
+                  if (Number.isNaN(t)) return;
+                  const k = chaveLog(l.client, l.document);
+                  if (t > (ultimaCobranca.get(k) ?? 0)) ultimaCobranca.set(k, t);
+                });
+                const ultimaDe = (d: Debtor) => ultimaCobranca.get(chaveLog(d.client, d.document)) ?? null;
+                const inicioHoje = new Date(); inicioHoje.setHours(0, 0, 0, 0);
+                const cobradoHoje = (d: Debtor) => (ultimaDe(d) ?? 0) >= inicioHoje.getTime();
+                const textoUltima = (t: number) => {
+                  const dt = new Date(t);
+                  const hora = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                  const dias = Math.round((inicioHoje.getTime() - new Date(dt).setHours(0, 0, 0, 0)) / 86_400_000);
+                  if (dias <= 0) return `hoje às ${hora}`;
+                  if (dias === 1) return `ontem às ${hora}`;
+                  return `${dt.toLocaleDateString("pt-BR")} · há ${dias} dias`;
+                };
+
+                const filtrados = debtors.filter(d =>
                   (tipoEnvio === "todos" || d.category === tipoEnvio) &&
-                  (!termo || d.client.toLowerCase().includes(termo) || (d.document || "").toLowerCase().includes(termo)))
-                  // Quem já recebeu a cobrança desce para o fim; o resto mantém a ordem
-                  // (o sort é estável), então os pendentes ficam sempre no topo.
-                  .sort((a, b) => Number(a.status === "sent") - Number(b.status === "sent"));
+                  (!termo || d.client.toLowerCase().includes(termo) || (d.document || "").toLowerCase().includes(termo)));
+                const enviadosHoje = filtrados.filter(cobradoHoje)
+                  .sort((a, b) => (ultimaDe(b) ?? 0) - (ultimaDe(a) ?? 0)); // mais recente primeiro
+                // Quem nunca foi cobrado vem primeiro; depois quem foi cobrado há mais
+                // tempo. Empate mantém a ordem da carteira (o sort é estável).
+                const faltamEnviar = filtrados.filter(d => !cobradoHoje(d))
+                  .sort((a, b) => (ultimaDe(a) ?? 0) - (ultimaDe(b) ?? 0));
+                const listaEnvio = abaEnvio === "hoje" ? enviadosHoje : faltamEnviar;
                 const sel = selectedDebtorForMessage;
 
                 return (
@@ -5057,6 +5092,30 @@ export default function App() {
                         <span className="text-[11px] text-zinc-500 font-mono flex-shrink-0">{listaEnvio.length}</span>
                       </header>
                       <div className="px-4 py-3 border-b border-zinc-900">
+                        {/* Faltam enviar x Enviados hoje — conta pelo Histórico de hoje */}
+                        <div className="grid grid-cols-2 gap-1 p-1 mb-2.5 bg-zinc-900 border border-zinc-800 rounded-lg" role="tablist" aria-label="Situação do envio hoje">
+                          {([
+                            { id: "faltam" as const, label: "Faltam enviar", n: faltamEnviar.length },
+                            { id: "hoje" as const, label: "Enviados hoje", n: enviadosHoje.length },
+                          ]).map(a => {
+                            const ativa = abaEnvio === a.id;
+                            return (
+                              <button
+                                key={a.id}
+                                type="button"
+                                role="tab"
+                                aria-selected={ativa}
+                                onClick={() => setAbaEnvio(a.id)}
+                                className={`flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                                  ativa ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40" : "text-zinc-400 hover:text-zinc-200"
+                                }`}
+                              >
+                                {a.label}
+                                <span className={`font-mono text-[10px] ${ativa ? "text-emerald-400/80" : "text-zinc-500"}`}>{a.n}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
                         <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 focus-within:border-zinc-600">
                           <Search className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
                           <input
@@ -5097,7 +5156,10 @@ export default function App() {
                       <div className="max-h-[520px] overflow-y-auto p-2 space-y-1">
                         {listaEnvio.length === 0 && (
                           <p className="px-5 py-8 text-xs text-zinc-500 text-center">
-                            {debtors.length === 0 ? "A carteira está vazia." : tipoEnvio !== "todos" && !termo ? "Nenhum devedor deste tipo." : "Nenhum devedor encontrado."}
+                            {debtors.length === 0 ? "A carteira está vazia."
+                              : filtrados.length > 0 && abaEnvio === "hoje" ? "Nenhuma cobrança enviada hoje ainda."
+                              : filtrados.length > 0 ? "Tudo cobrado por hoje."
+                              : tipoEnvio !== "todos" && !termo ? "Nenhum devedor deste tipo." : "Nenhum devedor encontrado."}
                           </p>
                         )}
                         {listaEnvio.map((d) => {
@@ -5118,15 +5180,19 @@ export default function App() {
                                 <span className="min-w-0">
                                   <span className="block text-xs font-semibold text-white truncate">{d.client}</span>
                                   <span className="block text-[10px] text-zinc-500 font-mono mt-0.5">{d.document} · {d.dueDate}</span>
+                                  {(() => {
+                                    const ultima = ultimaDe(d);
+                                    return (
+                                      <span className={`flex items-center gap-1 text-[10px] mt-1 ${ultima === null ? "text-zinc-600" : cobradoHoje(d) ? "text-emerald-400" : "text-zinc-400"}`}>
+                                        {ultima !== null && cobradoHoje(d) && <Check className="w-2.5 h-2.5" strokeWidth={3} />}
+                                        {ultima === null ? "Nunca cobrado" : `Última cobrança: ${textoUltima(ultima)}`}
+                                      </span>
+                                    );
+                                  })()}
                                 </span>
                                 <span className="flex flex-col items-end gap-1 flex-shrink-0">
                                   <span className="text-xs font-mono text-white tabular-nums">{formatBRL(d.value)}</span>
                                   <span className="flex items-center gap-1.5">
-                                    {d.status === "sent" && (
-                                      <span className="text-[9px] text-emerald-400 flex items-center gap-0.5">
-                                        <Check className="w-2.5 h-2.5" strokeWidth={3} /> Enviado
-                                      </span>
-                                    )}
                                     <span className={`px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wide font-bold font-mono ${CATEGORY_TINT[d.category]}`}>
                                       {CATEGORY_LABEL[d.category]}
                                     </span>
