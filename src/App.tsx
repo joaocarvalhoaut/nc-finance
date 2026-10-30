@@ -4933,9 +4933,11 @@ export default function App() {
                 const enviadosHoje = filtrados.filter(cobradoHoje)
                   .sort((a, b) => (ultimaDe(b) ?? 0) - (ultimaDe(a) ?? 0)); // mais recente primeiro
                 // Quem nunca foi cobrado vem primeiro; depois quem foi cobrado há mais
-                // tempo. Empate mantém a ordem da carteira (o sort é estável).
+                // tempo. Liquidados e desabilitados não recebem cobrança: vão para o fim.
+                // Empate mantém a ordem da carteira (o sort é estável).
+                const naoCobravel = (d: Debtor) => d.category === "liquidado" || d.category === "desabilitado";
                 const faltamEnviar = filtrados.filter(d => !cobradoHoje(d))
-                  .sort((a, b) => (ultimaDe(a) ?? 0) - (ultimaDe(b) ?? 0));
+                  .sort((a, b) => Number(naoCobravel(a)) - Number(naoCobravel(b)) || (ultimaDe(a) ?? 0) - (ultimaDe(b) ?? 0));
                 const listaEnvio = abaEnvio === "hoje" ? enviadosHoje : faltamEnviar;
                 const sel = selectedDebtorForMessage;
 
