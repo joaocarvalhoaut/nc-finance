@@ -63,6 +63,10 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   (`_shared/zapiProvisioning.ts`); assina ao conectar, cancela quando a assinatura acaba
   (verificação diária no run-automation-scheduler). Falta o usuário entrar no programa Partner
   e gravar `ZAPI_PARTNER_TOKEN`; até lá, instância manual via formulário de suporte (e-mail do cliente).
+- **Boleto:** só anexado um a um (upload do PDF → Storage `charge-pdfs`, `drive_file_id = 'uploaded'`),
+  enviado como link na mensagem. A busca/sugestão de boletos pelo Google Drive saiu da interface em
+  30/10/2026 a pedido do dono e os envios ignoram sugestão do Drive; as Edge Functions de Drive
+  (`match-drive-files`, `drive-index-folder`, `drive-import-boleto`) e os services seguem no repo, sem uso.
 - **Pendente — proteção contra bloqueio do número (pedido do dono):** (1) limite diário de envios
   configurável também no envio em lote e nos planos Básico e Pro (hoje só a automação do Premium tem
   `max_daily_sends`); (2) "aquecimento" sugerido para número novo (começar com 20–50/dia e subir aos

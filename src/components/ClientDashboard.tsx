@@ -12,7 +12,6 @@
  *  financeService.createMany → salva na base consolidada (Visão Geral)
  *  financeService.reconcileLiquidations → reconcilia liquidações
  *  whatsappBatchService.sendBatchCharges → envia via Z-API (apenas vencidos/a_vencer)
- *  driveFolderService.syncFolder → matching Drive automático antes do envio
  *
  * Sem: QR Code, instância Z-API, tokens, webhooks, status técnicos.
  */

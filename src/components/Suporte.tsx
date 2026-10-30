@@ -105,8 +105,8 @@ const PERGUNTAS: Pergunta[] = [
     tema: "WhatsApp e envios",
     pergunta: "Como anexar o boleto de cada cliente?",
     resposta:
-      "Nos planos Pro e Premium, aponte a pasta do Google Drive onde ficam os boletos em PDF. Na barra do Google Drive (na Carteira ou em Preparar envios), o “?” mostra o e-mail com que a pasta deve ser compartilhada (como Leitor); depois é só colar o link da pasta.\n" +
-      "O sistema encontra o PDF de cada cliente pelo número do título no nome do arquivo ou pelos dados de dentro do boleto (linha digitável, CPF/CNPJ, valor e vencimento). Só sugere quando a correspondência é segura — para nunca anexar o boleto de outra pessoa.",
+      "Um por um, na Carteira ou em Preparar envios: em cada título, clique em “Anexar” e escolha o PDF do boleto. Ele vai junto na mensagem como link, para o cliente abrir e pagar.\n" +
+      "O olho ao lado do arquivo mostra o PDF anexado e o “x” remove. Vale em todos os planos.",
   },
   {
     tema: "WhatsApp e envios",

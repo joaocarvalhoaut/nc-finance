@@ -34,8 +34,7 @@ import { duplicidadeLiberada, reserveChargeSend } from "../_shared/sendReservati
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
-import { normalizePhone, validatePhone, sendTextMessage, sendDocumentMessage } from "../_shared/zapi.ts";
-import { downloadDriveFile, getDriveAccessToken } from "../_shared/driveFolderIndex.ts";
+import { normalizePhone, validatePhone, sendTextMessage } from "../_shared/zapi.ts";
 import { checkSubscription }               from "../_shared/subscriptionGuard.ts";
 import { getUsageSnapshot, incrementChargesSent } from "../_shared/usageGuard.ts";
 import { insertBillingLog }                from "../_shared/billingLog.ts";
@@ -291,10 +290,6 @@ Deno.serve(async (request: Request) => {
     const today = new Date().toISOString().slice(0, 10);
     const liberado = duplicidadeLiberada(userId); // temporário — ver _shared/sendReservation.ts
 
-    // ── Pre-fetch Drive access token once (for PDF attachment in loop) ────────
-    // Non-blocking: if token unavailable, batch continues without attachments
-    const driveAccessToken = await getDriveAccessToken().catch(() => null);
-
     // Lista não-contatar (opt-out) buscada uma vez — checagem O(1) por devedor.
     const optOutSet = await fetchOptOutSet(admin, userId);
 
@@ -487,26 +482,9 @@ Deno.serve(async (request: Request) => {
         const shortUrl = await shortenUrl(publicPdfUrl);
         finalMessage = `${message}\n\n📎 Boleto: ${shortUrl}`;
         sentWithPdf = true; // link is included — recipient can access the PDF
-              } else if (driveFileId && driveFileId !== "uploaded" && driveAccessToken) {
-        // Legacy: Drive-matched PDF — no public URL, skip link but still try document send
-        const pdfBytes = await downloadDriveFile(driveFileId, driveAccessToken).catch(() => null);
-        if (pdfBytes && pdfBytes.length > 0 && !dryRun) {
-          // Attempt document send for Drive PDFs (no public URL available for these)
-          const pdfResult = await sendDocumentMessage({
-            instanceId:    zapiCreds.instanceId,
-            token:         zapiCreds.token,
-            clientToken:   zapiCreds.clientToken,
-            phone:         normalizedPhone,
-            fileName:      driveFileName ?? "boleto.pdf",
-            documentBytes: pdfBytes,
-            caption:       null,
-          });
-          if (pdfResult.success) {
-            sentWithPdf = true;
-            console.log(`[batch] Drive PDF sent for debtorId=${debtorId}`);
-          }
-        }
       }
+      // Boleto só vai se foi anexado um a um (drive_file_id = "uploaded"). A
+      // sugestão automática do Drive saiu do produto: nunca é enviada.
 
       if (!dryRun) {
         zapiResult = await sendTextMessage({

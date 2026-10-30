@@ -11,7 +11,7 @@ import {
   CheckCircle2,
   ChevronDown,
   FileText,
-  FolderSearch,
+  Paperclip,
   X,
 } from "lucide-react";
 import type { AuthCredentials, SignUpPayload } from "../types";
@@ -507,15 +507,15 @@ function VisualBoleto() {
       </div>
       <div className="mt-4 rounded-md border border-zinc-800 bg-zinc-950 p-3">
         <p className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-          <FolderSearch className="w-3.5 h-3.5 flex-shrink-0" /> Google Drive › Boletos
+          <Paperclip className="w-3.5 h-3.5 flex-shrink-0" /> Boleto do título
         </p>
         <div className="mt-3 flex items-center gap-3">
           <FileText className="w-7 h-7 text-rose-400 flex-shrink-0" strokeWidth={1.5} />
           <div className="min-w-0 flex-1">
             <p className="text-sm text-zinc-100 truncate">boleto-{EXEMPLO.documento}.pdf</p>
-            <p className="text-[11px] text-emerald-400">Mesmo número do título · sugerido</p>
+            <p className="text-[11px] text-emerald-400">Anexado · vai junto na mensagem</p>
           </div>
-          <span className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-bold text-black">Anexar</span>
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
         </div>
       </div>
     </div>

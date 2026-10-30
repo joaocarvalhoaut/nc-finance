@@ -27,8 +27,6 @@ import { isStripeLegacy, STRIPE_LEGACY_CUTOFF } from "../supabase/functions/_sha
 import { userConfigService } from "./services/userConfigService";
 import { whatsappService, SEND_STATUS_LABELS, type SendChargeStatus } from "./services/whatsappService";
 import { googleSheetsService, type ImportResult as SheetsImportResult, type ExportResult as SheetsExportResult } from "./services/googleSheetsService";
-import { googleDriveService, DRIVE_STATUS_LABELS, type DriveMatchResult, type DriveMatchStatus } from "./services/googleDriveService";
-import { driveFolderService, type DriveFolderStatus } from "./services/driveMatching/driveFolderService";
 import { whatsappBatchService, BATCH_TOP_STATUS_LABELS, type BatchChargeResult, type BatchTopStatus } from "./services/whatsappBatchService";
 import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type AutomationRule, type AutomationRun, type AutomationRuleCreate } from "./services/automationService";
 import { validateNewAutomationRule } from "./utils/automationValidation";
@@ -48,7 +46,6 @@ import { normalizarDigitosTelefone } from "./services/localDocumentExtraction/re
 import { exportRelatorio } from "./services/exportRelatorio";
 const Suporte = lazy(() => import("./components/Suporte"));
 import { PdfPreviewModal, openPdfPreview } from "./components/PdfPreviewModal";
-import DriveHelpPopover from "./components/DriveHelpPopover";
 import { 
   Debtor, 
   Representative, 
@@ -109,7 +106,6 @@ import {
   Eye,
   ChevronDown,
   UserCheck,
-  HardDrive,
   Menu
 } from "lucide-react";
 
@@ -379,23 +375,7 @@ export default function App() {
   const [exportSheetUrl, setExportSheetUrl] = useState<string>("");
   const [exportSheetName, setExportSheetName] = useState<string>("Visão Geral");
   const [sheetsImportResult, setSheetsImportResult] = useState<SheetsImportResult | null>(null);
-  const [isDriveMatching, setIsDriveMatching] = useState<boolean>(false);
-  const [driveMatchResult, setDriveMatchResult] = useState<DriveMatchResult | null>(null);
-  // Boleto Drive: importação por devedor (estado de loading) e mensagens
-  const [importingBoletoId, setImportingBoletoId] = useState<string | null>(null);
-  const [driveBoletoMsg, setDriveBoletoMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  // Importação em lote de boletos do Drive (Visão Geral)
-  const [isAttachingAll, setIsAttachingAll] = useState<boolean>(false);
-  const [attachAllProgress, setAttachAllProgress] = useState<{ done: number; total: number; ok: number } | null>(null);
   // Visualização do PDF do boleto: estado isolado em PdfPreviewModal (openPdfPreview)
-  // Edição da pasta do Drive (trocar URL de uma pasta já configurada)
-  const [editingDriveFolder, setEditingDriveFolder] = useState<boolean>(false);
-  const [isDriveSyncing, setIsDriveSyncing] = useState<boolean>(false);
-  const [driveFolderUrl, setDriveFolderUrl] = useState<string>("");
-  const [isDriveSaving, setIsDriveSaving] = useState<boolean>(false);
-  const [driveSaveMsg, setDriveSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [driveFolderStatus, setDriveFolderStatus] = useState<DriveFolderStatus | null>(null);
-
 
   // Inline phone editing in Cobrança tab
   const [editingPhoneDebtorId, setEditingPhoneDebtorId] = useState<string | null>(null);
@@ -886,206 +866,6 @@ export default function App() {
     }
   }, [debtors, selectedDebtorForMessage]);
 
-  // Localizar PDFs no Google Drive e associar aos devedores
-  const handleMatchDriveFiles = async () => {
-    setIsDriveMatching(true);
-    setDriveMatchResult(null);
-    try {
-      const result = await googleDriveService.matchDriveFiles();
-      setDriveMatchResult(result);
-      if (result.success) {
-        // Aplica os matches retornados no state local de devedores. Quem não
-        // veio na lista ficou sem sugestão no servidor (o novo casamento limpa
-        // sugestão que não se sustenta) — exceto boleto já anexado.
-        setDebtors((prev) =>
-          prev.map((d) => {
-            const m = result.matches.find((r) => r.debtorId === d.id);
-            if (!m) {
-              return d.driveFileId && d.driveFileId !== "uploaded"
-                ? { ...d, driveFileId: null, driveFileName: null, driveFileUrl: null, driveMatchScore: null }
-                : d;
-            }
-            return {
-              ...d,
-              driveFileId:      m.fileId,
-              driveFileName:    m.fileName,
-              driveFileUrl:     m.fileUrl,
-              driveMatchScore:  m.score,
-              driveLastMatchAt: result.matchedAt,
-            };
-          }),
-        );
-        void refreshSubscription();
-        // Contador "sem boleto" da barra do Drive
-        void driveFolderService.getStatus().then((s) => { if (!s.loadError) setDriveFolderStatus(s); });
-      }
-    } finally {
-      setIsDriveMatching(false);
-    }
-  };
-
-  // Anexar (importar) o boleto sugerido do Drive para o sistema
-  const handleAttachDriveBoleto = async (debtorId: string) => {
-    setImportingBoletoId(debtorId);
-    setDriveBoletoMsg(null);
-    try {
-      const result = await googleDriveService.importBoleto(debtorId);
-      if (result.success) {
-        setDebtors(prev => prev.map(d =>
-          d.id === debtorId
-            ? { ...d, driveFileId: "uploaded", driveFileName: result.fileName, driveFileUrl: result.fileUrl }
-            : d
-        ));
-        setDriveBoletoMsg({ ok: true, text: `Boleto "${result.fileName ?? "PDF"}" anexado ao cliente.` });
-      } else {
-        setDriveBoletoMsg({ ok: false, text: result.error ?? "Falha ao importar o boleto." });
-      }
-    } finally {
-      setImportingBoletoId(null);
-    }
-  };
-
-  // Anexar TODOS os boletos sugeridos (importação em lote) — usado na Visão Geral
-  const handleAttachAllDriveBoletos = async () => {
-    const suggested = debtors.filter(d => d.driveFileId && d.driveFileId !== "uploaded");
-    if (!suggested.length) return;
-    setIsAttachingAll(true);
-    setAttachAllProgress({ done: 0, total: suggested.length, ok: 0 });
-    let done = 0;
-    let ok = 0;
-    for (const target of suggested) {
-      const result = await googleDriveService.importBoleto(target.id);
-      if (result.success) {
-        ok++;
-        setDebtors(prev => prev.map(d =>
-          d.id === target.id
-            ? { ...d, driveFileId: "uploaded", driveFileName: result.fileName, driveFileUrl: result.fileUrl }
-            : d
-        ));
-      }
-      done++;
-      setAttachAllProgress({ done, total: suggested.length, ok });
-    }
-    setIsAttachingAll(false);
-    setDriveBoletoMsg({ ok: true, text: `${ok} de ${suggested.length} boleto(s) anexado(s) aos clientes.` });
-  };
-
-  // Ignorar a sugestão de boleto do Drive (limpa os campos drive_*)
-  const handleIgnoreDriveBoleto = async (debtorId: string) => {
-    setDebtors(prev => prev.map(d =>
-      d.id === debtorId
-        ? { ...d, driveFileId: null, driveFileName: null, driveFileUrl: null, driveMatchScore: null }
-        : d
-    ));
-    if (!currentOwnerUserId) return;
-    try {
-      await financeService.updatePdfAttachment(currentOwnerUserId, debtorId, null);
-    } catch {
-      // non-critical — estado local já atualizado
-    }
-  };
-
-  // Acompanha o progresso da indexação em background, fazendo polling do status
-  // até o servidor terminar de ler o conteúdo de todos os PDFs. true = terminou.
-  const pollDriveIndexingProgress = async (): Promise<boolean> => {
-    for (let i = 0; i < 120; i++) { // ~6 min de teto; o background segue mesmo após
-      const status = await driveFolderService.getStatus();
-      setDriveFolderStatus(status);
-      if (status.loadError) return false;
-      if (!status.indexing) {
-        setDriveSaveMsg({
-          ok: true,
-          text: `Indexação concluída: ${status.contentIndexed ?? status.fileCount} de ${status.fileCount} boleto(s) lidos. Clique em "Buscar boletos no Drive" para casar com os devedores.`,
-        });
-        return true;
-      }
-      setDriveSaveMsg({
-        ok: true,
-        text: `Indexando em segundo plano: ${status.contentIndexed ?? 0} de ${status.fileCount} boleto(s) lidos…`,
-      });
-      await new Promise((r) => setTimeout(r, 3000));
-    }
-    return false;
-  };
-
-  // Salvar pasta do Google Drive — indexa o 1º lote e segue em background
-  const handleSaveDriveFolder = async () => {
-    if (!driveFolderUrl.trim()) return;
-    setIsDriveSaving(true);
-    setDriveSaveMsg(null);
-    try {
-      const result = await driveFolderService.saveFolder(driveFolderUrl.trim());
-      if (!result.success) {
-        setDriveSaveMsg({ ok: false, text: result.message || result.error || "Falha ao salvar pasta." });
-        return;
-      }
-      setDriveFolderUrl("");
-      setEditingDriveFolder(false);
-      setDriveSaveMsg({ ok: true, text: `Pasta "${result.folderName ?? "Drive"}" conectada. Indexando boletos em segundo plano…` });
-      const status = await driveFolderService.getStatus();
-      setDriveFolderStatus(status);
-      setIsDriveSyncing(true);
-      try {
-        if (status.indexing) await pollDriveIndexingProgress();
-        else setDriveSaveMsg({ ok: true, text: `Pasta "${result.folderName ?? "Drive"}" conectada e indexada (${status.fileCount} boleto(s)).` });
-      } finally {
-        setIsDriveSyncing(false);
-      }
-    } finally {
-      setIsDriveSaving(false);
-    }
-  };
-
-  // Reindexar a pasta — dispara o ciclo de indexação e acompanha o progresso.
-  // true = pasta relida até o fim.
-  const handleSyncDriveFolder = async (): Promise<boolean> => {
-    setIsDriveSyncing(true);
-    try {
-      const r = await driveFolderService.syncFolder();
-      const status = await driveFolderService.getStatus();
-      setDriveFolderStatus(status);
-
-      // Indexação rodando em background segue valendo mesmo se a chamada caiu
-      // (tempo esgotado); fora isso, falha é falha — antes, havendo índice
-      // antigo, a tela dizia "concluída" até com a pasta sem acesso.
-      if (status.indexing) return await pollDriveIndexingProgress();
-      if (!r.success) {
-        setDriveSaveMsg({ ok: false, text: r.error || "Falha ao indexar a pasta." });
-        return false;
-      }
-      setDriveSaveMsg({
-        ok: true,
-        text: `Indexação concluída: ${status.contentIndexed ?? status.fileCount} de ${status.fileCount} boleto(s) lidos. Clique em "Buscar boletos no Drive" para casar com os devedores.`,
-      });
-      return true;
-    } finally {
-      setIsDriveSyncing(false);
-    }
-  };
-
-  // Pasta lida há mais de 12 h é relida sozinha ao abrir a tela, e os devedores
-  // são casados em seguida. Antes dependia de alguém lembrar do "Reindexar": o
-  // índice ficava meses parado e os boletos novos nunca apareciam.
-  const DRIVE_RELEITURA_MS = 12 * 60 * 60 * 1000;
-  const driveReleituraFeitaRef = React.useRef(false);
-
-  const loadDriveFolderStatus = async () => {
-    const status = await driveFolderService.getStatus();
-    setDriveFolderStatus(status);
-
-    // "indexing" não segura a releitura: leitura em fila há mais de 12 h é
-    // cadeia em background que parou — a releitura a retoma.
-    const lidaHa = status.lastIndexedAt ? Date.now() - new Date(status.lastIndexedAt).getTime() : Infinity;
-    if (!status.configured || !status.isAccessible || lidaHa < DRIVE_RELEITURA_MS) return;
-    if (driveReleituraFeitaRef.current) return;
-    driveReleituraFeitaRef.current = true;
-    if (await handleSyncDriveFolder()) {
-      setDriveSaveMsg(null);
-      await handleMatchDriveFiles();
-    }
-  };
-
-
   // Envio em lote de cobranças — liquidados são bloqueados
   const handleBatchSend = async () => {
     if (selectedDebtorIds.size === 0 || isBatchSending) return;
@@ -1163,12 +943,6 @@ export default function App() {
   useEffect(() => {
     if ((currentTab === "automacoes" || currentTab === "dashboard") && isLoggedIn && automationRules.length === 0 && !isLoadingAutomation) {
       void loadAutomationData();
-    }
-  }, [currentTab, isLoggedIn]);
-
-  useEffect(() => {
-    if ((currentTab === "cobranca" || currentTab === "visao_geral") && isLoggedIn && !driveFolderStatus) {
-      void loadDriveFolderStatus();
     }
   }, [currentTab, isLoggedIn]);
 
@@ -2945,7 +2719,7 @@ export default function App() {
                         { t: "Importe", d: "Envie o relatório, a planilha ou o PDF. O sistema lê os vencimentos sozinho." },
                         { t: "Corrija os valores", d: "Defina multa e juros ao dia. Os valores atualizados aparecem na hora." },
                         { t: "Escolha o tom", d: "Amigável, neutro, firme ou notificação jurídica, conforme o atraso." },
-                        { t: "Dispare", d: "Envie pelo seu WhatsApp, com o boleto do Google Drive anexado, ou deixe automático." },
+                        { t: "Dispare", d: "Envie pelo seu WhatsApp, com o boleto em PDF anexado, ou deixe automático." },
                       ].map((p, i) => (
                         <li key={p.t} className="px-5 py-4">
                           <p className="text-[10px] font-mono text-emerald-400">{String(i + 1).padStart(2, "0")}</p>
@@ -3438,51 +3212,6 @@ export default function App() {
               {currentTab === "visao_geral" && (
                 <>
                 <div className="space-y-4">
-
-                  {/* ── Boletos do Google Drive (busca + anexar em lote) ──────── */}
-                  {driveFolderStatus?.configured && (() => {
-                    const suggestedCount = debtors.filter(d => d.driveFileId && d.driveFileId !== "uploaded").length;
-                    return (
-                      <div className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <HardDrive className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                          <DriveHelpPopover />
-                          <span className="text-xs text-zinc-300 truncate">
-                            Boletos do Drive: <span className="text-zinc-400">{driveFolderStatus.folderName || "pasta"}</span>
-                            {driveFolderStatus.indexing && <span className="text-sky-300"> · indexando {driveFolderStatus.contentIndexed ?? 0}/{driveFolderStatus.fileCount}…</span>}
-                            {suggestedCount > 0 && <span className="text-emerald-300 font-semibold"> · {suggestedCount} boleto(s) sugerido(s)</span>}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void handleMatchDriveFiles()}
-                            disabled={isDriveMatching || isAttachingAll}
-                            className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-100 text-xs font-semibold border border-zinc-700 transition-all cursor-pointer inline-flex items-center gap-1.5 whitespace-nowrap"
-                          >
-                            {isDriveMatching ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Buscando…</> : <><Search className="w-3.5 h-3.5" /> Buscar boletos no Drive</>}
-                          </button>
-                          {suggestedCount > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => void handleAttachAllDriveBoletos()}
-                              disabled={isAttachingAll}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 whitespace-nowrap"
-                            >
-                              {isAttachingAll
-                                ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Anexando {attachAllProgress?.done ?? 0}/{attachAllProgress?.total ?? 0}…</>
-                                : <><Check className="w-3.5 h-3.5" strokeWidth={3} /> Anexar todos ({suggestedCount})</>}
-                            </button>
-                          )}
-                        </div>
-                        {driveBoletoMsg && (
-                          <div className={`w-full text-[11px] rounded-lg px-3 py-1.5 border ${driveBoletoMsg.ok ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20" : "text-rose-300 bg-rose-500/10 border-rose-500/20"}`}>
-                            {driveBoletoMsg.text}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
 
                   {/* ── Barra da carteira ───────────────────────────────────────
                       Configurações (encargos, responsáveis) viram botões que abrem
@@ -4000,7 +3729,7 @@ export default function App() {
                                     {d.phone
                                       ? <span className="text-[11px] font-mono text-zinc-400">{d.phone}</span>
                                       : <span className="text-[11px] text-amber-400">sem WhatsApp</span>}
-                                    {d.driveFileId && <span className="text-[11px] text-emerald-400">boleto anexado</span>}
+                                    {d.driveFileId === "uploaded" && <span className="text-[11px] text-emerald-400">boleto anexado</span>}
                                     {d.notes && <MessageSquare className="w-3.5 h-3.5 text-amber-300" aria-label="Tem observação" />}
                                   </span>
                                 </button>
@@ -4944,144 +4673,6 @@ export default function App() {
                 return (
                 <div className="space-y-4">
 
-                  {/* ── Boletos do Google Drive ───────────────────────────────── */}
-                  <div className={`${card} px-4 py-3 space-y-2.5`}>
-                    {/* Sem status ainda (ou falha ao consultar) não é "sem pasta": antes a
-                        tela pedia para conectar a pasta enquanto o status carregava. */}
-                    {driveFolderStatus === null ? (
-                      <p className="text-xs text-zinc-500 flex items-center gap-2">
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Carregando a pasta do Drive…
-                      </p>
-                    ) : driveFolderStatus.loadError ? (
-                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-                        <p className="text-xs text-zinc-400 flex items-center gap-2 min-w-0">
-                          <HardDrive className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
-                          <span>{driveFolderStatus.loadError}</span>
-                        </p>
-                        {driveFolderStatus.loadErrorStatus !== "bloqueado_plano" && (
-                          <button
-                            type="button"
-                            onClick={() => { setDriveFolderStatus(null); void loadDriveFolderStatus(); }}
-                            className="px-2.5 py-1.5 rounded-lg text-[11px] text-zinc-400 hover:text-white inline-flex items-center gap-1 transition-colors cursor-pointer"
-                          >
-                            <RefreshCw className="w-3 h-3" /> Tentar de novo
-                          </button>
-                        )}
-                      </div>
-                    ) : driveFolderStatus.configured && !editingDriveFolder ? (
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                        <span className="flex items-center gap-2 min-w-0 flex-1 text-xs text-zinc-400">
-                          <HardDrive className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
-                          <DriveHelpPopover />
-                          <span className="truncate">
-                            Boletos do Drive: <span className="text-zinc-200">{driveFolderStatus.folderName || "Drive"}</span>
-                            <span className="text-zinc-500"> · {driveFolderStatus.fileCount} arquivo(s)</span>
-                            {driveFolderStatus.indexing
-                              ? <span className="text-sky-300"> · lendo {driveFolderStatus.contentIndexed ?? 0}/{driveFolderStatus.fileCount}…</span>
-                              : driveFolderStatus.lastIndexedAt && (
-                                <span className="text-zinc-500" title="Última leitura da pasta">
-                                  {" "}· lida em {new Date(driveFolderStatus.lastIndexedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                                </span>
-                              )}
-                            {driveFolderStatus.isAccessible === false && <span className="text-amber-300"> · sem acesso à pasta</span>}
-                            {driveFolderStatus.unmatchedDebtors > 0 && <span className="text-zinc-500"> · {driveFolderStatus.unmatchedDebtors} sem boleto</span>}
-                          </span>
-                        </span>
-                        <span className="flex items-center gap-1 flex-shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => void handleSyncDriveFolder()}
-                            disabled={isDriveSyncing}
-                            className="px-2.5 py-1.5 rounded-lg text-[11px] text-zinc-400 hover:text-white disabled:opacity-50 inline-flex items-center gap-1 transition-colors cursor-pointer"
-                            title="Ler a pasta de novo e atualizar o índice"
-                          >
-                            <RefreshCw className={`w-3 h-3 ${isDriveSyncing ? "animate-spin" : ""}`} /> {isDriveSyncing ? "Lendo…" : "Reindexar"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setDriveFolderUrl(""); setDriveSaveMsg(null); setEditingDriveFolder(true); }}
-                            className="px-2.5 py-1.5 rounded-lg text-[11px] text-zinc-400 hover:text-white inline-flex items-center gap-1 transition-colors cursor-pointer"
-                            title="Trocar a pasta do Google Drive"
-                          >
-                            <Pencil className="w-3 h-3" /> Trocar pasta
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleMatchDriveFiles()}
-                            disabled={isDriveMatching}
-                            className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-100 text-[11px] font-semibold inline-flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
-                            title="Procurar no Drive o boleto de cada devedor"
-                          >
-                            {isDriveMatching ? <><RefreshCw className="w-3 h-3 animate-spin" /> Buscando…</> : <><Search className="w-3 h-3" /> Buscar boletos</>}
-                          </button>
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <p className="text-xs text-zinc-400 flex items-center gap-2">
-                          <HardDrive className="w-3.5 h-3.5 text-zinc-500" />
-                          {driveFolderStatus?.configured ? "Trocar a pasta de boletos do Drive" : "Conecte a pasta de boletos do Google Drive"}
-                          <DriveHelpPopover />
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <input
-                            type="text"
-                            value={driveFolderUrl}
-                            onChange={(e) => setDriveFolderUrl(e.target.value)}
-                            placeholder="Cole o link da pasta do Google Drive…"
-                            aria-label="Link da pasta do Google Drive"
-                            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white font-mono placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => void handleSaveDriveFolder()}
-                            disabled={isDriveSaving || !driveFolderUrl.trim()}
-                            className="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-black text-xs font-bold transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5 whitespace-nowrap"
-                          >
-                            {isDriveSaving ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Salvando…</> : (driveFolderStatus?.configured ? "Salvar nova pasta" : "Conectar pasta")}
-                          </button>
-                          {driveFolderStatus?.configured && (
-                            <button
-                              type="button"
-                              onClick={() => { setEditingDriveFolder(false); setDriveFolderUrl(""); setDriveSaveMsg(null); }}
-                              className="px-3.5 py-2 rounded-lg text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-600 text-xs transition-colors whitespace-nowrap cursor-pointer"
-                            >
-                              Cancelar
-                            </button>
-                          )}
-                        </div>
-                        {driveFolderStatus?.configured && (
-                          <p className="text-[10px] text-zinc-500">
-                            Pasta atual: <span className="text-zinc-400">{driveFolderStatus.folderName || "Drive"}</span>. A nova pasta substitui a atual e é lida de novo.
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {driveSaveMsg && (
-                      <p className={`text-[11px] rounded-lg px-3 py-2 border ${driveSaveMsg.ok ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20" : "text-rose-300 bg-rose-500/10 border-rose-500/20"}`}>
-                        {driveSaveMsg.text}
-                      </p>
-                    )}
-                    {driveMatchResult && !driveMatchResult.success && (
-                      <p className="text-[11px] rounded-lg px-3 py-2 border text-rose-300 bg-rose-500/10 border-rose-500/20">
-                        {driveMatchResult.error ?? DRIVE_STATUS_LABELS[driveMatchResult.status]}
-                      </p>
-                    )}
-                    {driveMatchResult && driveMatchResult.success && (
-                      <p className="text-[11px] rounded-lg px-3 py-2 border text-emerald-300 bg-emerald-500/10 border-emerald-500/20">
-                        {driveMatchResult.debtorsMatched > 0
-                          ? `Encontramos ${driveMatchResult.debtorsMatched} boleto(s) — confirme "Anexar" em cada devedor abaixo.`
-                          : "Nenhum boleto correspondente encontrado na pasta."}
-                      </p>
-                    )}
-                    {driveBoletoMsg && (
-                      <p className={`text-[11px] rounded-lg px-3 py-2 border ${driveBoletoMsg.ok ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20" : "text-rose-300 bg-rose-500/10 border-rose-500/20"}`}>
-                        {driveBoletoMsg.text}
-                      </p>
-                    )}
-                  </div>
-
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
                     {/* ── Devedores ───────────────────────────────────────────── */}
@@ -5255,32 +4846,6 @@ export default function App() {
                                     <span className="text-[10px] text-zinc-400 flex items-center gap-1.5 flex-1">
                                       <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" /> Enviando PDF…
                                     </span>
-                                  ) : importingBoletoId === d.id ? (
-                                    <span className="text-[10px] text-zinc-400 flex items-center gap-1.5 flex-1">
-                                      <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" /> Importando do Drive…
-                                    </span>
-                                  ) : (d.driveFileId && d.driveFileId !== "uploaded") ? (
-                                    /* Sugerido: achado no Drive, aguardando confirmação */
-                                    <div className="flex-1 flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                      <span className="text-[10px] text-sky-300 flex items-center gap-1 truncate min-w-0" title={d.driveFileName || "boleto.pdf"}>
-                                        <HardDrive className="w-3 h-3 flex-shrink-0" />
-                                        No Drive{typeof d.driveMatchScore === "number" ? ` (${Math.round(d.driveMatchScore * 100)}%)` : ""}: {d.driveFileName || "boleto.pdf"}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); void handleAttachDriveBoleto(d.id); }}
-                                        className="px-2 py-0.5 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
-                                      >
-                                        <Check className="w-3 h-3" strokeWidth={3} /> Anexar
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); void handleIgnoreDriveBoleto(d.id); }}
-                                        className="px-2 py-0.5 rounded text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-600 text-[10px] transition-colors cursor-pointer"
-                                      >
-                                        Ignorar
-                                      </button>
-                                    </div>
                                   ) : d.driveFileId === "uploaded" ? (
                                     <>
                                       <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1 flex-1 truncate" title={d.driveFileName || "boleto.pdf"}>

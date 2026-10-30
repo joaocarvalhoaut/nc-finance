@@ -22,8 +22,7 @@ import { duplicidadeLiberada, reserveChargeSend } from "../_shared/sendReservati
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
 import { ACCESS_COLUMNS, canUseSubscription } from "../_shared/billingStatus.ts";
-import { normalizePhone, validatePhone, sendTextMessage, sendDocumentMessage } from "../_shared/zapi.ts";
-import { downloadDriveFile, getDriveAccessToken } from "../_shared/driveFolderIndex.ts";
+import { normalizePhone, validatePhone, sendTextMessage } from "../_shared/zapi.ts";
 import { loadZApiCredentialsForUser } from "../_shared/platformIntegrations.ts";
 import { maskPhone, messagePreview, sanitizeError } from "../_shared/sanitize.ts";
 import { checkPilotGuard, incrementPilotDailyCount } from "../_shared/pilotGuard.ts";
@@ -411,28 +410,9 @@ Deno.serve(async (request: Request) => {
       const shortUrl = await shortenUrl(publicPdfUrl);
       finalMessage = `${body.message}\n\n📎 Boleto: ${shortUrl}`;
       sentWithPdf = true;
-          } else if (debtorDriveFileId && debtorDriveFileId !== "uploaded") {
-      // Legacy: Drive-matched PDF — no public URL, attempt document send as bytes
-      const driveToken = await getDriveAccessToken().catch(() => null);
-      if (driveToken) {
-        const pdfBytes = await downloadDriveFile(debtorDriveFileId, driveToken).catch(() => null);
-        if (pdfBytes && pdfBytes.length > 0) {
-          const pdfResult = await sendDocumentMessage({
-            instanceId:    zapiCreds.instanceId,
-            token:         zapiCreds.token,
-            clientToken:   zapiCreds.clientToken,
-            phone:         normalizedPhone,
-            fileName:      debtorDriveFileName ?? "boleto.pdf",
-            documentBytes: pdfBytes,
-            caption:       null,
-          });
-          if (pdfResult.success) {
-            sentWithPdf = true;
-            console.log(`[charge] Drive PDF sent for debtorId=${body.debtorId}`);
-          }
-        }
-      }
     }
+    // Boleto só vai se foi anexado um a um (drive_file_id = "uploaded"). A
+    // sugestão automática do Drive saiu do produto: nunca é enviada.
 
     // ── Send text message (with PDF link appended when available) ─────────────
     zapiResult = await sendTextMessage({

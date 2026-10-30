@@ -46,9 +46,9 @@ export const DIFERENCIAIS: Diferencial[] = [
     planos: "Todos os planos",
   },
   {
-    titulo: "O boleto certo, anexado sozinho",
-    texto: "Aponte a pasta do Google Drive onde ficam os boletos. O sistema encontra o PDF de cada cliente pelo número do título e sugere o anexo — você confere e envia.",
-    planos: "Pro e Premium",
+    titulo: "O boleto vai junto",
+    texto: "Anexe o PDF do boleto em cada título. Ele segue na mensagem como link, para o cliente abrir e pagar na hora.",
+    planos: "Todos os planos",
   },
   {
     titulo: "Cobra sozinho, todo dia",
