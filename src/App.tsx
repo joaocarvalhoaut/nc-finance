@@ -864,9 +864,6 @@ export default function App() {
     : [];
   const assinaturaTitulos = titulosDaMensagem.map((t) => t.id).join(",");
 
-  // Trocar de título volta a juntar; sem isto a escolha "só este" passava adiante.
-  useEffect(() => { setSepararTitulo(false); }, [selectedDebtorForMessage?.id]);
-
   // Sync drafted text message when selected debitor or tone updates
   useEffect(() => {
     if (titulosDaMensagem.length) {
@@ -1625,14 +1622,22 @@ export default function App() {
     const phone = editingPhoneValue.trim();
     const debtor = debtors.find(d => d.id === debtorId);
     if (!debtor) return;
-    const updatedDebtor = { ...debtor, phone };
-    setDebtors(prev => prev.map(d => d.id === debtorId ? updatedDebtor : d));
-    if (selectedDebtorForMessage?.id === debtorId) {
-      setSelectedDebtorForMessage(updatedDebtor);
+    // Em Preparar envios o cliente aparece numa linha só (títulos agrupados):
+    // o número novo vale para todos os títulos dele com o número antigo, de
+    // qualquer tipo — senão o grupo se desfazia e as linhas voltavam separadas.
+    const mesmoCliente = (x: Debtor) => {
+      const k = chaveDeAgrupamento(debtor.client, debtor.phone || "", "vencidos");
+      return x.id === debtorId || (k !== null && chaveDeAgrupamento(x.client, x.phone || "", "vencidos") === k);
+    };
+    const alterados = debtors.filter(mesmoCliente).map((x) => ({ ...x, phone }));
+    const porId = new Map(alterados.map((x) => [x.id, x]));
+    setDebtors(prev => prev.map(d => porId.get(d.id) ?? d));
+    if (selectedDebtorForMessage && porId.has(selectedDebtorForMessage.id)) {
+      setSelectedDebtorForMessage(porId.get(selectedDebtorForMessage.id)!);
     }
     setEditingPhoneDebtorId(null);
     try {
-      await financeService.update(currentOwnerUserId, updatedDebtor);
+      await Promise.all(alterados.map((x) => financeService.update(currentOwnerUserId, x)));
     } catch {
       // silently ignore — local state already updated
     }
@@ -4755,17 +4760,31 @@ export default function App() {
                   return `${dt.toLocaleDateString("pt-BR")} · há ${dias} dias`;
                 };
 
+                // Uma linha por mensagem: os títulos do mesmo cliente e tipo vão
+                // juntos, então só o primeiro do grupo (na ordem da aba) aparece.
+                const chaveEnvio = (d: Debtor) => chaveDeAgrupamento(d.client, d.phone || "", d.category);
+                const umPorMensagem = (lista: Debtor[]) => {
+                  const vistos = new Set<string>();
+                  return lista.filter((d) => {
+                    const k = chaveEnvio(d);
+                    if (!k) return true;
+                    if (vistos.has(k)) return false;
+                    vistos.add(k);
+                    return true;
+                  });
+                };
+
                 const filtrados = debtors.filter(d =>
                   (tipoEnvio === "todos" || d.category === tipoEnvio) &&
                   (!termo || d.client.toLowerCase().includes(termo) || (d.document || "").toLowerCase().includes(termo)));
-                const enviadosHoje = filtrados.filter(cobradoHoje)
-                  .sort((a, b) => (ultimaDe(b) ?? 0) - (ultimaDe(a) ?? 0)); // mais recente primeiro
+                const enviadosHoje = umPorMensagem(filtrados.filter(cobradoHoje)
+                  .sort((a, b) => (ultimaDe(b) ?? 0) - (ultimaDe(a) ?? 0))); // mais recente primeiro
                 // Quem nunca foi cobrado vem primeiro; depois quem foi cobrado há mais
                 // tempo. Liquidados e desabilitados não recebem cobrança: vão para o fim.
                 // Empate mantém a ordem da carteira (o sort é estável).
                 const naoCobravel = (d: Debtor) => d.category === "liquidado" || d.category === "desabilitado";
-                const faltamEnviar = filtrados.filter(d => !cobradoHoje(d))
-                  .sort((a, b) => Number(naoCobravel(a)) - Number(naoCobravel(b)) || (ultimaDe(a) ?? 0) - (ultimaDe(b) ?? 0));
+                const faltamEnviar = umPorMensagem(filtrados.filter(d => !cobradoHoje(d))
+                  .sort((a, b) => Number(naoCobravel(a)) - Number(naoCobravel(b)) || (ultimaDe(a) ?? 0) - (ultimaDe(b) ?? 0)));
                 const listaEnvio = abaEnvio === "hoje" ? enviadosHoje : faltamEnviar;
                 const sel = selectedDebtorForMessage;
 
@@ -4869,8 +4888,11 @@ export default function App() {
                           </p>
                         )}
                         {listaEnvio.map((d) => {
-                          const isSelected = sel?.id === d.id;
+                          const chaveLinha = chaveEnvio(d);
+                          const isSelected = !!sel && (sel.id === d.id || (chaveLinha !== null && chaveEnvio(sel) === chaveLinha));
                           const isEditingPhone = editingPhoneDebtorId === d.id;
+                          const grupoLinha = juntosCom(d) > 0 ? grupoDoTitulo(d) : [d];
+                          const anexados = grupoLinha.filter((t) => t.driveFileId === "uploaded").length;
 
                           return (
                             <div
@@ -4879,15 +4901,16 @@ export default function App() {
                             >
                               <button
                                 type="button"
-                                onClick={() => setSelectedDebtorForMessage(d)}
+                                onClick={() => { setSepararTitulo(false); setSelectedDebtorForMessage(d); }}
                                 aria-pressed={isSelected}
                                 className="w-full flex items-start justify-between gap-3 px-3 pt-2.5 pb-1.5 text-left cursor-pointer"
                               >
                                 <span className="min-w-0">
                                   <span className="block text-xs font-semibold text-white truncate">{d.client}</span>
                                   <span className="block text-[10px] text-zinc-500 font-mono mt-0.5">
-                                    {d.document} · {d.dueDate}
-                                    {juntosCom(d) > 0 && <span className="font-sans text-zinc-400"> · +{juntosCom(d)} na mesma mensagem</span>}
+                                    {grupoLinha.length > 1
+                                      ? <span className="font-sans text-zinc-400">{grupoLinha.length} títulos · venc. {grupoLinha[0].dueDate} a {grupoLinha[grupoLinha.length - 1].dueDate}</span>
+                                      : <>{d.document} · {d.dueDate}</>}
                                   </span>
                                   {(() => {
                                     const ultima = ultimaDe(d);
@@ -4900,7 +4923,7 @@ export default function App() {
                                   })()}
                                 </span>
                                 <span className="flex flex-col items-end gap-1 flex-shrink-0">
-                                  <span className="text-xs font-mono text-white tabular-nums">{formatBRL(d.value)}</span>
+                                  <span className="text-xs font-mono text-white tabular-nums">{formatBRL(grupoLinha.reduce((soma, t) => soma + t.value, 0))}</span>
                                   <span className="flex items-center gap-1.5">
                                     <span className={`px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wide font-bold font-mono ${CATEGORY_TINT[d.category]}`}>
                                       {CATEGORY_LABEL[d.category]}
@@ -4958,7 +4981,12 @@ export default function App() {
                                 </div>
 
                                 <div className="flex items-center gap-2 min-w-0">
-                                  {uploadingPdfDebtorId === d.id ? (
+                                  {grupoLinha.length > 1 ? (
+                                    /* Vários títulos: o boleto de cada um é anexado no quadro da mensagem */
+                                    <span className={`text-[10px] flex-1 truncate ${anexados ? "text-emerald-400" : "text-zinc-600"}`}>
+                                      {anexados ? `📎 ${anexados} de ${grupoLinha.length} boletos anexados` : "Sem boleto"} · anexe ao abrir
+                                    </span>
+                                  ) : uploadingPdfDebtorId === d.id ? (
                                     <span className="text-[10px] text-zinc-400 flex items-center gap-1.5 flex-1">
                                       <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" /> Enviando PDF…
                                     </span>
@@ -5053,20 +5081,75 @@ export default function App() {
                                     {separarTitulo ? "Juntar de novo" : "Enviar só este título"}
                                   </button>
                                 </div>
-                                {!separarTitulo && (
-                                  <ul className="mt-2 space-y-1 border-t border-zinc-800/80 pt-2">
-                                    {grupoSel.map((t) => (
-                                      <li key={t.id} className="flex items-center justify-between gap-3 text-[11px] font-mono">
-                                        <span className={t.id === sel.id ? "text-zinc-200" : "text-zinc-400"}>{t.document} · {t.dueDate}</span>
-                                        <span className="text-zinc-300 tabular-nums">{formatBRL(valorDaMensagem(t))}</span>
+                                <ul className="mt-2 space-y-1 border-t border-zinc-800/80 pt-2">
+                                    {grupoSel.map((t) => {
+                                      const foraDaMensagem = separarTitulo && t.id !== sel.id;
+                                      return (
+                                      <li key={t.id} className={`flex items-center justify-between gap-3 text-[11px] font-mono ${foraDaMensagem ? "opacity-50" : ""}`}>
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedDebtorForMessage(t)}
+                                          className={`text-left truncate cursor-pointer hover:text-white ${t.id === sel.id ? "text-zinc-200" : "text-zinc-400"}`}
+                                          title={separarTitulo ? "Enviar só este título" : undefined}
+                                        >
+                                          {t.document} · {t.dueDate}
+                                        </button>
+                                        <span className="flex items-center gap-2.5 flex-shrink-0 font-sans">
+                                          {uploadingPdfDebtorId === t.id ? (
+                                            <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" aria-label="Enviando PDF" />
+                                          ) : t.driveFileId === "uploaded" ? (
+                                            <span className="inline-flex items-center gap-1">
+                                              <button
+                                                type="button"
+                                                onClick={() => t.driveFileUrl && openPdfPreview(t.driveFileUrl, t.driveFileName || "boleto.pdf")}
+                                                className="text-[10px] text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1 cursor-pointer"
+                                                title={t.driveFileName || "boleto.pdf"}
+                                              >
+                                                <Eye className="w-3 h-3" /> Boleto
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => void handlePdfRemove(t.id)}
+                                                className="text-zinc-600 hover:text-rose-400 transition-colors p-0.5 cursor-pointer"
+                                                title="Remover PDF"
+                                              >
+                                                <X className="w-3 h-3" />
+                                              </button>
+                                            </span>
+                                          ) : (
+                                            <>
+                                              <label
+                                                htmlFor={`pdf-grupo-${t.id}`}
+                                                className="text-[10px] text-zinc-500 hover:text-zinc-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                                title="Anexar PDF do boleto"
+                                              >
+                                                <Upload className="w-3 h-3" /> Anexar
+                                              </label>
+                                              <input
+                                                id={`pdf-grupo-${t.id}`}
+                                                type="file"
+                                                accept=".pdf,application/pdf"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                  const file = e.target.files?.[0];
+                                                  if (file) void handlePdfUpload(t.id, file);
+                                                  e.target.value = "";
+                                                }}
+                                              />
+                                            </>
+                                          )}
+                                          <span className="font-mono text-zinc-300 tabular-nums">{formatBRL(valorDaMensagem(t))}</span>
+                                        </span>
                                       </li>
-                                    ))}
+                                      );
+                                    })}
+                                    {!separarTitulo && (
                                     <li className="flex items-center justify-between gap-3 text-[11px] pt-1">
                                       <span className="text-zinc-500">Total</span>
                                       <span className="font-mono text-white tabular-nums">{formatBRL(totalDaMensagem)}</span>
                                     </li>
-                                  </ul>
-                                )}
+                                    )}
+                                </ul>
                               </div>
                             )}
 
