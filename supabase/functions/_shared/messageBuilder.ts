@@ -27,7 +27,7 @@ export interface DebtorForMessage {
   companyName?: string | null;
 }
 
-import { aplicarEmpresa } from "./assinatura.ts";
+import { preencherMensagem } from "./agrupamento.ts";
 
 // ─── Default templates (por tom) ──────────────────────────────────────────────
 
@@ -78,14 +78,6 @@ const FALLBACK_TONE = "neutro";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const formatBRL = (value: number): string => {
-  // Manual BRL format for Deno (no Intl.NumberFormat locale guaranteed)
-  const fixed = value.toFixed(2);
-  const [int, dec] = fixed.split(".");
-  const intFormatted = int.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return `${intFormatted},${dec}`;
-};
-
 /**
  * Normaliza data de YYYY-MM-DD para DD/MM/YYYY.
  * Se já estiver no formato DD/MM/YYYY, retorna como está.
@@ -110,28 +102,32 @@ export const buildMessage = (
   debtor: DebtorForMessage,
   tone = FALLBACK_TONE,
   customTemplate?: string | null,
+): string => buildGroupMessage([debtor], tone, customTemplate);
+
+/**
+ * Uma mensagem para vários títulos do mesmo cliente e tipo (_shared/agrupamento.ts).
+ * Com um título só, sai igual ao buildMessage de sempre.
+ */
+export const buildGroupMessage = (
+  debtors: DebtorForMessage[],
+  tone = FALLBACK_TONE,
+  customTemplate?: string | null,
 ): string => {
   const template =
     customTemplate?.trim() ||
     DEFAULT_TEMPLATES[tone] ||
     DEFAULT_TEMPLATES[FALLBACK_TONE];
 
-  const dueFormatted = normalizeDate(debtor.dueDate);
-  const amountFormatted = formatBRL(debtor.amount);
-
-  const daysOverdueStr = String(debtor.daysOverdue ?? 0);
-
-  let msg = template
-    .replace(/{nome_cliente}/g,    debtor.clientName   || "Cliente")
-    .replace(/{documento}/g,       debtor.documentNumber || "—")
-    .replace(/{documento_boleto}/g, debtor.documentNumber || "—")
-    .replace(/{vencimento}/g,      dueFormatted)
-    .replace(/{valor_atualizado}/g, amountFormatted)
-    .replace(/{dias_atraso}/g,     daysOverdueStr);
-  msg = aplicarEmpresa(msg, debtor.companyName);
-
   // NOTE: PDF link is appended by the calling Edge Function (not here),
   // so that it can use the correct public Storage URL with optional shortening.
-
-  return msg;
+  return preencherMensagem(template, {
+    nomeCliente: debtors[0]?.clientName || "Cliente",
+    empresa:     debtors[0]?.companyName,
+    titulos:     debtors.map((d) => ({
+      documento:  d.documentNumber,
+      vencimento: normalizeDate(d.dueDate),
+      valor:      d.amount,
+      diasAtraso: d.daysOverdue ?? 0,
+    })),
+  });
 };

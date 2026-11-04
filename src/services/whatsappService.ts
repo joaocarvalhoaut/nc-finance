@@ -36,6 +36,8 @@ export interface SendChargePayload {
   clientName: string;
   documentNumber: string;
   amount: number;
+  /** Outros títulos do mesmo cliente e tipo que vão juntos nesta mensagem. */
+  grupoIds?: string[];
 }
 
 export interface SendChargeResult {

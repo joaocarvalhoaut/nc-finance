@@ -22,6 +22,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
 import { ACCESS_COLUMNS, canUseSubscription } from "../_shared/billingStatus.ts";
 import { reconcileAutoInstances } from "../_shared/zapiProvisioning.ts";
+import { chaveDeAgrupamento } from "../_shared/agrupamento.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -147,13 +148,17 @@ const processRule = async (rule: RuleRow): Promise<void> => {
     const dedupeWindow = new Date(Date.now() - DEDUP_WINDOW_HOURS * 60 * 60 * 1_000).toISOString();
     const { data: recentJobs } = await admin
       .from("user_dispatch_jobs")
-      .select("debtor_id")
+      .select("debtor_id, metadata")
       .eq("automation_rule_id", ruleId)
       .gte("created_at", dedupeWindow)
       .not("status", "in", '("failed","skipped")');
 
+    // Conta também os títulos que foram juntos na mensagem de outro job.
     const recentDebtorSet = new Set(
-      ((recentJobs ?? []) as Array<{ debtor_id: string }>).map(j => j.debtor_id),
+      ((recentJobs ?? []) as Array<{ debtor_id: string; metadata?: { grupo_ids?: unknown } | null }>).flatMap((j) => [
+        j.debtor_id,
+        ...(Array.isArray(j.metadata?.grupo_ids) ? (j.metadata!.grupo_ids as unknown[]).map(String) : []),
+      ]),
     );
 
     // ── 5. Aplica max_daily_sends ───────────────────────────────────────────
@@ -166,8 +171,20 @@ const processRule = async (rule: RuleRow): Promise<void> => {
         !d.archived_at &&
         d.status !== "liquidado",
     );
-    const limited = maxDaily ? eligible.slice(0, maxDaily) : eligible;
-    jobsSkipped = totalCandidates - limited.length;
+    // Um job por cliente, WhatsApp e tipo: os títulos dele vão numa mensagem só
+    // (_shared/agrupamento.ts). O limite diário conta mensagens, não títulos.
+    const grupos = new Map<string, DebtorRow[]>();
+    for (const d of eligible as DebtorRow[]) {
+      const chave = chaveDeAgrupamento(String(d.client_name ?? ""), String(d.phone ?? ""), String(d.category ?? "")) ?? `id:${d.id}`;
+      const g = grupos.get(chave);
+      if (g) g.push(d); else grupos.set(chave, [d]);
+    }
+    const porVencimento = (a: DebtorRow, b: DebtorRow) => String(a.due_date ?? "").localeCompare(String(b.due_date ?? ""));
+    const todosGrupos = [...grupos.values()].map((g) => g.sort(porVencimento));
+    const gruposDoDia = maxDaily ? todosGrupos.slice(0, maxDaily) : todosGrupos;
+    const limited = gruposDoDia.map((g) => g[0]);
+    const juntosDe = new Map(gruposDoDia.map((g) => [String(g[0].id), g.slice(1).map((d) => String(d.id))]));
+    jobsSkipped = totalCandidates - gruposDoDia.reduce((n, g) => n + g.length, 0);
 
     // ── 6. Cria jobs ────────────────────────────────────────────────────────
     const schedFor = scheduledFor(winStart);
@@ -185,6 +202,7 @@ const processRule = async (rule: RuleRow): Promise<void> => {
         tone,
         rule_type:       ruleType,
         plan:            sub.plan,
+        grupo_ids:       juntosDe.get(String(d.id)) ?? [],
       },
     }));
     // Liga cada job à execução (run) para o worker contabilizar "Enviados".

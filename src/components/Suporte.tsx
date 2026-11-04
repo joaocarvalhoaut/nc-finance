@@ -105,6 +105,13 @@ const PERGUNTAS: Pergunta[] = [
   },
   {
     tema: "WhatsApp e envios",
+    pergunta: "Cliente com vários boletos recebe várias mensagens?",
+    resposta:
+      "Não. Títulos do mesmo cliente (mesmo nome e mesmo WhatsApp) e do mesmo tipo vão numa mensagem só: os vencidos juntos, os a vencer juntos — tipos diferentes nunca se misturam. A mensagem lista cada título com o seu valor, mostra o total e leva o link do boleto de cada um.\n" +
+      "Vale no envio um por um, no envio em lote e nas automações. Em Preparar envios, “Enviar só este título” manda um título separado quando precisar.",
+  },
+  {
+    tema: "WhatsApp e envios",
     pergunta: "Qual valor vai na mensagem?",
     resposta: "O valor atualizado: o valor do título mais a multa e os juros ao dia que você configurou, contados até o dia do envio — o mesmo valor corrigido que aparece no painel. Títulos a vencer vão pelo valor original.",
   },

@@ -28,6 +28,8 @@ import { maskPhone, messagePreview, sanitizeError } from "../_shared/sanitize.ts
 import { checkPilotGuard, incrementPilotDailyCount } from "../_shared/pilotGuard.ts";
 import { checkRateLimit, tooManyRequests } from "../_shared/rateLimit.ts";
 import { isOptedOut } from "../_shared/optOut.ts";
+import { linhasDeBoleto } from "../_shared/agrupamento.ts";
+import { lerEncargos, valorAtualizado } from "../_shared/encargos.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -139,6 +141,8 @@ Deno.serve(async (request: Request) => {
       clientName?: string;
       documentNumber?: string;
       amount?: number;
+      /** Outros títulos do mesmo cliente e tipo que vão juntos nesta mensagem. */
+      grupoIds?: string[];
     };
 
     try {
@@ -207,6 +211,35 @@ Deno.serve(async (request: Request) => {
             : chk.category === "desabilitado"
             ? "Cliente desabilitado — cobrança bloqueada."
             : "Cliente liquidado (já pago) — cobrança bloqueada.",
+          status: "bloqueado_liquidado",
+        });
+      }
+    }
+
+    // ── 4a.1 Títulos juntos (mesmo cliente e tipo) ────────────────────────────
+    // Sempre da própria conta e nunca liquidado, desabilitado ou arquivado: se
+    // algum mudou desde que a tela montou o texto, recusa em vez de cobrar errado.
+    type TituloJunto = {
+      id: string; client_name: string | null; document_number: string | null;
+      amount: number | null; due_date: string | null; category: string | null;
+      status: string | null; archived_at: string | null;
+      drive_file_id: string | null; drive_file_name: string | null;
+    };
+    const grupoIds = [...new Set((Array.isArray(body.grupoIds) ? body.grupoIds : [])
+      .filter((id): id is string => typeof id === "string" && id !== body.debtorId))].slice(0, 30);
+    let titulosJuntos: TituloJunto[] = [];
+    if (grupoIds.length && body.debtorId) {
+      const { data: rows } = await admin
+        .from("user_registros_financeiros")
+        .select("id, client_name, document_number, amount, due_date, category, status, archived_at, drive_file_id, drive_file_name")
+        .eq("user_id", userId)
+        .in("id", grupoIds);
+      titulosJuntos = (rows ?? []) as TituloJunto[];
+      const bloqueado = titulosJuntos.some((t) =>
+        t.category === "liquidado" || t.status === "liquidado" || t.category === "desabilitado" || t.archived_at);
+      if (titulosJuntos.length !== grupoIds.length || bloqueado) {
+        return errResponse(409, {
+          error:  "Um dos títulos desta mensagem mudou (pago, arquivado ou removido). Atualize a página e envie de novo.",
           status: "bloqueado_liquidado",
         });
       }
@@ -403,12 +436,19 @@ Deno.serve(async (request: Request) => {
     let sentWithPdf = false;
     let finalMessage = body.message;
 
-    if (debtorDriveFileId === "uploaded" && body.debtorId) {
-      const ext = debtorDriveFileName?.split(".").pop() ?? "pdf";
-      const storagePath = `${userId}/${body.debtorId}/boleto.${ext}`;
-      const publicPdfUrl = `${SUPABASE_URL}/storage/v1/object/public/charge-pdfs/${storagePath}`;
-      const shortUrl = await shortenUrl(publicPdfUrl);
-      finalMessage = `${body.message}\n\n📎 Boleto: ${shortUrl}`;
+    // Um link por título com boleto anexado (principal + os que vão juntos).
+    const comBoleto = [
+      { id: body.debtorId, documento: body.documentNumber || "", fileId: debtorDriveFileId, fileName: debtorDriveFileName },
+      ...titulosJuntos.map((t) => ({ id: t.id, documento: t.document_number || "", fileId: t.drive_file_id, fileName: t.drive_file_name })),
+    ].filter((t) => t.id && t.fileId === "uploaded");
+    if (comBoleto.length) {
+      const boletos = await Promise.all(comBoleto.map(async (t) => {
+        const ext = t.fileName?.split(".").pop() ?? "pdf";
+        const storagePath = `${userId}/${t.id}/boleto.${ext}`;
+        const publicPdfUrl = `${SUPABASE_URL}/storage/v1/object/public/charge-pdfs/${storagePath}`;
+        return { documento: t.documento, url: await shortenUrl(publicPdfUrl) };
+      }));
+      finalMessage = `${body.message}\n\n${linhasDeBoleto(boletos)}`;
       sentWithPdf = true;
     }
     // Boleto só vai se foi anexado um a um (drive_file_id = "uploaded"). A
@@ -453,6 +493,27 @@ Deno.serve(async (request: Request) => {
       })
       .select("id, created_at")
       .single();
+
+    // ── 9b. Um registro no histórico por título que foi junto ─────────────────
+    // Sem idempotency_key: a checagem de duplicidade lê uma linha só por chave.
+    if (zapiResult.success && titulosJuntos.length) {
+      const encargos = await lerEncargos(admin, userId);
+      const { error: grupoLogErr } = await admin.from("user_logs_cobranca").insert(titulosJuntos.map((t) => ({
+        user_id:             userId,
+        client_name:         (t.client_name || body.clientName || "Desconhecido").slice(0, 255),
+        document_number:     (t.document_number || "").slice(0, 100),
+        phone:               maskPhone(normalizedPhone),
+        amount:              valorAtualizado(Number(t.amount ?? 0), String(t.due_date ?? ""), String(t.category ?? ""), encargos),
+        tone:                body.tone || "neutro",
+        message:             messagePreview(body.message ?? "", 100),
+        status:              "sucesso",
+        type:                "manual",
+        provider:            "zapi",
+        provider_message_id: zapiResult.messageId,
+        debtor_id:           t.id,
+      })));
+      if (grupoLogErr) console.error("[charge] falha ao registrar títulos juntos:", grupoLogErr.message);
+    }
 
     // ── 10. Incrementa usage counter e pilot counter (apenas em caso de sucesso)
     if (zapiResult.success) {

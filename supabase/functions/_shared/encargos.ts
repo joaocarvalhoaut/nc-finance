@@ -35,6 +35,14 @@ export async function lerEncargos(admin: AdminClient, userId: string): Promise<E
 const hojeBrasilia = (): string =>
   new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
+/** Dias de atraso até hoje (Brasília); zero para quem não é vencido/recompra. */
+export function diasDeAtraso(dueDate: string, category: string, hoje: string = hojeBrasilia()): number {
+  if (category !== "vencidos" && category !== "recompra") return 0;
+  const venc = Date.parse(`${(dueDate || "").slice(0, 10)}T00:00:00Z`);
+  const ref  = Date.parse(`${hoje}T00:00:00Z`);
+  return Number.isNaN(venc) ? 0 : Math.max(0, Math.floor((ref - venc) / 86_400_000));
+}
+
 /**
  * Valor com multa e juros. Só vencidos e recompra têm encargos (a vencer,
  * liquidado e desabilitado ficam no valor original), como no painel.
@@ -48,9 +56,7 @@ export function valorAtualizado(
   hoje: string = hojeBrasilia(),
 ): number {
   if (category !== "vencidos" && category !== "recompra") return amount;
-  const venc = Date.parse(`${(dueDate || "").slice(0, 10)}T00:00:00Z`);
-  const ref  = Date.parse(`${hoje}T00:00:00Z`);
-  const dias = Number.isNaN(venc) ? 0 : Math.max(0, Math.floor((ref - venc) / 86_400_000));
+  const dias  = diasDeAtraso(dueDate, category, hoje);
   const multa = amount * (enc.multaPct / 100);
   const juros = amount * (enc.jurosDiaPct / 100) * dias;
   return Math.round((amount + multa + juros) * 100) / 100;

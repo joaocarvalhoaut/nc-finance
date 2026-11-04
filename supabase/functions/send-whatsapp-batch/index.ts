@@ -1,5 +1,5 @@
 import { duplicidadeLiberada, reserveChargeSend } from "../_shared/sendReservation.ts";
-import { lerEncargos, valorAtualizado } from "../_shared/encargos.ts";
+import { diasDeAtraso, lerEncargos, valorAtualizado } from "../_shared/encargos.ts";
 /**
  * send-whatsapp-batch — Edge Function para envio em lote de cobranças via Z-API global.
  *
@@ -39,7 +39,8 @@ import { normalizePhone, validatePhone, sendTextMessage } from "../_shared/zapi.
 import { checkSubscription }               from "../_shared/subscriptionGuard.ts";
 import { getUsageSnapshot, incrementChargesSent } from "../_shared/usageGuard.ts";
 import { insertBillingLog }                from "../_shared/billingLog.ts";
-import { buildMessage }                    from "../_shared/messageBuilder.ts";
+import { buildGroupMessage }               from "../_shared/messageBuilder.ts";
+import { chaveDeAgrupamento, linhasDeBoleto } from "../_shared/agrupamento.ts";
 import { loadCompanyName }                 from "../_shared/empresa.ts";
 import { loadZApiCredentialsForUser }       from "../_shared/platformIntegrations.ts";
 import { sanitizeError }                   from "../_shared/sanitize.ts";
@@ -301,18 +302,30 @@ Deno.serve(async (request: Request) => {
     const encargos = await lerEncargos(admin, userId);
 
     // ── 7. Loop de envio ──────────────────────────────────────────────────────
+    // a. Busca os devedores de uma vez — filtrado pelo userId (auth.uid() derivado)
+    const { data: linhasDevedores } = idsToProcess.length
+      ? await admin
+          .from("user_registros_financeiros")
+          .select(
+            "id, client_name, document_number, due_date, amount, phone, " +
+            "updated_value, category, status, drive_file_id, drive_file_url, drive_file_name, archived_at",
+          )
+          .in("id", idsToProcess)
+          .eq("user_id", userId) // garante que o devedor pertence ao usuário
+      : { data: [] };
+    const devedorPorId = new Map(
+      ((linhasDevedores ?? []) as unknown as Array<Record<string, unknown>>).map((r) => [String(r.id), r]),
+    );
+    const cobravel = (r: Record<string, unknown>) =>
+      r.category !== "liquidado" && r.status !== "liquidado" && r.category !== "desabilitado" &&
+      !r.archived_at && Number(r.amount ?? 0) > 0;
+    // Títulos que já foram junto na mensagem de outro título do mesmo cliente.
+    const jaEnviadosJunto = new Set<string>();
+
     let sentInLoop = 0;
     for (const debtorId of idsToProcess) {
-      // a. Busca devedor — filtrado pelo userId (user_id = auth.uid() derivado)
-      const { data: debtorRow } = await admin
-        .from("user_registros_financeiros")
-        .select(
-          "id, client_name, document_number, due_date, amount, phone, " +
-          "updated_value, category, status, drive_file_id, drive_file_url, drive_file_name, archived_at",
-        )
-        .eq("id", debtorId)
-        .eq("user_id", userId) // garante que o devedor pertence ao usuário
-        .maybeSingle();
+      if (jaEnviadosJunto.has(debtorId)) continue;
+      const debtorRow = devedorPorId.get(debtorId);
 
       if (!debtorRow) {
         results.push({
@@ -370,9 +383,6 @@ Deno.serve(async (request: Request) => {
       }
       // Cobranca leva o valor atualizado (multa + juros ao dia), calculado agora.
       const amount        = valorAtualizado(valorBase, dueDate, String(dr.category ?? ""), encargos);
-      const driveFileId   = (dr.drive_file_id   as string | null) ?? null;
-      const driveFileUrl  = (dr.drive_file_url  as string | null) ?? null;
-      const driveFileName = (dr.drive_file_name as string | null) ?? null;
 
       // b. Normaliza e valida telefone
       const normalizedPhone = normalizePhone(rawPhone);
@@ -417,9 +427,31 @@ Deno.serve(async (request: Request) => {
         continue;
       }
 
-      // c. Monta mensagem
-      const message = buildMessage(
-        { clientName, documentNumber, dueDate, amount, driveFileUrl, driveFileName, companyName },
+      // c. Junta os títulos do mesmo cliente, WhatsApp e tipo que estão no lote
+      // (regra do dono: uma mensagem por cliente e tipo, vencimento mais antigo primeiro).
+      const chave = chaveDeAgrupamento(clientName, rawPhone, String(dr.category ?? ""));
+      const juntos = chave
+        ? idsToProcess
+            .filter((id) => id !== debtorId && !jaEnviadosJunto.has(id))
+            .map((id) => devedorPorId.get(id))
+            .filter((r): r is Record<string, unknown> => !!r && cobravel(r) &&
+              chaveDeAgrupamento(String(r.client_name ?? ""), String(r.phone ?? ""), String(r.category ?? "")) === chave)
+        : [];
+      juntos.forEach((r) => jaEnviadosJunto.add(String(r.id)));
+      const titulos = [dr, ...juntos].sort((a, b) => String(a.due_date ?? "").localeCompare(String(b.due_date ?? "")));
+      const valorDe = (r: Record<string, unknown>) =>
+        r === dr ? amount : valorAtualizado(Number(r.amount ?? 0), String(r.due_date ?? ""), String(r.category ?? ""), encargos);
+
+      // d. Monta mensagem
+      const message = buildGroupMessage(
+        titulos.map((r) => ({
+          clientName,
+          documentNumber: String(r.document_number ?? ""),
+          dueDate:        String(r.due_date ?? ""),
+          amount:         valorDe(r),
+          daysOverdue:    diasDeAtraso(String(r.due_date ?? ""), String(r.category ?? "")),
+          companyName,
+        })),
         tone,
         customMessage,
       );
@@ -442,20 +474,26 @@ Deno.serve(async (request: Request) => {
       if (!dupRow && !dryRun && !liberado) {
         try { reserved = await reserveChargeSend(admin, userId, idempotencyHash); }
         catch {
-          results.push({ debtorId, clientName, phone: normalizedPhone, status: "erro", messageId: null, logId: null, error: "Envio pausado: proteção indisponível. Tente novamente mais tarde.", sentWithPdf: false });
+          // Os títulos que iam juntos ficam com o mesmo resultado (não saem sozinhos).
+          for (const id of [debtorId, ...juntos.map((r) => String(r.id))]) {
+            results.push({ debtorId: id, clientName, phone: normalizedPhone, status: "erro", messageId: null, logId: null, error: "Envio pausado: proteção indisponível. Tente novamente mais tarde.", sentWithPdf: false });
+          }
           failedCount++;
           continue;
         }
       }
       if (!liberado && (dupRow || !reserved)) {
-        results.push({
-          debtorId, clientName, phone: normalizedPhone,
-          status:      "duplicado",
-          messageId:   null,
-          logId:       (dupRow as { id: string } | null)?.id ?? null,
-          error:       "Envio duplicado detectado (janela de 5 min).",
-          sentWithPdf: false,
-        });
+        // Os títulos que iam juntos ficam com o mesmo resultado (não saem sozinhos).
+        for (const id of [debtorId, ...juntos.map((r) => String(r.id))]) {
+          results.push({
+            debtorId: id, clientName, phone: normalizedPhone,
+            status:      "duplicado",
+            messageId:   null,
+            logId:       id === debtorId ? (dupRow as { id: string } | null)?.id ?? null : null,
+            error:       "Envio duplicado detectado (janela de 5 min).",
+            sentWithPdf: false,
+          });
+        }
         duplicateCount++;
         continue;
       }
@@ -476,16 +514,16 @@ Deno.serve(async (request: Request) => {
       // ── Resolve PDF storage path + build message with link ────────────────────
       // Path is always derived from the server-verified userId + debtorId.
       // Never trust caller-supplied paths (prevents IDOR cross-user document access).
-      const pdfStoragePath = driveFileId === "uploaded"
-        ? `${userId}/${debtorId}/boleto.${driveFileName?.split(".").pop() ?? "pdf"}`
-        : null;
-
-      // Build the final message: append short PDF link if available
+      // Build the final message: one short PDF link per title that has one.
       let finalMessage = message;
-      if (pdfStoragePath) {
-        const publicPdfUrl = `${SUPABASE_URL}/storage/v1/object/public/charge-pdfs/${pdfStoragePath}`;
-        const shortUrl = await shortenUrl(publicPdfUrl);
-        finalMessage = `${message}\n\n📎 Boleto: ${shortUrl}`;
+      const comBoleto = titulos.filter((r) => r.drive_file_id === "uploaded");
+      if (comBoleto.length) {
+        const boletos = await Promise.all(comBoleto.map(async (r) => {
+          const ext = (r.drive_file_name as string | null)?.split(".").pop() ?? "pdf";
+          const publicPdfUrl = `${SUPABASE_URL}/storage/v1/object/public/charge-pdfs/${userId}/${String(r.id)}/boleto.${ext}`;
+          return { documento: String(r.document_number ?? ""), url: await shortenUrl(publicPdfUrl) };
+        }));
+        finalMessage = `${message}\n\n${linhasDeBoleto(boletos)}`;
         sentWithPdf = true; // link is included — recipient can access the PDF
       }
       // Boleto só vai se foi anexado um a um (drive_file_id = "uploaded"). A
@@ -533,6 +571,35 @@ Deno.serve(async (request: Request) => {
         error:       zapiResult.error,
         sentWithPdf,
       });
+
+      // Os que foram juntos: um registro no histórico e um resultado para cada.
+      // Sem idempotency_key — a checagem de duplicidade lê uma linha por chave.
+      for (const r of juntos) {
+        const idJunto = String(r.id);
+        const logJunto = await insertBillingLog(admin, {
+          userId, clientName,
+          documentNumber:   String(r.document_number ?? ""),
+          phone:            normalizedPhone,
+          amount:           valorDe(r),
+          tone,
+          message,
+          status:           logStatus,
+          type:             "lote",
+          provider:         PROVIDER,
+          providerMessageId: zapiResult.messageId,
+          errorMessage:     zapiResult.error,
+          idempotencyKey:   null,
+          debtorId:         idJunto,
+        });
+        results.push({
+          debtorId: idJunto, clientName, phone: normalizedPhone,
+          status:      logStatus as BatchItemStatus,
+          messageId:   zapiResult.messageId,
+          logId:       logJunto,
+          error:       zapiResult.error,
+          sentWithPdf,
+        });
+      }
 
       if (zapiResult.success) {
         successCount++;

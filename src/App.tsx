@@ -32,7 +32,7 @@ import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type Automation
 import { validateNewAutomationRule } from "./utils/automationValidation";
 import { isBrazilHoliday, getBrazilHolidayName, isBusinessDay } from "./utils/brazilHolidays";
 import { getMessageTemplate, fillMessageTemplate } from "./utils/messageTemplates";
-import { aplicarEmpresa } from "../supabase/functions/_shared/assinatura.ts";
+import { chaveDeAgrupamento, preencherMensagem } from "../supabase/functions/_shared/agrupamento.ts";
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
 import {
   ACEITA_IMPORTACAO,
@@ -475,6 +475,8 @@ export default function App() {
     try { return localStorage.getItem("ncf-usar-padrao") === "1"; } catch { return false; }
   });
   const [rascunhoPadrao, setRascunhoPadrao] = useState<string | null>(null); // null = fora de edição
+  // Títulos do mesmo cliente e tipo vão juntos; "Enviar só este título" separa.
+  const [separarTitulo, setSepararTitulo] = useState<boolean>(false);
   const [salvandoPadrao, setSalvandoPadrao] = useState<boolean>(false);
   const [erroPadrao, setErroPadrao] = useState<string>("");
   const campoPadraoRef = React.useRef<HTMLTextAreaElement>(null);
@@ -856,14 +858,23 @@ export default function App() {
   // qualquer título muda (e na carga inicial). O guard hasChanged impede loop.
   }, [globalFinePct, globalInterestDayPct, debtorCalcSignature]);
 
+  // Títulos que vão na mensagem do selecionado (ele + os do mesmo cliente e tipo).
+  const titulosDaMensagem = selectedDebtorForMessage
+    ? (separarTitulo ? [selectedDebtorForMessage] : grupoDoTitulo(selectedDebtorForMessage))
+    : [];
+  const assinaturaTitulos = titulosDaMensagem.map((t) => t.id).join(",");
+
+  // Trocar de título volta a juntar; sem isto a escolha "só este" passava adiante.
+  useEffect(() => { setSepararTitulo(false); }, [selectedDebtorForMessage?.id]);
+
   // Sync drafted text message when selected debitor or tone updates
   useEffect(() => {
-    if (selectedDebtorForMessage) {
+    if (titulosDaMensagem.length) {
       setCustomMessageDraft(usarPadrao && mensagemPadrao.trim()
-        ? preencherModelo(mensagemPadrao, selectedDebtorForMessage)
-        : buildMessageText(selectedDebtorForMessage, selectedTone));
+        ? preencherModelo(mensagemPadrao, titulosDaMensagem)
+        : buildMessageText(titulosDaMensagem, selectedTone));
     }
-  }, [selectedDebtorForMessage, selectedTone, globalFinePct, globalInterestDayPct, usarPadrao, mensagemPadrao]);
+  }, [assinaturaTitulos, selectedTone, globalFinePct, globalInterestDayPct, usarPadrao, mensagemPadrao]);
 
   const escolherPadrao = (ligar: boolean) => {
     setUsarPadrao(ligar);
@@ -1175,52 +1186,55 @@ export default function App() {
   // Valor cobrado na mensagem: vencidos e recompra com multa + juros ao dia;
   // a vencer, liquidado e desabilitado no valor original. Calculado aqui e não
   // lido de updatedValue para não depender de o recálculo já ter rodado.
-  const valorDaMensagem = (debtor: Debtor): number => {
-    if (!cobraComoVencido(debtor.category)) return debtor.value;
+  // Dias de atraso reais, contados do vencimento (DD/MM/AAAA). Antes era fixo
+  // em "12": os tons Firme e Jurídico diziam a todo vencido que o título
+  // "acumula 12 dia(s) de atraso", qualquer que fosse o atraso de verdade.
+  const diasDeAtrasoDe = (debtor: Debtor): number => {
     const m = (debtor.dueDate || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return 0;
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
-    const diasDeAtraso = m
-      ? Math.max(0, Math.floor((hoje.getTime() - new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])).getTime()) / 86_400_000))
-      : 0;
+    return Math.max(0, Math.floor((hoje.getTime() - new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])).getTime()) / 86_400_000));
+  };
+
+  const valorDaMensagem = (debtor: Debtor): number => {
+    if (!cobraComoVencido(debtor.category)) return debtor.value;
     const multa = debtor.value * (globalFinePct / 100);
-    const juros = debtor.value * (globalInterestDayPct / 100) * diasDeAtraso;
+    const juros = debtor.value * (globalInterestDayPct / 100) * diasDeAtrasoDe(debtor);
     return Math.round((debtor.value + multa + juros) * 100) / 100;
   };
 
-  const buildMessageText = (debtor: Debtor, tone: MessageTone): string => {
+  // Mesmo cliente, mesmo WhatsApp e mesmo tipo: uma mensagem só, com o
+  // vencimento mais antigo primeiro. Declaração de função (hoisted) porque o
+  // cálculo dos títulos da mensagem roda antes, no corpo do componente.
+  function grupoDoTitulo(d: Debtor): Debtor[] {
+    const chave = chaveDeAgrupamento(d.client, d.phone || "", d.category);
+    if (!chave) return [d];
+    const ymd = (data: string) => (data || "").split("/").reverse().join("");
+    const grupo = debtors.filter((x) => x.id !== d.id && chaveDeAgrupamento(x.client, x.phone || "", x.category) === chave);
+    return [d, ...grupo].sort((a, b) => ymd(a.dueDate).localeCompare(ymd(b.dueDate)));
+  }
+
+  const buildMessageText = (titulos: Debtor[], tone: MessageTone): string => {
     const pat = patternTemplates.find(p => p.id === tone);
     if (!pat) return "";
-    return preencherModelo(pat.template, debtor);
+    return preencherModelo(pat.template, titulos);
   };
 
-  // Troca as variáveis ({nome_cliente}, {valor_atualizado}…) pelos dados do título.
-  const preencherModelo = (modelo: string, debtor: Debtor): string => {
-
-    // Dias de atraso reais, contados do vencimento (DD/MM/AAAA). Antes era fixo
-    // em "12": os tons Firme e Jurídico diziam a todo vencido que o título
-    // "acumula 12 dia(s) de atraso", qualquer que fosse o atraso de verdade.
-    const diasDeAtraso = (() => {
-      const m = (debtor.dueDate || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-      if (!m) return 0;
-      const venc = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      return Math.max(0, Math.floor((hoje.getTime() - venc.getTime()) / 86_400_000));
-    })();
-    const daysAtraso = cobraComoVencido(debtor.category) ? String(diasDeAtraso) : "0";
-    // A mensagem leva o valor atualizado (multa + juros ao dia), o mesmo do painel
-    // e o que o lote e a automação calculam no servidor (_shared/encargos.ts).
-    const valStr = valorDaMensagem(debtor).toFixed(2);
-    
-    return aplicarEmpresa(modelo, empresaAssinatura)
-      .replace(/{nome_cliente}/g, debtor.client)
-      .replace(/{documento}/g, debtor.document)
-      .replace(/{documento_boleto}/g, debtor.document)
-      .replace(/{vencimento}/g, debtor.dueDate)
-      .replace(/{valor_atualizado}/g, parseFloat(valStr).toLocaleString("pt-BR", { minimumFractionDigits: 2 }))
-      .replace(/{dias_atraso}/g, daysAtraso);
-  };
+  // Troca as variáveis ({nome_cliente}, {valor_atualizado}…) pelos dados dos
+  // títulos — o mesmo preenchimento do lote e da automação (_shared/agrupamento.ts).
+  // O valor é o atualizado (multa + juros ao dia), como no servidor (_shared/encargos.ts).
+  const preencherModelo = (modelo: string, titulos: Debtor[]): string =>
+    preencherMensagem(modelo, {
+      nomeCliente: titulos[0]?.client ?? "",
+      empresa: empresaAssinatura,
+      titulos: titulos.map((t) => ({
+        documento:  t.document,
+        vencimento: t.dueDate,
+        valor:      valorDaMensagem(t),
+        diasAtraso: cobraComoVencido(t.category) ? diasDeAtrasoDe(t) : 0,
+      })),
+    });
 
   const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -2091,6 +2105,9 @@ export default function App() {
     setIsSendingMessage(true);
     setMessageFeedback(null);
 
+    // Os títulos que estão no texto agora — o servidor registra um por um.
+    const titulos = titulosDaMensagem.length ? titulosDaMensagem : [selectedDebtorForMessage];
+
     try {
       const result = await whatsappService.sendCharge({
         debtorId: selectedDebtorForMessage.id,
@@ -2100,38 +2117,42 @@ export default function App() {
         clientName: selectedDebtorForMessage.client,
         documentNumber: selectedDebtorForMessage.document,
         amount: valorDaMensagem(selectedDebtorForMessage),
+        grupoIds: titulos.filter((t) => t.id !== selectedDebtorForMessage.id).map((t) => t.id),
       });
 
       if (result.success) {
-        // Atualiza registro local do devedor
-        void updateGeneralDebtorField(selectedDebtorForMessage.id, "status", "sent");
-        void updateGeneralDebtorField(selectedDebtorForMessage.id, "lastSentDate", new Date().toISOString());
-        void updateGeneralDebtorField(selectedDebtorForMessage.id, "lastSentMessage", customMessageDraft);
+        const agora = new Date().toISOString();
+        // Atualiza o registro local de cada título que foi na mensagem
+        for (const t of titulos) {
+          void updateGeneralDebtorField(t.id, "status", "sent");
+          void updateGeneralDebtorField(t.id, "lastSentDate", agora);
+          void updateGeneralDebtorField(t.id, "lastSentMessage", customMessageDraft);
+        }
 
-        // Adiciona log na UI (o log real já foi criado no backend pelo Edge Function)
-        const localLogEntry: BillingLog = {
-          id: result.logId ?? `local-log-${Date.now()}`,
+        // Adiciona os logs na UI (os reais já foram criados no backend pelo Edge Function)
+        const logsLocais: BillingLog[] = titulos.map((t, i) => ({
+          id: (t.id === selectedDebtorForMessage.id ? result.logId : null) ?? `local-log-${Date.now()}-${i}`,
           userId: currentOwnerUserId || undefined,
-          client: selectedDebtorForMessage.client,
-          document: selectedDebtorForMessage.document,
-          phone: selectedDebtorForMessage.phone,
-          value: selectedDebtorForMessage.value,
-          dateSent: new Date().toISOString(),
+          client: t.client,
+          document: t.document,
+          phone: t.phone,
+          value: valorDaMensagem(t),
+          dateSent: agora,
           tone: selectedTone,
           message: customMessageDraft,
           status: "sucesso",
           type: "manual",
           providerMessageId: result.messageId ?? null,
           payload: null,
-        };
-        setBillingLogs((prev) => [localLogEntry, ...prev]);
+        }));
+        setBillingLogs((prev) => [...logsLocais, ...prev]);
 
         // Atualiza contadores de uso na UI (backend já incrementou no DB)
         void refreshSubscription();
 
         setMessageFeedback({
           success: true,
-          text: `Mensagem enviada com sucesso! ID: ${result.messageId ?? "?"}. ${
+          text: `${titulos.length > 1 ? `Mensagem com ${titulos.length} títulos enviada!` : "Mensagem enviada com sucesso!"} ID: ${result.messageId ?? "?"}. ${
             result.chargesUsed != null && result.chargesLimit != null
               ? `Uso do mês: ${result.chargesUsed}/${result.chargesLimit}`
               : ""
@@ -4748,6 +4769,20 @@ export default function App() {
                 const listaEnvio = abaEnvio === "hoje" ? enviadosHoje : faltamEnviar;
                 const sel = selectedDebtorForMessage;
 
+                // Quantos títulos cada cliente+tipo tem: vão juntos numa mensagem.
+                const tamanhoGrupo = new Map<string, number>();
+                for (const d of debtors) {
+                  const k = chaveDeAgrupamento(d.client, d.phone || "", d.category);
+                  if (k) tamanhoGrupo.set(k, (tamanhoGrupo.get(k) ?? 0) + 1);
+                }
+                const juntosCom = (d: Debtor) => {
+                  const k = chaveDeAgrupamento(d.client, d.phone || "", d.category);
+                  return k ? (tamanhoGrupo.get(k) ?? 1) - 1 : 0;
+                };
+                const grupoSel = sel ? grupoDoTitulo(sel) : [];
+                const nomeTipo = (c: Debtor["category"]) => c === "a_vencer" ? "a vencer" : c === "recompra" ? "de recompra" : "vencidos";
+                const totalDaMensagem = titulosDaMensagem.reduce((soma, t) => soma + valorDaMensagem(t), 0);
+
                 return (
                 <div className="space-y-4">
 
@@ -4850,7 +4885,10 @@ export default function App() {
                               >
                                 <span className="min-w-0">
                                   <span className="block text-xs font-semibold text-white truncate">{d.client}</span>
-                                  <span className="block text-[10px] text-zinc-500 font-mono mt-0.5">{d.document} · {d.dueDate}</span>
+                                  <span className="block text-[10px] text-zinc-500 font-mono mt-0.5">
+                                    {d.document} · {d.dueDate}
+                                    {juntosCom(d) > 0 && <span className="font-sans text-zinc-400"> · +{juntosCom(d)} na mesma mensagem</span>}
+                                  </span>
                                   {(() => {
                                     const ultima = ultimaDe(d);
                                     return (
@@ -4998,6 +5036,40 @@ export default function App() {
                           </header>
 
                           <div className="px-5 py-4 space-y-4 flex-1 flex flex-col">
+                            {/* Títulos do mesmo cliente e tipo: uma mensagem só */}
+                            {grupoSel.length > 1 && (
+                              <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2.5">
+                                <div className="flex items-start justify-between gap-3">
+                                  <p className="text-[11px] text-zinc-300">
+                                    {separarTitulo
+                                      ? <>Este cliente tem {grupoSel.length} títulos {nomeTipo(sel.category)}. Enviando só este.</>
+                                      : <>{grupoSel.length} títulos {nomeTipo(sel.category)} deste cliente vão juntos nesta mensagem.</>}
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSepararTitulo((v) => !v)}
+                                    className="text-[11px] text-zinc-400 hover:text-white transition-colors cursor-pointer flex-shrink-0"
+                                  >
+                                    {separarTitulo ? "Juntar de novo" : "Enviar só este título"}
+                                  </button>
+                                </div>
+                                {!separarTitulo && (
+                                  <ul className="mt-2 space-y-1 border-t border-zinc-800/80 pt-2">
+                                    {grupoSel.map((t) => (
+                                      <li key={t.id} className="flex items-center justify-between gap-3 text-[11px] font-mono">
+                                        <span className={t.id === sel.id ? "text-zinc-200" : "text-zinc-400"}>{t.document} · {t.dueDate}</span>
+                                        <span className="text-zinc-300 tabular-nums">{formatBRL(valorDaMensagem(t))}</span>
+                                      </li>
+                                    ))}
+                                    <li className="flex items-center justify-between gap-3 text-[11px] pt-1">
+                                      <span className="text-zinc-500">Total</span>
+                                      <span className="font-mono text-white tabular-nums">{formatBRL(totalDaMensagem)}</span>
+                                    </li>
+                                  </ul>
+                                )}
+                              </div>
+                            )}
+
                             <div>
                               <p className={`${rotulo} mb-2`}>Tom</p>
                               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2" role="radiogroup" aria-label="Tom da mensagem">
@@ -5113,10 +5185,19 @@ export default function App() {
                                 className="w-full flex-1 bg-zinc-900 border border-zinc-800 rounded-lg p-4 text-xs text-zinc-100 focus:outline-none focus:border-emerald-500 transition-colors leading-relaxed"
                               />
                               <p className="mt-1.5 text-[11px] text-zinc-500">
-                                Valor na mensagem: <span className="font-mono text-zinc-300">{formatBRL(valorDaMensagem(sel))}</span>
-                                {valorDaMensagem(sel) !== sel.value
-                                  ? <> — atualizado, com multa e juros (original: <span className="font-mono">{formatBRL(sel.value)}</span>).</>
-                                  : <> — sem multa e juros.</>}
+                                {titulosDaMensagem.length > 1 ? (
+                                  <>
+                                    Valor na mensagem: <span className="font-mono text-zinc-300">{formatBRL(totalDaMensagem)}</span> no total de {titulosDaMensagem.length} títulos
+                                    {cobraComoVencido(sel.category) ? <>, com multa e juros.</> : <>, sem multa e juros.</>}
+                                  </>
+                                ) : (
+                                  <>
+                                    Valor na mensagem: <span className="font-mono text-zinc-300">{formatBRL(valorDaMensagem(sel))}</span>
+                                    {valorDaMensagem(sel) !== sel.value
+                                      ? <> — atualizado, com multa e juros (original: <span className="font-mono">{formatBRL(sel.value)}</span>).</>
+                                      : <> — sem multa e juros.</>}
+                                  </>
+                                )}
                               </p>
                             </div>
 

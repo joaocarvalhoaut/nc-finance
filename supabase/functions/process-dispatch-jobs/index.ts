@@ -1,6 +1,6 @@
 import { deferredAutomationStart } from "../_shared/automationClock.ts";
 import { reserveChargeSend } from "../_shared/sendReservation.ts";
-import { lerEncargos, valorAtualizado } from "../_shared/encargos.ts";
+import { diasDeAtraso, lerEncargos, valorAtualizado } from "../_shared/encargos.ts";
 /**
  * process-dispatch-jobs — worker que processa a fila de jobs de disparo.
  *
@@ -33,11 +33,17 @@ import { checkSubscription }                     from "../_shared/subscriptionGu
 import { getUsageSnapshot, incrementChargesSent } from "../_shared/usageGuard.ts";
 import { checkPilotGuard, incrementPilotDailyCount } from "../_shared/pilotGuard.ts";
 import { insertBillingLog }                      from "../_shared/billingLog.ts";
-import { buildMessage }                          from "../_shared/messageBuilder.ts";
+import { buildGroupMessage }                     from "../_shared/messageBuilder.ts";
+import { chaveDeAgrupamento, linhasDeBoleto }      from "../_shared/agrupamento.ts";
 import { loadCompanyName }                       from "../_shared/empresa.ts";
 import { loadZApiCredentialsForUser }             from "../_shared/platformIntegrations.ts";
 import { sanitizeError }                         from "../_shared/sanitize.ts";
 import { isOptedOut }                            from "../_shared/optOut.ts";
+
+// Colunas do devedor usadas no envio (o principal e os que vão juntos).
+const COLUNAS_DEVEDOR =
+  "id, client_name, document_number, due_date, amount, updated_value, phone, category, status, " +
+  "drive_file_id, drive_file_url, drive_file_name, archived_at";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -264,7 +270,7 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     // ── 6. Busca devedor ──────────────────────────────────────────────────
     const { data: debtorRow } = await admin
       .from("user_registros_financeiros")
-      .select("id, client_name, document_number, due_date, amount, updated_value, phone, category, status, drive_file_url, drive_file_name, archived_at")
+      .select(COLUNAS_DEVEDOR)
       .eq("id", debtorId)
       .eq("user_id", userId)
       .maybeSingle();
@@ -274,7 +280,7 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
       return;
     }
 
-    const dr = debtorRow as Record<string, unknown>;
+    const dr = debtorRow as unknown as Record<string, unknown>;
 
     // Arquivado saiu da carteira ativa: nunca é cobrado.
     if (dr.archived_at) {
@@ -327,10 +333,29 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     }
     // Cobranca leva o valor atualizado (multa + juros ao dia), calculado agora:
     // updated_value no banco so muda quando o painel abre.
-    const amount        = valorAtualizado(valorBase, dueDate, String(dr.category ?? ""), await lerEncargos(admin, userId));
-    const driveFileUrl  = (dr.drive_file_url  as string | null) ?? null;
-    const driveFileName = (dr.drive_file_name as string | null) ?? null;
+    const encargos      = await lerEncargos(admin, userId);
+    const amount        = valorAtualizado(valorBase, dueDate, String(dr.category ?? ""), encargos);
     const customMsg     = (meta.custom_message as string | null) ?? null;
+
+    // Títulos do mesmo cliente e tipo que o agendador juntou neste job. Re-checa
+    // tudo: entre agendar e enviar, um deles pode ter sido pago, arquivado ou mudado.
+    const grupoIds = Array.isArray(meta.grupo_ids) ? (meta.grupo_ids as unknown[]).map(String).slice(0, 30) : [];
+    const chave = chaveDeAgrupamento(clientName, rawPhone, String(dr.category ?? ""));
+    let juntos: Array<Record<string, unknown>> = [];
+    if (grupoIds.length && chave) {
+      const { data: linhas } = await admin
+        .from("user_registros_financeiros")
+        .select(COLUNAS_DEVEDOR)
+        .eq("user_id", userId)
+        .in("id", grupoIds);
+      juntos = ((linhas ?? []) as unknown as Array<Record<string, unknown>>).filter((r) =>
+        !r.archived_at && r.category !== "liquidado" && r.status !== "liquidado" && r.category !== "desabilitado" &&
+        Number(r.amount ?? 0) > 0 &&
+        chaveDeAgrupamento(String(r.client_name ?? ""), String(r.phone ?? ""), String(r.category ?? "")) === chave);
+    }
+    const titulos = [dr, ...juntos].sort((a, b) => String(a.due_date ?? "").localeCompare(String(b.due_date ?? "")));
+    const valorDe = (r: Record<string, unknown>) =>
+      r === dr ? amount : valorAtualizado(Number(r.amount ?? 0), String(r.due_date ?? ""), String(r.category ?? ""), encargos);
 
     // ── 7. Valida telefone ────────────────────────────────────────────────
     const normalizedPhone = normalizePhone(rawPhone);
@@ -352,16 +377,29 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
 
     // ── 8. Monta mensagem (+ link do boleto PDF se disponível) ───────────
     const companyName = await loadCompanyName(admin, userId);
-    let message = buildMessage(
-      { clientName, documentNumber, dueDate, amount, driveFileUrl, driveFileName, companyName },
+    let message = buildGroupMessage(
+      titulos.map((r) => ({
+        clientName,
+        documentNumber: String(r.document_number ?? ""),
+        dueDate:        String(r.due_date ?? ""),
+        amount:         valorDe(r),
+        daysOverdue:    diasDeAtraso(String(r.due_date ?? ""), String(r.category ?? "")),
+        companyName,
+      })),
       tone,
       customMsg,
     );
 
-    if (driveFileUrl) {
-      const shortPdfUrl = await shortenUrl(driveFileUrl);
-      message = `${message}\n\n📎 Boleto: ${shortPdfUrl}`;
-          }
+    // Boleto só vai se foi anexado um a um (drive_file_id = "uploaded"): a URL
+    // de uma sugestão antiga do Drive também fica em drive_file_url.
+    const comBoleto = titulos.filter((r) => r.drive_file_id === "uploaded" && r.drive_file_url);
+    if (comBoleto.length) {
+      const boletos = await Promise.all(comBoleto.map(async (r) => ({
+        documento: String(r.document_number ?? ""),
+        url:       await shortenUrl(String(r.drive_file_url)),
+      })));
+      message = `${message}\n\n${linhasDeBoleto(boletos)}`;
+    }
 
     // ── 9. Idempotência (5 min) ───────────────────────────────────────────
     const today = new Date().toISOString().slice(0, 10);
@@ -405,6 +443,23 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
       idempotencyKey: idemHash,
       debtorId,
     });
+
+    // Um registro no histórico para cada título que foi junto (sem idempotency_key:
+    // a checagem de duplicidade lê uma linha por chave).
+    if (zapiResult.success) {
+      for (const r of juntos) {
+        await insertBillingLog(admin, {
+          userId, clientName,
+          documentNumber: String(r.document_number ?? ""),
+          phone: normalizedPhone, amount: valorDe(r), tone, message,
+          status: logStatus, type: "lote", provider: PROVIDER,
+          providerMessageId: zapiResult.messageId,
+          errorMessage: zapiResult.error,
+          idempotencyKey: null,
+          debtorId: String(r.id),
+        });
+      }
+    }
 
     // ── 12. Incrementa usage em sucesso ───────────────────────────────────
     if (zapiResult.success) {
