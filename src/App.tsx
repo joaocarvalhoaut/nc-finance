@@ -5743,6 +5743,32 @@ export default function App() {
                           </div>
                         )}
 
+                        {/* Risco de bloqueio: a regra sai do número do próprio cliente. */}
+                        <div className="sm:col-span-2 flex gap-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.07] px-4 py-3" role="note">
+                          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                          <div className="space-y-1.5 text-[12px] leading-relaxed">
+                            <p className="font-semibold text-amber-200">Muitas mensagens de uma vez podem bloquear o seu número</p>
+                            <p className="text-zinc-300">
+                              As cobranças saem do seu WhatsApp. Um disparo grande — principalmente de um número novo ou para
+                              quem nunca conversou com ele — pode levar o WhatsApp a restringir o número por 24 a 48 h, ou a
+                              bloqueá-lo de vez.
+                            </p>
+                            {plan === "premium" ? (
+                              <p className="text-zinc-400">
+                                {newRuleForm.maxDailySends
+                                  ? <>Esta regra manda no máximo <span className="text-zinc-200 font-semibold">{newRuleForm.maxDailySends} mensagens por dia</span>.</>
+                                  : <><span className="text-amber-200 font-semibold">Sem limite:</span> esta regra manda para todos que se encaixarem, no mesmo dia.</>}
+                                {" "}Número novo: comece com 30 a 50 por dia e suba aos poucos. Se as mensagens pararem de chegar, desative a regra por 24 a 48 h.
+                              </p>
+                            ) : (
+                              <p className="text-zinc-400">
+                                Esta regra manda para todos que se encaixarem, no mesmo dia. Número novo: comece com poucos clientes
+                                e aumente aos poucos. Se as mensagens pararem de chegar, desative a regra por 24 a 48 h.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
                         <div className="sm:col-span-2">
                           <div className="flex items-center justify-between mb-1.5">
                             <label htmlFor="regra-mensagem" className={`${rotulo} mb-0`}>Mensagem</label>
