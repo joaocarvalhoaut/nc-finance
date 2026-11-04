@@ -15,6 +15,7 @@
  */
 
 import React, { useState } from "react";
+import AvisoBloqueioNumero from "./AvisoBloqueioNumero";
 import {
   Send, AlertTriangle, CheckCircle2, XCircle,
   WifiOff, Eye, X, Pencil, RotateCcw, Check,
@@ -31,6 +32,8 @@ export interface BatchConfirmData {
   toneValue:          string;          // raw value (e.g. "amigavel")
   pilotRemaining:     number | null;   // null = not in pilot mode
   whatsappConnected:  boolean;
+  /** Mensagens que vão sair: títulos do mesmo cliente e tipo viram uma só. */
+  messageCount?:      number;
 }
 
 interface BatchConfirmModalProps {
@@ -144,6 +147,9 @@ export default function BatchConfirmModal({
               </p>
             </div>
           )}
+
+          {/* Risco de bloqueio do número num disparo grande */}
+          <AvisoBloqueioNumero mensagens={data.messageCount ?? data.validPhoneCount} />
 
           <p className="text-sm text-zinc-300">Confira destinatários, valores, vencimentos e o boleto de cada cliente na revisão. Contatos bloqueados e limites serão verificados novamente pelo servidor. Mensagem enviada não significa pagamento recebido.</p>
           {/* Summary */}

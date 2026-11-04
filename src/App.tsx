@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback, lazy } from "react";
 import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
 import CountUp from "./components/CountUp";
+import AvisoBloqueioNumero from "./components/AvisoBloqueioNumero";
 const MinhaConta = lazy(() => import("./components/MinhaConta"));
 import PasswordInput from "./components/PasswordInput";
 import BoletoResponsibilityModal from "./components/BoletoResponsibilityModal";
@@ -3650,6 +3651,17 @@ export default function App() {
                       </div>
                     </div>
                   )}
+
+                  {/* Risco de bloqueio: o envio em lote sai na hora, do número do cliente.
+                      Conta mensagens — títulos do mesmo cliente e tipo saem numa só. */}
+                  {selectedDebtorIds.size > 0 && plan !== "basic" && (() => {
+                    const mensagens = new Set(
+                      debtors
+                        .filter((d) => selectedDebtorIds.has(d.id) && d.category !== "liquidado" && d.category !== "desabilitado" && d.value > 0)
+                        .map((d) => chaveDeAgrupamento(d.client, d.phone || "", d.category) ?? d.id),
+                    ).size;
+                    return mensagens > 0 ? <AvisoBloqueioNumero mensagens={mensagens} compacto /> : null;
+                  })()}
 
                   {batchSendResult && (
                     <div className={`p-4 rounded-2xl border space-y-3 ${

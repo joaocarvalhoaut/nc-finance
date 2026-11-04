@@ -49,6 +49,7 @@ import { pilotService } from "../services/pilotService";
 import { ACEITA_IMPORTACAO, interpretarDocumento, lerArquivo } from "../services/localDocumentExtraction";
 import { getMessageTemplate, fillMessageTemplate } from "../utils/messageTemplates";
 import BatchConfirmModal, { type BatchConfirmData } from "./BatchConfirmModal";
+import { chaveDeAgrupamento } from "../../supabase/functions/_shared/agrupamento.ts";
 import BoletoResponsibilityModal from "./BoletoResponsibilityModal";
 import type { Debtor, MessageTone } from "../types";
 
@@ -432,6 +433,12 @@ export default function ClientDashboard({
     }
 
     const validPhone  = selected.filter(d => d.phone && d.phone.replace(/\D/g, "").length >= 10).length;
+    // Mensagens de verdade: títulos do mesmo cliente e tipo saem numa só.
+    const mensagens = new Set(
+      selected
+        .filter(d => d.phone && d.phone.replace(/\D/g, "").length >= 10)
+        .map(d => chaveDeAgrupamento(d.client, d.phone || "", d.category) ?? d.id),
+    ).size;
     const invalidPhone = selected.length - validPhone;
 
     const template = getMessageTemplate(selectedTone);
@@ -459,6 +466,7 @@ export default function ClientDashboard({
       toneValue:            selectedTone,
       pilotRemaining,
       whatsappConnected:    waConnected ?? false,
+      messageCount:         mensagens,
     });
   };
 

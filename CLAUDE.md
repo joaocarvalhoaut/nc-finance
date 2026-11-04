@@ -71,8 +71,9 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   configurável também no envio em lote e nos planos Básico e Pro (hoje só a automação do Premium tem
   `max_daily_sends`); (2) "aquecimento" sugerido para número novo (começar com 20–50/dia e subir aos
   poucos); (3) deixar claro na interface o risco de bloqueio, com a orientação de pausar 24–48 h se a
-  entrega cair ou aparecer restrição — **feito no formulário de regra de automação** (aviso âmbar
-  junto do "Máx. envios por dia", 04/11/2026); falta no envio em lote. A Meta não publica um número fixo para o WhatsApp comum
+  entrega cair ou aparecer restrição — **feito em 04/11/2026**: aviso âmbar no formulário de regra
+  de automação (junto do "Máx. envios por dia") e no envio em lote (`AvisoBloqueioNumero`, na barra
+  da Carteira e no modal de confirmação), com a contagem de mensagens. Itens (1) e (2) seguem pendentes. A Meta não publica um número fixo para o WhatsApp comum
   (Z-API): o bloqueio vem de denúncias, pico de volume e envio para quem nunca falou com o número.
 - PostHog: **ativo**. A `VITE_POSTHOG_KEY` esta no Vercel desde 25/08/2026, mas o CSP
   nao liberava `us.i.posthog.com` — a lib inicializava e o navegador descartava todo
