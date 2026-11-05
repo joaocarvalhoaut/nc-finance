@@ -110,7 +110,14 @@ const PERGUNTAS: Pergunta[] = [
     pergunta: "Posso usar uma mensagem minha para todos os clientes?",
     resposta:
       "Sim. Em Preparar envios, escolha “Minha mensagem”, escreva o texto uma vez e salve. Os botões de campo (Nome, Documento, Vencimento, Valor, Dias de atraso, Empresa) entram no texto e são trocados pelos dados de cada título.\n" +
-      "Ao clicar em cada cliente, a mensagem já aparece preenchida para ele; o envio continua um por um, e dá para ajustar o texto antes de enviar.",
+      "Ao clicar em cada cliente, a mensagem já aparece preenchida para ele; dá para ajustar o texto antes de enviar.",
+  },
+  {
+    tema: "WhatsApp e envios",
+    pergunta: "Dá para enviar para todos de uma vez?",
+    resposta:
+      "Sim, nos planos Pro e Premium. Em Preparar envios, filtre o tipo (Vencidos, A vencer, Recompra ou Todos) e clique em “Enviar todos…”. Saem só os títulos que ainda não foram cobrados hoje, com a mensagem que está em uso (a sua ou o tom escolhido). Antes do envio aparece a confirmação com a mensagem de exemplo.\n" +
+      "Vale a proteção do número: o que passar do limite do dia fica para amanhã. Mantenha a página aberta até terminar.",
   },
   {
     tema: "WhatsApp e envios",

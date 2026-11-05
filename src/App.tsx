@@ -5,6 +5,8 @@ import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
 import CountUp from "./components/CountUp";
 import AvisoBloqueioNumero from "./components/AvisoBloqueioNumero";
+import BatchConfirmModal, { type BatchConfirmData } from "./components/BatchConfirmModal";
+import { whatsappGatewayService } from "./services/whatsappGatewayService";
 const MinhaConta = lazy(() => import("./components/MinhaConta"));
 import PasswordInput from "./components/PasswordInput";
 import BoletoResponsibilityModal from "./components/BoletoResponsibilityModal";
@@ -467,6 +469,13 @@ export default function App() {
   const [tipoEnvio, setTipoEnvio] = useState<"todos" | Debtor["category"]>("todos");
   // Preparar envios: quem ainda falta cobrar hoje x quem já foi cobrado hoje
   const [abaEnvio, setAbaEnvio] = useState<"faltam" | "hoje">("faltam");
+  // "Enviar todos" (Preparar envios): os títulos do tipo filtrado que faltam
+  // cobrar hoje, numa confirmação de lote e depois no send-whatsapp-batch.
+  const [envioTodos, setEnvioTodos] = useState<{ ids: string[]; modelo: string; data: BatchConfirmData } | null>(null);
+  const [preparandoTodos, setPreparandoTodos] = useState(false);
+  const [enviandoTodos, setEnviandoTodos] = useState(false);
+  const [resultadoTodos, setResultadoTodos] = useState<BatchChargeResult | null>(null);
+  const [progressoTodos, setProgressoTodos] = useState<{ feitas: number; total: number } | null>(null);
   const [verTodasExecucoes, setVerTodasExecucoes] = useState(false);
   const [selectedTone, setSelectedTone] = useState<MessageTone>(DEFAULT_USER_CONFIG.selectedTone);
   const [customMessageDraft, setCustomMessageDraft] = useState<string>("");
@@ -1009,6 +1018,137 @@ export default function App() {
       setSelectedDebtorIds(new Set()); // limpa seleção após envio
     } finally {
       setIsBatchSending(false);
+    }
+  };
+
+  // Preparar envios › "Enviar todos": abre a confirmação do lote com a mensagem
+  // em uso (a padrão do usuário ou o tom escolhido). Os títulos do mesmo
+  // cliente e tipo saem numa mensagem só (o servidor agrupa).
+  const abrirEnvioTodos = async (titulos: Debtor[]) => {
+    if (!titulos.length || preparandoTodos || enviandoTodos) return;
+    setPreparandoTodos(true);
+    setResultadoTodos(null);
+    try {
+      let conectado = false;
+      try { conectado = (await whatsappGatewayService.validateConnection()).connected; } catch { conectado = false; }
+
+      const padraoAtivo = usarPadrao && !!mensagemPadrao.trim();
+      const modelo = padraoAtivo
+        ? mensagemPadrao
+        : patternTemplates.find((p) => p.id === selectedTone)?.template ?? getMessageTemplate(selectedTone);
+      const temTelefone = (d: Debtor) => (d.phone || "").replace(/\D/g, "").length >= 10;
+      const chave = (d: Debtor) => chaveDeAgrupamento(d.client, d.phone || "", d.category) ?? d.id;
+      const comTelefone = new Set(titulos.filter(temTelefone).map(chave));
+      const semTelefone = new Set(titulos.filter((d) => !temTelefone(d)).map(chave));
+      const exemplo = titulos.find(temTelefone) ?? titulos[0];
+
+      setEnvioTodos({
+        ids: titulos.map((d) => d.id),
+        modelo,
+        data: {
+          debtorCount:          comTelefone.size + semTelefone.size,
+          validPhoneCount:      comTelefone.size,
+          invalidPhoneCount:    semTelefone.size,
+          messagePreview:       modelo,
+          messagePreviewFilled: preencherModelo(modelo, grupoDoTitulo(exemplo)),
+          sampleDebtorName:     exemplo.client,
+          tone:                 padraoAtivo ? "Mensagem padrão" : patternTemplates.find((p) => p.id === selectedTone)?.name ?? selectedTone,
+          toneValue:            selectedTone,
+          pilotRemaining:       null,
+          whatsappConnected:    conectado,
+          messageCount:         comTelefone.size,
+          situacaoHoje,
+        },
+      });
+    } finally {
+      setPreparandoTodos(false);
+    }
+  };
+
+  const confirmarEnvioTodos = async (editada?: string | null) => {
+    if (!envioTodos) return;
+    const { ids, modelo } = envioTodos;
+    setEnvioTodos(null);
+    setEnviandoTodos(true);
+    try {
+      // Em partes de até ~40 títulos: o servidor espera ~1 s entre mensagens e a
+      // função tem tempo limitado. Os títulos do mesmo cliente ficam na mesma
+      // parte, senão sairiam em duas mensagens.
+      const porId = new Map(debtors.map((d) => [d.id, d]));
+      const grupos = new Map<string, string[]>();
+      for (const id of ids) {
+        const d = porId.get(id);
+        const k = (d && chaveDeAgrupamento(d.client, d.phone || "", d.category)) ?? id;
+        grupos.set(k, [...(grupos.get(k) ?? []), id]);
+      }
+      const partes: string[][] = [];
+      let atual: string[] = [];
+      for (const g of grupos.values()) {
+        if (atual.length > 0 && atual.length + g.length > 40) { partes.push(atual); atual = []; }
+        atual.push(...g);
+      }
+      if (atual.length) partes.push(atual);
+
+      setProgressoTodos({ feitas: 0, total: grupos.size });
+      let result: BatchChargeResult | null = null;
+      let feitas = 0;
+      for (let i = 0; i < partes.length; i++) {
+        const r = await whatsappBatchService.sendBatchCharges({
+          debtorIds: partes[i],
+          tone: selectedTone,
+          customMessage: editada || modelo,
+        });
+        if (!result) result = r;
+        else if (r.success) {
+          result = {
+            ...r,
+            totalRequested: result.totalRequested + r.totalRequested,
+            totalProcessed: result.totalProcessed + r.totalProcessed,
+            sent: result.sent + r.sent,
+            failed: result.failed + r.failed,
+            duplicated: result.duplicated + r.duplicated,
+            invalidPhone: result.invalidPhone + r.invalidPhone,
+            blockedLimit: result.blockedLimit + r.blockedLimit,
+            blockedDaily: (result.blockedDaily ?? 0) + (r.blockedDaily ?? 0),
+            blockedPlan: result.blockedPlan + r.blockedPlan,
+            results: [...result.results, ...r.results],
+          };
+        }
+        feitas += new Set(partes[i].map((id) => {
+          const d = porId.get(id);
+          return (d && chaveDeAgrupamento(d.client, d.phone || "", d.category)) ?? id;
+        })).size;
+        setProgressoTodos({ feitas, total: grupos.size });
+        // Parou (limite do dia, plano, rede…) ou o dia encheu: o resto fica para amanhã.
+        const parou = !r.success || (r.blockedDaily ?? 0) > 0 || r.blockedLimit > 0;
+        if (parou) {
+          // Títulos que não chegaram a ser tentados: esta parte (se falhou
+          // inteira) e as seguintes.
+          const resto = (r.success ? 0 : partes[i].length) + partes.slice(i + 1).reduce((s, p) => s + p.length, 0);
+          if (result.success && resto > 0) {
+            result = r.blockedLimit > 0 ? { ...result, blockedLimit: result.blockedLimit + resto }
+              : r.success || r.status === "limite_do_dia" ? { ...result, blockedDaily: (result.blockedDaily ?? 0) + resto }
+              : { ...result, failed: result.failed + resto };
+          }
+          break;
+        }
+      }
+      if (!result) return;
+      setResultadoTodos(result);
+      if (result.sent > 0) {
+        void refreshSubscription();
+        const enviados = new Set(result.results.filter((r) => r.status === "sucesso").map((r) => r.debtorId));
+        if (enviados.size > 0) {
+          setDebtors((prev) => prev.map((d) => (enviados.has(d.id) ? { ...d, status: "sent" as const } : d)));
+        }
+        // Recarrega o histórico: "Enviados hoje" e o contador do dia dependem dele.
+        if (currentOwnerUserId) {
+          billingLogsService.listByUser(currentOwnerUserId).then(setBillingLogs).catch(() => {});
+        }
+      }
+    } finally {
+      setEnviandoTodos(false);
+      setProgressoTodos(null);
     }
   };
 
@@ -4804,6 +4944,21 @@ export default function App() {
                 const faltamEnviar = umPorMensagem(filtrados.filter(d => !cobradoHoje(d))
                   .sort((a, b) => Number(naoCobravel(a)) - Number(naoCobravel(b)) || (ultimaDe(a) ?? 0) - (ultimaDe(b) ?? 0)));
                 const listaEnvio = abaEnvio === "hoje" ? enviadosHoje : faltamEnviar;
+
+                // "Enviar todos": títulos do tipo filtrado que ainda não foram cobrados
+                // hoje (ignora a busca). Conta mensagens — o servidor junta os títulos.
+                const paraTodos = tipoEnvio === "liquidado" || tipoEnvio === "desabilitado" ? [] : debtors.filter(d =>
+                  (tipoEnvio === "todos" || d.category === tipoEnvio) && !naoCobravel(d) && d.value > 0 && !cobradoHoje(d));
+                const mensagensTodos = new Set(paraTodos.map(d => chaveEnvio(d) ?? d.id)).size;
+                const rotuloTodos = tipoEnvio === "vencidos" ? "Enviar todos os vencidos"
+                  : tipoEnvio === "a_vencer" ? "Enviar todos a vencer"
+                  : tipoEnvio === "recompra" ? "Enviar todos de recompra"
+                  : "Enviar todos que faltam";
+                const travaTodos = plan === "basic" ? "Envio de todos de uma vez: planos Pro e Premium."
+                  : !canUseApp ? "Assinatura inativa."
+                  : remainingCharges === 0 ? "Limite mensal do plano esgotado."
+                  : situacaoHoje?.restante === 0 ? `Limite de hoje atingido (${situacaoHoje.limite}). Volta amanhã.`
+                  : null;
                 const sel = selectedDebtorForMessage;
 
                 // Quantos títulos cada cliente+tipo tem: vão juntos numa mensagem.
@@ -4894,7 +5049,67 @@ export default function App() {
                             );
                           })}
                         </div>
+
+                        {/* Enviar todos do tipo filtrado de uma vez (lote, com confirmação) */}
+                        {(mensagensTodos > 0 || enviandoTodos || resultadoTodos) && (
+                          <div className="mt-2.5 pt-2.5 border-t border-zinc-900 space-y-1.5">
+                            {mensagensTodos > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => void abrirEnvioTodos(paraTodos)}
+                                disabled={!!travaTodos || preparandoTodos || enviandoTodos}
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-emerald-300 text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                {enviandoTodos ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Enviando{progressoTodos ? ` ${progressoTodos.feitas} de ${progressoTodos.total}` : ""}… não feche a página</>
+                                  : preparandoTodos ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Conferindo o WhatsApp…</>
+                                  : <><SendHorizonal className="w-3.5 h-3.5" /> {rotuloTodos} <span className="font-mono font-normal text-emerald-400/80">{mensagensTodos}</span></>}
+                              </button>
+                            )}
+                            {mensagensTodos > 0 && (
+                              <p className={`text-[10px] leading-snug ${travaTodos ? "text-amber-300/90" : "text-zinc-500"}`}>
+                                {travaTodos ?? <>
+                                  {mensagensTodos} mensage{mensagensTodos === 1 ? "m" : "ns"} com {paraTodos.length} título{paraTodos.length === 1 ? "" : "s"}
+                                  {situacaoHoje?.restante != null && situacaoHoje.restante < mensagensTodos
+                                    ? ` · hoje saem ${situacaoHoje.restante}, o resto fica para amanhã`
+                                    : ""}. Você confere a mensagem antes.
+                                </>}
+                              </p>
+                            )}
+                            {resultadoTodos && (
+                              <div className={`flex items-start justify-between gap-2 px-2.5 py-2 rounded-md border text-[11px] ${
+                                resultadoTodos.success && resultadoTodos.sent > 0
+                                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                                  : "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                              }`}>
+                                <span>
+                                  {resultadoTodos.success
+                                    ? [
+                                        `${resultadoTodos.sent} enviada${resultadoTodos.sent === 1 ? "" : "s"}`,
+                                        (resultadoTodos.blockedDaily ?? 0) > 0 ? `${resultadoTodos.blockedDaily} ficam para amanhã` : null,
+                                        resultadoTodos.invalidPhone > 0 ? `${resultadoTodos.invalidPhone} sem telefone válido` : null,
+                                        resultadoTodos.failed > 0 ? `${resultadoTodos.failed} com erro` : null,
+                                        resultadoTodos.duplicated > 0 ? `${resultadoTodos.duplicated} já enviadas há pouco` : null,
+                                      ].filter(Boolean).join(" · ")
+                                    : resultadoTodos.status === "limite_do_dia" && resultadoTodos.error
+                                      ? resultadoTodos.error
+                                      : BATCH_TOP_STATUS_LABELS[resultadoTodos.status as BatchTopStatus] ?? resultadoTodos.error}
+                                </span>
+                                <button type="button" onClick={() => setResultadoTodos(null)} aria-label="Fechar resultado" className="text-zinc-500 hover:text-zinc-300 cursor-pointer flex-shrink-0">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
+
+                      {envioTodos && (
+                        <BatchConfirmModal
+                          data={envioTodos.data}
+                          onConfirm={(m) => void confirmarEnvioTodos(m)}
+                          onCancel={() => setEnvioTodos(null)}
+                        />
+                      )}
 
                       <div className="max-h-[520px] overflow-y-auto p-2 space-y-1">
                         {listaEnvio.length === 0 && (
