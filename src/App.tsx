@@ -3717,6 +3717,12 @@ export default function App() {
                       ? arquivados.filter(d => d.client.toLowerCase().includes(termo) || (d.document || "").toLowerCase().includes(termo))
                       : arquivados;
                     const dataCurta = (iso?: string | null) => iso ? new Date(iso).toLocaleDateString("pt-BR") : "—";
+                    // Arquivado por duplicidade: tem um título ativo com o mesmo cliente,
+                    // documento e vencimento (utils/tituloUnico.ts). Conferido na hora,
+                    // vale também para cópias arquivadas antes desta marcação.
+                    const ativoPorChave = new Map<string, Debtor>();
+                    for (const a of debtors) { const k = chaveDoTitulo(a); if (k && !ativoPorChave.has(k)) ativoPorChave.set(k, a); }
+                    const copiaDe = (d: Debtor) => { const k = chaveDoTitulo(d); return k ? ativoPorChave.get(k) : undefined; };
                     return (
                       <section className="bg-zinc-950 border border-zinc-800 rounded-xl">
                         <header className="flex items-center justify-between gap-3 px-5 py-4 border-b border-zinc-800/80">
@@ -3738,13 +3744,25 @@ export default function App() {
                           </div>
                         ) : (
                           <ul className="divide-y divide-zinc-900">
-                            {lista.map(d => (
+                            {lista.map(d => { const original = copiaDe(d); return (
                               <li key={d.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
                                 <div className="flex-1 min-w-[180px]">
-                                  <p className="text-sm font-medium text-zinc-200 truncate">{d.client}</p>
+                                  <p className="text-sm font-medium text-zinc-200 truncate flex items-center gap-2">
+                                    <span className="truncate">{d.client}</span>
+                                    {original && (
+                                      <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-500/10 text-amber-300 border border-amber-500/25">
+                                        Duplicidade
+                                      </span>
+                                    )}
+                                  </p>
                                   <p className="text-[11px] text-zinc-500 font-mono truncate">
                                     {d.document ? `Doc. ${d.document} · ` : ""}venc. {d.dueDate || "—"} · arquivado em {dataCurta(d.archivedAt)}
                                   </p>
+                                  {original && (
+                                    <p className="text-[11px] text-amber-300/80 mt-0.5 truncate">
+                                      Arquivado por duplicidade: fica na carteira o doc. {original.document} ({formatBRL(original.value)}, {CATEGORY_LABEL[original.category].toLowerCase()}).
+                                    </p>
+                                  )}
                                 </div>
                                 <span className="text-sm font-mono tabular-nums text-zinc-300">
                                   {d.value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
@@ -3768,7 +3786,7 @@ export default function App() {
                                   </button>
                                 </div>
                               </li>
-                            ))}
+                            ); })}
                           </ul>
                         )}
                       </section>
