@@ -31,21 +31,17 @@ export async function lerSituacaoDoDia(admin: AdminClient, userId: string): Prom
     if (error) throw new Error(error.message);
 
     const c = cfg as { limite_diario_envios: number | null; aquecimento_ativo: boolean | null; aquecimento_inicio: string | null } | null;
-    const aquecimentoAtivo = c?.aquecimento_ativo !== false;
+    // Aquecimento é opcional: só vale se o usuário ligou (número novo).
+    const aquecimentoAtivo = c?.aquecimento_ativo === true;
     let aquecimentoInicio = c?.aquecimento_inicio ?? null;
 
-    // O aquecimento começa no primeiro envio: grava o dia 1.
+    // Ligado sem data: o aquecimento começa neste envio — grava o dia 1.
     if (aquecimentoAtivo && !aquecimentoInicio) {
       aquecimentoInicio = hoje;
-      if (c) {
-        await admin.from("user_configuracoes")
-          .update({ aquecimento_inicio: hoje })
-          .eq("user_id", userId)
-          .is("aquecimento_inicio", null);
-      } else {
-        await admin.from("user_configuracoes")
-          .upsert({ user_id: userId, aquecimento_inicio: hoje }, { onConflict: "user_id", ignoreDuplicates: true });
-      }
+      await admin.from("user_configuracoes")
+        .update({ aquecimento_inicio: hoje })
+        .eq("user_id", userId)
+        .is("aquecimento_inicio", null);
     }
 
     const limite = limiteDeHoje({

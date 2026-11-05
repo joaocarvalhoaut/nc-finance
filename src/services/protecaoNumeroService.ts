@@ -24,7 +24,7 @@ export const protecaoNumeroService = {
     const row = data as { limite_diario_envios: number | null; aquecimento_ativo: boolean | null; aquecimento_inicio: string | null } | null;
     return {
       limiteDiario: row?.limite_diario_envios ?? null,
-      aquecimentoAtivo: row?.aquecimento_ativo !== false,
+      aquecimentoAtivo: row?.aquecimento_ativo === true, // opcional: desligado por padrão
       aquecimentoInicio: row?.aquecimento_inicio ?? null,
     };
   },

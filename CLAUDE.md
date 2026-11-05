@@ -73,8 +73,10 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   - **Aquecimento + limite diário da conta**, em todo envio (um por um, lote, automação) e todo plano.
     Regras puras em `_shared/protecaoNumero.ts` (etapas 30/50/80/120/200 nos dias 1–3/4–7/8–14/15–21/22–30;
     vale o menor entre aquecimento e limite da conta; conta MENSAGENS — títulos juntos = 1).
+    **Aquecimento é opcional** (desligado por padrão; o usuário liga "Meu número é novo" — pedido do dono).
     Servidor: `_shared/limiteDiario.ts` (`lerSituacaoDoDia`, fail-open, grava `aquecimento_inicio` no
-    1º envio). Colunas em `user_configuracoes` (migration `20261105120000_protecao_numero.sql`).
+    1º envio após ligar). Colunas em `user_configuracoes` (migrations `20261105120000_protecao_numero.sql`
+    e `20261105150000_aquecimento_opcional.sql`).
     Ajuste em Configurações › Proteção do número (`ProtecaoNumeroCard`). Lote: excedente volta como
     `limite_do_dia`; automação: o scheduler divide as vagas entre as regras e o worker marca `blocked_limit`.
   - **Aviso de risco** (`AvisoBloqueioNumero`) na barra da Carteira e no modal do lote, com quantas

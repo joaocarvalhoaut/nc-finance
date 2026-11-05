@@ -1,9 +1,10 @@
 /**
  * ProtecaoNumeroCard — Configurações › Proteção do número.
  *
- * Aquecimento de número novo e limite diário de mensagens da conta. Valem para
- * todo envio (um por um, lote e automação), em qualquer plano; o servidor
- * aplica as mesmas regras (_shared/protecaoNumero.ts).
+ * Aquecimento de número novo (opcional — só liga quem conectou um número novo)
+ * e limite diário de mensagens da conta. Valem para todo envio (um por um, lote
+ * e automação), em qualquer plano; o servidor aplica as mesmas regras
+ * (_shared/protecaoNumero.ts).
  */
 
 import { useEffect, useState } from "react";
@@ -27,7 +28,7 @@ const Rotulo = ({ children }: { children: React.ReactNode }) => (
 
 export default function ProtecaoNumeroCard({ userId, protecao, situacao, onSalvo }: Props) {
   const [limiteStr, setLimiteStr] = useState("");
-  const [ativo, setAtivo] = useState(true);
+  const [ativo, setAtivo] = useState(false);
   const [inicio, setInicio] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -111,18 +112,24 @@ export default function ProtecaoNumeroCard({ userId, protecao, situacao, onSalvo
             <div className="pt-4 border-t border-zinc-900">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm text-zinc-200">Aquecimento de número novo</p>
+                  <p className="text-sm text-zinc-200">Meu número é novo (aquecimento)</p>
                   <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">
-                    Nos primeiros {DIAS_DE_AQUECIMENTO} dias o limite sobe aos poucos: é quando o WhatsApp
-                    mais bloqueia número novo que dispara muito de uma vez.
+                    Ligue só se o WhatsApp conectado é novo ou quase não conversou com clientes. Por{" "}
+                    {DIAS_DE_AQUECIMENTO} dias o limite sobe aos poucos: é quando o WhatsApp mais bloqueia
+                    número novo que dispara muito de uma vez.
                   </p>
                 </div>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={ativo}
-                  aria-label="Aquecimento de número novo"
-                  onClick={() => { setAtivo((v) => !v); setMsg(null); }}
+                  aria-label="Meu número é novo (aquecimento)"
+                  onClick={() => {
+                    // Ligar = número novo: o aquecimento recomeça no próximo envio.
+                    if (!ativo) setInicio(null);
+                    setAtivo((v) => !v);
+                    setMsg(null);
+                  }}
                   className={`relative mt-0.5 inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer ${ativo ? "bg-emerald-500" : "bg-zinc-700"}`}
                 >
                   <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${ativo ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
@@ -148,7 +155,7 @@ export default function ProtecaoNumeroCard({ userId, protecao, situacao, onSalvo
                   </ol>
                   <div className="mt-2 flex items-center justify-between gap-3 text-[11px]">
                     <span className="text-zinc-500">
-                      {!inicio ? "Começa no primeiro envio."
+                      {!inicio ? "Começa no próximo envio."
                         : concluido ? "Concluído: agora vale só o limite diário abaixo."
                         : `Dia ${dia} de ${DIAS_DE_AQUECIMENTO}.`}
                     </span>
@@ -164,11 +171,7 @@ export default function ProtecaoNumeroCard({ userId, protecao, situacao, onSalvo
                     )}
                   </div>
                 </>
-              ) : (
-                <p className="mt-2 text-[11px] text-amber-300/90">
-                  Desligue só se o número já conversa com clientes há meses.
-                </p>
-              )}
+              ) : null}
             </div>
 
             {/* ── Limite diário ─────────────────────────────────────────── */}
@@ -186,8 +189,8 @@ export default function ProtecaoNumeroCard({ userId, protecao, situacao, onSalvo
                 className={inputCls}
               />
               <p className="mt-1.5 text-[11px] text-zinc-500 leading-relaxed">
-                Vale todo dia, em toda forma de envio: um por um, lote e automação. Durante o aquecimento,
-                vale o menor dos dois. Sugestão: até 200 por dia.
+                Vale todo dia, em toda forma de envio: um por um, lote e automação. Com o aquecimento
+                ligado, vale o menor dos dois. Sugestão: até 200 por dia.
               </p>
               {!limiteValido && <p className="mt-1 text-[11px] text-rose-400">Use um número de 1 a 2000, ou deixe vazio.</p>}
             </div>
