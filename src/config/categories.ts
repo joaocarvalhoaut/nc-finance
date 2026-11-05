@@ -36,8 +36,8 @@ export const CATEGORY_TINT: Record<Category, string> = {
   desabilitado: "bg-zinc-600/20 text-zinc-400",
 };
 
-/** Ordem do clique no selo "Tipo". Desabilitado fica fora: muda pela lista própria. */
-export const CATEGORY_CYCLE: readonly Category[] = ["vencidos", "a_vencer", "recompra", "liquidado"];
+/** Ordem do clique no selo "Tipo" (e das opções do campo Tipo no celular). */
+export const CATEGORY_CYCLE: readonly Category[] = ["vencidos", "a_vencer", "recompra", "liquidado", "desabilitado"];
 
 /**
  * Recompra é cobrada como vencido: com juros e multa, e entra nas regras de

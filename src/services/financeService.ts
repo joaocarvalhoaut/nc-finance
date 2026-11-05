@@ -236,32 +236,48 @@ export const financeService = {
         return row;
       });
 
+      // Mesmo título = mesmo documento + cliente + vencimento (migration
+      // 20261106120000_titulo_unico_doc_cliente_venc). Documento igual com outro
+      // cliente ou outro vencimento é outro título.
+      //
       // O Postgres não aceita ON CONFLICT DO UPDATE quando dois registros do batch
       // colidem entre si. Para preservar TODOS os registros, renomeamos duplicatas
       // dentro do lote adicionando sufixo "-2", "-3", etc. em vez de descartar.
-      const seenCount = new Map<string, number>();
-      const payloadWithDoc = rawWithDoc.map((row) => {
-        const key = String(row.document_number);
-        const count = (seenCount.get(key) ?? 0) + 1;
-        seenCount.set(key, count);
-        if (count > 1) {
-          return { ...row, document_number: `${key}-${count}` };
-        }
-        return row;
-      });
+      const comSufixo = (chave: (row: typeof rawWithDoc[number]) => string) => {
+        const seenCount = new Map<string, number>();
+        return rawWithDoc.map((row) => {
+          const key = chave(row);
+          const count = (seenCount.get(key) ?? 0) + 1;
+          seenCount.set(key, count);
+          return count > 1 ? { ...row, document_number: `${row.document_number}-${count}` } : row;
+        });
+      };
 
       // Reimportar um título arquivado o traz de volta para a lista ativa: se ele
       // está no relatório de novo, voltou a ser cobrável. (Sem a coluna — antes
       // da migração de arquivamento — grava sem ela.)
-      const gravar = (linhas: typeof payloadWithDoc) => supabase
+      const gravar = (linhas: typeof rawWithDoc, onConflict: string) => supabase
         .from(TABLE_NAME)
         .upsert(linhas, {
-          onConflict: "user_id,document_number",
+          onConflict,
           ignoreDuplicates: false,   // atualiza se já existir
         })
         .select(SELECT_FIELDS);
-      let { data, error } = await gravar(payloadWithDoc.map((r) => ({ ...r, archived_at: null })));
-      if (semColunaDeArquivo(error)) ({ data, error } = await gravar(payloadWithDoc));
+      const gravarTudo = async (linhas: typeof rawWithDoc, onConflict: string) => {
+        let r = await gravar(linhas.map((l) => ({ ...l, archived_at: null })), onConflict);
+        if (semColunaDeArquivo(r.error)) r = await gravar(linhas, onConflict);
+        return r;
+      };
+
+      let { data, error } = await gravarTudo(
+        comSufixo((r) => `${r.document_number}|${r.client_name}|${r.due_date}`),
+        "user_id,document_number,client_name,due_date",
+      );
+      // Antes da migration a chave do banco é só (user_id, document_number):
+      // volta à regra antiga para a importação não parar.
+      if (error && (error.code === "42P10" || /no unique or exclusion constraint/i.test(error.message ?? ""))) {
+        ({ data, error } = await gravarTudo(comSufixo((r) => String(r.document_number)), "user_id,document_number"));
+      }
 
       if (error) throw new Error(error.message || "Falha ao salvar registros com documento.");
       results.push(...((data || []) as FinancialRecordRow[]));

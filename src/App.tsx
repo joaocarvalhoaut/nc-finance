@@ -231,6 +231,13 @@ const mesclarDevedores = (
   return posicao === "inicio" ? [...novos, ...atualizados] : [...atualizados, ...novos];
 };
 
+// Mesmo título = mesmo documento, mesmo cliente e mesmo vencimento (a chave
+// única do banco — migration 20261106120000). null = sem documento.
+const normDoc = (doc: string | undefined) => (doc ?? "").replace(/[^a-z0-9]/gi, "").toUpperCase();
+const normNome = (nome: string | undefined) => (nome ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+const chaveDoTitulo = (d: Pick<Debtor, "document" | "client" | "dueDate">): string | null =>
+  d.document?.trim() ? `${d.document.trim().toUpperCase()}|${normNome(d.client)}|${d.dueDate}` : null;
+
 // Máscaras do cadastro manual: a pessoa digita só números.
 const mascaraData = (v: string) => {
   const d = v.replace(/\D/g, "").slice(0, 8);
@@ -488,6 +495,9 @@ export default function App() {
   const [rascunhoPadrao, setRascunhoPadrao] = useState<string | null>(null); // null = fora de edição
   // Títulos do mesmo cliente e tipo vão juntos; "Enviar só este título" separa.
   const [separarTitulo, setSepararTitulo] = useState<boolean>(false);
+  // Títulos do grupo que o usuário tirou desta mensagem (só deste envio; a
+  // carteira não muda). Zera ao trocar de cliente.
+  const [titulosFora, setTitulosFora] = useState<Set<string>>(() => new Set());
   const [salvandoPadrao, setSalvandoPadrao] = useState<boolean>(false);
   const [erroPadrao, setErroPadrao] = useState<string>("");
   const campoPadraoRef = React.useRef<HTMLTextAreaElement>(null);
@@ -894,8 +904,14 @@ export default function App() {
 
   // Títulos que vão na mensagem do selecionado (ele + os do mesmo cliente e tipo).
   const titulosDaMensagem = selectedDebtorForMessage
-    ? (separarTitulo ? [selectedDebtorForMessage] : grupoDoTitulo(selectedDebtorForMessage))
+    ? (separarTitulo ? [selectedDebtorForMessage]
+      : grupoDoTitulo(selectedDebtorForMessage).filter((t) => t.id === selectedDebtorForMessage.id || !titulosFora.has(t.id)))
     : [];
+  // Trocou de cliente (outro grupo): volta a mandar todos os títulos juntos.
+  const chaveGrupoSel = selectedDebtorForMessage
+    ? chaveDeAgrupamento(selectedDebtorForMessage.client, selectedDebtorForMessage.phone || "", selectedDebtorForMessage.category) ?? selectedDebtorForMessage.id
+    : "";
+  useEffect(() => { setTitulosFora(new Set()); }, [chaveGrupoSel]);
   const assinaturaTitulos = titulosDaMensagem.map((t) => t.id).join(",");
 
   // Sync drafted text message when selected debitor or tone updates
@@ -1572,15 +1588,16 @@ export default function App() {
       return;
     }
 
-    // Detecta duplicatas de document_number dentro do lote
-    const docCount = new Map<string, number>();
+    // Duplicado = mesmo documento, mesmo cliente e mesmo vencimento. Documento
+    // igual com outro cliente ou outro vencimento é outro título.
+    const docCount = new Map<string, { doc: string; count: number }>();
     for (const d of toSend) {
-      const doc = d.document?.trim();
-      if (doc) docCount.set(doc, (docCount.get(doc) ?? 0) + 1);
+      const k = chaveDoTitulo(d);
+      if (!k) continue;
+      const atual = docCount.get(k);
+      docCount.set(k, { doc: `${d.document.trim()} · ${d.client.trim()} · ${d.dueDate}`, count: (atual?.count ?? 0) + 1 });
     }
-    const dupes = Array.from(docCount.entries())
-      .filter(([, c]) => c > 1)
-      .map(([doc, count]) => ({ doc, count }));
+    const dupes = Array.from(docCount.values()).filter((x) => x.count > 1);
 
     if (dupes.length > 0) {
       setDupDocModal({ pending: toSend, dupes });
@@ -1590,18 +1607,35 @@ export default function App() {
     await doSendToOverview(toSend);
   };
 
+  // Relatório de pagos: a baixa cai no título aberto da carteira de mesmo
+  // documento e cliente, mesmo que a data do relatório seja outra (ex.: a do
+  // pagamento). Copia o nome, o documento e o vencimento do título da carteira
+  // para o upsert (documento + cliente + vencimento) atualizar ele, e não criar
+  // outro. Sem cliente igual, vale o documento quando só um título aberto tem ele.
+  const alinharBaixas = (lista: Debtor[]): Debtor[] => lista.map((d) => {
+    if (d.category !== "liquidado" || !d.document?.trim()) return d;
+    const doc = normDoc(d.document);
+    const abertosDoDoc = debtors.filter((x) =>
+      x.category !== "liquidado" && x.category !== "desabilitado" && normDoc(x.document) === doc);
+    const doCliente = abertosDoDoc.filter((x) => normNome(x.client) === normNome(d.client));
+    const candidatos = doCliente.length ? doCliente : abertosDoDoc;
+    const alvo = candidatos.find((x) => x.dueDate === d.dueDate) ?? (candidatos.length === 1 ? candidatos[0] : null);
+    return alvo ? { ...d, client: alvo.client, document: alvo.document, dueDate: alvo.dueDate } : d;
+  });
+
   const doSendToOverview = async (toSend: typeof extractedDebtors, keepAll = true) => {
-    // Se keepAll=false: mantém só o primeiro de cada doc duplicado (descarta o resto)
-    const finalList = keepAll ? toSend : (() => {
+    // Se keepAll=false: mantém só o primeiro de cada título duplicado (descarta o resto)
+    const semRepetidos = keepAll ? toSend : (() => {
       const seen = new Set<string>();
       return toSend.filter(d => {
-        const doc = d.document?.trim();
-        if (!doc) return true;
-        if (seen.has(doc)) return false;
-        seen.add(doc);
+        const k = chaveDoTitulo(d);
+        if (!k) return true;
+        if (seen.has(k)) return false;
+        seen.add(k);
         return true;
       });
     })();
+    const finalList = alinharBaixas(semRepetidos);
 
     try {
       const savedDebtors = await financeService.createMany(currentOwnerUserId!, finalList);
@@ -1966,7 +2000,8 @@ export default function App() {
     // createMany faz upsert por (user_id, document_number): salvar com um
     // documento que ja existe SOBRESCREVE o boleto anterior, sem aviso. Como o
     // usuario acha que esta criando um novo, perguntamos antes.
-    const existente = debtors.find(d => d.document === newDebtor.document);
+    const chaveNovo = chaveDoTitulo(newDebtor);
+    const existente = chaveNovo ? debtors.find(d => chaveDoTitulo(d) === chaveNovo) : undefined;
     if (existente) {
       setAddDupModal({ novo: newDebtor, existente });
       return;
@@ -4037,10 +4072,9 @@ export default function App() {
                                     </div>
                                     <div>
                                       <label htmlFor={`c-tipo-${d.id}`} className={rotuloCampo}>Tipo</label>
-                                      <select id={`c-tipo-${d.id}`} value={d.category} disabled={d.category === "desabilitado"}
+                                      <select id={`c-tipo-${d.id}`} value={d.category}
                                         onChange={(e) => updateGeneralDebtorField(d.id, "category", e.target.value as Debtor["category"])}
                                         className={campoCartao}>
-                                        {d.category === "desabilitado" && <option value="desabilitado">{CATEGORY_LABEL.desabilitado}</option>}
                                         {CATEGORY_CYCLE.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
                                       </select>
                                     </div>
@@ -4418,15 +4452,14 @@ export default function App() {
                                   <td className="px-4 py-3 text-center">
                                     <span 
                                       onClick={() => {
-                                        // Vencido → A vencer → Recompra → Liquidado. Desabilitado não
-                                        // cicla ao clicar (mude pela lista de desabilitados).
+                                        // Vencido → A vencer → Recompra → Liquidado → Desabilitado → Vencido.
                                         const currentIdx = CATEGORY_CYCLE.indexOf(d.category);
                                         if (currentIdx === -1) return;
                                         const nextCat = CATEGORY_CYCLE[(currentIdx + 1) % CATEGORY_CYCLE.length];
                                         updateGeneralDebtorField(d.id, "category", nextCat);
                                       }}
                                       title={d.category === "desabilitado" && d.notes ? d.notes : undefined}
-                                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase select-none transition-all ${d.category === "desabilitado" ? "cursor-default" : "cursor-pointer"}
+                                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase select-none transition-all cursor-pointer
                                         ${CATEGORY_BADGE[d.category]}
                                       `}
                                     >
@@ -5304,7 +5337,9 @@ export default function App() {
                                   <p className="text-[11px] text-zinc-300">
                                     {separarTitulo
                                       ? <>Este cliente tem {grupoSel.length} títulos {nomeTipo(sel.category)}. Enviando só este.</>
-                                      : <>{grupoSel.length} títulos {nomeTipo(sel.category)} deste cliente vão juntos nesta mensagem.</>}
+                                      : titulosDaMensagem.length < grupoSel.length
+                                        ? <>{titulosDaMensagem.length} de {grupoSel.length} títulos {nomeTipo(sel.category)} deste cliente vão nesta mensagem.</>
+                                        : <>{grupoSel.length} títulos {nomeTipo(sel.category)} deste cliente vão juntos nesta mensagem.</>}
                                   </p>
                                   <button
                                     type="button"
@@ -5316,17 +5351,44 @@ export default function App() {
                                 </div>
                                 <ul className="mt-2 space-y-1 border-t border-zinc-800/80 pt-2">
                                     {grupoSel.map((t) => {
-                                      const foraDaMensagem = separarTitulo && t.id !== sel.id;
+                                      const tirado = !separarTitulo && t.id !== sel.id && titulosFora.has(t.id);
+                                      const foraDaMensagem = (separarTitulo && t.id !== sel.id) || tirado;
+                                      // Tirar só desta mensagem — sempre sobra pelo menos um título.
+                                      const tirar = () => {
+                                        const restantes = titulosDaMensagem.filter((x) => x.id !== t.id);
+                                        if (!restantes.length) return;
+                                        setTitulosFora((prev) => new Set(prev).add(t.id));
+                                        if (t.id === sel.id) setSelectedDebtorForMessage(restantes[0]);
+                                      };
+                                      const incluir = () => setTitulosFora((prev) => { const n = new Set(prev); n.delete(t.id); return n; });
                                       return (
                                       <li key={t.id} className={`flex items-center justify-between gap-3 text-[11px] font-mono ${foraDaMensagem ? "opacity-50" : ""}`}>
                                         <button
                                           type="button"
-                                          onClick={() => setSelectedDebtorForMessage(t)}
-                                          className={`text-left truncate cursor-pointer hover:text-white ${t.id === sel.id ? "text-zinc-200" : "text-zinc-400"}`}
-                                          title={separarTitulo ? "Enviar só este título" : undefined}
+                                          onClick={() => (tirado ? incluir() : setSelectedDebtorForMessage(t))}
+                                          className={`text-left truncate cursor-pointer hover:text-white ${tirado ? "line-through text-zinc-500" : t.id === sel.id ? "text-zinc-200" : "text-zinc-400"}`}
+                                          title={separarTitulo ? "Enviar só este título" : tirado ? "Incluir de novo nesta mensagem" : undefined}
                                         >
                                           {t.document} · {t.dueDate}
                                         </button>
+                                        {!separarTitulo && (tirado ? (
+                                          <button
+                                            type="button"
+                                            onClick={incluir}
+                                            className="ml-auto text-[10px] font-sans text-emerald-400 hover:text-emerald-300 cursor-pointer flex-shrink-0"
+                                          >
+                                            Incluir
+                                          </button>
+                                        ) : titulosDaMensagem.length > 1 && (
+                                          <button
+                                            type="button"
+                                            onClick={tirar}
+                                            className="ml-auto text-[10px] font-sans text-zinc-500 hover:text-rose-400 cursor-pointer flex-shrink-0"
+                                            title="Tirar este título desta mensagem (a carteira não muda)"
+                                          >
+                                            Tirar
+                                          </button>
+                                        ))}
                                         <span className="flex items-center gap-2.5 flex-shrink-0 font-sans">
                                           {uploadingPdfDebtorId === t.id ? (
                                             <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" aria-label="Enviando PDF" />
@@ -6592,16 +6654,16 @@ export default function App() {
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
               <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  Documentos Duplicados Detectados
+                  Títulos repetidos no arquivo
                 </h3>
                 <p className="text-xs text-zinc-400">
-                  Os seguintes números de documento aparecem mais de uma vez no arquivo. Como deseja prosseguir?
+                  Estes títulos aparecem mais de uma vez com o mesmo documento, cliente e vencimento. Como deseja prosseguir?
                 </p>
                 <div className="bg-zinc-950 rounded-xl p-3 max-h-40 overflow-y-auto space-y-1">
                   {dupDocModal.dupes.map(({ doc, count }) => (
-                    <div key={doc} className="flex items-center justify-between text-xs font-mono">
-                      <span className="text-zinc-300">{doc}</span>
-                      <span className="text-amber-400 font-bold">{count}× duplicado</span>
+                    <div key={doc} className="flex items-center justify-between gap-3 text-xs font-mono">
+                      <span className="text-zinc-300 truncate" title={doc}>{doc}</span>
+                      <span className="text-amber-400 font-bold flex-shrink-0">{count}×</span>
                     </div>
                   ))}
                 </div>

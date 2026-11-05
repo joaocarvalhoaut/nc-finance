@@ -76,12 +76,16 @@ const upsertRow = async (
     // Build lookup key
     let existing: { id: string } | null = null;
 
+    // Mesmo título = mesmo documento + cliente + vencimento (documento igual com
+    // outro cliente ou vencimento é outro título).
     if (row.documentNumber) {
       const { data } = await admin
         .from("user_registros_financeiros")
         .select("id")
         .eq("user_id", userId)
-        .eq("document_number", row.documentNumber)
+        .eq("document_number", base.document_number)
+        .eq("client_name", base.client_name)
+        .eq("due_date", row.dueDate)
         .maybeSingle();
       existing = data as { id: string } | null;
     }
