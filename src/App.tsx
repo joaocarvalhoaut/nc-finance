@@ -34,6 +34,11 @@ import { validateNewAutomationRule } from "./utils/automationValidation";
 import { isBrazilHoliday, getBrazilHolidayName, isBusinessDay } from "./utils/brazilHolidays";
 import { getMessageTemplate } from "./utils/messageTemplates";
 import { chaveDeAgrupamento, preencherMensagem } from "../supabase/functions/_shared/agrupamento.ts";
+import {
+  contarMensagens, hojeEmBrasilia, inicioDoDiaISO, limiteDeHoje, motivoDoLimite,
+  type ProtecaoNumero, type SituacaoDoDia,
+} from "../supabase/functions/_shared/protecaoNumero.ts";
+import { protecaoNumeroService } from "./services/protecaoNumeroService";
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
 import {
   ACEITA_IMPORTACAO,
@@ -487,6 +492,20 @@ export default function App() {
   // Histórico mostra as mensagens aos poucos (os totais contam todas).
   const [linhasHistorico, setLinhasHistorico] = useState(200);
 
+  // Proteção do número: aquecimento + limite diário da conta (null = não lida /
+  // migração pendente). Mesmas regras que o servidor aplica em todo envio.
+  const [protecao, setProtecao] = useState<ProtecaoNumero | null>(null);
+  const situacaoHoje = useMemo<SituacaoDoDia | null>(() => {
+    if (!protecao) return null;
+    const hoje = hojeEmBrasilia();
+    const inicio = Date.parse(inicioDoDiaISO(hoje));
+    const enviadasHoje = contarMensagens(billingLogs
+      .filter((l) => { const t = Date.parse(l.dateSent); return !Number.isNaN(t) && t >= inicio; })
+      .map((l) => ({ id: l.id, status: l.status, providerMessageId: l.providerMessageId })));
+    const limite = limiteDeHoje(protecao, hoje);
+    return { ...limite, enviadasHoje, restante: limite.limite === null ? null : Math.max(0, limite.limite - enviadasHoje) };
+  }, [protecao, billingLogs]);
+
   useEffect(() => {
     if (isLoggedIn && currentTab === "inicio") {
       setCurrentTab("cobrar");
@@ -675,6 +694,13 @@ export default function App() {
       lastConnectionCheck: null
     };
   };
+
+  useEffect(() => {
+    if (!currentOwnerUserId || !isLoggedIn) return;
+    let vivo = true;
+    void protecaoNumeroService.ler(currentOwnerUserId).then((p) => { if (vivo) setProtecao(p); });
+    return () => { vivo = false; };
+  }, [currentOwnerUserId, isLoggedIn]);
 
   useEffect(() => {
     if (!currentOwnerUserId || !isLoggedIn) return;
@@ -2160,7 +2186,9 @@ export default function App() {
         const baseLabel = SEND_STATUS_LABELS[result.status as SendChargeStatus];
         const friendlyText = result.status === "erro" && result.error
           ? `${baseLabel} Detalhe: ${result.error}`
-          : baseLabel ?? result.error ?? "Falha ao enviar cobrança.";
+          : result.status === "limite_do_dia" && result.error
+            ? result.error // traz o limite e o motivo (aquecimento ou limite da conta)
+            : baseLabel ?? result.error ?? "Falha ao enviar cobrança.";
 
         setMessageFeedback({ success: false, text: friendlyText });
 
@@ -2514,6 +2542,9 @@ export default function App() {
                   onManageSubscription={handleOpenBillingPortal}
                   onDeleteAccount={() => setShowDeleteAccount(true)}
                   onProfileUpdated={() => { if (userId) void carregarPerfilCadastro(userId); }}
+                  protecao={protecao}
+                  situacaoHoje={situacaoHoje}
+                  onProtecaoSalva={setProtecao}
                 />
               )}
 
@@ -2527,6 +2558,7 @@ export default function App() {
                     userId={userId}
                     onGoToSettings={() => setCurrentTab("minha_conta")}
                     companyName={empresaAssinatura}
+                    situacaoHoje={situacaoHoje}
                     globalFinePct={globalFinePct}
                     globalInterestDayPct={globalInterestDayPct}
                     knownContacts={contactsByKey}
@@ -3629,7 +3661,7 @@ export default function App() {
                         .filter((d) => selectedDebtorIds.has(d.id) && d.category !== "liquidado" && d.category !== "desabilitado" && d.value > 0)
                         .map((d) => chaveDeAgrupamento(d.client, d.phone || "", d.category) ?? d.id),
                     ).size;
-                    return mensagens > 0 ? <AvisoBloqueioNumero mensagens={mensagens} compacto /> : null;
+                    return mensagens > 0 ? <AvisoBloqueioNumero mensagens={mensagens} compacto situacao={situacaoHoje} /> : null;
                   })()}
 
                   {batchSendResult && (
@@ -3651,7 +3683,9 @@ export default function App() {
                           }`}>
                             {batchSendResult.success
                               ? `✓ ${batchSendResult.dryRun ? "[Simulação] " : ""}Lote processado · ${batchSendResult.sent} enviados`
-                              : `✗ ${BATCH_TOP_STATUS_LABELS[batchSendResult.status as BatchTopStatus] ?? batchSendResult.error}`
+                              : `✗ ${batchSendResult.status === "limite_do_dia" && batchSendResult.error
+                                  ? batchSendResult.error
+                                  : BATCH_TOP_STATUS_LABELS[batchSendResult.status as BatchTopStatus] ?? batchSendResult.error}`
                             }
                           </div>
                           {batchSendResult.success && (
@@ -3670,6 +3704,9 @@ export default function App() {
                               )}
                               {batchSendResult.blockedLimit > 0 && (
                                 <span className="text-zinc-500">⚡ {batchSendResult.blockedLimit} bloqueados (limite)</span>
+                              )}
+                              {(batchSendResult.blockedDaily ?? 0) > 0 && (
+                                <span className="text-amber-400">{batchSendResult.blockedDaily} ficam para amanhã (limite do dia)</span>
                               )}
                               <span className="text-zinc-600">
                                 Uso: {batchSendResult.usageAfter}/{batchSendResult.usageLimit}
@@ -5273,12 +5310,22 @@ export default function App() {
                           </div>
 
                           <footer className="px-5 py-3 border-t border-zinc-800/80 flex items-center justify-between gap-3">
-                            <span className="text-[11px] text-zinc-500">
+                            <span className="text-[11px] text-zinc-500 min-w-0">
                               {!sel.phone ? "Informe o telefone na lista para enviar." : sel.status === "sent" ? "Já enviada antes para este devedor." : "Sai pelo seu WhatsApp."}
+                              {situacaoHoje?.limite != null && (
+                                <span
+                                  className={`block font-mono ${situacaoHoje.restante === 0 ? "text-amber-300" : "text-zinc-600"}`}
+                                  title={`Limite de hoje: ${motivoDoLimite(situacaoHoje)}. Ajuste em Configurações › Proteção do número.`}
+                                >
+                                  {situacaoHoje.restante === 0
+                                    ? `Limite de hoje atingido (${situacaoHoje.limite}). Volta amanhã.`
+                                    : `Hoje: ${situacaoHoje.enviadasHoje} de ${situacaoHoje.limite} mensagens`}
+                                </span>
+                              )}
                             </span>
                             <button
                               onClick={handleSendMessage}
-                              disabled={isSendingMessage || !sel.phone}
+                              disabled={isSendingMessage || !sel.phone || situacaoHoje?.restante === 0}
                               className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                             >
                               {isSendingMessage ? (
@@ -5797,14 +5844,24 @@ export default function App() {
                                 {newRuleForm.maxDailySends
                                   ? <>Esta regra manda no máximo <span className="text-zinc-200 font-semibold">{newRuleForm.maxDailySends} mensagens por dia</span>.</>
                                   : <><span className="text-amber-200 font-semibold">Sem limite:</span> esta regra manda para todos que se encaixarem, no mesmo dia.</>}
-                                {" "}Número novo: comece com 30 a 50 por dia e suba aos poucos. Se as mensagens pararem de chegar, desative a regra por 24 a 48 h.
+                                {" "}Se as mensagens pararem de chegar, desative a regra por 24 a 48 h.
                               </p>
                             ) : (
                               <p className="text-zinc-400">
-                                Esta regra manda para todos que se encaixarem, no mesmo dia. Número novo: comece com poucos clientes
-                                e aumente aos poucos. Se as mensagens pararem de chegar, desative a regra por 24 a 48 h.
+                                Esta regra manda para todos que se encaixarem, no mesmo dia. Se as mensagens pararem de chegar,
+                                desative a regra por 24 a 48 h.
                               </p>
                             )}
+                            <p className="text-zinc-400">
+                              Acima de tudo vale a proteção do número da conta
+                              {situacaoHoje?.limite != null
+                                ? <>: hoje, no máximo <span className="text-zinc-200 font-semibold">{situacaoHoje.limite} mensagens</span> ({motivoDoLimite(situacaoHoje)}), somando todos os envios</>
+                                : <> (aquecimento de número novo e limite diário)</>}
+                              . O que passar fica para o dia seguinte.{" "}
+                              <button type="button" onClick={() => setCurrentTab("minha_conta")} className="text-zinc-300 hover:text-white underline underline-offset-2 cursor-pointer">
+                                Ajustar em Configurações
+                              </button>
+                            </p>
                           </div>
                         </div>
 

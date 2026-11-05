@@ -68,8 +68,9 @@ export const PERGUNTAS: Pergunta[] = [
     pergunta: "Meu número pode ser bloqueado pelo WhatsApp?",
     resposta:
       "Pode, como em qualquer envio automatizado: o WhatsApp bloqueia números que recebem muitas denúncias ou que mandam muito volume de repente. " +
-      "Para reduzir o risco, cobre só quem já é seu cliente, aumente o volume aos poucos num número novo e comece pelos tons amigável e neutro. " +
-      "As automações não cobram o mesmo cliente duas vezes em menos de 20 horas, e no plano Premium dá para limitar os envios por dia.",
+      "Para reduzir o risco, o sistema faz o aquecimento de número novo: nos primeiros 30 dias o limite de mensagens por dia sobe aos poucos (de 30 para 200). " +
+      "Você também pode definir um limite diário para todos os envios, em qualquer plano. Cobre só quem já é seu cliente e comece pelos tons amigável e neutro. " +
+      "As automações não cobram o mesmo cliente duas vezes em menos de 20 horas.",
   },
   {
     pergunta: "Quem aparece como remetente da cobrança?",

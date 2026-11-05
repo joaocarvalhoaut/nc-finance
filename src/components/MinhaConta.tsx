@@ -8,6 +8,8 @@ import { updatePassword } from "../services/authService";
 import { getConsent, grantAnalyticsConsent, declineAnalyticsConsent } from "../lib/analytics";
 import PasswordInput from "./PasswordInput";
 import WhatsappGatewayCard from "./WhatsappGatewayCard";
+import ProtecaoNumeroCard from "./ProtecaoNumeroCard";
+import type { ProtecaoNumero, SituacaoDoDia } from "../../supabase/functions/_shared/protecaoNumero.ts";
 
 interface Props {
   userId: string;
@@ -21,6 +23,10 @@ interface Props {
   onDeleteAccount: () => void;
   /** Avisa o app que o perfil mudou (ex.: nome da empresa nas mensagens). */
   onProfileUpdated?: () => void;
+  /** Proteção do número (aquecimento + limite diário) e a situação de hoje. */
+  protecao: ProtecaoNumero | null;
+  situacaoHoje: SituacaoDoDia | null;
+  onProtecaoSalva: (p: ProtecaoNumero) => void;
 }
 
 const maskCpf = (cpf: string) => {
@@ -69,6 +75,7 @@ function Campo({ label, value }: { label: string; value: string }) {
 export default function MinhaConta({
   userId, email, displayName, plan, subscription, chargesSent = 0,
   onManageSubscription, onDeleteAccount, onProfileUpdated,
+  protecao, situacaoHoje, onProtecaoSalva,
 }: Props) {
   const [profile, setProfile] = useState<UserProfileData | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -217,6 +224,8 @@ export default function MinhaConta({
 
           {/* Número de WhatsApp da conta — o cartão traz a própria moldura */}
           <WhatsappGatewayCard />
+
+          <ProtecaoNumeroCard userId={userId} protecao={protecao} situacao={situacaoHoje} onSalvo={onProtecaoSalva} />
 
           <Secao titulo="Nome nas mensagens" sub="Assina as cobranças que seus clientes recebem">
             <div className="space-y-3">

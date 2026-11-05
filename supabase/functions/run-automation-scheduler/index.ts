@@ -10,7 +10,8 @@ import { nextAutomationStart, scheduledAutomationStart } from "../_shared/automa
  *  2.  Verifica plano (Basic → skip)
  *  3.  Busca devedores candidatos conforme rule_type
  *  4.  Filtra candidatos que já têm job recente (últimas 20h) para a mesma regra
- *  5.  Respeita max_daily_sends (Premium)
+ *  5.  Respeita max_daily_sends (Premium) e o limite de mensagens do dia da
+ *      conta (aquecimento + limite diário — _shared/protecaoNumero.ts)
  *  6.  Cria user_dispatch_jobs com status='queued' e scheduled_for adequado
  *  7.  Registra user_automation_runs
  *  8.  Atualiza last_run_at e next_run_at na regra
@@ -23,6 +24,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { ACCESS_COLUMNS, canUseSubscription } from "../_shared/billingStatus.ts";
 import { reconcileAutoInstances } from "../_shared/zapiProvisioning.ts";
 import { chaveDeAgrupamento } from "../_shared/agrupamento.ts";
+import { lerSituacaoDoDia } from "../_shared/limiteDiario.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -49,7 +51,10 @@ const scheduledFor = (start: string | null): string => scheduledAutomationStart(
 
 // ─── Process one rule ─────────────────────────────────────────────────────────
 
-const processRule = async (rule: RuleRow): Promise<void> => {
+/** Vagas de mensagens do dia por conta (null = sem limite), divididas entre as regras. */
+type VagasDoDia = Map<string, number | null>;
+
+const processRule = async (rule: RuleRow, vagasDoDia: VagasDoDia): Promise<void> => {
   const ruleId   = String(rule.id);
   const userId   = String(rule.user_id);
   const ruleType = String(rule.rule_type);
@@ -181,7 +186,14 @@ const processRule = async (rule: RuleRow): Promise<void> => {
     }
     const porVencimento = (a: DebtorRow, b: DebtorRow) => String(a.due_date ?? "").localeCompare(String(b.due_date ?? ""));
     const todosGrupos = [...grupos.values()].map((g) => g.sort(porVencimento));
-    const gruposDoDia = maxDaily ? todosGrupos.slice(0, maxDaily) : todosGrupos;
+    // Proteção do número (aquecimento + limite diário da conta): as regras do
+    // mesmo usuário dividem as vagas do dia; o que sobrar volta amanhã.
+    if (!vagasDoDia.has(userId)) vagasDoDia.set(userId, (await lerSituacaoDoDia(admin, userId)).restante);
+    const vagasDaConta = vagasDoDia.get(userId) ?? null;
+    const tetos = [maxDaily, vagasDaConta].filter((n): n is number => n !== null);
+    const teto = tetos.length ? Math.min(...tetos) : null;
+    const gruposDoDia = teto !== null ? todosGrupos.slice(0, teto) : todosGrupos;
+    if (vagasDaConta !== null) vagasDoDia.set(userId, Math.max(0, vagasDaConta - gruposDoDia.length));
     const limited = gruposDoDia.map((g) => g[0]);
     const juntosDe = new Map(gruposDoDia.map((g) => [String(g[0].id), g.slice(1).map((d) => String(d.id))]));
     jobsSkipped = totalCandidates - gruposDoDia.reduce((n, g) => n + g.length, 0);
@@ -293,8 +305,9 @@ Deno.serve(async (request: Request) => {
     const ruleList = (rules ?? []) as RuleRow[];
     let processed = 0;
 
+    const vagasDoDia: VagasDoDia = new Map();
     for (const rule of ruleList) {
-      await processRule(rule);
+      await processRule(rule, vagasDoDia);
       processed++;
     }
 

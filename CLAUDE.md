@@ -67,14 +67,18 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   enviado como link na mensagem. A busca/sugestão de boletos pelo Google Drive saiu da interface em
   30/10/2026 a pedido do dono e os envios ignoram sugestão do Drive; as Edge Functions de Drive
   (`match-drive-files`, `drive-index-folder`, `drive-import-boleto`) e os services seguem no repo, sem uso.
-- **Pendente — proteção contra bloqueio do número (pedido do dono):** (1) limite diário de envios
-  configurável também no envio em lote e nos planos Básico e Pro (hoje só a automação do Premium tem
-  `max_daily_sends`); (2) "aquecimento" sugerido para número novo (começar com 20–50/dia e subir aos
-  poucos); (3) deixar claro na interface o risco de bloqueio, com a orientação de pausar 24–48 h se a
-  entrega cair ou aparecer restrição — **feito em 04/11/2026**: aviso âmbar no formulário de regra
-  de automação (junto do "Máx. envios por dia") e no envio em lote (`AvisoBloqueioNumero`, na barra
-  da Carteira e no modal de confirmação), com a contagem de mensagens. Itens (1) e (2) seguem pendentes. A Meta não publica um número fixo para o WhatsApp comum
-  (Z-API): o bloqueio vem de denúncias, pico de volume e envio para quem nunca falou com o número.
+- **Proteção do número contra bloqueio** (pedido do dono, feito em 04–05/11/2026). A Meta não publica
+  teto para o WhatsApp comum (Z-API): o bloqueio vem de denúncias, pico de volume e envio para quem
+  nunca falou com o número.
+  - **Aquecimento + limite diário da conta**, em todo envio (um por um, lote, automação) e todo plano.
+    Regras puras em `_shared/protecaoNumero.ts` (etapas 30/50/80/120/200 nos dias 1–3/4–7/8–14/15–21/22–30;
+    vale o menor entre aquecimento e limite da conta; conta MENSAGENS — títulos juntos = 1).
+    Servidor: `_shared/limiteDiario.ts` (`lerSituacaoDoDia`, fail-open, grava `aquecimento_inicio` no
+    1º envio). Colunas em `user_configuracoes` (migration `20261105120000_protecao_numero.sql`).
+    Ajuste em Configurações › Proteção do número (`ProtecaoNumeroCard`). Lote: excedente volta como
+    `limite_do_dia`; automação: o scheduler divide as vagas entre as regras e o worker marca `blocked_limit`.
+  - **Aviso de risco** (`AvisoBloqueioNumero`) na barra da Carteira e no modal do lote, com quantas
+    ainda saem hoje; aviso no formulário de regra de automação.
 - PostHog: **ativo**. A `VITE_POSTHOG_KEY` esta no Vercel desde 25/08/2026, mas o CSP
   nao liberava `us.i.posthog.com` — a lib inicializava e o navegador descartava todo
   evento, em silencio. Corrigido no `vercel.json` e no `server.ts`. Ao mexer no CSP,

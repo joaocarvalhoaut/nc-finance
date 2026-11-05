@@ -24,6 +24,7 @@ export type SendChargeStatus =
   | "fora_horario"
   | "dia_nao_permitido"
   | "limite_diario"
+  | "limite_do_dia"
   | "config_ausente"
   | "erro_interno"
   | "payload_invalido";
@@ -70,6 +71,7 @@ export const SEND_STATUS_LABELS: Record<SendChargeStatus, string> = {
   fora_horario:          "Envio bloqueado: fora da janela permitida do modo piloto.",
   dia_nao_permitido:     "Envio bloqueado: o modo piloto não permite disparos hoje.",
   limite_diario:         "Envio bloqueado: limite diário do modo piloto atingido.",
+  limite_do_dia:         "Limite de mensagens de hoje atingido. Os envios voltam amanhã (Configurações › Proteção do número).",
   config_ausente:        "Envio bloqueado: conta não habilitada no piloto.",
   erro_interno:          "Erro interno. Tente novamente ou contate o suporte.",
   payload_invalido:      "Dados inválidos. Verifique os campos e tente novamente.",

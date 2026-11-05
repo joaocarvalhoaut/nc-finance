@@ -16,6 +16,7 @@
 
 import React, { useState } from "react";
 import AvisoBloqueioNumero from "./AvisoBloqueioNumero";
+import type { SituacaoDoDia } from "../../supabase/functions/_shared/protecaoNumero.ts";
 import {
   Send, AlertTriangle, CheckCircle2, XCircle,
   WifiOff, Eye, X, Pencil, RotateCcw, Check,
@@ -34,6 +35,8 @@ export interface BatchConfirmData {
   whatsappConnected:  boolean;
   /** Mensagens que vão sair: títulos do mesmo cliente e tipo viram uma só. */
   messageCount?:      number;
+  /** Limite de mensagens de hoje (aquecimento + limite diário da conta). */
+  situacaoHoje?:      SituacaoDoDia | null;
 }
 
 interface BatchConfirmModalProps {
@@ -64,10 +67,14 @@ export default function BatchConfirmModal({
   const blockedByPilotLimit =
     data.pilotRemaining !== null && data.pilotRemaining === 0;
 
+  // Limite de mensagens do dia acabou: nada sairia agora.
+  const blockedByDailyLimit = data.situacaoHoje?.restante === 0;
+
   const canConfirm =
     acknowledged &&
     !blockedByDisconnect &&
     !blockedByPilotLimit &&
+    !blockedByDailyLimit &&
     data.validPhoneCount > 0;
 
   const handleConfirm = () => {
@@ -149,7 +156,7 @@ export default function BatchConfirmModal({
           )}
 
           {/* Risco de bloqueio do número num disparo grande */}
-          <AvisoBloqueioNumero mensagens={data.messageCount ?? data.validPhoneCount} />
+          <AvisoBloqueioNumero mensagens={data.messageCount ?? data.validPhoneCount} situacao={data.situacaoHoje} />
 
           <p className="text-sm text-zinc-300">Confira destinatários, valores, vencimentos e o boleto de cada cliente na revisão. Contatos bloqueados e limites serão verificados novamente pelo servidor. Mensagem enviada não significa pagamento recebido.</p>
           {/* Summary */}

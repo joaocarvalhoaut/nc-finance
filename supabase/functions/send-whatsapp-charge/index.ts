@@ -30,6 +30,8 @@ import { checkRateLimit, tooManyRequests } from "../_shared/rateLimit.ts";
 import { isOptedOut } from "../_shared/optOut.ts";
 import { linhasDeBoleto } from "../_shared/agrupamento.ts";
 import { lerEncargos, valorAtualizado } from "../_shared/encargos.ts";
+import { lerSituacaoDoDia } from "../_shared/limiteDiario.ts";
+import { mensagemLimiteAtingido } from "../_shared/protecaoNumero.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -253,6 +255,17 @@ Deno.serve(async (request: Request) => {
       return errResponse(pilotResult.statusCode, {
         error:  pilotResult.message,
         status: pilotResult.reason,
+      });
+    }
+
+    // ── 4b2. Proteção do número: limite de mensagens do dia ───────────────────
+    // Aquecimento de número novo + limite diário da conta (_shared/protecaoNumero.ts).
+    // Uma mensagem, mesmo com vários títulos juntos, conta uma vez.
+    const situacaoDoDia = await lerSituacaoDoDia(admin, userId);
+    if (situacaoDoDia.restante !== null && situacaoDoDia.restante <= 0) {
+      return errResponse(429, {
+        error:  mensagemLimiteAtingido(situacaoDoDia),
+        status: "limite_do_dia",
       });
     }
 

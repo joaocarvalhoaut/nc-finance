@@ -77,9 +77,18 @@ const PERGUNTAS: Pergunta[] = [
     resposta:
       "Pode, como em qualquer envio automatizado: o WhatsApp bloqueia números que recebem muitas denúncias ou que mandam muito volume de repente. Para reduzir o risco:\n" +
       "• cobre só quem já é seu cliente;\n" +
-      "• num número novo, aumente o volume aos poucos;\n" +
+      "• deixe ligado o aquecimento de número novo;\n" +
       "• comece pelos tons amigável e neutro.\n" +
-      "As automações não cobram o mesmo cliente duas vezes em menos de 20 horas, e no Premium dá para limitar os envios por dia.",
+      "As automações não cobram o mesmo cliente duas vezes em menos de 20 horas.",
+  },
+  {
+    tema: "WhatsApp e envios",
+    pergunta: "O que é o aquecimento e o limite diário de mensagens?",
+    resposta:
+      "Ficam em Configurações › Proteção do número e valem para todo envio — um por um, em lote e pela automação —, em qualquer plano.\n" +
+      "• Aquecimento: nos primeiros 30 dias de uso o limite sobe aos poucos — 30 mensagens por dia nos dias 1 a 3, 50 até o 7º, 80 até o 14º, 120 até o 21º e 200 até o 30º. Começa no primeiro envio. Trocou de número? Clique em “Recomeçar”.\n" +
+      "• Limite diário: um teto seu, que vale todo dia. Durante o aquecimento vale o menor dos dois.\n" +
+      "Vários títulos do mesmo cliente numa mensagem contam como uma. Quando o limite do dia acaba, o que faltou fica para o dia seguinte: no lote, os excedentes aparecem como “fica para amanhã”; na automação, o cliente volta a ser cobrado na execução seguinte.",
   },
   {
     tema: "WhatsApp e envios",

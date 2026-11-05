@@ -20,10 +20,12 @@ export type BatchItemStatus =
   | "bloqueado_limite"
   | "bloqueado_liquidado"
   | "nao_contatar"
+  | "limite_do_dia"
   | "devedor_nao_encontrado";
 
 export type BatchTopStatus =
   | "completed"
+  | "limite_do_dia"
   | "nao_autenticado"
   | "payload_invalido"
   | "zapi_nao_configurada"
@@ -54,6 +56,8 @@ export interface BatchChargeResult {
   duplicated:     number;
   invalidPhone:   number;
   blockedLimit:   number;
+  /** Títulos que ficaram para amanhã pelo limite de mensagens do dia. */
+  blockedDaily?:  number;
   blockedPlan:    number;
   usageAfter:     number;
   usageLimit:     number;
@@ -74,6 +78,7 @@ export interface BatchChargeOptions {
 
 export const BATCH_TOP_STATUS_LABELS: Record<BatchTopStatus, string> = {
   completed:             "Lote processado!",
+  limite_do_dia:         "Limite de mensagens de hoje atingido. Os envios voltam amanhã.",
   nao_autenticado:       "Sessão expirada. Faça login novamente.",
   payload_invalido:      "Dados inválidos. Verifique os devedores selecionados.",
   zapi_nao_configurada:  "Canal de envio não configurado. Contate o suporte.",
@@ -91,6 +96,7 @@ export const BATCH_ITEM_STATUS_LABELS: Record<BatchItemStatus, string> = {
   bloqueado_limite:       "Limite atingido",
   bloqueado_liquidado:    "Bloqueado (liquidado, desabilitado ou valor zerado)",
   nao_contatar:           "Pediu para não ser contatado",
+  limite_do_dia:          "Fica para amanhã (limite do dia)",
   devedor_nao_encontrado: "Devedor não encontrado",
 };
 

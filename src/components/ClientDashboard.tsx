@@ -50,6 +50,7 @@ import { ACEITA_IMPORTACAO, interpretarDocumento, lerArquivo } from "../services
 import { getMessageTemplate, fillMessageTemplate } from "../utils/messageTemplates";
 import BatchConfirmModal, { type BatchConfirmData } from "./BatchConfirmModal";
 import { chaveDeAgrupamento } from "../../supabase/functions/_shared/agrupamento.ts";
+import type { SituacaoDoDia } from "../../supabase/functions/_shared/protecaoNumero.ts";
 import BoletoResponsibilityModal from "./BoletoResponsibilityModal";
 import type { Debtor, MessageTone } from "../types";
 
@@ -96,6 +97,8 @@ interface ClientDashboardProps {
   onGoToSettings?: () => void;
   /** Nome da empresa — assina as mensagens ({empresa}) */
   companyName?: string | null;
+  /** Limite de mensagens de hoje (aquecimento + limite diário da conta). */
+  situacaoHoje?: SituacaoDoDia | null;
 }
 
 // ─── Step type ────────────────────────────────────────────────────────────────
@@ -114,6 +117,7 @@ export default function ClientDashboard({
   onDebtorsImported,
   onGoToSettings,
   companyName = null,
+  situacaoHoje = null,
 }: ClientDashboardProps) {
   // ── WhatsApp status ──────────────────────────────────────────────────────────
   const [waConnected, setWaConnected]   = useState<boolean | null>(null);
@@ -467,6 +471,7 @@ export default function ClientDashboard({
       pilotRemaining,
       whatsappConnected:    waConnected ?? false,
       messageCount:         mensagens,
+      situacaoHoje,
     });
   };
 
@@ -1135,6 +1140,12 @@ export default function ClientDashboard({
                       ? `${sendResult.duplicated} mensagem(ns) bloqueada(s) por anti-duplicata (aguarde 5 min antes de reenviar as mesmas cobranças).`
                       : "Lote processado com sucesso.")}
                 </p>
+                {(sendResult.blockedDaily ?? 0) > 0 && (
+                  <p className="text-sm text-amber-300 mt-1">
+                    {sendResult.blockedDaily} título(s) ficaram para amanhã: o limite de mensagens de hoje acabou
+                    (Configurações › Proteção do número).
+                  </p>
+                )}
               </div>
             </div>
 

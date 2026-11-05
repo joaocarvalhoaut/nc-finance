@@ -39,6 +39,8 @@ import { loadCompanyName }                       from "../_shared/empresa.ts";
 import { loadZApiCredentialsForUser }             from "../_shared/platformIntegrations.ts";
 import { sanitizeError }                         from "../_shared/sanitize.ts";
 import { isOptedOut }                            from "../_shared/optOut.ts";
+import { lerSituacaoDoDia }                      from "../_shared/limiteDiario.ts";
+import { mensagemLimiteAtingido }                from "../_shared/protecaoNumero.ts";
 
 // Colunas do devedor usadas no envio (o principal e os que vão juntos).
 const COLUNAS_DEVEDOR =
@@ -228,6 +230,15 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
       }
       // limite_diario e demais bloqueios: para o job, nao reagenda.
       await markJob("blocked_limit", { last_error: pilot.message });
+      return;
+    }
+
+    // ── 4b2. Proteção do número: limite de mensagens do dia ────────────────
+    // Aquecimento + limite diário da conta (_shared/protecaoNumero.ts). O job
+    // para aqui; o devedor volta a ser candidato na execução de amanhã.
+    const situacaoDoDia = await lerSituacaoDoDia(admin, userId);
+    if (situacaoDoDia.restante !== null && situacaoDoDia.restante <= 0) {
+      await markJob("blocked_limit", { last_error: mensagemLimiteAtingido(situacaoDoDia) });
       return;
     }
 

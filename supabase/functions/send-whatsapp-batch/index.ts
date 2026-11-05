@@ -39,6 +39,8 @@ import { normalizePhone, validatePhone, sendTextMessage } from "../_shared/zapi.
 import { checkSubscription }               from "../_shared/subscriptionGuard.ts";
 import { getUsageSnapshot, incrementChargesSent } from "../_shared/usageGuard.ts";
 import { insertBillingLog }                from "../_shared/billingLog.ts";
+import { lerSituacaoDoDia }                from "../_shared/limiteDiario.ts";
+import { mensagemLimiteAtingido, motivoDoLimite } from "../_shared/protecaoNumero.ts";
 import { buildGroupMessage }               from "../_shared/messageBuilder.ts";
 import { chaveDeAgrupamento, linhasDeBoleto } from "../_shared/agrupamento.ts";
 import { loadCompanyName }                 from "../_shared/empresa.ts";
@@ -74,6 +76,7 @@ type BatchItemStatus =
   | "bloqueado_limite"
   | "bloqueado_liquidado"
   | "nao_contatar"
+  | "limite_do_dia"
   | "devedor_nao_encontrado";
 
 interface BatchItemResult {
@@ -210,6 +213,22 @@ Deno.serve(async (request: Request) => {
 
     // Clamp rawIds to pilot remaining capacity (on top of plan limit)
     const pilotRemaining = pilotResult.ok ? pilotResult.remaining : Number.MAX_SAFE_INTEGER;
+
+    // ── 3c. Proteção do número: limite de mensagens do dia ────────────────────
+    // Aquecimento + limite diário da conta (_shared/protecaoNumero.ts). Conta
+    // MENSAGENS: é aplicado no loop, depois de juntar os títulos do mesmo cliente.
+    const situacaoDoDia = await lerSituacaoDoDia(admin, userId);
+    if (situacaoDoDia.restante !== null && situacaoDoDia.restante <= 0) {
+      return errResponse(429, {
+        error:  mensagemLimiteAtingido(situacaoDoDia),
+        status: "limite_do_dia",
+      });
+    }
+    let mensagensRestantesHoje = situacaoDoDia.restante; // null = sem limite
+    const avisoLimiteDoDia = situacaoDoDia.limite !== null
+      ? `Limite de hoje (${situacaoDoDia.limite} mensagens, ${motivoDoLimite(situacaoDoDia)}): fica para amanhã.`
+      : "";
+    let bloqueadosNoDia = 0;
 
     // ── 4. Valida assinatura Stripe ────────────────────────────────────────────
     const subResult = await checkSubscription(admin, userId);
@@ -442,6 +461,19 @@ Deno.serve(async (request: Request) => {
       const valorDe = (r: Record<string, unknown>) =>
         r === dr ? amount : valorAtualizado(Number(r.amount ?? 0), String(r.due_date ?? ""), String(r.category ?? ""), encargos);
 
+      // c2. Limite de mensagens do dia: o que passar fica para amanhã (não sai).
+      if (mensagensRestantesHoje !== null && mensagensRestantesHoje <= 0) {
+        for (const id of [debtorId, ...juntos.map((r) => String(r.id))]) {
+          results.push({
+            debtorId: id, clientName, phone: normalizedPhone,
+            status: "limite_do_dia", messageId: null, logId: null,
+            error: avisoLimiteDoDia, sentWithPdf: false,
+          });
+          bloqueadosNoDia++;
+        }
+        continue;
+      }
+
       // d. Monta mensagem
       const message = buildGroupMessage(
         titulos.map((r) => ({
@@ -603,6 +635,7 @@ Deno.serve(async (request: Request) => {
 
       if (zapiResult.success) {
         successCount++;
+        if (mensagensRestantesHoje !== null) mensagensRestantesHoje--;
       } else {
         failedCount++;
       }
@@ -627,7 +660,7 @@ Deno.serve(async (request: Request) => {
 
     // ── 9. Retorna resumo sanitizado ──────────────────────────────────────────
     const totalProcessed = results.filter(
-      r => r.status !== "bloqueado_limite",
+      r => r.status !== "bloqueado_limite" && r.status !== "limite_do_dia",
     ).length;
 
     return okResponse({
@@ -641,6 +674,7 @@ Deno.serve(async (request: Request) => {
       duplicated:     duplicateCount,
       invalidPhone,
       blockedLimit:   idsOverLimit.length,
+      blockedDaily:   bloqueadosNoDia,
       blockedPlan:    0,
       usageAfter:     dryRun ? usage.chargesUsed : usage.chargesUsed + successCount,
       usageLimit:     usage.planLimit,
