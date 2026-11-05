@@ -171,13 +171,22 @@ export const automationService = {
     return mapRule(data as RuleRow);
   },
 
+  /**
+   * Liga/desliga e confere no banco: o update sem linha afetada (RLS, regra
+   * apagada) não dá erro no Supabase, então lê de volta o que ficou gravado.
+   */
   async toggleRule(id: string, enabled: boolean): Promise<void> {
     const supabase = getSupabaseClient();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("user_automation_rules")
       .update({ enabled, updated_at: new Date().toISOString() })
-      .eq("id", id);
-    if (error) throw new Error(error.message);
+      .eq("id", id)
+      .select("id, enabled")
+      .maybeSingle();
+    if (error) throw new Error("Não foi possível salvar a regra. Tente de novo.");
+    if (!data || (data as { enabled?: boolean }).enabled !== enabled) {
+      throw new Error("A regra não foi salva. Atualize a página e tente de novo.");
+    }
   },
 
   async deleteRule(id: string): Promise<void> {

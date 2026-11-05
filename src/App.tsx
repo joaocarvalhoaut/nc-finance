@@ -1290,19 +1290,71 @@ export default function App() {
     setNewRuleForm(regraVazia());
   };
 
-  const handleToggleRule = async (id: string, enabled: boolean) => {
-    setAutomationRules((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, enabled } : r)),
-    );
-    try {
-      await automationService.toggleRule(id, enabled);
-    } catch (e) {
-      // rollback
-      setAutomationRules((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, enabled: !enabled } : r)),
-      );
-      setAutomationError(e instanceof Error ? e.message : "Falha ao atualizar regra.");
+  // Liga/desliga: a chave muda na hora; só o estado final é gravado, 400 ms
+  // depois do último clique (cliques rápidos não brigam entre si). Depois de
+  // gravar, o banco é conferido e a linha mostra o resultado (próximo disparo
+  // ou "Pausada"); se falhar, volta ao que estava gravado e avisa.
+  const regraTimer = React.useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const regraGravada = React.useRef(new Map<string, boolean>());
+  const [regraSalvando, setRegraSalvando] = useState<Map<string, "salvando" | "ok" | "erro">>(new Map());
+  const marcarRegra = (id: string, estado: "salvando" | "ok" | "erro" | null) =>
+    setRegraSalvando((prev) => {
+      const m = new Map(prev);
+      if (estado) m.set(id, estado); else m.delete(id);
+      return m;
+    });
+
+  const handleToggleRule = (id: string, enabled: boolean) => {
+    const atual = automationRules.find((r) => r.id === id);
+    if (!atual) return;
+    if (!regraGravada.current.has(id)) regraGravada.current.set(id, atual.enabled);
+    setAutomationRules((prev) => prev.map((r) => (r.id === id ? { ...r, enabled } : r)));
+    setAutomationError("");
+    const t = regraTimer.current.get(id);
+    if (t) clearTimeout(t);
+    marcarRegra(id, "salvando");
+    regraTimer.current.set(id, setTimeout(async () => {
+      regraTimer.current.delete(id);
+      const gravado = regraGravada.current.get(id);
+      if (gravado === enabled) { regraGravada.current.delete(id); marcarRegra(id, null); return; }
+      try {
+        await automationService.toggleRule(id, enabled);
+        if (regraTimer.current.has(id)) return; // outro clique chegou: ele decide
+        regraGravada.current.delete(id);
+        marcarRegra(id, "ok");
+      } catch (e) {
+        if (regraTimer.current.has(id)) return;
+        regraGravada.current.delete(id);
+        setAutomationRules((prev) => prev.map((r) => (r.id === id ? { ...r, enabled: gravado ?? !enabled } : r)));
+        setAutomationError(e instanceof Error ? e.message : "Falha ao atualizar regra.");
+        marcarRegra(id, "erro");
+      }
+    }, 400));
+  };
+
+  /** Próximo disparo da regra (08:00 de Brasília, respeitando dias úteis/feriados). */
+  const proximoDisparo = (modo: string, pularFeriados: boolean): Date => {
+    const DIA = 24 * 60 * 60 * 1000;
+    const br = new Date(Date.now() - 3 * 60 * 60 * 1000); // campos UTC = Brasília
+    let d = Date.UTC(br.getUTCFullYear(), br.getUTCMonth(), br.getUTCDate());
+    if (br.getUTCHours() >= 8) d += DIA;
+    for (let i = 0; i < 20; i++, d += DIA) {
+      const u = new Date(d);
+      const dia = new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate());
+      const fds = dia.getDay() === 0 || dia.getDay() === 6;
+      if ((modo === "weekdays" && fds) || (pularFeriados && isBrazilHoliday(dia))) continue;
+      return dia;
     }
+    return new Date(d);
+  };
+  const textoProximoDisparo = (modo: string, pularFeriados: boolean): string => {
+    const dia = proximoDisparo(modo, pularFeriados);
+    const hojeBr = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    const hoje = new Date(hojeBr.getUTCFullYear(), hojeBr.getUTCMonth(), hojeBr.getUTCDate());
+    const dif = Math.round((dia.getTime() - hoje.getTime()) / (24 * 60 * 60 * 1000));
+    const quando = dif === 0 ? "hoje" : dif === 1 ? "amanhã"
+      : `${dia.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")} ${dia.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`;
+    return `próximo disparo ${quando} às 8h`;
   };
 
   const handleDeleteRule = async (id: string) => {
@@ -6347,15 +6399,16 @@ export default function App() {
                         {automationRules.map((rule) => (
                           <div key={rule.id} className="flex items-center gap-4 px-5 py-3.5">
                             <button
-                              onClick={() => void handleToggleRule(rule.id, !rule.enabled)}
+                              type="button"
+                              onClick={() => handleToggleRule(rule.id, !rule.enabled)}
                               title={rule.enabled ? "Pausar regra" : "Ativar regra"}
                               aria-label={`${rule.enabled ? "Pausar" : "Ativar"} a regra ${rule.name}`}
-                              className="flex-shrink-0 cursor-pointer focus:outline-none group"
+                              className="flex-shrink-0 -m-2 p-2 cursor-pointer rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 group select-none [-webkit-tap-highlight-color:transparent]"
                               role="switch"
                               aria-checked={rule.enabled}
                             >
-                              <span className={`relative block w-9 h-5 rounded-full transition-colors duration-200 ${rule.enabled ? "bg-emerald-500" : "bg-zinc-700 group-hover:bg-zinc-600"}`}>
-                                <span className={`absolute top-[3px] left-[3px] w-3.5 h-3.5 bg-white rounded-full transition-transform duration-200 ${rule.enabled ? "translate-x-4" : "translate-x-0"}`} />
+                              <span className={`relative block w-9 h-5 rounded-full transition-colors duration-150 ease-out ${rule.enabled ? "bg-emerald-500" : "bg-zinc-700 group-hover:bg-zinc-600"}`}>
+                                <span className={`absolute top-[3px] left-[3px] h-3.5 bg-white rounded-full shadow-sm transition-[transform,width] duration-150 ease-out w-3.5 group-active:w-[18px] ${rule.enabled ? "translate-x-4 group-active:translate-x-[12px]" : "translate-x-0"}`} />
                               </span>
                             </button>
 
@@ -6377,6 +6430,29 @@ export default function App() {
                                 {rule.sendWindowStart && rule.sendWindowEnd && ` · ${rule.sendWindowStart}–${rule.sendWindowEnd}`}
                                 {rule.maxDailySends != null && ` · máx ${rule.maxDailySends}/dia`}
                               </p>
+                              {(() => {
+                                const estado = regraSalvando.get(rule.id);
+                                if (estado === "salvando") {
+                                  return <p className="mt-1 text-[11px] text-zinc-500 flex items-center gap-1.5"><RefreshCw className="w-3 h-3 animate-spin" /> Salvando…</p>;
+                                }
+                                if (estado === "erro") {
+                                  return <p className="mt-1 text-[11px] text-rose-300 flex items-center gap-1.5"><AlertTriangle className="w-3 h-3" /> Não salvou — a regra continua como estava</p>;
+                                }
+                                if (!rule.enabled) {
+                                  return estado === "ok"
+                                    ? <p className="mt-1 text-[11px] text-zinc-400">Pausada · nada desta regra é enviado, nem o que estava na fila</p>
+                                    : null;
+                                }
+                                if (plan === "basic") return null;
+                                return (
+                                  <p className={`mt-1 text-[11px] flex items-center gap-1.5 ${estado === "ok" ? "text-emerald-300" : "text-zinc-500"}`}>
+                                    {estado === "ok" && <Check className="w-3 h-3" />}
+                                    {estado === "ok" ? "Ativada e conferida · " : "Ativa · "}
+                                    {textoProximoDisparo(rule.scheduleMode, rule.skipHolidays)}
+                                    {rule.sendWindowStart && `, envio a partir das ${rule.sendWindowStart}`}
+                                  </p>
+                                );
+                              })()}
                             </div>
 
                             <button
