@@ -1718,6 +1718,43 @@ export default function App() {
     }
   };
 
+  // Clique no selo "Tipo" (Carteira): muda na hora e salva só o tipo final,
+  // meio segundo depois do último clique. Salvar a cada clique fazia o selo
+  // "pular para trás": a resposta do 1º clique chegava depois do 2º e
+  // sobrescrevia a tela com o tipo antigo.
+  const debtorsRef = React.useRef(debtors);
+  debtorsRef.current = debtors;
+  const tipoPendente = React.useRef(new Map<string, { original: Debtor["category"]; atual: Debtor["category"]; timer: number }>());
+  const ciclarTipo = (id: string) => {
+    const d = debtorsRef.current.find((x) => x.id === id);
+    if (!d || !currentOwnerUserId) return;
+    const pend = tipoPendente.current.get(id);
+    const base = pend?.atual ?? d.category;
+    const i = CATEGORY_CYCLE.indexOf(base);
+    const proximo = CATEGORY_CYCLE[(i + 1) % CATEGORY_CYCLE.length];
+    setDebtors((prev) => prev.map((x) => (x.id === id ? { ...x, category: proximo } : x)));
+    if (pend) window.clearTimeout(pend.timer);
+
+    const dono = currentOwnerUserId;
+    const timer = window.setTimeout(async () => {
+      const p = tipoPendente.current.get(id);
+      tipoPendente.current.delete(id);
+      const atual = debtorsRef.current.find((x) => x.id === id);
+      if (!p || !atual || p.atual === p.original) return; // voltou ao tipo de antes: nada a salvar
+      try {
+        await financeService.update(dono, { ...atual, category: p.atual });
+      } catch (error) {
+        console.error('[workspace]', error instanceof Error ? error.message : 'Falha ao salvar o tipo.');
+        // Não salvou: volta ao tipo que está no banco (se ninguém clicou de novo).
+        if (!tipoPendente.current.has(id)) {
+          setDebtors((prev) => prev.map((x) => (x.id === id ? { ...x, category: p.original } : x)));
+          setDebtorSaveError("Não foi possível salvar o tipo. Tente de novo.");
+        }
+      }
+    }, 500);
+    tipoPendente.current.set(id, { original: pend?.original ?? d.category, atual: proximo, timer });
+  };
+
   // Delete option inside extracted stage
   const removeExtractedRow = (id: string) => {
     setExtractedDebtors(prev => prev.filter(d => d.id !== id));
@@ -4450,21 +4487,17 @@ export default function App() {
                                     {formatBRL(d.updatedValue || d.value)}
                                   </td>
                                   <td className="px-4 py-3 text-center">
-                                    <span 
-                                      onClick={() => {
-                                        // Vencido → A vencer → Recompra → Liquidado → Desabilitado → Vencido.
-                                        const currentIdx = CATEGORY_CYCLE.indexOf(d.category);
-                                        if (currentIdx === -1) return;
-                                        const nextCat = CATEGORY_CYCLE[(currentIdx + 1) % CATEGORY_CYCLE.length];
-                                        updateGeneralDebtorField(d.id, "category", nextCat);
-                                      }}
-                                      title={d.category === "desabilitado" && d.notes ? d.notes : undefined}
-                                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase select-none transition-all cursor-pointer
+                                    {/* Vencido → A vencer → Recompra → Liquidado → Desabilitado → Vencido */}
+                                    <button
+                                      type="button"
+                                      onClick={() => ciclarTipo(d.id)}
+                                      title={d.category === "desabilitado" && d.notes ? d.notes : "Clique para mudar o tipo"}
+                                      className={`inline-block min-w-[108px] px-2.5 py-1 rounded-full text-[10px] font-bold uppercase select-none transition-colors duration-150 cursor-pointer active:scale-95
                                         ${CATEGORY_BADGE[d.category]}
                                       `}
                                     >
                                       {CATEGORY_LABEL[d.category]}
-                                    </span>
+                                    </button>
                                   </td>
                                   <td className="px-4 py-3">
                                     <select
