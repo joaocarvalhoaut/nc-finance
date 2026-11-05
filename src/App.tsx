@@ -2019,14 +2019,19 @@ export default function App() {
 
     // Mesmo cliente, documento e vencimento já na carteira: é o mesmo título e
     // não pode existir duas vezes (utils/tituloUnico.ts).
+    // O aviso aparece no formulário enquanto se digita; aqui é só a trava final.
     const chaveNovo = chaveDoTitulo(newDebtor);
     const existente = chaveNovo ? debtors.find(d => chaveDoTitulo(d) === chaveNovo) : undefined;
     if (existente) {
       setAddDebtorError(`Este título já está na carteira: ${existente.client}, documento ${existente.document}, vencimento ${existente.dueDate}. Para mudar algo, edite o que já existe.`);
       return;
     }
+    // Igual a um arquivado: grava em cima dele (mesmos valores da chave), e ele volta.
+    const arquivado = chaveNovo ? arquivados.find(d => chaveDoTitulo(d) === chaveNovo) : undefined;
 
-    await salvarDevedorManual(newDebtor);
+    await salvarDevedorManual(arquivado
+      ? { ...newDebtor, client: arquivado.client, document: arquivado.document, dueDate: arquivado.dueDate }
+      : newDebtor);
   };
 
   const salvarDevedorManual = async (devedor: Debtor) => {
@@ -2036,6 +2041,7 @@ export default function App() {
     try {
       const [saved] = await financeService.createMany(currentOwnerUserId, [devedor]);
       setDebtors(prev => mesclarDevedores(prev, [saved], "inicio"));
+      setArquivados(prev => prev.filter(a => a.id !== saved.id));
       // Aprende o contato (telefone) para sugerir em cadastros/importações futuras
       void learnContactsFromDebtors([saved]);
       setAddDebtorForm({ client: "", supplier: "", document: "", dueDate: "", value: "", phone: "", category: "vencidos" });
@@ -4762,6 +4768,14 @@ export default function App() {
                     match?.phone && addDebtorForm.phone.replace(/\D/g, "").length < 10 && addDebtorForm.client.trim().length >= 3,
                   );
                   const fechar = () => setShowAddDebtorModal(false);
+                  // Aviso na hora: mesmo cliente + documento + vencimento já existe
+                  // (utils/tituloUnico.ts). Na carteira: não deixa salvar; nos
+                  // arquivados: salvar traz o título de volta.
+                  const chaveForm = addDebtorForm.document.trim() && isValidDueDate(addDebtorForm.dueDate)
+                    ? chaveDoTitulo({ document: addDebtorForm.document, client: addDebtorForm.client, dueDate: addDebtorForm.dueDate.trim() })
+                    : null;
+                  const jaNaCarteira = chaveForm ? debtors.find(d => chaveDoTitulo(d) === chaveForm) : undefined;
+                  const jaArquivado = chaveForm && !jaNaCarteira ? arquivados.find(d => chaveDoTitulo(d) === chaveForm) : undefined;
 
                   return (
                     <div
@@ -4893,6 +4907,32 @@ export default function App() {
                               </div>
                             </div>
 
+                            {jaNaCarteira && (
+                              <div role="alert" className="text-xs bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2.5">
+                                <p className="flex items-center gap-2 font-semibold text-amber-200">
+                                  <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                                  Este título já está na carteira
+                                </p>
+                                <p className="mt-1 text-zinc-300">
+                                  {jaNaCarteira.client} · doc. {jaNaCarteira.document} · venc. {jaNaCarteira.dueDate} · {formatBRL(jaNaCarteira.value)} · {CATEGORY_LABEL[jaNaCarteira.category] ?? jaNaCarteira.category}
+                                </p>
+                                <p className="mt-1 text-zinc-500">
+                                  Mesmo cliente, documento e vencimento não entra duas vezes. Para mudar valor, telefone ou tipo, edite o título na carteira.
+                                </p>
+                              </div>
+                            )}
+                            {jaArquivado && (
+                              <div role="status" className="text-xs bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2.5">
+                                <p className="flex items-center gap-2 font-semibold text-amber-200">
+                                  <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                                  Este título está nos Arquivados
+                                </p>
+                                <p className="mt-1 text-zinc-400">
+                                  Ao adicionar, ele volta para a carteira com os dados preenchidos aqui.
+                                </p>
+                              </div>
+                            )}
+
                             {/* Cliente já cadastrado: oferece o telefone salvo */}
                             {sugerirTelefone && match && (
                               <div className="flex items-center justify-between gap-3 text-xs bg-emerald-500/5 border border-emerald-500/20 rounded-md px-3 py-2">
@@ -4941,12 +4981,16 @@ export default function App() {
                             </button>
                             <button
                               type="submit"
-                              disabled={addDebtorSaving}
+                              disabled={addDebtorSaving || Boolean(jaNaCarteira)}
                               className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black text-sm font-bold flex items-center gap-2 transition-colors cursor-pointer disabled:cursor-not-allowed"
                             >
                               {addDebtorSaving
                                 ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Salvando…</>
-                                : <><Plus className="w-4 h-4" /> Adicionar devedor</>}
+                                : jaNaCarteira
+                                  ? <>Já está na carteira</>
+                                  : jaArquivado
+                                    ? <><Plus className="w-4 h-4" /> Trazer de volta</>
+                                    : <><Plus className="w-4 h-4" /> Adicionar devedor</>}
                             </button>
                           </footer>
                         </form>
