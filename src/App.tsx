@@ -32,7 +32,7 @@ import { whatsappBatchService, BATCH_TOP_STATUS_LABELS, type BatchChargeResult, 
 import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type AutomationRule, type AutomationRun, type AutomationRuleCreate } from "./services/automationService";
 import { validateNewAutomationRule } from "./utils/automationValidation";
 import { isBrazilHoliday, getBrazilHolidayName, isBusinessDay } from "./utils/brazilHolidays";
-import { getMessageTemplate, fillMessageTemplate } from "./utils/messageTemplates";
+import { getMessageTemplate } from "./utils/messageTemplates";
 import { chaveDeAgrupamento, preencherMensagem } from "../supabase/functions/_shared/agrupamento.ts";
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
 import {
@@ -5343,7 +5343,20 @@ export default function App() {
                 );
               })()}
 
-              {currentTab === "historico" && (
+              {currentTab === "historico" && (() => {
+                // Uma linha por mensagem. Os títulos que foram juntos (mesmo cliente
+                // e tipo) têm um registro cada no banco, todos com o mesmo
+                // provider_message_id — aqui eles voltam a ser uma mensagem só.
+                const porMensagem = new Map<string, BillingLog[]>();
+                for (const log of billingLogs) {
+                  const chave = log.providerMessageId ? `m:${log.providerMessageId}` : `l:${log.id}`;
+                  const lista = porMensagem.get(chave);
+                  if (lista) lista.push(log); else porMensagem.set(chave, [log]);
+                }
+                const mensagensHistorico = [...porMensagem.values()].map((titulos) =>
+                  [...titulos].sort((a, b) => a.document.localeCompare(b.document, "pt-BR", { numeric: true })));
+                const clientesContatados = new Set(billingLogs.map((l) => `${l.client}|${l.phone}`)).size;
+                return (
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     <div className="bg-zinc-900/40 border border-zinc-900/80 p-5 rounded-2xl shadow-lg flex items-center gap-4">
@@ -5352,7 +5365,10 @@ export default function App() {
                       </div>
                       <div>
                         <span className="text-xs uppercase tracking-wider text-zinc-400 block">Total de Disparos</span>
-                        <span className="text-xl font-bold text-white font-mono whitespace-nowrap">{billingLogs.length}</span>
+                        <span className="text-xl font-bold text-white font-mono whitespace-nowrap">{mensagensHistorico.length}</span>
+                        {mensagensHistorico.length !== billingLogs.length && (
+                          <span className="text-[10px] text-zinc-500 block">{billingLogs.length} títulos cobrados</span>
+                        )}
                       </div>
                     </div>
                     
@@ -5362,9 +5378,7 @@ export default function App() {
                       </div>
                       <div>
                         <span className="text-xs uppercase tracking-wider text-zinc-400 block">Clientes Contatados</span>
-                        <span className="text-xl font-bold text-white font-mono whitespace-nowrap">
-                          {Array.from(new Set(billingLogs.map(log => log.document))).length}
-                        </span>
+                        <span className="text-xl font-bold text-white font-mono whitespace-nowrap">{clientesContatados}</span>
                       </div>
                     </div>
 
@@ -5430,7 +5444,11 @@ export default function App() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-900 text-xs text-zinc-300">
-                              {billingLogs.map((log) => (
+                              {mensagensHistorico.map((titulosLog) => {
+                                const log = titulosLog[0];
+                                const varios = titulosLog.length > 1;
+                                const totalLog = titulosLog.reduce((soma, t) => soma + (Number(t.value) || 0), 0);
+                                return (
                                 <React.Fragment key={log.id}>
                                   <tr className="hover:bg-zinc-900/25 transition-colors">
                                     <td className="px-5 py-4 font-mono text-zinc-500 text-[11px]">
@@ -5443,7 +5461,12 @@ export default function App() {
                                     </td>
                                     <td className="px-5 py-4">
                                       <div className="font-bold text-white text-xs">{log.client}</div>
-                                      <div className="text-[10px] text-zinc-500 font-mono">Doc: {log.document} · Tel: {log.phone}</div>
+                                      <div className="text-[10px] text-zinc-500 font-mono">
+                                        {varios
+                                          ? <><span className="font-sans text-zinc-400">{titulosLog.length} títulos:</span> {titulosLog.map((t) => t.document).join(", ")}</>
+                                          : <>Doc: {log.document}</>}
+                                        {" · "}Tel: {log.phone}
+                                      </div>
                                     </td>
                                     <td className="px-5 py-4">
                                       <div className="flex items-center gap-2">
@@ -5457,7 +5480,7 @@ export default function App() {
                                         </span>
                                       </div>
                                     </td>
-                                    <td className="px-5 py-4 text-right font-mono text-emerald-300 font-semibold">{formatBRL(log.value)}</td>
+                                    <td className="px-5 py-4 text-right font-mono text-emerald-300 font-semibold">{formatBRL(totalLog)}</td>
                                     <td className="px-5 py-4 text-center">
                                       {(log.status === "sucesso" || log.status === "sent") ? (
                                         <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded font-mono font-semibold">
@@ -5497,8 +5520,12 @@ export default function App() {
                                         </button>
                                         <button
                                           onClick={() => {
-                                            const originalDebtor = debtors.find(d => d.document === log.document) || debtors[0];
+                                            // Abre o título em Preparar envios; os outros do mesmo
+                                            // cliente e tipo entram juntos de novo na mensagem.
+                                            const originalDebtor = debtors.find(d => d.document === log.document && d.client === log.client)
+                                              || debtors.find(d => d.document === log.document) || debtors[0];
                                             if (originalDebtor) {
+                                              setSepararTitulo(false);
                                               setSelectedDebtorForMessage(originalDebtor);
                                               setCurrentTab("cobranca");
                                             }
@@ -5515,18 +5542,34 @@ export default function App() {
                                     // Reconstrói a mensagem completa a partir do template (tom) + dados
                                     // do log. O banco guarda só um preview de 100 chars por privacidade
                                     // (LGPD); aqui remontamos localmente, sem armazenar o texto completo.
-                                    const debtor = debtors.find(d => d.document === log.document);
-                                    const rebuilt = fillMessageTemplate(getMessageTemplate(log.tone), {
-                                      clientName:     log.client,
-                                      documentNumber: log.document,
-                                      dueDate:        debtor?.dueDate ?? "",
-                                      amount:         Number(log.value) || 0,
-                                      companyName:    empresaAssinatura,
+                                    // Com vários títulos, o preenchimento é o mesmo do envio
+                                    // (_shared/agrupamento.ts): bloco por título + total.
+                                    const diaDoEnvio = log.dateSent ? new Date(log.dateSent) : new Date();
+                                    diaDoEnvio.setHours(0, 0, 0, 0);
+                                    const titulosMsg = titulosLog.map((t) => {
+                                      const devedor = debtors.find(d => d.document === t.document && d.client === t.client)
+                                        ?? debtors.find(d => d.document === t.document);
+                                      const vencimento = devedor?.dueDate ?? "";
+                                      const m = vencimento.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                                      const diasAtraso = m && devedor && cobraComoVencido(devedor.category)
+                                        ? Math.max(0, Math.floor((diaDoEnvio.getTime() - new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])).getTime()) / 86_400_000))
+                                        : 0;
+                                      return { documento: t.document, vencimento, valor: Number(t.value) || 0, diasAtraso };
                                     });
+                                    const montar = (modelo: string) =>
+                                      preencherMensagem(modelo, { nomeCliente: log.client, empresa: empresaAssinatura, titulos: titulosMsg });
+                                    const doTom = montar(patternTemplates.find(p => p.id === log.tone)?.template ?? getMessageTemplate(log.tone));
+                                    // O banco guarda o começo do texto: se ele bate com "Minha
+                                    // mensagem", foi ela que saiu, não o modelo do tom.
+                                    const inicio = (log.message || "").replace(/…$/, "").trim();
+                                    const daPadrao = mensagemPadrao.trim() ? montar(mensagemPadrao) : "";
+                                    const rebuilt = daPadrao && inicio.length > 20 && daPadrao.trim().startsWith(inicio) && !doTom.trim().startsWith(inicio)
+                                      ? daPadrao
+                                      : doTom;
                                     // Oculta valor e nº do documento com * (mantém a estrutura visível).
                                     let fullMessage = rebuilt.replace(/R\$\s*[\d.,]+/g, (m) => m.replace(/\d/g, "*"));
-                                    if (log.document) {
-                                      fullMessage = fullMessage.split(log.document).join(log.document.replace(/[A-Za-z0-9]/g, "*"));
+                                    for (const t of titulosLog) {
+                                      if (t.document) fullMessage = fullMessage.split(t.document).join(t.document.replace(/[A-Za-z0-9]/g, "*"));
                                     }
                                     return (
                                     <tr className="bg-zinc-950/50">
@@ -5548,6 +5591,7 @@ export default function App() {
                                             {fullMessage}
                                           </pre>
                                           <p className="text-[10px] text-zinc-600">
+                                            {varios && `Os ${titulosLog.length} títulos foram juntos, numa mensagem só. `}
                                             Mensagem reconstruída a partir do modelo e dos dados desta cobrança. Por privacidade, o valor e o documento aparecem ocultos (*) e o texto completo não é armazenado.
                                           </p>
                                         </div>
@@ -5556,7 +5600,8 @@ export default function App() {
                                     );
                                   })()}
                                 </React.Fragment>
-                              ))}
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
@@ -5564,7 +5609,8 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               {currentTab === "automacoes" && (() => {
                 // ── Automações ─────────────────────────────────────────────
