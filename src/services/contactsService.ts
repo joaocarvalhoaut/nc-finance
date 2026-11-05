@@ -120,6 +120,31 @@ export const contactsService = {
   },
 
   /**
+   * Grava vários contatos de uma vez (importação de agenda/planilha). Sem a
+   * coluna representative_id no payload: o responsável que o contato já tinha
+   * fica (ver contactSync.ts). Devolve quantos foram gravados.
+   */
+  async upsertMany(userId: string, contatos: { clientName: string; phone: string }[]): Promise<number> {
+    const agora = new Date().toISOString();
+    const porChave = new Map<string, { user_id: string; contact_key: string; client_name: string; phone: string; updated_at: string }>();
+    for (const c of contatos) {
+      const key = contactKeyFromName(c.clientName);
+      if (!key || !hasValidPhone(c.phone)) continue;
+      porChave.set(key, { user_id: userId, contact_key: key, client_name: c.clientName.trim(), phone: c.phone.trim(), updated_at: agora });
+    }
+    const linhas = [...porChave.values()];
+    const supabase = getSupabaseClient();
+    let gravados = 0;
+    for (let i = 0; i < linhas.length; i += 500) {
+      const lote = linhas.slice(i, i + 500);
+      const { error } = await supabase.from(TABLE_NAME).upsert(lote, { onConflict: "user_id,contact_key", ignoreDuplicates: false });
+      if (error) throw new Error("Não foi possível salvar os contatos. Tente de novo.");
+      gravados += lote.length;
+    }
+    return gravados;
+  },
+
+  /**
    * Upsert em lote a partir de devedores que tenham telefone válido.
    * Deduplica por chave (mantém o último com telefone). Não bloqueia o fluxo
    * em caso de erro — apenas registra no console.

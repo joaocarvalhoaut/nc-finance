@@ -41,6 +41,12 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   (tesseract) é servido de `/ocr`, copiado de node_modules por `tools/ocr-assets.mjs` no dev/build
   (gitignored) — por isso o CSP tem `'wasm-unsafe-eval'`. Não apontar o OCR para CDN.
 
+- **Importar telefones** (`src/services/importarTelefones.ts` + `components/ImportarTelefones.tsx`, no
+  navegador): agenda `.vcf` (iPhone `item1.TEL`, Android quoted-printable) ou planilha (colunas achadas
+  por título ou conteúdo). Casa com a carteira pelo nome (`contactKeyFromName`): exato já vem marcado;
+  "parecido" (2+ palavras = começo do nome do cliente, um só candidato) o usuário confirma. Só troca
+  número existente se pedir; contato que não é cliente só vai para `user_contatos` se pedir.
+
 ## Quality gate (CI)
 `.github/workflows/ci.yml` roda em todo push/PR: `npm run lint` (tsc), `npm run test:parser`
 (parser + motor de importação), `npm run build`. Não quebrar esses. Rode-os localmente antes de commitar mudança grande.

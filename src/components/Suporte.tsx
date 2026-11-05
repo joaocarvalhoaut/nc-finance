@@ -114,6 +114,13 @@ const PERGUNTAS: Pergunta[] = [
   },
   {
     tema: "WhatsApp e envios",
+    pergunta: "Como trago o WhatsApp dos clientes da agenda do celular?",
+    resposta:
+      "Exporte os contatos do celular em um arquivo .vcf (no iPhone: app Contatos › Listas › segure em Todos os Contatos › Exportar; no Android: Contatos › Exportar) ou use uma planilha com uma coluna de nome e outra de telefone. Em Importar carteira › Telefones dos clientes (ou no aviso de títulos sem WhatsApp, na Carteira), escolha o arquivo.\n" +
+      "O arquivo é lido no seu navegador. O sistema mostra quais contatos são clientes da carteira (nome igual, ou o começo do nome com nome e sobrenome — esses você confere) e você escolhe quem recebe o telefone. Quem já tem outro número só é trocado se você marcar. Contatos que não são clientes só são guardados se você pedir.",
+  },
+  {
+    tema: "WhatsApp e envios",
     pergunta: "Dá para enviar para todos de uma vez?",
     resposta:
       "Sim, nos planos Pro e Premium. Em Preparar envios, filtre o tipo (Vencidos, A vencer, Recompra ou Todos) e clique em “Enviar todos…”. Saem só os títulos que ainda não foram cobrados hoje, com a mensagem que está em uso (a sua ou o tom escolhido). Antes do envio aparece a confirmação com a mensagem de exemplo.\n" +

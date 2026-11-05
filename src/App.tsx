@@ -53,6 +53,8 @@ import {
 import { normalizarDigitosTelefone } from "./services/localDocumentExtraction/regexExtractors";
 import { exportRelatorio } from "./services/exportRelatorio";
 const Suporte = lazy(() => import("./components/Suporte"));
+const ImportarTelefones = lazy(() => import("./components/ImportarTelefones"));
+import type { AplicarTelefones } from "./components/ImportarTelefones";
 import { PdfPreviewModal, openPdfPreview } from "./components/PdfPreviewModal";
 import { 
   Debtor, 
@@ -75,6 +77,7 @@ import {
   FileSpreadsheet,
   Download,
   Upload,
+  Phone,
   Percent, 
   CheckCircle, 
   Clock, 
@@ -336,6 +339,7 @@ export default function App() {
   const [avisoImportacao, setAvisoImportacao] = useState("");
   // Carteira › arquivar as cópias de títulos repetidos (confirmação).
   const [verRepetidos, setVerRepetidos] = useState(false);
+  const [verImportarTelefones, setVerImportarTelefones] = useState(false);
   const [revisaoModal, setRevisaoModal] = useState<{ pending: typeof extractedDebtors; duvidosos: number } | null>(null);
   // Exclusão sempre confirmada: um cliente, ou a carteira inteira (com "EXCLUIR" digitado).
   const [excluirConfirm, setExcluirConfirm] = useState<{ tipo: "um"; debtor: Debtor } | { tipo: "todos"; total: number } | null>(null);
@@ -2037,6 +2041,28 @@ export default function App() {
   }, [avisoArquivo]);
 
   // Aprende contatos a partir de devedores com telefone e atualiza o mapa local
+  // Importar telefones (agenda .vcf ou planilha): grava o WhatsApp nos títulos
+  // marcados, 6 por vez, e os contatos na agenda (user_contatos).
+  const aplicarTelefones = async ({ telefones, contatos }: AplicarTelefones) => {
+    const dono = currentOwnerUserId;
+    if (!dono) throw new Error("Sessão expirada. Entre de novo.");
+    const alvo = debtorsRef.current.filter((d) => telefones.has(d.id)).map((d) => ({ ...d, phone: telefones.get(d.id)! }));
+    const salvos = new Map<string, Debtor>();
+    let falhas = 0;
+    for (let i = 0; i < alvo.length; i += 6) {
+      const r = await Promise.allSettled(alvo.slice(i, i + 6).map((d) => financeService.update(dono, d)));
+      r.forEach((x) => { if (x.status === "fulfilled") salvos.set(x.value.id, x.value); else falhas++; });
+    }
+    if (salvos.size) setDebtors((prev) => prev.map((d) => salvos.get(d.id) ?? d));
+    let gravados = 0;
+    if (contatos.length) {
+      gravados = await contactsService.upsertMany(dono, contatos);
+      const refreshed = await contactsService.listByUser(dono).catch(() => null);
+      if (refreshed) setContactsByKey(new Map(refreshed.map((c) => [c.contactKey, c])));
+    }
+    return { titulos: salvos.size, falhas, contatos: gravados };
+  };
+
   const learnContactsFromDebtors = async (list: Debtor[]) => {
     if (!currentOwnerUserId) return;
     try {
@@ -3572,6 +3598,17 @@ export default function App() {
                     </section>
 
                   </div>
+
+                  {/* ── Telefones: agenda do celular ou planilha → WhatsApp dos títulos ── */}
+                  <section className={`${card} flex flex-wrap items-center justify-between gap-3 px-5 py-4`}>
+                    <div>
+                      <h4 className="text-sm font-bold text-white">Telefones dos clientes</h4>
+                      <p className="text-xs text-zinc-500 mt-0.5">Traga o WhatsApp da agenda do celular (.vcf) ou de uma planilha com nome e telefone.</p>
+                    </div>
+                    <button type="button" onClick={() => setVerImportarTelefones(true)} className="px-3 py-2 rounded-lg border border-zinc-700 hover:border-zinc-500 text-zinc-200 text-xs font-semibold cursor-pointer flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5" /> Importar telefones
+                    </button>
+                  </section>
                 </div>
                 );
               })()}
@@ -3599,6 +3636,20 @@ export default function App() {
                         </span>
                         <button type="button" onClick={() => setVerRepetidos(true)} className="px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-200 text-xs font-semibold cursor-pointer flex-shrink-0">
                           Ver e arquivar cópias
+                        </button>
+                      </div>
+                    );
+                  })()}
+                  {(() => {
+                    const semWhats = debtors.filter(d => d.category !== "liquidado" && d.category !== "desabilitado" && !normalizarDigitosTelefone(d.phone || "")).length;
+                    if (!semWhats) return null;
+                    return (
+                      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-lg border border-zinc-800 bg-zinc-950">
+                        <span className="text-xs text-zinc-300">
+                          {semWhats} título{semWhats === 1 ? "" : "s"} sem WhatsApp não {semWhats === 1 ? "pode" : "podem"} ser cobrado{semWhats === 1 ? "" : "s"}.
+                        </span>
+                        <button type="button" onClick={() => setVerImportarTelefones(true)} className="px-3 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-500 text-zinc-200 text-xs font-semibold cursor-pointer flex-shrink-0 flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5" /> Importar telefones
                         </button>
                       </div>
                     );
@@ -6811,6 +6862,13 @@ export default function App() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* ── Importar telefones: agenda .vcf ou planilha → WhatsApp dos títulos ── */}
+          {verImportarTelefones && (
+            <React.Suspense fallback={null}>
+              <ImportarTelefones debtors={debtors} onClose={() => setVerImportarTelefones(false)} onAplicar={aplicarTelefones} />
+            </React.Suspense>
           )}
 
           {/* ── Carteira: títulos repetidos que já existem → arquivar as cópias ── */}
