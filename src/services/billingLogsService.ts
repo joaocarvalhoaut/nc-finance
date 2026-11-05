@@ -113,17 +113,27 @@ const mapBillingLogToRow = (userId: string, log: BillingLog) => ({
 export const billingLogsService = {
   async listByUser(userId: string) {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .select(SELECT_FIELDS)
-      .eq("user_id", userId)
-      .order("sent_at", { ascending: false });
+    // O Supabase devolve no máximo 1000 linhas por consulta: sem paginar, o
+    // Histórico parava nos 1000 envios mais recentes (e os totais travavam em 1000).
+    const PAGINA = 1000;
+    const linhas: BillingLogRow[] = [];
+    for (let de = 0; ; de += PAGINA) {
+      const { data, error } = await supabase
+        .from(TABLE_NAME)
+        .select(SELECT_FIELDS)
+        .eq("user_id", userId)
+        .order("sent_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(de, de + PAGINA - 1);
 
-    if (error) {
-      throw new Error(error.message || "Falha ao carregar historico de cobranca.");
+      if (error) {
+        throw new Error(error.message || "Falha ao carregar historico de cobranca.");
+      }
+      linhas.push(...((data || []) as BillingLogRow[]));
+      if (!data || data.length < PAGINA) break;
     }
 
-    return (data || []).map((row) => mapRowToBillingLog(row as BillingLogRow));
+    return linhas.map(mapRowToBillingLog);
   },
 
   async create(userId: string, log: BillingLog) {

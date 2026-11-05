@@ -488,6 +488,8 @@ export default function App() {
   // Billing history logs state
   const [billingLogs, setBillingLogs] = useState<BillingLog[]>([]);
   const [selectedLogDetail, setSelectedLogDetail] = useState<BillingLog | null>(null);
+  // Histórico mostra as mensagens aos poucos (os totais contam todas).
+  const [linhasHistorico, setLinhasHistorico] = useState(200);
 
   useEffect(() => {
     if (isLoggedIn && currentTab === "inicio") {
@@ -5444,7 +5446,7 @@ export default function App() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-900 text-xs text-zinc-300">
-                              {mensagensHistorico.map((titulosLog) => {
+                              {mensagensHistorico.slice(0, linhasHistorico).map((titulosLog) => {
                                 const log = titulosLog[0];
                                 const varios = titulosLog.length > 1;
                                 const totalLog = titulosLog.reduce((soma, t) => soma + (Number(t.value) || 0), 0);
@@ -5604,6 +5606,18 @@ export default function App() {
                               })}
                             </tbody>
                           </table>
+                          {mensagensHistorico.length > linhasHistorico && (
+                            <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-zinc-900 text-[11px] text-zinc-500">
+                              <span>Mostrando {linhasHistorico} de {mensagensHistorico.length} mensagens</span>
+                              <button
+                                type="button"
+                                onClick={() => setLinhasHistorico((n) => n + 200)}
+                                className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 font-semibold transition-colors cursor-pointer"
+                              >
+                                Mostrar mais
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
