@@ -8,7 +8,8 @@
  *  4. Valida assinatura Stripe (trialing | active)
  *  5. Lê planilha com Service Account
  *  6. Normaliza linhas
- *  7. Upsert em user_registros_financeiros (chave: user_id + document_number OU user_id + phone + client_name)
+ *  7. Upsert em user_registros_financeiros (título único = documento + cliente + vencimento,
+ *     ver _shared/tituloUnico.ts; sem documento: telefone + nome)
  *  8. Salva/atualiza user_google_sheets_config
  *  9. Registra user_import_logs
  * 10. Incrementa sheets_imports em user_usage_counters
@@ -27,6 +28,7 @@ import {
   readSpreadsheet,
   type SheetRow,
 } from "../_shared/googleSheets.ts";
+import { chaveDoTitulo } from "../_shared/tituloUnico.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -73,24 +75,32 @@ const upsertRow = async (
       updated_at:       new Date().toISOString(),
     };
 
-    // Build lookup key
     let existing: { id: string } | null = null;
 
-    // Mesmo título = mesmo documento + cliente + vencimento (documento igual com
-    // outro cliente ou vencimento é outro título).
-    if (row.documentNumber) {
+    // Mesmo título = mesmo documento + cliente + vencimento, pela regra de
+    // _shared/tituloUnico.ts ("DP 1439/005" = "1439/005"; nome sem caixa/acento).
+    // Achou: atualiza o que já existe, mantendo o nome e o documento gravados.
+    const chave = chaveDoTitulo(row.documentNumber, row.clientName, row.dueDate);
+    if (chave) {
       const { data } = await admin
         .from("user_registros_financeiros")
-        .select("id")
+        .select("id, document_number, client_name, due_date, archived_at")
         .eq("user_id", userId)
-        .eq("document_number", base.document_number)
-        .eq("client_name", base.client_name)
-        .eq("due_date", row.dueDate)
-        .maybeSingle();
-      existing = data as { id: string } | null;
+        .eq("due_date", row.dueDate);
+      const iguais = ((data ?? []) as {
+        id: string; document_number: string | null; client_name: string | null; due_date: string | null; archived_at: string | null;
+      }[]).filter((r) => chaveDoTitulo(r.document_number, r.client_name, r.due_date) === chave);
+      // Havendo cópia antiga arquivada, fica a que está na carteira.
+      const alvo = iguais.find((r) => !r.archived_at) ?? iguais[0];
+      if (alvo) {
+        existing = { id: alvo.id };
+        base.client_name = alvo.client_name ?? base.client_name;
+        base.document_number = alvo.document_number ?? base.document_number;
+      }
     }
 
-    if (!existing && row.phone && row.clientName) {
+    // Sem documento: casa pelo telefone + nome (com documento, a chave acima decide).
+    if (!existing && !chave && row.phone && row.clientName) {
       const { data } = await admin
         .from("user_registros_financeiros")
         .select("id")
@@ -102,16 +112,19 @@ const upsertRow = async (
     }
 
     if (existing) {
-      await admin
+      // Reimportar traz o título de volta para a carteira (igual à importação por arquivo).
+      const { error } = await admin
         .from("user_registros_financeiros")
-        .update(base)
+        .update({ ...base, archived_at: null })
         .eq("id", existing.id)
         .eq("user_id", userId);
+      if (error) return "skipped";
       return "updated";
     } else {
-      await admin
+      const { error } = await admin
         .from("user_registros_financeiros")
         .insert({ ...base, created_at: new Date().toISOString() });
+      if (error) return "skipped";
       return "inserted";
     }
   } catch {
@@ -243,8 +256,15 @@ Deno.serve(async (request: Request) => {
     // ── 8. Upsert registros ────────────────────────────────────────────────────
     let imported = 0;
     let skippedDb = 0;
+    const vistos = new Set<string>();
 
     for (const row of readResult.rows) {
+      // Linha repetida na própria planilha (mesmo título): fica a primeira.
+      const chave = chaveDoTitulo(row.documentNumber, row.clientName, row.dueDate);
+      if (chave) {
+        if (vistos.has(chave)) { skippedDb++; continue; }
+        vistos.add(chave);
+      }
       const op = await upsertRow(admin, userId, row);
       if (op === "inserted" || op === "updated") {
         imported++;
