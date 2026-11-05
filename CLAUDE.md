@@ -67,10 +67,13 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   enviado como link na mensagem. A busca/sugestão de boletos pelo Google Drive saiu da interface em
   30/10/2026 a pedido do dono e os envios ignoram sugestão do Drive; as Edge Functions de Drive
   (`match-drive-files`, `drive-index-folder`, `drive-import-boleto`) e os services seguem no repo, sem uso.
-- **Título único = documento + cliente + vencimento** (pedido do dono, 06/11/2026). Constraint
-  `uq_urf_user_doc_cliente_venc` (migration `20261106120000`); `createMany` faz upsert nela e cai na
-  chave antiga (só documento) se a migration não rodou. Importação de pagos (`alinharBaixas` no App)
-  dá baixa no título aberto de mesmo documento + cliente, mesmo com outra data.
+- **Título único = documento + cliente + vencimento** (pedido do dono, 06/11/2026): não pode existir
+  duas vezes. Regra em `src/utils/tituloUnico.ts` — documento comparado só pelos números
+  ("DP 1439/005" = "1439/005"), nome sem caixa/acento. Importação descarta repetidos e atualiza o que
+  já está na carteira (`alinharComCarteira` no App, que também dá baixa do relatório de pagos no título
+  aberto de mesmo doc + cliente); cadastro manual recusa; Carteira mostra repetidos antigos e arquiva
+  as cópias (fica a paga ou a mais recente). No banco: constraint `uq_urf_user_doc_cliente_venc`
+  (migration `20261106120000`, valores exatos); `createMany` cai na chave antiga se ela não rodou.
 - **Proteção do número contra bloqueio** (pedido do dono, feito em 04–05/11/2026). A Meta não publica
   teto para o WhatsApp comum (Z-API): o bloqueio vem de denúncias, pico de volume e envio para quem
   nunca falou com o número.

@@ -2,6 +2,7 @@ import type { Debtor } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
 import { ensureNinthDigit } from "../../supabase/functions/_shared/brPhone.ts";
 import { normalizarDigitosTelefone } from "./localDocumentExtraction/regexExtractors";
+import { semRepetidos } from "../utils/tituloUnico";
 
 type FinancialCategory = "vencidos" | "a_vencer" | "recompra" | "liquidado" | "desabilitado";
 type FinancialStatus = "pending" | "sent" | "failed";
@@ -214,7 +215,10 @@ export const financeService = {
     return mapRowToDebtor(data as FinancialRecordRow);
   },
 
-  async createMany(userId: string, debtors: Debtor[]) {
+  async createMany(userId: string, recebidos: Debtor[]) {
+    // Título repetido no lote (mesmo cliente, documento pelos números e
+    // vencimento) entra uma vez só — utils/tituloUnico.ts.
+    const debtors = semRepetidos(recebidos).lista;
     if (!debtors.length) return [];
 
     const supabase = getSupabaseClient();

@@ -35,6 +35,7 @@ import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type Automation
 import { validateNewAutomationRule } from "./utils/automationValidation";
 import { isBrazilHoliday, getBrazilHolidayName, isBusinessDay } from "./utils/brazilHolidays";
 import { getMessageTemplate } from "./utils/messageTemplates";
+import { chaveDoTitulo, docBase, nomeBase, repetidosNaCarteira, semRepetidos } from "./utils/tituloUnico";
 import { chaveDeAgrupamento, preencherMensagem } from "../supabase/functions/_shared/agrupamento.ts";
 import {
   contarMensagens, hojeEmBrasilia, inicioDoDiaISO, limiteDeHoje, motivoDoLimite,
@@ -231,13 +232,6 @@ const mesclarDevedores = (
   return posicao === "inicio" ? [...novos, ...atualizados] : [...atualizados, ...novos];
 };
 
-// Mesmo título = mesmo documento, mesmo cliente e mesmo vencimento (a chave
-// única do banco — migration 20261106120000). null = sem documento.
-const normDoc = (doc: string | undefined) => (doc ?? "").replace(/[^a-z0-9]/gi, "").toUpperCase();
-const normNome = (nome: string | undefined) => (nome ?? "").trim().replace(/\s+/g, " ").toLowerCase();
-const chaveDoTitulo = (d: Pick<Debtor, "document" | "client" | "dueDate">): string | null =>
-  d.document?.trim() ? `${d.document.trim().toUpperCase()}|${normNome(d.client)}|${d.dueDate}` : null;
-
 // Máscaras do cadastro manual: a pessoa digita só números.
 const mascaraData = (v: string) => {
   const d = v.replace(/\D/g, "").slice(0, 8);
@@ -338,7 +332,10 @@ export default function App() {
   const tableScrollRef = React.useRef<HTMLDivElement>(null);
   const tableDragRef = React.useRef({ isDown: false, startX: 0, scrollLeft: 0 });
   const [extractionAlert, setExtractionAlert] = useState<string>("");
-  const [dupDocModal, setDupDocModal] = useState<{ pending: typeof extractedDebtors; dupes: { doc: string; count: number }[] } | null>(null);
+  // Resultado da importação sobre títulos repetidos (mostrado na Carteira).
+  const [avisoImportacao, setAvisoImportacao] = useState("");
+  // Carteira › arquivar as cópias de títulos repetidos (confirmação).
+  const [verRepetidos, setVerRepetidos] = useState(false);
   const [revisaoModal, setRevisaoModal] = useState<{ pending: typeof extractedDebtors; duvidosos: number } | null>(null);
   // Exclusão sempre confirmada: um cliente, ou a carteira inteira (com "EXCLUIR" digitado).
   const [excluirConfirm, setExcluirConfirm] = useState<{ tipo: "um"; debtor: Debtor } | { tipo: "todos"; total: number } | null>(null);
@@ -348,7 +345,6 @@ export default function App() {
   const [arquivados, setArquivados] = useState<Debtor[]>([]);
   const [verArquivados, setVerArquivados] = useState(false);
   const [avisoArquivo, setAvisoArquivo] = useState<{ ids: string[]; texto: string; desfazerArquivando: boolean } | null>(null);
-  const [addDupModal, setAddDupModal] = useState<{ novo: Debtor; existente: Debtor } | null>(null);
   const [notesPopover, setNotesPopover] = useState<{ debtorId: string; draft: string } | null>(null);
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
   // Andamento da leitura (páginas do PDF, OCR) mostrado no campo do arquivo.
@@ -1588,62 +1584,50 @@ export default function App() {
       return;
     }
 
-    // Duplicado = mesmo documento, mesmo cliente e mesmo vencimento. Documento
-    // igual com outro cliente ou outro vencimento é outro título.
-    const docCount = new Map<string, { doc: string; count: number }>();
-    for (const d of toSend) {
-      const k = chaveDoTitulo(d);
-      if (!k) continue;
-      const atual = docCount.get(k);
-      docCount.set(k, { doc: `${d.document.trim()} · ${d.client.trim()} · ${d.dueDate}`, count: (atual?.count ?? 0) + 1 });
-    }
-    const dupes = Array.from(docCount.values()).filter((x) => x.count > 1);
-
-    if (dupes.length > 0) {
-      setDupDocModal({ pending: toSend, dupes });
-      return;
-    }
-
     await doSendToOverview(toSend);
   };
 
-  // Relatório de pagos: a baixa cai no título aberto da carteira de mesmo
-  // documento e cliente, mesmo que a data do relatório seja outra (ex.: a do
-  // pagamento). Copia o nome, o documento e o vencimento do título da carteira
-  // para o upsert (documento + cliente + vencimento) atualizar ele, e não criar
-  // outro. Sem cliente igual, vale o documento quando só um título aberto tem ele.
-  const alinharBaixas = (lista: Debtor[]): Debtor[] => lista.map((d) => {
-    if (d.category !== "liquidado" || !d.document?.trim()) return d;
-    const doc = normDoc(d.document);
+  // Liga o título importado ao que já está na carteira, para o upsert
+  // (documento + cliente + vencimento) atualizar ele em vez de criar outro:
+  //  1. o mesmo título (mesmo cliente, documento pelos números e vencimento —
+  //     "DP 1439/005" e "1439/005" são o mesmo; utils/tituloUnico.ts);
+  //  2. relatório de pagos: a baixa cai no título aberto de mesmo documento e
+  //     cliente, mesmo que a data seja outra (ex.: a do pagamento). Sem cliente
+  //     igual, vale o documento quando só um título aberto tem ele.
+  const alinharComCarteira = (lista: Debtor[]): Debtor[] => lista.map((d) => {
+    const k = chaveDoTitulo(d);
+    const mesmo = k ? debtors.find((x) => chaveDoTitulo(x) === k) : undefined;
+    if (mesmo) return { ...d, client: mesmo.client, document: mesmo.document, dueDate: mesmo.dueDate };
+
+    if (d.category !== "liquidado" || !docBase(d.document)) return d;
+    const doc = docBase(d.document);
     const abertosDoDoc = debtors.filter((x) =>
-      x.category !== "liquidado" && x.category !== "desabilitado" && normDoc(x.document) === doc);
-    const doCliente = abertosDoDoc.filter((x) => normNome(x.client) === normNome(d.client));
+      x.category !== "liquidado" && x.category !== "desabilitado" && docBase(x.document) === doc);
+    const doCliente = abertosDoDoc.filter((x) => nomeBase(x.client) === nomeBase(d.client));
     const candidatos = doCliente.length ? doCliente : abertosDoDoc;
     const alvo = candidatos.find((x) => x.dueDate === d.dueDate) ?? (candidatos.length === 1 ? candidatos[0] : null);
     return alvo ? { ...d, client: alvo.client, document: alvo.document, dueDate: alvo.dueDate } : d;
   });
 
-  const doSendToOverview = async (toSend: typeof extractedDebtors, keepAll = true) => {
-    // Se keepAll=false: mantém só o primeiro de cada título duplicado (descarta o resto)
-    const semRepetidos = keepAll ? toSend : (() => {
-      const seen = new Set<string>();
-      return toSend.filter(d => {
-        const k = chaveDoTitulo(d);
-        if (!k) return true;
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      });
-    })();
-    const finalList = alinharBaixas(semRepetidos);
+  // Título repetido (mesmo cliente, documento e vencimento) nunca entra duas
+  // vezes: no arquivo fica o primeiro; o que já está na carteira é atualizado.
+  const doSendToOverview = async (toSend: typeof extractedDebtors) => {
+    const { lista, removidos } = semRepetidos(toSend);
+    const chavesCarteira = new Set(debtors.map(chaveDoTitulo).filter(Boolean));
+    const jaNaCarteira = lista.filter((d) => { const k = chaveDoTitulo(d); return !!k && chavesCarteira.has(k); }).length;
+    const finalList = alinharComCarteira(lista);
 
     try {
       const savedDebtors = await financeService.createMany(currentOwnerUserId!, finalList);
       setDebtors((prev) => mesclarDevedores(prev, savedDebtors, "fim"));
-      const sentIds = new Set(finalList.map(d => d.id));
+      const sentIds = new Set(toSend.map(d => d.id));
       setExtractedDebtors(prev => prev.filter(d => !sentIds.has(d.id)));
       setExtractedSelectedIds(new Set());
-      setDupDocModal(null);
+      const partes = [
+        removidos > 0 ? `${removidos} título${removidos === 1 ? "" : "s"} repetido${removidos === 1 ? "" : "s"} no arquivo ficou de fora` : "",
+        jaNaCarteira > 0 ? `${jaNaCarteira} já estava${jaNaCarteira === 1 ? "" : "m"} na carteira e foi atualizado${jaNaCarteira === 1 ? "" : "s"}, sem criar outro` : "",
+      ].filter(Boolean);
+      setAvisoImportacao(partes.length ? `${partes.join(". ")}. Mesmo cliente, documento e vencimento é o mesmo título.` : "");
       if (extractedDebtors.length === toSend.length) {
         setImportFileName("");
         setImportDoc(null);
@@ -1651,7 +1635,6 @@ export default function App() {
       }
     } catch (error) {
       setExtractionAlert(error instanceof Error ? error.message : "Não foi possível salvar os registros importados.");
-      setDupDocModal(null);
     }
   };
 
@@ -2034,26 +2017,16 @@ export default function App() {
         : Math.round(val * (1 + globalFinePct / 100) * 100) / 100,
     };
 
-    // createMany faz upsert por (user_id, document_number): salvar com um
-    // documento que ja existe SOBRESCREVE o boleto anterior, sem aviso. Como o
-    // usuario acha que esta criando um novo, perguntamos antes.
+    // Mesmo cliente, documento e vencimento já na carteira: é o mesmo título e
+    // não pode existir duas vezes (utils/tituloUnico.ts).
     const chaveNovo = chaveDoTitulo(newDebtor);
     const existente = chaveNovo ? debtors.find(d => chaveDoTitulo(d) === chaveNovo) : undefined;
     if (existente) {
-      setAddDupModal({ novo: newDebtor, existente });
+      setAddDebtorError(`Este título já está na carteira: ${existente.client}, documento ${existente.document}, vencimento ${existente.dueDate}. Para mudar algo, edite o que já existe.`);
       return;
     }
 
     await salvarDevedorManual(newDebtor);
-  };
-
-  /** Proximo documento livre no padrao "base-2", "base-3"… */
-  const documentoLivre = (base: string): string => {
-    const usados = new Set(debtors.map(d => d.document));
-    if (!usados.has(base)) return base;
-    let n = 2;
-    while (usados.has(`${base}-${n}`)) n++;
-    return `${base}-${n}`;
   };
 
   const salvarDevedorManual = async (devedor: Debtor) => {
@@ -2067,7 +2040,6 @@ export default function App() {
       void learnContactsFromDebtors([saved]);
       setAddDebtorForm({ client: "", supplier: "", document: "", dueDate: "", value: "", phone: "", category: "vencidos" });
       setShowAddDebtorModal(false);
-      setAddDupModal(null);
     } catch (err) {
       setAddDebtorError(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
     } finally {
@@ -3530,6 +3502,30 @@ export default function App() {
               {currentTab === "visao_geral" && (
                 <>
                 <div className="space-y-4">
+
+                  {/* Títulos repetidos: o que a última importação deixou de fora e
+                      as cópias que já estão na carteira (mesmo cliente, documento
+                      e vencimento — utils/tituloUnico.ts). */}
+                  {avisoImportacao && (
+                    <p className="flex items-start justify-between gap-3 px-4 py-2.5 rounded-lg border border-zinc-800 bg-zinc-950 text-xs text-zinc-300">
+                      <span>{avisoImportacao}</span>
+                      <button type="button" onClick={() => setAvisoImportacao("")} aria-label="Fechar aviso" className="text-zinc-500 hover:text-zinc-300 cursor-pointer flex-shrink-0"><X className="w-3.5 h-3.5" /></button>
+                    </p>
+                  )}
+                  {(() => {
+                    const copias = repetidosNaCarteira(debtors).reduce((s, g) => s + g.saem.length, 0);
+                    if (!copias) return null;
+                    return (
+                      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5">
+                        <span className="text-xs text-amber-200">
+                          {copias} título{copias === 1 ? "" : "s"} repetido{copias === 1 ? "" : "s"} na carteira (mesmo cliente, documento e vencimento). O cliente pode ser cobrado em dobro.
+                        </span>
+                        <button type="button" onClick={() => setVerRepetidos(true)} className="px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-200 text-xs font-semibold cursor-pointer flex-shrink-0">
+                          Ver e arquivar cópias
+                        </button>
+                      </div>
+                    );
+                  })()}
 
                   {/* ── Barra da carteira ───────────────────────────────────────
                       Configurações (encargos, responsáveis) viram botões que abrem
@@ -6509,63 +6505,6 @@ export default function App() {
             />
           )}
 
-          {addDupModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-              <div className="bg-zinc-900 border border-amber-700/60 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
-                <h3 className="text-sm font-bold text-white">
-                  Já existe um boleto com o documento {addDupModal.novo.document}
-                </h3>
-                <div className="bg-zinc-950 rounded-xl p-3 space-y-1 text-xs">
-                  <div className="flex justify-between gap-3">
-                    <span className="text-zinc-500">Cliente</span>
-                    <span className="text-zinc-200 truncate">{addDupModal.existente.client}</span>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-zinc-500">Vencimento</span>
-                    <span className="text-zinc-200 font-mono">{addDupModal.existente.dueDate}</span>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-zinc-500">Valor</span>
-                    <span className="text-zinc-200 font-mono">{formatBRL(addDupModal.existente.value)}</span>
-                  </div>
-                </div>
-                <p className="text-xs text-zinc-400 leading-relaxed">
-                  Atualizar substitui os dados acima pelos que você acabou de preencher.
-                  O boleto anterior deixa de existir.
-                </p>
-                <div className="grid grid-cols-1 gap-3 pt-1">
-                  <button
-                    onClick={() => {
-                      const alvo = addDupModal.novo;
-                      void salvarDevedorManual({ ...alvo, document: documentoLivre(alvo.document) });
-                    }}
-                    disabled={addDebtorSaving}
-                    className="py-2.5 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-colors cursor-pointer"
-                  >
-                    Criar como boleto separado
-                    <span className="block text-[10px] font-normal opacity-80">
-                      Salva com o documento {documentoLivre(addDupModal.novo.document)} e mantém o anterior
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => void salvarDevedorManual(addDupModal.novo)}
-                    disabled={addDebtorSaving}
-                    className="py-2.5 px-3 rounded-xl text-xs font-bold bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white transition-colors cursor-pointer"
-                  >
-                    Atualizar o existente
-                    <span className="block text-[10px] font-normal opacity-80">Sobrescreve o boleto acima</span>
-                  </button>
-                </div>
-                <button
-                  onClick={() => setAddDupModal(null)}
-                  disabled={addDebtorSaving}
-                  className="w-full text-[10px] text-zinc-600 hover:text-zinc-400 disabled:opacity-50 transition-colors pt-1 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          )}
 
           {excluirConfirm && (() => {
             const todos = excluirConfirm.tipo === "todos";
@@ -6672,7 +6611,7 @@ export default function App() {
                     <span className="block text-[10px] font-normal opacity-80">Recomendado</span>
                   </button>
                   <button
-                    onClick={() => { const p = revisaoModal.pending; setRevisaoModal(null); void doSendToOverview(p, true); }}
+                    onClick={() => { const p = revisaoModal.pending; setRevisaoModal(null); void doSendToOverview(p); }}
                     className="py-2.5 px-3 rounded-xl text-xs font-bold bg-zinc-700 hover:bg-zinc-600 text-white transition-colors"
                   >
                     Importar assim mesmo
@@ -6683,48 +6622,64 @@ export default function App() {
             </div>
           )}
 
-          {dupDocModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-              <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  Títulos repetidos no arquivo
-                </h3>
-                <p className="text-xs text-zinc-400">
-                  Estes títulos aparecem mais de uma vez com o mesmo documento, cliente e vencimento. Como deseja prosseguir?
-                </p>
-                <div className="bg-zinc-950 rounded-xl p-3 max-h-40 overflow-y-auto space-y-1">
-                  {dupDocModal.dupes.map(({ doc, count }) => (
-                    <div key={doc} className="flex items-center justify-between gap-3 text-xs font-mono">
-                      <span className="text-zinc-300 truncate" title={doc}>{doc}</span>
-                      <span className="text-amber-400 font-bold flex-shrink-0">{count}×</span>
-                    </div>
-                  ))}
+          {/* ── Carteira: títulos repetidos que já existem → arquivar as cópias ── */}
+          {verRepetidos && (() => {
+            const grupos = repetidosNaCarteira(debtors);
+            const idsSaem = grupos.flatMap((g) => g.saem.map((d) => d.id));
+            const linha = (d: Debtor) => (
+              <span className="flex items-center justify-between gap-3">
+                <span className="truncate font-mono">{d.document} · {d.dueDate}</span>
+                <span className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`px-1.5 py-0.5 rounded text-[8px] uppercase font-bold font-mono ${CATEGORY_TINT[d.category]}`}>{CATEGORY_LABEL[d.category]}</span>
+                  <span className="font-mono tabular-nums">{formatBRL(d.value)}</span>
+                </span>
+              </span>
+            );
+            return (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={(e) => e.target === e.currentTarget && setVerRepetidos(false)}>
+                <div className="bg-zinc-950 border border-zinc-800 rounded-xl w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh]">
+                  <div className="px-5 py-4 border-b border-zinc-800">
+                    <h3 className="text-sm font-bold text-white">Títulos repetidos na carteira</h3>
+                    <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">
+                      Mesmo cliente, mesmo documento e mesmo vencimento. Fica a cópia paga, se houver; senão, a atualizada por último.
+                      As outras vão para Arquivados (dá para restaurar).
+                    </p>
+                  </div>
+                  <div className="px-5 py-3 overflow-y-auto space-y-3">
+                    {grupos.length === 0 && <p className="text-xs text-zinc-500 py-4 text-center">Nenhum título repetido.</p>}
+                    {grupos.map((g) => (
+                      <div key={g.fica.id} className="text-[11px] space-y-1">
+                        <p className="text-xs font-semibold text-white truncate">{g.fica.client}</p>
+                        <div className="text-emerald-300 pl-2 border-l-2 border-emerald-500/50">
+                          <span className="text-[9px] uppercase tracking-widest text-emerald-500/80">Fica</span>
+                          {linha(g.fica)}
+                        </div>
+                        {g.saem.map((d) => (
+                          <div key={d.id} className="text-zinc-500 pl-2 border-l-2 border-zinc-700">
+                            <span className="text-[9px] uppercase tracking-widest">Arquiva</span>
+                            {linha(d)}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-5 py-3 border-t border-zinc-800 flex justify-end gap-2">
+                    <button type="button" onClick={() => setVerRepetidos(false)} className="px-3.5 py-2 rounded-lg border border-zinc-800 text-zinc-300 hover:bg-zinc-900 text-xs font-semibold cursor-pointer">
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!idsSaem.length}
+                      onClick={() => { setVerRepetidos(false); void moverArquivo(idsSaem, true); }}
+                      className="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-black text-xs font-bold cursor-pointer"
+                    >
+                      Arquivar {idsSaem.length} cópia{idsSaem.length === 1 ? "" : "s"}
+                    </button>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  <button
-                    onClick={() => void doSendToOverview(dupDocModal.pending, true)}
-                    className="py-2.5 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
-                  >
-                    Salvar todos
-                    <span className="block text-[10px] font-normal opacity-80">Duplicatas recebem sufixo -2, -3…</span>
-                  </button>
-                  <button
-                    onClick={() => void doSendToOverview(dupDocModal.pending, false)}
-                    className="py-2.5 px-3 rounded-xl text-xs font-bold bg-zinc-700 hover:bg-zinc-600 text-white transition-colors"
-                  >
-                    Manter só o primeiro
-                    <span className="block text-[10px] font-normal opacity-80">Descarta os registros duplicados</span>
-                  </button>
-                </div>
-                <button
-                  onClick={() => setDupDocModal(null)}
-                  className="w-full text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors pt-1"
-                >
-                  Cancelar
-                </button>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ── Modal Global: Gerenciar Responsáveis (acessível de qualquer aba) ── */}
           {showRepModal && (
