@@ -31,7 +31,7 @@ import { userConfigService, MENSAGEM_PADRAO_KEY } from "./services/userConfigSer
 import { whatsappService, SEND_STATUS_LABELS, type SendChargeStatus } from "./services/whatsappService";
 import { googleSheetsService, type ImportResult as SheetsImportResult, type ExportResult as SheetsExportResult } from "./services/googleSheetsService";
 import { whatsappBatchService, BATCH_TOP_STATUS_LABELS, type BatchChargeResult, type BatchTopStatus } from "./services/whatsappBatchService";
-import { automationService, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type AutomationRule, type AutomationRun, type AutomationRuleCreate } from "./services/automationService";
+import { automationService, motivoDoJob, RULE_TYPE_LABELS, JOB_STATUS_COLORS, type AutomationRule, type AutomationRun, type AutomationRuleCreate } from "./services/automationService";
 import { validateNewAutomationRule } from "./utils/automationValidation";
 import { isBrazilHoliday, getBrazilHolidayName, isBusinessDay } from "./utils/brazilHolidays";
 import { getMessageTemplate } from "./utils/messageTemplates";
@@ -480,6 +480,9 @@ export default function App() {
   const [resultadoTodos, setResultadoTodos] = useState<BatchChargeResult | null>(null);
   const [progressoTodos, setProgressoTodos] = useState<{ feitas: number; total: number } | null>(null);
   const [verTodasExecucoes, setVerTodasExecucoes] = useState(false);
+  // O que cada execução virou (enviada / na fila / não saiu e por quê), por run.
+  const [resultadoExecucoes, setResultadoExecucoes] = useState<Map<string, { fila: number; naoSairam: number; motivos: [string, number][] }>>(new Map());
+  const [execucaoAberta, setExecucaoAberta] = useState<string | null>(null);
   const [selectedTone, setSelectedTone] = useState<MessageTone>(DEFAULT_USER_CONFIG.selectedTone);
   const [customMessageDraft, setCustomMessageDraft] = useState<string>("");
   // Mensagem padrão (Preparar envios): texto do usuário com variáveis, aplicado a
@@ -1175,6 +1178,22 @@ export default function App() {
       ]);
       setAutomationRules(rules);
       setAutomationRuns(runs);
+      // Sem travar a tela: o destino de cada cobrança criada pelas execuções.
+      void automationService.listRunOutcomes(runs.map(r => r.id)).then((jobs) => {
+        const porRun = new Map<string, { fila: number; naoSairam: number; motivos: Map<string, number> }>();
+        for (const j of jobs) {
+          const r = porRun.get(j.runId) ?? { fila: 0, naoSairam: 0, motivos: new Map<string, number>() };
+          porRun.set(j.runId, r);
+          if (j.status === "success") continue;
+          if (j.status === "queued" || j.status === "retrying" || j.status === "processing") { r.fila++; continue; }
+          r.naoSairam++;
+          const motivo = motivoDoJob(j.status, j.lastError);
+          r.motivos.set(motivo, (r.motivos.get(motivo) ?? 0) + 1);
+        }
+        setResultadoExecucoes(new Map([...porRun].map(([id, r]) => [id, {
+          fila: r.fila, naoSairam: r.naoSairam, motivos: [...r.motivos].sort((a, b) => b[1] - a[1]),
+        }])));
+      }).catch(() => { /* a tabela segue com os números da execução */ });
     } catch (e) {
       setAutomationError(e instanceof Error ? e.message : "Falha ao carregar automações.");
     } finally {
@@ -6394,46 +6413,80 @@ export default function App() {
                       <header className={cabecalho}>
                         <div>
                           <h4 className="text-sm font-bold text-white">Execuções</h4>
-                          <p className="text-xs text-zinc-500 mt-0.5">O que cada disparo diário fez</p>
+                          <p className="text-xs text-zinc-500 mt-0.5">O que cada disparo diário fez · clique na linha para ver o que não saiu</p>
                         </div>
                       </header>
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
                           <thead>
                             <tr className="border-b border-zinc-800 text-[10px] uppercase font-mono text-zinc-500 tracking-wider">
-                              <th className="px-5 py-2.5 font-medium">Data</th>
-                              <th className="px-3 py-2.5 font-medium">Status</th>
-                              <th className="px-3 py-2.5 font-medium text-right" title="Devedores que se encaixavam nas regras">Elegíveis</th>
-                              <th className="px-3 py-2.5 font-medium text-right">Criadas</th>
-                              <th className="px-3 py-2.5 font-medium text-right" title="Puladas: cliente já cobrado nas últimas horas, título pago ou desabilitado, ou acima do limite diário">Puladas</th>
+                              <th className="px-5 py-2.5 font-medium">Dia</th>
+                              <th className="px-3 py-2.5 font-medium">Regra</th>
+                              <th className="px-3 py-2.5 font-medium text-right" title="Títulos que se encaixavam na regra nesse dia">Elegíveis</th>
+                              <th className="px-3 py-2.5 font-medium text-right" title="Mensagens montadas (títulos do mesmo cliente vão juntos). Fica de fora quem já foi cobrado nas últimas 20 h ou passou do limite do dia">Criadas</th>
                               <th className="px-3 py-2.5 font-medium text-right">Enviadas</th>
-                              <th className="px-5 py-2.5 font-medium text-right">Erros</th>
+                              <th className="px-3 py-2.5 font-medium text-right" title="Esperando a janela de envio ou nova tentativa">Na fila</th>
+                              <th className="px-5 py-2.5 font-medium text-right" title="Clique na linha para ver o motivo">Não saíram</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-zinc-900 text-zinc-300">
-                            {execucoes.map((run) => (
-                              <tr key={run.id} className="hover:bg-zinc-900/40 transition-colors">
-                                <td className="px-5 py-2.5 font-mono text-zinc-400 text-[11px] whitespace-nowrap">
-                                  {new Date(run.startedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                                </td>
-                                <td className="px-3 py-2.5">
-                                  <span className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded border ${
-                                    run.status === "success"
-                                      ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10"
-                                      : run.status === "running"
-                                      ? "text-amber-300 border-amber-500/30 bg-amber-500/10"
-                                      : "text-rose-300 border-rose-500/30 bg-rose-500/10"
-                                  }`}>
-                                    {run.status === "success" ? "Concluída" : run.status === "running" ? "Rodando" : run.status === "failed" ? "Falhou" : run.status}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-2.5 text-right font-mono tabular-nums">{run.totalCandidates}</td>
-                                <td className="px-3 py-2.5 text-right font-mono tabular-nums">{run.jobsCreated}</td>
-                                <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-500">{run.jobsSkipped}</td>
-                                <td className="px-3 py-2.5 text-right font-mono tabular-nums text-white">{run.sent}</td>
-                                <td className={`px-5 py-2.5 text-right font-mono tabular-nums ${run.failed > 0 ? "text-rose-300" : "text-zinc-600"}`}>{run.failed}</td>
-                              </tr>
-                            ))}
+                            {execucoes.map((run) => {
+                              const res = resultadoExecucoes.get(run.id);
+                              const naoSairam = res ? res.naoSairam : run.failed;
+                              const regra = automationRules.find(r => r.id === run.automationRuleId);
+                              const aberta = execucaoAberta === run.id;
+                              const temDetalhe = Boolean(res && (res.motivos.length > 0)) || run.status !== "success" || run.totalCandidates > run.jobsCreated;
+                              const inicio = new Date(run.startedAt);
+                              const nota = (run.metadata?.reason as string | undefined) ?? (run.metadata?.note as string | undefined);
+                              return (
+                                <React.Fragment key={run.id}>
+                                  <tr
+                                    onClick={temDetalhe ? () => setExecucaoAberta(aberta ? null : run.id) : undefined}
+                                    className={`transition-colors ${temDetalhe ? "cursor-pointer hover:bg-zinc-900/40" : ""} ${aberta ? "bg-zinc-900/40" : ""}`}
+                                  >
+                                    <td className="px-5 py-2.5 font-mono text-zinc-400 text-[11px] whitespace-nowrap">
+                                      {inicio.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                                      <span className="text-zinc-600"> {inicio.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}</span>
+                                      {run.status !== "success" && run.status !== "running" && (
+                                        <span className="ml-2 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border text-rose-300 border-rose-500/30 bg-rose-500/10">Falhou</span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2.5 text-zinc-300 whitespace-nowrap">{regra?.name ?? <span className="text-zinc-600">Regra apagada</span>}</td>
+                                    <td className="px-3 py-2.5 text-right font-mono tabular-nums">{run.totalCandidates}</td>
+                                    <td className="px-3 py-2.5 text-right font-mono tabular-nums">{run.jobsCreated}</td>
+                                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-white">{run.sent}</td>
+                                    <td className={`px-3 py-2.5 text-right font-mono tabular-nums ${res && res.fila > 0 ? "text-amber-300" : "text-zinc-600"}`}>{res ? res.fila : "—"}</td>
+                                    <td className={`px-5 py-2.5 text-right font-mono tabular-nums ${naoSairam > 0 ? "text-rose-300" : "text-zinc-600"}`}>
+                                      {naoSairam}
+                                      {temDetalhe && <ChevronDown className={`inline w-3 h-3 ml-1.5 text-zinc-500 transition-transform ${aberta ? "rotate-180" : ""}`} />}
+                                    </td>
+                                  </tr>
+                                  {aberta && (
+                                    <tr className="bg-zinc-900/40">
+                                      <td colSpan={7} className="px-5 pb-3 pt-1">
+                                        <ul className="space-y-1 text-[11px]">
+                                          {run.status !== "success" && run.status !== "running" && (
+                                            <li className="text-rose-300">
+                                              A execução não criou cobranças: {nota === "blocked_subscription" ? "assinatura inativa" : nota === "blocked_plan" ? "plano sem automação" : "erro ao montar a lista"}.
+                                            </li>
+                                          )}
+                                          {run.totalCandidates > run.jobsCreated && (
+                                            <li className="text-zinc-400">
+                                              <span className="font-mono tabular-nums text-zinc-300">{run.totalCandidates - run.jobsCreated}</span> títulos não viraram mensagem: foram juntos na mensagem do mesmo cliente, já tinham sido cobrados nas últimas 20 h ou passaram do limite do dia.
+                                            </li>
+                                          )}
+                                          {res?.motivos.map(([motivo, n]) => (
+                                            <li key={motivo} className="text-zinc-400">
+                                              <span className="font-mono tabular-nums text-rose-300">{n}</span> {motivo}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>

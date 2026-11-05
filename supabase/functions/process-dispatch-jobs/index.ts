@@ -41,6 +41,7 @@ import { sanitizeError }                         from "../_shared/sanitize.ts";
 import { isOptedOut }                            from "../_shared/optOut.ts";
 import { lerSituacaoDoDia }                      from "../_shared/limiteDiario.ts";
 import { mensagemLimiteAtingido }                from "../_shared/protecaoNumero.ts";
+import { motivoSemEnvio }                        from "../_shared/diaDeEnvio.ts";
 
 // Colunas do devedor usadas no envio (o principal e os que vão juntos).
 const COLUNAS_DEVEDOR =
@@ -174,7 +175,7 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
     if (ruleId) {
       const { data: rule } = await admin
         .from("user_automation_rules")
-        .select("send_window_start, send_window_end, enabled, rule_type")
+        .select("send_window_start, send_window_end, enabled, rule_type, schedule_mode, skip_holidays")
         .eq("id", ruleId)
         .maybeSingle();
 
@@ -182,6 +183,14 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
       jobRuleType = (r?.rule_type as string | null) ?? null;
       if (r && r.enabled === false) {
         await markJob("skipped", { last_error: "Regra desativada." });
+        return;
+      }
+
+      // Job que ficou para um dia sem envio (ex.: reagendado da sexta para o
+      // sábado): não sai. A regra cria outro no próximo dia de envio.
+      const semEnvio = r ? motivoSemEnvio(r.schedule_mode as string | null, r.skip_holidays === true, new Date()) : null;
+      if (semEnvio) {
+        await markJob("skipped", { last_error: `Dia sem envio pela regra (${semEnvio}).` });
         return;
       }
 

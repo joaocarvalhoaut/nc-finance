@@ -222,6 +222,31 @@ export const automationService = {
     return (data ?? []).map(r => mapRun(r as RunRow));
   },
 
+  /**
+   * O que aconteceu com cada cobrança criada pelas execuções: enviada, na fila
+   * ou não saiu (e por quê). Base da tabela Execuções.
+   */
+  async listRunOutcomes(runIds: string[]): Promise<{ runId: string; status: string; lastError: string | null }[]> {
+    if (runIds.length === 0) return [];
+    const supabase = getSupabaseClient();
+    const saida: { runId: string; status: string; lastError: string | null }[] = [];
+    for (let de = 0; de < 5000; de += 1000) {
+      const { data, error } = await supabase
+        .from("user_dispatch_jobs")
+        .select("automation_run_id, status, last_error")
+        .in("automation_run_id", runIds)
+        .order("created_at", { ascending: true })
+        .range(de, de + 999);
+      if (error) break;
+      const linhas = (data ?? []) as Record<string, unknown>[];
+      for (const j of linhas) {
+        saida.push({ runId: String(j.automation_run_id), status: String(j.status ?? ""), lastError: (j.last_error as string | null) ?? null });
+      }
+      if (linhas.length < 1000) break;
+    }
+    return saida;
+  },
+
   // ── Jobs ───────────────────────────────────────────────────────────────────
 
   async listJobs(limit = 30, ruleId?: string): Promise<DispatchJob[]> {
@@ -238,6 +263,41 @@ export const automationService = {
 };
 
 // ─── Labels ───────────────────────────────────────────────────────────────────
+
+/**
+ * Motivo legível de uma cobrança da automação que não saiu. Os textos de
+ * last_error escritos pelo worker já são em pt-BR; erro de provedor ou
+ * exceção crua vira "Falha no envio pelo WhatsApp" (não vaza detalhe técnico).
+ */
+export function motivoDoJob(status: string, lastError: string | null): string {
+  const e = (lastError ?? "").trim();
+  switch (status) {
+    case "blocked_subscription": return "Assinatura inativa";
+    case "duplicated":           return "Já enviada há menos de 5 min";
+    case "conta_em_revisao":     return "Conta em revisão (muitos pedidos de PARE)";
+    case "blocked_limit":
+      if (/mensal/i.test(e)) return "Limite mensal do plano atingido";
+      return "Limite de mensagens do dia atingido";
+    case "skipped":
+      if (/regra desativada/i.test(e)) return "Regra desligada antes do envio";
+      if (/dia sem envio/i.test(e)) return e.replace(/\.$/, "");
+      if (/categoria/i.test(e)) return "Tipo do título mudou antes do envio";
+      if (/arquivad/i.test(e)) return "Título arquivado";
+      if (/desabilitad/i.test(e)) return "Cliente desabilitado";
+      if (/liquidad/i.test(e)) return "Título já pago";
+      if (/opt-out|não-contatar/i.test(e)) return "Cliente pediu para não receber";
+      if (/n[aã]o encontrado/i.test(e)) return "Título apagado";
+      if (/plano/i.test(e)) return "Plano sem automação";
+      return "Pulada";
+    case "failed":
+      if (/telefone/i.test(e)) return "Telefone inválido";
+      if (/whatsapp conectado|numero de whatsapp/i.test(e)) return "WhatsApp não conectado";
+      if (/valor/i.test(e)) return "Valor zerado";
+      return "Falha no envio pelo WhatsApp";
+    default:
+      return "Não saiu";
+  }
+}
 
 export const RULE_TYPE_LABELS: Record<RuleType, string> = {
   overdue:     "Vencidos",

@@ -6,6 +6,7 @@ import { nextAutomationStart, scheduledAutomationStart } from "../_shared/automa
  * Protegida por AUTOMATION_CRON_SECRET — não acessível publicamente.
  *
  * Fluxo por regra:
+ *  0.  Pula o dia se a regra é "só dias úteis" / "pular feriados" (_shared/diaDeEnvio.ts)
  *  1.  Verifica assinatura do usuário (trialing | active)
  *  2.  Verifica plano (Basic → skip)
  *  3.  Busca devedores candidatos conforme rule_type
@@ -25,6 +26,7 @@ import { ACCESS_COLUMNS, canUseSubscription } from "../_shared/billingStatus.ts"
 import { reconcileAutoInstances } from "../_shared/zapiProvisioning.ts";
 import { chaveDeAgrupamento } from "../_shared/agrupamento.ts";
 import { lerSituacaoDoDia } from "../_shared/limiteDiario.ts";
+import { motivoSemEnvio } from "../_shared/diaDeEnvio.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -61,6 +63,14 @@ const processRule = async (rule: RuleRow, vagasDoDia: VagasDoDia): Promise<void>
   const tone     = String(rule.message_tone ?? "neutro");
   const maxDaily = rule.max_daily_sends ? Number(rule.max_daily_sends) : null;
   const winStart = (rule.send_window_start as string | null) ?? null;
+
+  // "Só dias úteis" / "Pular feriados nacionais": hoje não é dia de envio,
+  // não cria nada (a regra roda de novo amanhã).
+  const semEnvio = motivoSemEnvio(rule.schedule_mode as string | null, rule.skip_holidays === true, new Date());
+  if (semEnvio) {
+    await updateRule(ruleId);
+    return;
+  }
 
   // Registra início do run
   const { data: runRow } = await admin
