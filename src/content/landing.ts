@@ -25,7 +25,7 @@ export interface Passo { titulo: string; texto: string }
 export const PASSOS: Passo[] = [
   {
     titulo: "Importe a carteira",
-    texto: "Planilha Excel ou CSV, PDF, TXT, texto colado ou Google Sheets. O sistema lê cliente, documento, vencimento, valor e telefone, e você confere tudo antes de salvar.",
+    texto: "Planilha Excel ou CSV, PDF, TXT, foto do relatório ou Google Sheets. O sistema lê cliente, documento, vencimento, valor e telefone, e você confere tudo antes de salvar.",
   },
   {
     titulo: "Revise e envie",
@@ -88,7 +88,7 @@ export const PERGUNTAS: Pergunta[] = [
   {
     pergunta: "Quais arquivos consigo importar?",
     resposta:
-      "Planilha Excel (XLS ou XLSX), CSV, PDF, TXT, texto colado e planilhas do Google Sheets. Não precisa seguir um modelo: o sistema identifica os dados e você revisa antes de salvar.",
+      "Planilha Excel (XLS ou XLSX), CSV, PDF (inclusive escaneado), TXT, foto do relatório e planilhas do Google Sheets. Não precisa seguir um modelo: o sistema identifica os dados e você revisa antes de salvar.",
   },
   {
     pergunta: "Os juros e a multa são calculados sozinhos?",

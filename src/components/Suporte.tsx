@@ -135,7 +135,7 @@ const PERGUNTAS: Pergunta[] = [
     tema: "Importação",
     pergunta: "Quais arquivos posso importar?",
     resposta:
-      "Planilha Excel (XLSX, XLS) ou ODS, CSV, TXT, PDF — inclusive escaneado —, foto ou print do relatório (JPG, PNG) e texto colado. Nos planos Pro e Premium também dá para puxar de uma planilha do Google Sheets.\n" +
+      "Planilha Excel (XLSX, XLS) ou ODS, CSV, TXT, PDF — inclusive escaneado —, foto ou print do relatório (JPG, PNG). Nos planos Pro e Premium também dá para puxar de uma planilha do Google Sheets.\n" +
       "Não precisa seguir modelo: o sistema reconhece as colunas pelo título (“Sacado”, “Vencto”, “Vlr”…) e pelo conteúdo, e ignora linhas de total e rodapés.",
   },
   {

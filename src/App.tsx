@@ -37,7 +37,6 @@ import { chaveDeAgrupamento, preencherMensagem } from "../supabase/functions/_sh
 import { metricsService, type OperationalMetrics } from "./services/metricsService";
 import {
   ACEITA_IMPORTACAO,
-  extrairDeTexto,
   interpretarDocumento,
   lerArquivo,
   type DocumentoImportado,
@@ -312,9 +311,7 @@ export default function App() {
   const [patternTemplates, setPatternTemplates] = useState<PatternMessage[]>(DEFAULT_PATTERNS);
 
   // Extraction screen properties
-  const [importText, setImportText] = useState<string>("");
   const [importCategory, setImportCategory] = useState<"vencidos" | "a_vencer" | "recompra" | "liquidado">("vencidos");
-  const [isExtracting, setIsExtracting] = useState<boolean>(false);
   const [extractedDebtors, setExtractedDebtors] = useState<Debtor[]>([]);
   const [extractedSelectedIds, setExtractedSelectedIds] = useState<Set<string>>(new Set());
   // Revisão da importação: leitura com dúvida (vem da extração) e registros
@@ -342,8 +339,7 @@ export default function App() {
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
   // Andamento da leitura (páginas do PDF, OCR) mostrado no campo do arquivo.
   const [importProgresso, setImportProgresso] = useState<string>("");
-  // Arquivo já lido (tabelas + texto). Enquanto o texto da tela for o dele, a
-  // extração usa as tabelas; se a pessoa editar o texto, vale o texto.
+  // Arquivo já lido (tabelas + texto).
   const [importDoc, setImportDoc] = useState<DocumentoImportado | null>(null);
   // Last extraction result — used for post-import summary UI
   const [lastExtractionResult, setLastExtractionResult] = useState<LocalExtractionResult | null>(null);
@@ -1267,10 +1263,10 @@ export default function App() {
       }
 
       setImportDoc(doc);
-      setImportText(doc.texto);
+      // Lê os dados na hora: escolher o arquivo já traz os registros para revisar.
+      lerDadosDoDocumento(doc);
     } catch (error) {
       setImportFileName("");
-      setImportText("");
       setExtractionAlert(
         error instanceof Error
           ? error.message
@@ -1283,23 +1279,13 @@ export default function App() {
   };
 
   // ── Local extraction pipeline (free, no API key required) ────────────────
-  const handleAIExtract = async () => {
-    if (!importText.trim()) {
-      setExtractionAlert(
-        "Escreva, cole ou carregue um arquivo com informações reais de cobrança antes de prosseguir.",
-      );
-      return;
-    }
-
-    setIsExtracting(true);
+  const lerDadosDoDocumento = (doc: DocumentoImportado) => {
     setExtractionAlert("");
     setLastExtractionResult(null);
 
     try {
-      // ── Extração local: o arquivo lido (tabelas + texto) ou o texto da tela ──
-      const result = importDoc && importText === importDoc.texto
-        ? interpretarDocumento(importDoc)
-        : extrairDeTexto(importText, importDoc?.nomeArquivo);
+      // ── Extração local: tabelas + texto do arquivo lido ──
+      const result = interpretarDocumento(doc);
 
       setLastExtractionResult(result);
 
@@ -1370,10 +1356,16 @@ export default function App() {
           ? err.message
           : "Falha ao processar a extração local. Verifique o formato do arquivo.",
       );
-    } finally {
-      setIsExtracting(false);
     }
   };
+
+  // O tipo ("O que tem no arquivo") pode ser escolhido antes ou depois do
+  // arquivo: os registros em revisão acompanham a escolha.
+  useEffect(() => {
+    setExtractedDebtors(prev => prev.some(d => d.category !== importCategory)
+      ? prev.map(d => ({ ...d, category: importCategory }))
+      : prev);
+  }, [importCategory]);
   /**
    * O que ainda falta num registro da revisão. Calculado ao vivo a partir dos
    * campos: corrigir o telefone, o vencimento ou o valor tira o registro da
@@ -1453,7 +1445,6 @@ export default function App() {
       setExtractedSelectedIds(new Set());
       setDupDocModal(null);
       if (extractedDebtors.length === toSend.length) {
-        setImportText("");
         setImportFileName("");
         setImportDoc(null);
         setCurrentTab("visao_geral");
@@ -1533,16 +1524,14 @@ export default function App() {
   };
 
   // Revisão esvaziada (removeu tudo, um a um ou "remover selecionados"): limpa
-  // também o texto colado, o arquivo e o resumo da leitura — senão o texto
-  // antigo e o selo "N registros" ficavam na tela sem nada para revisar.
-  // Só na passagem de "tinha registros" para "nenhum": uma leitura que não
-  // achou nada mantém o texto para a pessoa corrigir.
+  // também o arquivo e o resumo da leitura — senão o nome do arquivo antigo e
+  // o selo "N registros" ficavam na tela sem nada para revisar.
+  // Só na passagem de "tinha registros" para "nenhum".
   const extraidosAntesRef = React.useRef(0);
   useEffect(() => {
     const antes = extraidosAntesRef.current;
     extraidosAntesRef.current = extractedDebtors.length;
     if (antes > 0 && extractedDebtors.length === 0) {
-      setImportText("");
       setImportFileName("");
       setImportDoc(null);
       setLastExtractionResult(null);
@@ -3002,7 +2991,7 @@ export default function App() {
                 return (
                 <div className="space-y-4">
                   <p className="text-xs text-zinc-500">
-                    Ferramenta completa de importação: PDF (inclusive escaneado), Excel, CSV, foto do relatório ou texto colado. Para o caminho guiado de
+                    Ferramenta completa de importação: PDF (inclusive escaneado), Excel, CSV ou foto do relatório. Para o caminho guiado de
                     importar e enviar, use{" "}
                     <button type="button" onClick={() => setCurrentTab("cobrar")} className="text-zinc-300 hover:text-white underline underline-offset-2 cursor-pointer">
                       Cobranças
@@ -3080,34 +3069,12 @@ export default function App() {
                           )}
                         </div>
 
-                        <div>
-                          <label htmlFor="importar-texto" className={`${rotulo} mb-1.5`}>Ou cole o texto</label>
-                          <textarea
-                            id="importar-texto"
-                            rows={4}
-                            value={importText}
-                            onChange={(e) => setImportText(e.target.value)}
-                            placeholder="Linhas do relatório: cliente, documento, vencimento, valor, telefone…"
-                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors font-mono"
-                          />
-                        </div>
-
                         {extractionAlert && (
                           <p className="text-[11px] rounded-lg flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 text-amber-300 px-3 py-2">
                             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
                             <span className="flex-1">{extractionAlert}</span>
                           </p>
                         )}
-
-                        <button
-                          onClick={handleAIExtract}
-                          disabled={isExtracting}
-                          className="w-full py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors cursor-pointer disabled:cursor-not-allowed"
-                        >
-                          {isExtracting
-                            ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Lendo o documento…</>
-                            : <><Zap className="w-3.5 h-3.5" /> Ler dados do documento</>}
-                        </button>
                       </div>
                     </section>
 
@@ -3159,7 +3126,7 @@ export default function App() {
                         <div className="flex-1 min-h-[320px] flex flex-col items-center justify-center text-center px-8 py-12">
                           <SlidersHorizontal className="w-8 h-8 text-zinc-700 mb-3" />
                           <p className="text-xs font-semibold text-zinc-300">Nada para revisar ainda</p>
-                          <p className="text-[11px] text-zinc-500 max-w-xs mt-1">Escolha um arquivo ou cole o texto e clique em "Ler dados do documento". Os registros aparecem aqui para conferir.</p>
+                          <p className="text-[11px] text-zinc-500 max-w-xs mt-1">Escolha um arquivo: os registros lidos aparecem aqui para conferir.</p>
                         </div>
                       ) : (
                         <>
