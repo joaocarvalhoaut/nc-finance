@@ -72,7 +72,9 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   ("DP 1439/005" = "1439/005"), nome sem caixa/acento. Importação descarta repetidos e atualiza o que
   já está na carteira (`alinharComCarteira` no App, que também dá baixa do relatório de pagos no título
   aberto de mesmo doc + cliente); cadastro manual recusa; Carteira mostra repetidos antigos e arquiva
-  as cópias (fica a paga ou a mais recente). No banco: constraint `uq_urf_user_doc_cliente_venc`
+  as cópias (fica a paga ou a mais recente). Google Sheets usa a mesma regra
+  (`supabase/functions/_shared/tituloUnico.ts`, cópia da do front). Edição direta na Carteira é livre
+  (decisão do dono). No banco: constraint `uq_urf_user_doc_cliente_venc`
   (migration `20261106120000`, valores exatos); `createMany` cai na chave antiga se ela não rodou.
 - **Proteção do número contra bloqueio** (pedido do dono, feito em 04–05/11/2026). A Meta não publica
   teto para o WhatsApp comum (Z-API): o bloqueio vem de denúncias, pico de volume e envio para quem
