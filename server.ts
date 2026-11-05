@@ -12,7 +12,7 @@ const PORT = Number(process.env.PORT) || 3000;
 // Content-Security-Policy e headers de segurança — espelham o vercel.json para
 // que o preview local reproduza o comportamento de produção. Origens externas:
 //   connect: Supabase (REST + realtime wss) e ViaCEP (autocompletar endereço)
-//   style/font: Google Fonts (Inter)  ·  script: apenas 'self' (bundle Vite)
+//   style/font: Google Fonts (Schibsted Grotesk)  ·  script: apenas 'self' (bundle Vite)
 // 'wasm-unsafe-eval' libera só compilar WebAssembly (não libera eval de JS): o
 // OCR da importação roda o tesseract em WASM, servido de /ocr pela própria origem.
 // Stripe usa redirect de página (checkout/portal), não iframe nem fetch, então

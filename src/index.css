@@ -1,22 +1,29 @@
 @import "tailwindcss";
 
+/* Uma família só: Schibsted Grotesk (grotesca de jornal, 400–900, acentuação
+   completa). "mono" aponta para ela também — os rótulos e números "mono" do app
+   são a mesma letra com números de largura fixa (regra .font-mono abaixo). */
 @theme {
-  --font-sans:    "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono:    "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:    "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
   html {
-    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     font-variation-settings: normal;
   }
 
   body {
-    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-sans);
+  }
+
+  /* Valores, datas e documentos alinham nas colunas */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
   }
 
   /* Dark-theme scrollbars — native white bars break the zinc palette */
