@@ -3473,7 +3473,7 @@ export default function App() {
                           </div>
 
                           <div className="max-h-[480px] overflow-y-auto divide-y divide-zinc-900">
-                            {extractedDebtors.map((item) => {
+                            {extractedDebtors.map((item, idx) => {
                               const marcado = extractedSelectedIds.has(item.id);
                               const pendencias = pendenciasRevisao(item);
                               const revisar = pendencias.length > 0;
@@ -3509,16 +3509,26 @@ export default function App() {
                                     />
                                     {revisar && (
                                       soConferir ? (
-                                        <button
-                                          type="button"
-                                          onClick={() => setConferidosIds(prev => new Set(prev).add(item.id))}
-                                          className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border border-amber-500/30 bg-amber-500/10 text-[10px] font-mono uppercase tracking-wider text-amber-300 hover:bg-amber-500/20 transition-colors cursor-pointer"
-                                          title={pendencias.includes("leitura")
-                                            ? "A leitura pode ter errado algum campo. Confira e clique para tirar da revisão."
-                                            : "Sem número de documento: o sistema gerou um. Clique se estiver certo assim."}
-                                        >
-                                          <Check className="w-3 h-3" /> Conferido
-                                        </button>
+                                        // Diz o que falta e a ação: digitar o número no campo
+                                        // Documento ou seguir assim (tira da revisão).
+                                        <span className="flex-shrink-0 inline-flex items-center gap-2">
+                                          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-amber-300">
+                                            <AlertTriangle className="w-3 h-3" />
+                                            {pendencias.includes("documento") && pendencias.includes("leitura")
+                                              ? "Sem nº do documento e leitura incerta"
+                                              : pendencias.includes("documento") ? "Sem nº do documento" : "Leitura incerta — confira os campos"}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => setConferidosIds(prev => new Set(prev).add(item.id))}
+                                            className="px-2 py-1 rounded-md border border-amber-500/30 bg-amber-500/10 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/20 transition-colors cursor-pointer"
+                                            title={pendencias.includes("leitura")
+                                              ? "A leitura do arquivo pode ter errado algum campo. Se estiver tudo certo, clique."
+                                              : "O arquivo não trouxe o número do documento. Digite no campo Documento ou siga sem número."}
+                                          >
+                                            {pendencias.includes("leitura") ? "Está certo" : "Seguir sem número"}
+                                          </button>
+                                        </span>
                                       ) : (
                                         <span
                                           className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-amber-300"
@@ -3540,9 +3550,14 @@ export default function App() {
                                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px] pl-5">
                                     <div>
                                       <label className={`${rotulo} mb-0.5`}>Documento</label>
-                                      <input aria-label="Documento" type="text" value={item.document}
-                                        onChange={(e) => updateExtractedField(item.id, "document", e.target.value)}
-                                        className={`${campo} font-mono`} />
+                                      {/* Número gerado pelo sistema (DOC-8) não aparece como se fosse do arquivo. */}
+                                      <input aria-label="Documento" type="text"
+                                        value={/^DOC-\d+$/.test(item.document) ? "" : item.document}
+                                        placeholder="sem número"
+                                        // Apagou tudo: volta o número interno, senão dois títulos sem
+                                        // número do mesmo cliente e vencimento virariam um só no banco.
+                                        onChange={(e) => updateExtractedField(item.id, "document", e.target.value.trim() ? e.target.value : `DOC-${idx + 1}`)}
+                                        className={`${campo} font-mono placeholder:text-zinc-600 ${pendencias.includes("documento") ? "border-amber-500/40" : ""}`} />
                                     </div>
                                     <div>
                                       <label className={`${rotulo} mb-0.5`}>Vencimento</label>
