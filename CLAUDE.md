@@ -62,7 +62,8 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   segue no repo, sem uso). Regra de acesso única em `_shared/billingStatus.ts` (`canUseSubscription`,
   `ACCESS_COLUMNS`) — todo guard usa ela. Contas da Stripe sem assinatura no Asaas valem até
   02/11/2026; `billing_provider = 'cortesia'` libera sem cobrança (conta do dono).
-  Pix nas faturas depende da verificação da conta Asaas + chave Pix (em andamento).
+  Conta Asaas verificada em 08/11/2026. Pix nas faturas não precisa de código (assinatura usa
+  `billingType: "UNDEFINED"`): aparece quando a conta tem chave Pix cadastrada no painel.
 - Planos: R$ 149 / 197 / 297 (`_shared/billingPlans.ts`, fonte única — landing lê de lá). Cobrem a
   instância Z-API (~R$ 90/cliente). Todo plano usa o número do próprio cliente.
 - WhatsApp por conta: "Conectar WhatsApp" cria a instância pela API de parceiro da Z-API
