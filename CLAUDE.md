@@ -106,6 +106,12 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   Senha mínima: 8 caracteres (cadastro, recuperação e troca).
 - Bucket `charge-pdfs`: público para o link do boleto, mas SELECT em `storage.objects` só do dono
   (migration `20261109120000`) — antes qualquer um listava os boletos de todos.
+- **Tokens da Z-API no Supabase Vault** (09/11/2026): `token`/`client_token` de `user_zapi_config` e
+  `platform_integrations` vão para o Vault por trigger (`zapi_tokens_para_vault`); a tabela guarda
+  `token_secret_id`/`client_token_secret_id`. Leitura só por `_shared/zapiSegredos.ts` → RPC
+  `zapi_abrir_segredos` (service_role, só segredos `zapi:`). Etapa 1 (`20261109150000`) rodou e o envio
+  foi testado. Etapa 2 (`20261109160000`) apaga o texto puro — depois dela, ler `token` direto da tabela
+  devolve null: sempre passar por `abrirTokens`.
 - PostHog: **ativo**. A `VITE_POSTHOG_KEY` esta no Vercel desde 25/08/2026, mas o CSP
   nao liberava `us.i.posthog.com` — a lib inicializava e o navegador descartava todo
   evento, em silencio. Corrigido no `vercel.json` e no `server.ts`. Ao mexer no CSP,
