@@ -23,6 +23,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders }  from "../_shared/cors.ts";
 import { maskPhone, sanitizeError } from "../_shared/sanitize.ts";
+import { abrirTokensDaLinha } from "../_shared/zapiSegredos.ts";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -73,7 +74,7 @@ Deno.serve(async (req: Request) => {
     // Load client_token from platform_integrations only (NO company_integrations fallback)
     const { data: piRow, error: piErr } = await admin
       .from("platform_integrations")
-      .select("client_token, status")
+      .select("*")
       .eq("provider", "zapi")
       .maybeSingle();
 
@@ -86,7 +87,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const row = piRow as Record<string, string | null>;
+    // client_token aberto do Vault (texto puro de reserva na etapa 1).
+    const row = (await abrirTokensDaLinha(admin, piRow as Record<string, string | null>))!;
     const expectedToken = row.client_token ?? "";
 
     if (!expectedToken || receivedToken !== expectedToken) {

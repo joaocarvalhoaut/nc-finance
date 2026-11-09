@@ -20,6 +20,7 @@
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
+import { abrirTokensDaLinha } from "./zapiSegredos.ts";
 
 // Os genericos precisam ser explicitos: sem eles o ReturnType resolve para os
 // padroes da DECLARACAO (SupabaseClient<unknown, never, GenericSchema>), que nao
@@ -60,14 +61,16 @@ export async function loadZApiCredentials(
 ): Promise<ZApiCredentials | null> {
   // 1. Try platform_integrations table first
   try {
+    // "*": inclui token_secret_id/client_token_secret_id quando a migration do
+    // Vault já rodou, sem quebrar a leitura quando ainda não rodou.
     const { data, error } = await admin
       .from("platform_integrations")
-      .select("instance_id, token, client_token, status")
+      .select("*")
       .eq("provider", "zapi")
       .maybeSingle();
 
     if (!error && data) {
-      const row = data as Record<string, string | null>;
+      const row = (await abrirTokensDaLinha(admin, data as Record<string, string | null>))!;
       if (row.instance_id && row.token && row.client_token) {
         return {
           instanceId:  row.instance_id,
@@ -111,13 +114,13 @@ export async function loadZApiCredentialsForUser(
   try {
     const { data, error } = await admin
       .from("user_zapi_config")
-      .select("instance_id, token, client_token, is_active")
+      .select("*")
       .eq("user_id", userId)
       .eq("is_active", true)
       .maybeSingle();
 
     if (!error && data) {
-      const row = data as Record<string, string | boolean | null>;
+      const row = (await abrirTokensDaLinha(admin, data as Record<string, string | null>))!;
       if (row.instance_id && row.token && row.client_token) {
         return {
           instanceId:  row.instance_id  as string,

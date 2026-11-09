@@ -17,6 +17,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { ACCESS_COLUMNS, canUseSubscription } from "./billingStatus.ts";
 import { cancelInstance, createInstance, subscribeInstance, zapiPartnerConfigured } from "./zapiPartner.ts";
+import { abrirTokensDaLinha, type LinhaComTokens } from "./zapiSegredos.ts";
 
 // deno-lint-ignore no-explicit-any
 type AdminClient = ReturnType<typeof createClient<any, any, any>>;
@@ -40,20 +41,28 @@ const AUTO_COLUMNS =
   "user_id, instance_id, token, is_active, connected, auto_provisioned, provisioned_at, subscribed_at, canceled_at";
 
 export const loadAutoInstance = async (admin: AdminClient, userId: string): Promise<AutoInstanceRow | null> => {
-  const { data, error } = await admin.from("user_zapi_config").select(AUTO_COLUMNS).eq("user_id", userId).maybeSingle();
-  if (!error) return (data as AutoInstanceRow | null) ?? null;
+  // "*" em vez de AUTO_COLUMNS: coluna que ainda não existe só vem ausente, sem
+  // derrubar a leitura, e os ids do Vault vêm junto para abrir o token.
+  const { data } = await admin.from("user_zapi_config").select("*").eq("user_id", userId).maybeSingle();
+  const row = await abrirTokensDaLinha(admin, data as (LinhaComTokens & Record<string, unknown>) | null);
+  if (!row) return null;
 
-  // Colunas da migration 20261026150000 ainda não existem: trata toda instância
-  // como cadastrada à mão. Sem isso, um erro de leitura viraria "conta sem
-  // instância" e criaria instâncias (com custo) por cima das que já funcionam.
-  const { data: legado } = await admin
-    .from("user_zapi_config")
-    .select("user_id, instance_id, token, is_active, connected")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (!legado) return null;
-  return { ...(legado as Pick<AutoInstanceRow, "user_id" | "instance_id" | "token" | "is_active" | "connected">),
-    auto_provisioned: false, provisioned_at: null, subscribed_at: null, canceled_at: null };
+  // Sem as colunas da migration 20261026150000, toda instância conta como
+  // cadastrada à mão (auto_provisioned ausente = false). Sem isso, a falta da
+  // coluna viraria "conta sem instância" e criaria instâncias (com custo) por
+  // cima das que já funcionam.
+  const texto = (v: unknown) => (typeof v === "string" && v ? v : null);
+  return {
+    user_id: String(row.user_id),
+    instance_id: texto(row.instance_id),
+    token: texto(row.token),
+    is_active: row.is_active === true,
+    connected: row.connected === true,
+    auto_provisioned: row.auto_provisioned === true,
+    provisioned_at: texto(row.provisioned_at),
+    subscribed_at: texto(row.subscribed_at),
+    canceled_at: texto(row.canceled_at),
+  };
 };
 
 /**
