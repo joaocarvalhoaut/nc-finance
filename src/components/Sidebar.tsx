@@ -86,8 +86,12 @@ export default function Sidebar({
             ${isExpanded ? "justify-between p-4" : "justify-center p-0"}
           `}>
             <div className={`flex items-center ${isExpanded ? "pl-1" : "justify-center w-full"}`}>
-              <span className="font-display font-extrabold text-sm uppercase tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-zinc-100 via-white to-emerald-400 select-none transition-all duration-300">
-                {isExpanded ? "NC Finance" : "NC"}
+              {/* Cores sólidas como no favicon: N branco, C verde (o degradê
+                  deixava o N esverdeado). Expandido segue a landing. */}
+              <span className="font-display font-extrabold text-sm uppercase tracking-tighter text-white select-none transition-all duration-300">
+                {isExpanded
+                  ? <>NC <span className="text-emerald-400">Finance</span></>
+                  : <>N<span className="text-emerald-400">C</span></>}
               </span>
             </div>
             {/* Recolher: icone discreto no cabecalho. Como botao de largura
