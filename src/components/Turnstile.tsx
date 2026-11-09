@@ -9,9 +9,9 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
  * front pode ir ao ar antes de ligar o CAPTCHA no Supabase. A ordem inversa
  * trava todo login.
  *
- * "interaction-only": quase sempre passa sozinho, sem caixa na tela; só pede
- * um clique quando a Cloudflare desconfia. O token vale uma vez: depois de cada
- * tentativa, reset() pede outro.
+ * A caixa fica sempre na tela: quase sempre passa sozinha ("Sucesso!"); só
+ * pede um clique quando a Cloudflare desconfia. O token vale uma vez: depois
+ * de cada tentativa, reset() pede outro.
  */
 
 interface TurnstileApi {
@@ -77,7 +77,10 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
           sitekey: TURNSTILE_SITE_KEY,
           theme: "dark",
           language: "pt-br",
-          appearance: "interaction-only",
+          // Sempre visível: com "interaction-only" a caixa sumia e a pessoa
+          // ficava sem saber que a verificação estava pendente.
+          appearance: "always",
+          "refresh-expired": "auto",
           size: "flexible",
           callback: (token: string) => cbToken.current(token),
           "expired-callback": () => cbToken.current(""),

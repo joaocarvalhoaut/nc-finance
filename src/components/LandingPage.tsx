@@ -592,6 +592,19 @@ function PainelAcesso({
   const [captchaFalhou, setCaptchaFalhou] = useState(false);
   const captchaRef = useRef<TurnstileHandle>(null);
   const aguardandoCaptcha = Boolean(TURNSTILE_SITE_KEY) && !captcha;
+  // Clicou antes da verificação terminar: o pedido espera o token e segue sozinho.
+  const [esperandoCaptcha, setEsperandoCaptcha] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (!esperandoCaptcha) return;
+    if (captcha) { setEsperandoCaptcha(false); formRef.current?.requestSubmit(); return; }
+    if (captchaFalhou) { setEsperandoCaptcha(false); return; }
+    const t = window.setTimeout(() => {
+      setEsperandoCaptcha(false);
+      setErro("A verificação de segurança está demorando. Se a caixa da Cloudflare pedir, marque-a; senão, recarregue a página.");
+    }, 20000);
+    return () => window.clearTimeout(t);
+  }, [esperandoCaptcha, captcha, captchaFalhou]);
 
   // Trava a rolagem da página atrás e fecha com Esc.
   useEffect(() => {
@@ -624,9 +637,8 @@ function PainelAcesso({
     setErro("");
     setInfo("");
     if (aguardandoCaptcha) {
-      setErro(captchaFalhou
-        ? "A verificação de segurança não carregou. Recarregue a página e tente de novo."
-        : "Aguarde a verificação de segurança terminar e tente de novo.");
+      if (captchaFalhou) setErro("A verificação de segurança não carregou. Recarregue a página e tente de novo.");
+      else setEsperandoCaptcha(true);
       return;
     }
     // O token vale uma tentativa: depois desta, pede outro.
@@ -680,6 +692,7 @@ function PainelAcesso({
 
   const textoBotao = isAuthLoading
     ? "Aguarde…"
+    : esperandoCaptcha ? "Verificando…"
     : modo === "cadastro" ? "Criar conta grátis" : modo === "senha" ? "Enviar link" : "Entrar";
 
   return (
@@ -698,7 +711,7 @@ function PainelAcesso({
           </button>
         </header>
 
-        <form onSubmit={(e) => void enviar(e)} className="px-6 py-5 space-y-4">
+        <form ref={formRef} onSubmit={(e) => void enviar(e)} className="px-6 py-5 space-y-4">
           {erro && <p role="alert" className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">{erro}</p>}
           {info && <p role="status" className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs text-sky-300">{info}</p>}
           {entrou && <p role="status" className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">Tudo certo. Abrindo o painel…</p>}
@@ -761,7 +774,7 @@ function PainelAcesso({
 
           <button
             type="submit"
-            disabled={isAuthLoading || entrou || Boolean(authConfigError)}
+            disabled={isAuthLoading || entrou || esperandoCaptcha || Boolean(authConfigError)}
             className={`${botaoPrimario} w-full py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {textoBotao}
