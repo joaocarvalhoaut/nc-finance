@@ -101,6 +101,8 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   token vai em `options.captchaToken` do Supabase Auth. Só aparece com `VITE_TURNSTILE_SITE_KEY`; a chave
   secreta fica no painel do Supabase (Attack Protection). **Ordem:** chave pública no ar ANTES de ligar o
   CAPTCHA no Supabase, senão ninguém entra. CSP libera `challenges.cloudflare.com` (script + frame).
+  **Ligado em produção em 09/11/2026** (chave na Vercel + secret no Supabase; login testado pelo dono).
+  Caixa sempre visível (`appearance: "always"`): com "interaction-only" ela sumia e o login travava calado.
   Senha mínima: 8 caracteres (cadastro, recuperação e troca).
 - Bucket `charge-pdfs`: público para o link do boleto, mas SELECT em `storage.objects` só do dono
   (migration `20261109120000`) — antes qualquer um listava os boletos de todos.
