@@ -97,6 +97,13 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
     `limite_do_dia`; automação: o scheduler divide as vagas entre as regras e o worker marca `blocked_limit`.
   - **Aviso de risco** (`AvisoBloqueioNumero`) na barra da Carteira e no modal do lote, com quantas
     ainda saem hoje; aviso no formulário de regra de automação.
+- **CAPTCHA no login/cadastro/recuperação** (Cloudflare Turnstile, 09/11/2026): `components/Turnstile.tsx`,
+  token vai em `options.captchaToken` do Supabase Auth. Só aparece com `VITE_TURNSTILE_SITE_KEY`; a chave
+  secreta fica no painel do Supabase (Attack Protection). **Ordem:** chave pública no ar ANTES de ligar o
+  CAPTCHA no Supabase, senão ninguém entra. CSP libera `challenges.cloudflare.com` (script + frame).
+  Senha mínima: 8 caracteres (cadastro, recuperação e troca).
+- Bucket `charge-pdfs`: público para o link do boleto, mas SELECT em `storage.objects` só do dono
+  (migration `20261109120000`) — antes qualquer um listava os boletos de todos.
 - PostHog: **ativo**. A `VITE_POSTHOG_KEY` esta no Vercel desde 25/08/2026, mas o CSP
   nao liberava `us.i.posthog.com` — a lib inicializava e o navegador descartava todo
   evento, em silencio. Corrigido no `vercel.json` e no `server.ts`. Ao mexer no CSP,

@@ -76,8 +76,8 @@ export const useSession = () => {
     return signOut();
   }, []);
 
-  const requestPasswordReset = useCallback((email: string) => {
-    return resetPassword(email);
+  const requestPasswordReset = useCallback((email: string, captchaToken?: string) => {
+    return resetPassword(email, captchaToken);
   }, []);
 
   const setNewPassword = useCallback(async (newPassword: string) => {

@@ -534,18 +534,18 @@ export default function App() {
     }
   }, [currentTab, isLoggedIn]);
 
-  const handleSignIn = async ({ email, password }: { email: string; password: string }) => {
+  const handleSignIn = async ({ email, password, captchaToken }: { email: string; password: string; captchaToken?: string }) => {
     setIsAuthenticating(true);
     try {
-      await signIn({ email, password });
+      await signIn({ email, password, captchaToken });
       setCurrentTab("cobrar");
     } finally {
       setIsAuthenticating(false);
     }
   };
 
-  const handleForgotPassword = async (email: string) => {
-    await resetPassword(email);
+  const handleForgotPassword = async (email: string, captchaToken?: string) => {
+    await resetPassword(email, captchaToken);
   };
 
   // ── Recuperação de senha: define a nova senha após abrir o link do email ──
@@ -558,8 +558,8 @@ export default function App() {
   const handleSetNewPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setNewPwdError("");
-    if (newPwd.length < 6) {
-      setNewPwdError("A senha deve ter no mínimo 6 caracteres.");
+    if (newPwd.length < 8) {
+      setNewPwdError("A senha deve ter no mínimo 8 caracteres.");
       return;
     }
     if (newPwd !== newPwdConfirm) {
@@ -579,10 +579,10 @@ export default function App() {
     }
   };
 
-  const handleSignUp = async ({ name, email, password }: SignUpPayload) => {
+  const handleSignUp = async ({ name, email, password, captchaToken }: SignUpPayload) => {
     setIsAuthenticating(true);
     try {
-      const authResult = await signUp({ name, email, password });
+      const authResult = await signUp({ name, email, password, captchaToken });
       const needsEmailConfirmation = !authResult.session;
 
       if (!needsEmailConfirmation) {

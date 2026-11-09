@@ -1,5 +1,6 @@
-import React, { lazy, Suspense, useEffect, useState } from "react";
+import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
 import PasswordInput from "./PasswordInput";
+import { Turnstile, TURNSTILE_SITE_KEY, type TurnstileHandle } from "./Turnstile";
 import TermosDeUso from "./TermosDeUso";
 import PoliticaPrivacidade from "./PoliticaPrivacidade";
 import AcordoTratamentoDados from "./AcordoTratamentoDados";
@@ -34,7 +35,7 @@ const Suporte = lazy(() => import("./Suporte"));
 interface LandingPageProps {
   onLogin: (credentials: AuthCredentials) => Promise<void>;
   onSignUp: (payload: SignUpPayload) => Promise<{ needsEmailConfirmation: boolean; message: string }>;
-  onForgotPassword: (email: string) => Promise<void>;
+  onForgotPassword: (email: string, captchaToken?: string) => Promise<void>;
   isAuthLoading: boolean;
   authConfigError?: string;
 }
@@ -586,6 +587,11 @@ function PainelAcesso({
   const [erro, setErro] = useState("");
   const [info, setInfo] = useState("");
   const [entrou, setEntrou] = useState(false);
+  // CAPTCHA (Turnstile): só existe com a chave pública configurada.
+  const [captcha, setCaptcha] = useState("");
+  const [captchaFalhou, setCaptchaFalhou] = useState(false);
+  const captchaRef = useRef<TurnstileHandle>(null);
+  const aguardandoCaptcha = Boolean(TURNSTILE_SITE_KEY) && !captcha;
 
   // Trava a rolagem da página atrás e fecha com Esc.
   useEffect(() => {
@@ -617,11 +623,21 @@ function PainelAcesso({
     if (authConfigError) { setErro(authConfigError); return; }
     setErro("");
     setInfo("");
+    if (aguardandoCaptcha) {
+      setErro(captchaFalhou
+        ? "A verificação de segurança não carregou. Recarregue a página e tente de novo."
+        : "Aguarde a verificação de segurança terminar e tente de novo.");
+      return;
+    }
+    // O token vale uma tentativa: depois desta, pede outro.
+    const captchaToken = captcha || undefined;
+    const renovarCaptcha = () => captchaRef.current?.reset();
 
     if (modo === "senha") {
       if (!email.trim()) { setErro("Digite seu e-mail."); return; }
       // Mesma mensagem com ou sem conta: não revela quais e-mails existem.
-      try { await onForgotPassword(email.trim()); } catch { /* idem */ }
+      try { await onForgotPassword(email.trim(), captchaToken); } catch { /* idem */ }
+      renovarCaptcha();
       setInfo("Se este e-mail tiver conta, enviamos um link para redefinir a senha. Confira a caixa de entrada e o spam.");
       return;
     }
@@ -629,13 +645,14 @@ function PainelAcesso({
     if (!email.trim() || !senha) { setErro("Preencha e-mail e senha."); return; }
     if (modo === "cadastro") {
       if (nome.trim().length < 2) { setErro("Digite seu nome."); return; }
-      if (senha.length < 6) { setErro("A senha precisa ter pelo menos 6 caracteres."); return; }
+      if (senha.length < 8) { setErro("A senha precisa ter pelo menos 8 caracteres."); return; }
       if (!aceitou) { setErro("Para criar a conta, aceite os Termos de Uso e a Política de Privacidade."); return; }
     }
 
     try {
       if (modo === "cadastro") {
-        const r = await onSignUp({ name: nome.trim(), email: email.trim(), password: senha });
+        const r = await onSignUp({ name: nome.trim(), email: email.trim(), password: senha, captchaToken });
+        renovarCaptcha();
         if (r.needsEmailConfirmation) {
           setModo("entrar");
           setSenha("");
@@ -643,16 +660,18 @@ function PainelAcesso({
           return;
         }
       } else {
-        await onLogin({ email: email.trim(), password: senha });
+        await onLogin({ email: email.trim(), password: senha, captchaToken });
       }
       setEntrou(true);
     } catch (err) {
+      renovarCaptcha();
       const raw = err instanceof Error ? err.message : "";
       let msg = modo === "cadastro" ? "Não foi possível criar a conta. Tente de novo." : "Não foi possível entrar. Tente de novo.";
       if (/invalid login credentials/i.test(raw)) msg = "E-mail ou senha incorretos.";
       else if (/email not confirmed/i.test(raw)) msg = "Confirme seu e-mail pelo link que enviamos antes de entrar.";
       else if (/already (been )?registered/i.test(raw)) msg = "Este e-mail já tem conta. Entre ou recupere a senha.";
-      else if (/password/i.test(raw)) msg = "A senha precisa ter pelo menos 6 caracteres.";
+      else if (/captcha/i.test(raw)) msg = "A verificação de segurança falhou. Aguarde um instante e tente de novo.";
+      else if (/password/i.test(raw)) msg = "A senha precisa ter pelo menos 8 caracteres.";
       else if (/rate limit|too many/i.test(raw)) msg = "Muitas tentativas seguidas. Aguarde alguns minutos.";
       else if (/network|fetch/i.test(raw)) msg = "Sem conexão. Verifique a internet e tente de novo.";
       setErro(msg);
@@ -709,7 +728,7 @@ function PainelAcesso({
                 value={senha}
                 onChange={(e) => { setSenha(e.target.value); setErro(""); }}
                 className={campoAcesso}
-                placeholder={modo === "cadastro" ? "Pelo menos 6 caracteres" : "Sua senha"}
+                placeholder={modo === "cadastro" ? "Pelo menos 8 caracteres" : "Sua senha"}
               />
               {modo === "entrar" && (
                 <button type="button" onClick={() => trocarModo("senha")} className="mt-2 text-xs text-emerald-400 hover:text-emerald-300 cursor-pointer">
@@ -730,6 +749,14 @@ function PainelAcesso({
                 <button type="button" onClick={abrirAcordo} className="text-emerald-400 hover:underline">Acordo de Tratamento de Dados</button>.
               </span>
             </label>
+          )}
+
+          {TURNSTILE_SITE_KEY && (
+            <Turnstile
+              ref={captchaRef}
+              onToken={(t) => { setCaptcha(t); if (t) setCaptchaFalhou(false); }}
+              onErro={() => setCaptchaFalhou(true)}
+            />
           )}
 
           <button

@@ -53,6 +53,8 @@ export interface ZApiConfig {
 export interface AuthCredentials {
   email: string;
   password: string;
+  /** Token do CAPTCHA (Turnstile), quando ligado. */
+  captchaToken?: string;
 }
 
 /**

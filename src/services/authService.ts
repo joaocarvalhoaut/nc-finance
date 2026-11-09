@@ -14,11 +14,12 @@ export const getSession = async () => {
   return data.session;
 };
 
-export const signIn = async ({ email, password }: AuthCredentials) => {
+export const signIn = async ({ email, password, captchaToken }: AuthCredentials) => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
-    password
+    password,
+    options: captchaToken ? { captchaToken } : undefined
   });
 
   if (error) {
@@ -38,13 +39,14 @@ export const signIn = async ({ email, password }: AuthCredentials) => {
  * acesso (CompletarCadastro) — o gatilho on_auth_user_created_profile só cria
  * o perfil quando o CPF vem no cadastro.
  */
-export const signUp = async ({ email, password, name }: SignUpPayload) => {
+export const signUp = async ({ email, password, name, captchaToken }: SignUpPayload) => {
   const supabase = getSupabaseClient();
 
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
+      ...(captchaToken ? { captchaToken } : {}),
       data: {
         full_name: name.trim(),
         accepted_terms_at: new Date().toISOString(),
@@ -69,10 +71,10 @@ export const signUp = async ({ email, password, name }: SignUpPayload) => {
  * o supabase-js dispara o evento PASSWORD_RECOVERY ao abrir, e o app mostra a
  * tela de nova senha.
  */
-export const resetPassword = async (email: string) => {
+export const resetPassword = async (email: string, captchaToken?: string) => {
   const supabase = getSupabaseClient();
   const redirectTo = typeof window !== "undefined" ? window.location.origin : undefined;
-  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo, ...(captchaToken ? { captchaToken } : {}) });
 
   if (error) {
     throw new Error(error.message || "Falha ao enviar o email de recuperação.");
