@@ -124,7 +124,7 @@ export default function LandingPage({
       <header className="sticky top-0 z-40 border-b border-zinc-900 bg-zinc-950/85 backdrop-blur">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <a href="#inicio" className="font-display font-black text-lg tracking-tight text-white">
-            NC <span className="text-emerald-400">Finance</span>
+            N<span className="text-emerald-400">C Finance</span>
           </a>
           <nav aria-label="Seções" className="hidden md:flex items-center gap-6 text-sm text-zinc-400">
             <a href="#como-funciona" className="hover:text-white transition-colors">Como funciona</a>
@@ -373,7 +373,7 @@ export default function LandingPage({
       <footer className="border-t border-zinc-900 text-xs text-zinc-500">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col sm:flex-row gap-6 sm:items-end justify-between">
           <div className="space-y-2 max-w-sm">
-            <p className="font-display font-black text-sm text-white">NC <span className="text-emerald-400">Finance</span></p>
+            <p className="font-display font-black text-sm text-white">N<span className="text-emerald-400">C Finance</span></p>
             <p className="leading-relaxed">Software de cobrança pelo WhatsApp para pequenas e médias empresas.</p>
             <p>Contato: <a href={`mailto:${CONTATO_EMAIL}`} className="text-zinc-300 hover:text-white">{CONTATO_EMAIL}</a></p>
           </div>

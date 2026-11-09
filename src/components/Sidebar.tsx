@@ -87,10 +87,10 @@ export default function Sidebar({
           `}>
             <div className={`flex items-center ${isExpanded ? "pl-1" : "justify-center w-full"}`}>
               {/* Cores sólidas como no favicon: N branco, C verde (o degradê
-                  deixava o N esverdeado). Expandido segue a landing. */}
+                  deixava o N esverdeado). Expandido igual à landing. */}
               <span className="font-display font-extrabold text-sm uppercase tracking-tighter text-white select-none transition-all duration-300">
                 {isExpanded
-                  ? <>NC <span className="text-emerald-400">Finance</span></>
+                  ? <>N<span className="text-emerald-400">C Finance</span></>
                   : <>N<span className="text-emerald-400">C</span></>}
               </span>
             </div>
