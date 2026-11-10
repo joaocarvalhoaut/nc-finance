@@ -3841,7 +3841,7 @@ export default function App() {
                       onClick={() => { setCobradorErro(""); setShowCobradoresModal(true); }}
                       className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 whitespace-nowrap transition-colors cursor-pointer"
                     >
-                      <UserPlus className="w-3.5 h-3.5" /> {cobradores.length ? "Cobradores" : "Criar cobrador"}
+                      <UserPlus className="w-3.5 h-3.5" /> Novo cobrador
                     </button>
                   </div>
 
