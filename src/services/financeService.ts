@@ -23,6 +23,7 @@ interface FinancialRecordRow {
   notes: string | null;
   bank: string | null;
   representative_id: string | null;
+  cobrador_id?: string | null;
   status: FinancialStatus;
   last_sent_message: string | null;
   last_sent_date: string | null;
@@ -54,6 +55,7 @@ const SELECT_FIELDS = `
   notes,
   bank,
   representative_id,
+  cobrador_id,
   status,
   last_sent_message,
   last_sent_date,
@@ -114,6 +116,7 @@ const mapRowToDebtor = (row: FinancialRecordRow): Debtor => ({
   notes: row.notes || "",
   bank: row.bank || "",
   representativeId: row.representative_id || undefined,
+  cobradorId: row.cobrador_id || undefined,
   status: row.status,
   lastSentMessage: row.last_sent_message || undefined,
   lastSentDate: row.last_sent_date || undefined,
@@ -149,6 +152,7 @@ const mapDebtorToRow = (userId: string, debtor: Debtor) => ({
   notes: debtor.notes || null,
   bank: debtor.bank || null,
   representative_id: isValidUUID(debtor.representativeId) ? debtor.representativeId : null,
+  cobrador_id: isValidUUID(debtor.cobradorId) ? debtor.cobradorId : null,
   status: debtor.status,
   last_sent_message: debtor.lastSentMessage || null,
   last_sent_date: debtor.lastSentDate || null
@@ -202,8 +206,8 @@ export const financeService = {
     if ("ids" in alvo && !alvo.ids.length) return;
     if (cobradorId !== null && !isValidUUID(cobradorId)) throw new Error("Cobrador inválido.");
     const supabase = getSupabaseClient();
-    let q = supabase.from(TABLE_NAME).update({ representative_id: cobradorId }).eq("user_id", userId);
-    q = "ids" in alvo ? q.in("id", alvo.ids) : q.eq("representative_id", alvo.deCobrador);
+    let q = supabase.from(TABLE_NAME).update({ cobrador_id: cobradorId }).eq("user_id", userId);
+    q = "ids" in alvo ? q.in("id", alvo.ids) : q.eq("cobrador_id", alvo.deCobrador);
     const { error } = await q;
     if (error) throw new Error("Não foi possível trocar o cobrador. Tente de novo.");
   },
@@ -253,10 +257,14 @@ export const financeService = {
         delete row.id;
         return row;
       });
-      // Nenhum título do lote traz cobrador: a coluna fica fora do upsert, e o
-      // título que já existe mantém o cobrador que tinha (reimportar não apaga).
+      // Nenhum título do lote traz representante (ou cobrador): a coluna fica
+      // fora do upsert, e o título que já existe mantém o que tinha —
+      // reimportar não apaga o representante nem o cobrador.
       if (rawWithDoc.every((row) => !row.representative_id)) {
         rawWithDoc.forEach((row) => { delete row.representative_id; });
+      }
+      if (rawWithDoc.every((row) => !row.cobrador_id)) {
+        rawWithDoc.forEach((row) => { delete row.cobrador_id; });
       }
 
       // Mesmo título = mesmo documento + cliente + vencimento (migration

@@ -19,6 +19,8 @@ export interface Debtor {
   notes?: string;
   bank?: string; // bank / card product extracted from document
   representativeId?: string; // assigned representative ID
+  /** Quem cobra este devedor (user_cobradores). Não é o representante. */
+  cobradorId?: string;
   status: "pending" | "sent" | "failed";
   lastSentMessage?: string;
   lastSentDate?: string;
@@ -41,6 +43,17 @@ export interface Representative {
   phone: string;
   role: string;
   color: string; // Tailwind color tag
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Quem cobra os devedores — cada um tem uma aba na Carteira. Não é o representante. */
+export interface Cobrador {
+  id: string;
+  userId?: string;
+  name: string;
+  phone: string;
+  color: string; // classe Tailwind do ponto (ex.: "bg-emerald-500")
   createdAt?: string;
   updatedAt?: string;
 }

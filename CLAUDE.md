@@ -109,12 +109,15 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   Regras em `src/config/categories.ts` (`estaPago`, `bloqueiaCobranca`, `foraDoLote`, `correEncargos`);
   no servidor `FORA_DO_LOTE` em `_shared/agrupamento.ts` e `COM_ENCARGOS` em `_shared/encargos.ts`.
   Sem CHECK no banco: tipo novo não precisa de migration.
-- **Cobradores (10/11/2026, pedido do dono):** tabela `user_representantes` (antes "responsáveis").
-  Carteira tem abas Geral / uma por cobrador / Sem cobrador (`repFilter`, vale também em Preparar
-  envios). Cadastro manual, Importar e importação guiada escolhem "Quem vai cobrar"; seleção da
-  Carteira tem "Passar para cobrador". Excluir cobrador deixa os títulos sem cobrador. Regra de
-  automação pode ser só de um cobrador (`representative_id`, migration `20261110120000` — cascade).
-  `createMany` não manda `representative_id` quando nenhum título do lote tem: reimportar não apaga.
+- **Cobradores (10/11/2026, pedido do dono):** quem cobra cada devedor. **Cobrador ≠ representante**
+  (o dono corrigiu: a 1ª versão usou `user_representantes`). Tabela `user_cobradores`, coluna
+  `cobrador_id` no título e na regra (migration `20261110150000`; trigger exige cobrador da mesma
+  conta). Representante/Responsável (`representativeId`, `repFilter`, modal "Responsáveis") segue
+  como era. Carteira tem abas Geral / uma por cobrador / Sem cobrador (`cobradorFiltro`, vale também
+  em Preparar envios); coluna Cobrador na tabela; cadastro, Importar e importação guiada escolhem
+  "Quem vai cobrar"; seleção tem "Passar para cobrador". Excluir cobrador: títulos ficam sem cobrador
+  (set null), regras dele saem (cascade). `createMany` não manda `representative_id`/`cobrador_id`
+  quando nenhum título do lote tem: reimportar não apaga.
 - Bucket `charge-pdfs`: público para o link do boleto, mas SELECT em `storage.objects` só do dono
   (migration `20261109120000`) — antes qualquer um listava os boletos de todos.
 - **Tokens da Z-API no Supabase Vault** (09/11/2026): `token`/`client_token` de `user_zapi_config` e

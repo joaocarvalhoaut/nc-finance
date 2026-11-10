@@ -52,7 +52,7 @@ import BatchConfirmModal, { type BatchConfirmData } from "./BatchConfirmModal";
 import { chaveDeAgrupamento } from "../../supabase/functions/_shared/agrupamento.ts";
 import type { SituacaoDoDia } from "../../supabase/functions/_shared/protecaoNumero.ts";
 import BoletoResponsibilityModal from "./BoletoResponsibilityModal";
-import type { Debtor, MessageTone, Representative } from "../types";
+import type { Cobrador, Debtor, MessageTone } from "../types";
 
 // ─── Tone options ─────────────────────────────────────────────────────────────
 
@@ -100,7 +100,7 @@ interface ClientDashboardProps {
   /** Limite de mensagens de hoje (aquecimento + limite diário da conta). */
   situacaoHoje?: SituacaoDoDia | null;
   /** Cobradores da conta: o importado entra com quem vai cobrar. */
-  cobradores?: Representative[];
+  cobradores?: Cobrador[];
   /** Cobrador já escolhido (aba aberta na Carteira). */
   cobradorInicial?: string;
 }
@@ -127,7 +127,7 @@ export default function ClientDashboard({
 }: ClientDashboardProps) {
   // Quem vai cobrar os títulos deste arquivo ("" = sem cobrador / mantém o que já tinham).
   const [cobrador, setCobrador] = useState(cobradorInicial);
-  const comCobrador = (lista: Debtor[]) => cobrador ? lista.map(d => ({ ...d, representativeId: cobrador })) : lista;
+  const comCobrador = (lista: Debtor[]) => cobrador ? lista.map(d => ({ ...d, cobradorId: cobrador })) : lista;
   // ── WhatsApp status ──────────────────────────────────────────────────────────
   const [waConnected, setWaConnected]   = useState<boolean | null>(null);
   const [waChecking,  setWaChecking]    = useState(false);

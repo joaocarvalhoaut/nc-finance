@@ -167,7 +167,7 @@ export function exportRelatorio(
       "Valor Original",
       "Valor Atualizado",
       "Categoria",
-      "Cobrador",
+      "Representante",
     ]],
     body: rows,
     styles: {

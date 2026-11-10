@@ -23,6 +23,7 @@ import { useAccount } from "./hooks/useAccount";
 import { useSubscription } from "./hooks/useSubscription";
 import { billingLogsService } from "./services/billingLogsService";
 import { financeService } from "./services/financeService";
+import { cobradoresService } from "./services/cobradoresService";
 import { representativesService } from "./services/representativesService";
 import { contactsService, contactKeyFromName, type Contact } from "./services/contactsService";
 import { BillingError, subscriptionService } from "./services/subscriptionService";
@@ -59,6 +60,7 @@ import { PdfPreviewModal, openPdfPreview } from "./components/PdfPreviewModal";
 import { 
   Debtor, 
   Representative, 
+  Cobrador,
   BillingLog,
   PlanId,
   UserConfig,
@@ -313,6 +315,14 @@ export default function App() {
   // Temporary seed data is now persisted by user_id on first authenticated access.
   const [debtors, setDebtors] = useState<Debtor[]>([]);
   const [representatives, setRepresentatives] = useState<Representative[]>([]);
+  // Cobradores: quem cobra cada devedor (user_cobradores). NÃO são os
+  // representantes/responsáveis — cadastros diferentes. Cada um tem aba na Carteira.
+  const [cobradores, setCobradores] = useState<Cobrador[]>([]);
+  const [cobradorFiltro, setCobradorFiltro] = useState<string>("all"); // "all" | "unassigned" | id
+  const [showCobradoresModal, setShowCobradoresModal] = useState(false);
+  const [cobradorForm, setCobradorForm] = useState({ name: "", phone: "" });
+  const [cobradorErro, setCobradorErro] = useState("");
+  const [salvandoCobrador, setSalvandoCobrador] = useState(false);
   // Cadastro de contatos (telefone/dados já preenchidos) por cliente normalizado
   const [contactsByKey, setContactsByKey] = useState<Map<string, Contact>>(new Map());
 
@@ -469,7 +479,7 @@ export default function App() {
     value:    "",
     phone:    "",
     category: "vencidos" as Exclude<Debtor["category"], "desabilitado">,
-    representativeId: "",
+    cobradorId: "",
   });
 
   // Billing Tab specific interactive properties
@@ -779,6 +789,8 @@ export default function App() {
         setDebtors(hydratedRecords.filter(d => !d.archivedAt));
         setArquivados(hydratedRecords.filter(d => d.archivedAt));
         setRepresentatives(hydratedRepresentatives);
+        // Falha aqui não derruba a Carteira: só fica sem as abas de cobrador.
+        void cobradoresService.listByUser(currentOwnerUserId).then(setCobradores).catch(() => setCobradores([]));
         setContactsByKey(new Map(contacts.map((c) => [c.contactKey, c])));
         setBillingLogs(hydratedLogs);
         setGlobalFinePct(hydratedConfig.globalFinePct);
@@ -1680,7 +1692,7 @@ export default function App() {
     const k = chaveDoTitulo(d);
     const mesmo = k ? debtors.find((x) => chaveDoTitulo(x) === k) : undefined;
     // O upsert grava a linha inteira: sem isso, reimportar tirava o cobrador do título.
-    if (mesmo) return { ...d, client: mesmo.client, document: mesmo.document, dueDate: mesmo.dueDate, representativeId: d.representativeId || mesmo.representativeId };
+    if (mesmo) return { ...d, client: mesmo.client, document: mesmo.document, dueDate: mesmo.dueDate, cobradorId: d.cobradorId || mesmo.cobradorId };
 
     if (!estaPago(d.category) || !docBase(d.document)) return d;
     const doc = docBase(d.document);
@@ -1689,7 +1701,7 @@ export default function App() {
     const doCliente = abertosDoDoc.filter((x) => nomeBase(x.client) === nomeBase(d.client));
     const candidatos = doCliente.length ? doCliente : abertosDoDoc;
     const alvo = candidatos.find((x) => x.dueDate === d.dueDate) ?? (candidatos.length === 1 ? candidatos[0] : null);
-    return alvo ? { ...d, client: alvo.client, document: alvo.document, dueDate: alvo.dueDate, representativeId: d.representativeId || alvo.representativeId } : d;
+    return alvo ? { ...d, client: alvo.client, document: alvo.document, dueDate: alvo.dueDate, cobradorId: d.cobradorId || alvo.cobradorId } : d;
   });
 
   // Título repetido (mesmo cliente, documento e vencimento) nunca entra duas
@@ -1698,7 +1710,7 @@ export default function App() {
     const { lista, removidos } = semRepetidos(toSend);
     const chavesCarteira = new Set(debtors.map(chaveDoTitulo).filter(Boolean));
     const jaNaCarteira = lista.filter((d) => { const k = chaveDoTitulo(d); return !!k && chavesCarteira.has(k); }).length;
-    const finalList = alinharComCarteira(importCobrador ? lista.map((d) => ({ ...d, representativeId: importCobrador })) : lista);
+    const finalList = alinharComCarteira(importCobrador ? lista.map((d) => ({ ...d, cobradorId: importCobrador })) : lista);
 
     try {
       const savedDebtors = await financeService.createMany(currentOwnerUserId!, finalList);
@@ -2114,7 +2126,7 @@ export default function App() {
       // Só dígitos: o campo mostra "(11) 98765-4321", mas o envio usa o número.
       phone:    addDebtorForm.phone.replace(/\D/g, ""),
       category: addDebtorForm.category,
-      representativeId: addDebtorForm.representativeId || undefined,
+      cobradorId: addDebtorForm.cobradorId || undefined,
       status:   "pending",
       interestApplied: estaPago(addDebtorForm.category) ? 0 : globalInterestDayPct,
       fineApplied:     estaPago(addDebtorForm.category) ? 0 : globalFinePct,
@@ -2150,7 +2162,7 @@ export default function App() {
       setArquivados(prev => prev.filter(a => a.id !== saved.id));
       // Aprende o contato (telefone) para sugerir em cadastros/importações futuras
       void learnContactsFromDebtors([saved]);
-      setAddDebtorForm({ client: "", supplier: "", document: "", dueDate: "", value: "", phone: "", category: "vencidos", representativeId: "" });
+      setAddDebtorForm({ client: "", supplier: "", document: "", dueDate: "", value: "", phone: "", category: "vencidos", cobradorId: "" });
       setShowAddDebtorModal(false);
     } catch (err) {
       setAddDebtorError(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
@@ -2242,43 +2254,14 @@ export default function App() {
     }
   };
 
-  // Passa títulos para um cobrador (null = sem cobrador). Muda na tela e
-  // salva; se o banco recusar, a tela volta como estava.
-  const passarParaCobrador = async (ids: string[], cobradorId: string | null) => {
-    if (!currentOwnerUserId || !ids.length) return;
-    const antes = new Map(debtors.filter(d => ids.includes(d.id)).map(d => [d.id, d.representativeId] as const));
-    const trocar = (volta: boolean) => setDebtors(prev => prev.map(d => antes.has(d.id)
-      ? { ...d, representativeId: volta ? antes.get(d.id) : cobradorId ?? undefined } : d));
-    trocar(false);
-    setSelectedDebtorIds(new Set());
-    try {
-      await financeService.setCobrador(currentOwnerUserId, { ids: [...antes.keys()] }, cobradorId);
-      const nome = cobradorId ? representatives.find(r => r.id === cobradorId)?.name ?? "o cobrador" : "sem cobrador";
-      setAvisoImportacao(`${antes.size} título${antes.size === 1 ? "" : "s"} ${cobradorId ? `passou${antes.size === 1 ? "" : "aram"} para ${nome}` : `ficou${antes.size === 1 ? "" : "aram"} sem cobrador`}.`);
-    } catch (error) {
-      trocar(true);
-      setAvisoImportacao(error instanceof Error ? error.message : "Não foi possível trocar o cobrador.");
-    }
-  };
-
-  // Excluir cobrador: os títulos dele ficam sem cobrador (nada é apagado).
+  // Delete representative from modal
   const handleDeleteRep = async (repId: string) => {
     if (!currentOwnerUserId) return;
-    const rep = representatives.find((r) => r.id === repId);
-    const qtd = debtors.filter((d) => d.representativeId === repId).length;
-    const regras = automationRules.filter((r) => r.cobradorId === repId).length;
-    if (!window.confirm(`Excluir o cobrador ${rep?.name ?? ""}?${qtd ? ` ${qtd} título${qtd === 1 ? "" : "s"} ${qtd === 1 ? "fica" : "ficam"} sem cobrador.` : ""}${regras ? ` ${regras} regra${regras === 1 ? "" : "s"} de automação dele também ${regras === 1 ? "é excluída" : "são excluídas"}.` : ""} Nenhum título é apagado.`)) return;
     try {
-      await financeService.setCobrador(currentOwnerUserId, { deCobrador: repId }, null);
       await representativesService.remove(currentOwnerUserId, repId);
       setRepresentatives((prev) => prev.filter((r) => r.id !== repId));
-      const limpa = (d: Debtor) => (d.representativeId === repId ? { ...d, representativeId: undefined } : d);
-      setDebtors((prev) => prev.map(limpa));
-      setArquivados((prev) => prev.map(limpa));
-      if (repFilter === repId) setRepFilter("all");
-      setAutomationRules((prev) => prev.filter((r) => r.cobradorId !== repId)); // o banco apaga junto (cascade)
     } catch (error) {
-      setRepModalError(error instanceof Error ? error.message : "Falha ao excluir o cobrador.");
+      setRepModalError(error instanceof Error ? error.message : "Falha ao excluir responsável.");
     }
   };
 
@@ -2286,11 +2269,7 @@ export default function App() {
   const handleAddRepFromModal = async () => {
     if (!currentOwnerUserId) return;
     if (!repModalForm.name.trim()) {
-      setRepModalError("Escreva o nome do cobrador.");
-      return;
-    }
-    if (representatives.some((r) => r.name.trim().toLowerCase() === repModalForm.name.trim().toLowerCase())) {
-      setRepModalError("Já existe um cobrador com esse nome.");
+      setRepModalError("Nome é obrigatório.");
       return;
     }
     setIsSavingRep(true);
@@ -2299,20 +2278,90 @@ export default function App() {
     const newRep: Representative = {
       id: `rep-${Date.now()}`,
       name: repModalForm.name.trim(),
-      // WhatsApp do cobrador é opcional (a coluna não aceita nulo: vai vazio).
-      phone: repModalForm.phone.replace(/\D/g, ""),
-      role: "Cobrador",
+      phone: repModalForm.phone.trim() || "5577999880000",
+      role: repModalForm.role.trim() || "Cobrança",
       color: colors[representatives.length % colors.length],
     };
     try {
       const saved = await representativesService.create(currentOwnerUserId, newRep);
       setRepresentatives((prev) => [...prev, saved]);
       setRepModalForm({ name: "", phone: "", role: "", color: "bg-emerald-500" });
-      setRepFilter(saved.id); // já abre a aba do novo cobrador
     } catch (error) {
-      setRepModalError(error instanceof Error ? error.message : "Falha ao salvar o cobrador.");
+      setRepModalError(error instanceof Error ? error.message : "Falha ao salvar responsável.");
     } finally {
       setIsSavingRep(false);
+    }
+  };
+
+  // ── Cobradores (quem cobra cada devedor; não é o representante) ──────────
+
+  // Passa títulos para um cobrador (null = sem cobrador). Muda na tela e
+  // salva; se o banco recusar, a tela volta como estava.
+  const passarParaCobrador = async (ids: string[], cobradorId: string | null) => {
+    if (!currentOwnerUserId || !ids.length) return;
+    const antes = new Map(debtors.filter(d => ids.includes(d.id)).map(d => [d.id, d.cobradorId] as const));
+    const trocar = (volta: boolean) => setDebtors(prev => prev.map(d => antes.has(d.id)
+      ? { ...d, cobradorId: volta ? antes.get(d.id) : cobradorId ?? undefined } : d));
+    trocar(false);
+    setSelectedDebtorIds(new Set());
+    try {
+      await financeService.setCobrador(currentOwnerUserId, { ids: [...antes.keys()] }, cobradorId);
+      const nome = cobradorId ? cobradores.find(c => c.id === cobradorId)?.name ?? "o cobrador" : "";
+      const n = antes.size, pl = n === 1 ? "" : "s";
+      setAvisoImportacao(cobradorId
+        ? `${n} título${pl} passou${n === 1 ? "" : "aram"} para ${nome}.`
+        : `${n} título${pl} ficou${n === 1 ? "" : "aram"} sem cobrador.`);
+    } catch (error) {
+      trocar(true);
+      setAvisoImportacao(error instanceof Error ? error.message : "Não foi possível trocar o cobrador.");
+    }
+  };
+
+  // Excluir cobrador: os títulos dele ficam sem cobrador (on delete set null)
+  // e as regras de automação só dele saem junto (on delete cascade).
+  const excluirCobrador = async (id: string) => {
+    if (!currentOwnerUserId) return;
+    const c = cobradores.find((x) => x.id === id);
+    const qtd = debtors.filter((d) => d.cobradorId === id).length;
+    const regras = automationRules.filter((r) => r.cobradorId === id).length;
+    const partes = [
+      qtd ? `${qtd} título${qtd === 1 ? "" : "s"} ${qtd === 1 ? "fica" : "ficam"} sem cobrador.` : "",
+      regras ? `${regras} regra${regras === 1 ? "" : "s"} de automação dele também ${regras === 1 ? "é excluída" : "são excluídas"}.` : "",
+    ].filter(Boolean).join(" ");
+    if (!window.confirm(`Excluir o cobrador ${c?.name ?? ""}? ${partes} Nenhum título é apagado.`)) return;
+    try {
+      await cobradoresService.remove(currentOwnerUserId, id);
+      setCobradores((prev) => prev.filter((x) => x.id !== id));
+      const limpa = (d: Debtor) => (d.cobradorId === id ? { ...d, cobradorId: undefined } : d);
+      setDebtors((prev) => prev.map(limpa));
+      setArquivados((prev) => prev.map(limpa));
+      setAutomationRules((prev) => prev.filter((r) => r.cobradorId !== id));
+      if (cobradorFiltro === id) setCobradorFiltro("all");
+    } catch (error) {
+      setCobradorErro(error instanceof Error ? error.message : "Não foi possível excluir o cobrador.");
+    }
+  };
+
+  const criarCobrador = async () => {
+    if (!currentOwnerUserId) return;
+    const nome = cobradorForm.name.trim();
+    if (!nome) { setCobradorErro("Escreva o nome do cobrador."); return; }
+    if (cobradores.some((c) => c.name.trim().toLowerCase() === nome.toLowerCase())) {
+      setCobradorErro("Já existe um cobrador com esse nome.");
+      return;
+    }
+    setSalvandoCobrador(true);
+    setCobradorErro("");
+    const cores = ["bg-emerald-500", "bg-sky-500", "bg-violet-500", "bg-amber-500", "bg-rose-500", "bg-cyan-500", "bg-indigo-500", "bg-pink-500"];
+    try {
+      const novo = await cobradoresService.create(currentOwnerUserId, { name: nome, phone: cobradorForm.phone, color: cores[cobradores.length % cores.length] });
+      setCobradores((prev) => [...prev, novo]);
+      setCobradorForm({ name: "", phone: "" });
+      setCobradorFiltro(novo.id); // já abre a aba do novo cobrador
+    } catch (error) {
+      setCobradorErro(error instanceof Error ? error.message : "Não foi possível criar o cobrador.");
+    } finally {
+      setSalvandoCobrador(false);
     }
   };
 
@@ -2373,7 +2422,8 @@ export default function App() {
         "Valor Atualizado (R$)":(d.updatedValue || d.value),
         "Telefone":             d.phone ? String(d.phone) : "",
         "Categoria":            CATEGORY_PT[d.category] ?? d.category,
-        "Cobrador":             rep ? rep.name : "Sem cobrador",
+        "Responsável":          rep ? rep.name : "Nenhum",
+        "Cobrador":             cobradores.find((c) => c.id === d.cobradorId)?.name ?? "",
         "Observações":          d.notes || "",
       };
     });
@@ -2402,6 +2452,7 @@ export default function App() {
       { wch: 18 }, // Telefone
       { wch: 14 }, // Categoria
       { wch: 22 }, // Responsável
+      { wch: 18 }, // Cobrador
       { wch: 30 }, // Observações
     ];
 
@@ -2614,11 +2665,11 @@ export default function App() {
   }, [debtors, criticalDays, criticalWithInterest, globalFinePct]);
 
   // Cobradores: ids que existem. Título com cobrador excluído conta como "sem cobrador".
-  const cobradorIds = new Set(representatives.map(r => r.id));
+  const cobradorIds = new Set(cobradores.map(c => c.id));
   const doCobrador = (d: Debtor, filtro: string) =>
     filtro === "all" ? true
-      : filtro === "unassigned" ? !d.representativeId || !cobradorIds.has(d.representativeId)
-      : d.representativeId === filtro;
+      : filtro === "unassigned" ? !d.cobradorId || !cobradorIds.has(d.cobradorId)
+      : d.cobradorId === filtro;
   // Cor do cobrador vira um ponto (cadastros antigos guardam "text-x bg-x/10").
   const pontoDoCobrador = (cor: string) => {
     const m = /bg-([a-z]+)-500/.exec(cor || "");
@@ -2633,8 +2684,9 @@ export default function App() {
                             d.supplier.toLowerCase().includes(searchFilter.toLowerCase());
       const matchesCategory = categoryFilter === "all" ? true : d.category === categoryFilter;
       const matchesStatus = statusFilter === "all" ? true : d.status === statusFilter;
-      const matchesRep = doCobrador(d, repFilter);
-      return matchesSearch && matchesCategory && matchesStatus && matchesRep;
+      const matchesRep = repFilter === "all" ? true : repFilter === "unassigned" ? !d.representativeId : d.representativeId === repFilter;
+      const matchesCobrador = doCobrador(d, cobradorFiltro);
+      return matchesSearch && matchesCategory && matchesStatus && matchesRep && matchesCobrador;
     });
     const cmp = (a: string, b: string) =>
       a.trim().localeCompare(b.trim(), "pt-BR", { sensitivity: "base", ignorePunctuation: true });
@@ -2911,8 +2963,8 @@ export default function App() {
                     globalFinePct={globalFinePct}
                     globalInterestDayPct={globalInterestDayPct}
                     knownContacts={contactsByKey}
-                    cobradores={representatives}
-                    cobradorInicial={cobradorIds.has(repFilter) ? repFilter : ""}
+                    cobradores={cobradores}
+                    cobradorInicial={cobradorIds.has(cobradorFiltro) ? cobradorFiltro : ""}
                     onLearnContacts={learnContactsFromDebtors}
                     onBatchSent={(result) => {
                       setBatchSendResult(result);
@@ -2970,7 +3022,7 @@ export default function App() {
                 <div className="space-y-6">
 
                   <div className="flex rounded-lg border border-zinc-800 overflow-hidden w-fit" role="tablist" aria-label="Visão do dashboard">
-                    {([["geral", "Visão geral"], ["responsaveis", "Por cobrador"]] as const).map(([v, txt]) => (
+                    {([["geral", "Visão geral"], ["responsaveis", "Por responsável"]] as const).map(([v, txt]) => (
                       <button
                         key={v}
                         role="tab"
@@ -3221,12 +3273,12 @@ export default function App() {
                   {dashView === "responsaveis" && (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-                    {/* ── Cobradores ──────────────────────────────────────────── */}
+                    {/* ── Responsáveis ────────────────────────────────────────── */}
                     <section className={`${card} lg:col-span-5`}>
                       <header className={cabecalho}>
                         <div>
-                          <h4 className="text-sm font-bold text-white">Cobradores</h4>
-                          <p className="text-xs text-zinc-500 mt-0.5">Quem cobra cada devedor</p>
+                          <h4 className="text-sm font-bold text-white">Responsáveis</h4>
+                          <p className="text-xs text-zinc-500 mt-0.5">Quem cuida de cada carteira</p>
                         </div>
                         <button
                           onClick={() => setShowRepModal(true)}
@@ -3236,7 +3288,7 @@ export default function App() {
                         </button>
                       </header>
                       {representatives.length === 0 ? (
-                        <p className="px-5 py-6 text-xs text-zinc-500 text-center">Nenhum cobrador ainda. Crie na Carteira ou aqui.</p>
+                        <p className="px-5 py-6 text-xs text-zinc-500 text-center">Nenhum responsável cadastrado.</p>
                       ) : (
                         <div className="max-h-[340px] overflow-y-auto divide-y divide-zinc-900">
                           {representatives.map(r => {
@@ -3252,8 +3304,11 @@ export default function App() {
                                   className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left hover:bg-zinc-900/60 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-default"
                                 >
                                   <span className="flex items-center gap-2.5 min-w-0">
-                                    <span className={`w-2 h-2 rounded-sm flex-shrink-0 ${pontoDoCobrador(r.color)}`} />
-                                    <span className="block text-xs font-semibold text-zinc-200 truncate min-w-0">{r.name}</span>
+                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${r.color}`} />
+                                    <span className="min-w-0">
+                                      <span className="block text-xs font-semibold text-zinc-200 truncate">{r.name}</span>
+                                      <span className="block text-[10px] text-zinc-500">{r.role}</span>
+                                    </span>
                                   </span>
                                   <span className={`text-[11px] font-mono flex-shrink-0 ${assignedCount === 0 ? "text-zinc-600" : "text-zinc-300"}`}>
                                     {assignedCount} {assignedCount === 1 ? "devedor" : "devedores"}{assignedCount > 0 && (isExpanded ? " ▴" : " ▾")}
@@ -3284,11 +3339,11 @@ export default function App() {
                       )}
                     </section>
 
-                    {/* ── Resumo por cobrador ─────────────────────────────────── */}
+                    {/* ── Resumo por responsável ──────────────────────────────── */}
                     <section className={`${card} lg:col-span-7`}>
                       <header className={cabecalho}>
                         <div>
-                          <h4 className="text-sm font-bold text-white flex items-center gap-2"><Users className="w-3.5 h-3.5 text-zinc-500" /> Resumo por cobrador</h4>
+                          <h4 className="text-sm font-bold text-white flex items-center gap-2"><Users className="w-3.5 h-3.5 text-zinc-500" /> Resumo por responsável</h4>
                           <p className="text-xs text-zinc-500 mt-0.5">Clientes e valores de cada carteira</p>
                         </div>
                       </header>
@@ -3305,7 +3360,7 @@ export default function App() {
                         const rows = Array.from(repGroups.entries())
                           .map(([key, { rep, items }]) => ({
                             key,
-                            name: rep ? rep.name : "Sem cobrador",
+                            name: rep ? rep.name : "Sem responsável",
                             total: items.length,
                             vencidos: items.filter(d => cobraComoVencido(d.category)).length,
                             aVencer: items.filter(d => d.category === "a_vencer").length,
@@ -3326,7 +3381,7 @@ export default function App() {
                             <table className="w-full text-xs text-left text-zinc-300">
                               <thead className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 border-b border-zinc-800">
                                 <tr>
-                                  <th className={`${th} pl-5`}>Cobrador</th>
+                                  <th className={`${th} pl-5`}>Responsável</th>
                                   <th className={`${th} text-right`}>Clientes</th>
                                   <th className={`${th} text-right`}><span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm" style={{ background: "#e11d48" }} />Vencidos</span></th>
                                   <th className={`${th} text-right`}><span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm" style={{ background: "#d97706" }} />A vencer</span></th>
@@ -3457,7 +3512,7 @@ export default function App() {
                           )}
                         </div>
 
-                        {representatives.length > 0 && (
+                        {cobradores.length > 0 && (
                           <div>
                             <label htmlFor="importar-cobrador" className={`${rotulo} mb-1.5`}>Quem vai cobrar</label>
                             <select
@@ -3467,7 +3522,7 @@ export default function App() {
                               className={`${campo} text-xs`}
                             >
                               <option value="">Sem cobrador (ou mantém o que já tinha)</option>
-                              {representatives.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                              {cobradores.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                             </select>
                           </div>
                         )}
@@ -3760,17 +3815,17 @@ export default function App() {
                   <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] border-b border-zinc-800/80 pb-2" role="tablist" aria-label="Carteira por cobrador">
                     {[
                       { id: "all", nome: "Geral", ponto: "", qtd: debtors.length },
-                      ...representatives.map(r => ({ id: r.id, nome: r.name, ponto: pontoDoCobrador(r.color), qtd: debtors.filter(d => d.representativeId === r.id).length })),
-                      ...(representatives.length > 0 ? [{ id: "unassigned", nome: "Sem cobrador", ponto: "", qtd: debtors.filter(d => doCobrador(d, "unassigned")).length }] : []),
+                      ...cobradores.map(r => ({ id: r.id, nome: r.name, ponto: pontoDoCobrador(r.color), qtd: debtors.filter(d => d.cobradorId === r.id).length })),
+                      ...(cobradores.length > 0 ? [{ id: "unassigned", nome: "Sem cobrador", ponto: "", qtd: debtors.filter(d => doCobrador(d, "unassigned")).length }] : []),
                     ].map(a => {
-                      const ativo = repFilter === a.id;
+                      const ativo = cobradorFiltro === a.id;
                       return (
                         <button
                           key={a.id}
                           type="button"
                           role="tab"
                           aria-selected={ativo}
-                          onClick={() => { setRepFilter(a.id); setSelectedDebtorIds(new Set()); }}
+                          onClick={() => { setCobradorFiltro(a.id); setSelectedDebtorIds(new Set()); }}
                           className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                             ativo ? "bg-emerald-500/15 text-emerald-300" : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900"
                           }`}
@@ -3783,15 +3838,15 @@ export default function App() {
                     })}
                     <button
                       type="button"
-                      onClick={() => { setRepModalError(""); setShowRepModal(true); }}
+                      onClick={() => { setCobradorErro(""); setShowCobradoresModal(true); }}
                       className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 whitespace-nowrap transition-colors cursor-pointer"
                     >
-                      <UserPlus className="w-3.5 h-3.5" /> {representatives.length ? "Cobradores" : "Criar cobrador"}
+                      <UserPlus className="w-3.5 h-3.5" /> {cobradores.length ? "Cobradores" : "Criar cobrador"}
                     </button>
                   </div>
 
                   {/* ── Barra da carteira ───────────────────────────────────────
-                      Configurações (encargos) viram botões que abrem
+                      Configurações (encargos, responsáveis) viram botões que abrem
                       no lugar, para a tabela ser o foco da tela. */}
                   <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex flex-wrap items-center gap-2">
                     <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 w-full sm:w-auto sm:flex-1 sm:min-w-[200px] focus-within:border-zinc-600">
@@ -3859,6 +3914,14 @@ export default function App() {
                       )}
                     </div>
 
+                    <button
+                      type="button"
+                      onClick={() => setShowRepModal(true)}
+                      className="px-3 py-2 rounded-lg border border-zinc-800 hover:border-zinc-700 text-xs text-zinc-300 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
+                    >
+                      <Users className="w-3.5 h-3.5 text-zinc-500" /> Responsáveis
+                    </button>
+
                     <div className="relative">
                       <button
                         onClick={() => setShowExportMenu((v) => !v)}
@@ -3907,7 +3970,7 @@ export default function App() {
                     <button
                       onClick={() => {
                         // Aberto na aba de um cobrador: o título já entra com ele.
-                        setAddDebtorForm(f => ({ ...f, representativeId: cobradorIds.has(repFilter) ? repFilter : "" }));
+                        setAddDebtorForm(f => ({ ...f, cobradorId: cobradorIds.has(cobradorFiltro) ? cobradorFiltro : "" }));
                         setShowAddDebtorModal(true); setAddDebtorError("");
                       }}
                       className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 text-xs whitespace-nowrap"
@@ -4102,7 +4165,7 @@ export default function App() {
                           )}
                         </button>
 
-                        {representatives.length > 0 && (
+                        {cobradores.length > 0 && (
                           <select
                             aria-label="Passar selecionados para um cobrador"
                             value=""
@@ -4113,7 +4176,7 @@ export default function App() {
                             className="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 text-xs font-bold rounded-xl cursor-pointer focus:outline-none focus:border-emerald-500"
                           >
                             <option value="">Passar para cobrador…</option>
-                            {representatives.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                            {cobradores.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                             <option value="nenhum">Sem cobrador</option>
                           </select>
                         )}
@@ -4413,12 +4476,21 @@ export default function App() {
                                         onBlur={() => saveDebtorFieldToDB(d.id)} className={campoCartao} />
                                     </div>
                                     <div className="col-span-2">
-                                      <label htmlFor={`c-resp-${d.id}`} className={rotuloCampo}>Cobrador</label>
+                                      <label htmlFor={`c-resp-${d.id}`} className={rotuloCampo}>Responsável</label>
                                       <select id={`c-resp-${d.id}`} value={d.representativeId || ""}
                                         onChange={(e) => updateGeneralDebtorField(d.id, "representativeId", e.target.value || undefined)}
                                         className={campoCartao}>
-                                        <option value="">Sem cobrador</option>
+                                        <option value="">Não atribuído</option>
                                         {representatives.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                      </select>
+                                    </div>
+                                    <div className="col-span-2">
+                                      <label htmlFor={`c-cob-${d.id}`} className={rotuloCampo}>Cobrador</label>
+                                      <select id={`c-cob-${d.id}`} value={d.cobradorId || ""}
+                                        onChange={(e) => updateGeneralDebtorField(d.id, "cobradorId", e.target.value || undefined)}
+                                        className={campoCartao}>
+                                        <option value="">Sem cobrador</option>
+                                        {cobradores.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                       </select>
                                     </div>
                                   </div>
@@ -4649,6 +4721,24 @@ export default function App() {
                                 </div>
                               </div>
                             </th>
+                            {/* Responsável — com filtro inline */}
+                            <th className="px-4 py-2">
+                              <div className="flex flex-col gap-1.5">
+                                <span>RESPONSÁVEL</span>
+                                <select
+                                  value={repFilter}
+                                  onChange={(e) => setRepFilter(e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className={`bg-zinc-900 border rounded-lg text-[9px] px-1.5 py-0.5 cursor-pointer transition-colors focus:outline-none normal-case tracking-normal font-normal w-full ${repFilter !== "all" ? "border-emerald-500/50 text-emerald-300" : "border-zinc-700 text-zinc-400"}`}
+                                >
+                                  <option value="all">Todos</option>
+                                  <option value="unassigned">Não atribuído</option>
+                                  {representatives.map(r => (
+                                    <option key={r.id} value={r.id}>{r.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </th>
                             {/* Cobrador — o filtro fica nas abas acima da tabela */}
                             <th className="px-4 py-3">COBRADOR</th>
                             <th className="px-4 py-3 text-center">NOTAS</th>
@@ -4659,7 +4749,7 @@ export default function App() {
                         <tbody className="divide-y divide-zinc-900">
                           {filteredDebtors.length === 0 ? (
                             <tr>
-                              <td colSpan={13} className="px-6 py-12 text-center text-zinc-500">
+                              <td colSpan={14} className="px-6 py-12 text-center text-zinc-500">
                                 Nenhum devedor encontrado nos parâmetros de filtros ativos.
                                 Vá para o assistente de extração para importar novas faturas ou clique em "Exportar planilha" para ver amostras.
                               </td>
@@ -4782,9 +4872,22 @@ export default function App() {
                                       onChange={(e) => updateGeneralDebtorField(d.id, "representativeId", e.target.value || undefined)}
                                       className="bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-300 rounded px-2 py-1 max-w-[140px] truncate focus:outline-none"
                                     >
-                                      <option value="">Sem cobrador</option>
+                                      <option value="">Não Atribuído</option>
                                       {representatives.map(r => (
                                         <option key={r.id} value={r.id}>{r.name}</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <select
+                                      aria-label={`Cobrador de ${d.client}`}
+                                      value={d.cobradorId || ""}
+                                      onChange={(e) => updateGeneralDebtorField(d.id, "cobradorId", e.target.value || undefined)}
+                                      className="bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-300 rounded px-2 py-1 max-w-[140px] truncate focus:outline-none"
+                                    >
+                                      <option value="">Sem cobrador</option>
+                                      {cobradores.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
                                       ))}
                                     </select>
                                   </td>
@@ -5166,17 +5269,17 @@ export default function App() {
                               </div>
                             </div>
 
-                            {representatives.length > 0 && (
+                            {cobradores.length > 0 && (
                               <div>
                                 <label htmlFor="novo-cobrador" className={rotulo}>Quem vai cobrar{opcional}</label>
                                 <select
                                   id="novo-cobrador"
-                                  value={addDebtorForm.representativeId}
-                                  onChange={e => setAddDebtorForm(f => ({ ...f, representativeId: e.target.value }))}
+                                  value={addDebtorForm.cobradorId}
+                                  onChange={e => setAddDebtorForm(f => ({ ...f, cobradorId: e.target.value }))}
                                   className={campo}
                                 >
                                   <option value="">Sem cobrador</option>
-                                  {representatives.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                  {cobradores.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                 </select>
                               </div>
                             )}
@@ -5293,7 +5396,7 @@ export default function App() {
                   { id: "desabilitado", label: "Desabilitados", cor: "#71717a" },
                 ];
                 // Cobrador escolhido (mesma aba da Carteira): lista, contagens e "Enviar todos" ficam só com os dele.
-                const daAba = debtors.filter(d => doCobrador(d, repFilter));
+                const daAba = debtors.filter(d => doCobrador(d, cobradorFiltro));
                 const porTipo = new Map<string, number>();
                 daAba.forEach(d => porTipo.set(d.category, (porTipo.get(d.category) ?? 0) + 1));
                 // Última cobrança de cada título, tirada do Histórico (só envios que
@@ -5417,15 +5520,15 @@ export default function App() {
                             );
                           })}
                         </div>
-                        {representatives.length > 0 && (
+                        {cobradores.length > 0 && (
                           <select
                             aria-label="Cobrador"
-                            value={repFilter}
-                            onChange={(e) => setRepFilter(e.target.value)}
-                            className={`mb-2 w-full bg-zinc-900 border rounded-lg px-3 py-2 text-xs focus:outline-none cursor-pointer ${repFilter !== "all" ? "border-emerald-500/50 text-emerald-300" : "border-zinc-800 text-zinc-300"}`}
+                            value={cobradorFiltro}
+                            onChange={(e) => setCobradorFiltro(e.target.value)}
+                            className={`mb-2 w-full bg-zinc-900 border rounded-lg px-3 py-2 text-xs focus:outline-none cursor-pointer ${cobradorFiltro !== "all" ? "border-emerald-500/50 text-emerald-300" : "border-zinc-800 text-zinc-300"}`}
                           >
                             <option value="all">Todos os cobradores</option>
-                            {representatives.map(r => <option key={r.id} value={r.id}>Cobranças de {r.name}</option>)}
+                            {cobradores.map(r => <option key={r.id} value={r.id}>Cobranças de {r.name}</option>)}
                             <option value="unassigned">Sem cobrador</option>
                           </select>
                         )}
@@ -6408,7 +6511,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        {representatives.length > 0 && (
+                        {cobradores.length > 0 && (
                           <div className="sm:col-span-2">
                             <label htmlFor="regra-cobrador" className={rotulo}>Cobrador</label>
                             <select id="regra-cobrador"
@@ -6417,7 +6520,7 @@ export default function App() {
                               className={campo}
                             >
                               <option value="">Todos os cobradores</option>
-                              {representatives.map(r => <option key={r.id} value={r.id}>Só as cobranças de {r.name}</option>)}
+                              {cobradores.map(r => <option key={r.id} value={r.id}>Só as cobranças de {r.name}</option>)}
                             </select>
                           </div>
                         )}
@@ -6663,7 +6766,7 @@ export default function App() {
                                 {rule.skipHolidays && " · pula feriados"}
                                 {rule.sendWindowStart && rule.sendWindowEnd && ` · ${rule.sendWindowStart}–${rule.sendWindowEnd}`}
                                 {rule.maxDailySends != null && ` · máx ${rule.maxDailySends}/dia`}
-                                {rule.cobradorId && ` · só ${representatives.find(r => r.id === rule.cobradorId)?.name ?? "um cobrador"}`}
+                                {rule.cobradorId && ` · só ${cobradores.find(c => c.id === rule.cobradorId)?.name ?? "um cobrador"}`}
                               </p>
                               {(() => {
                                 const estado = regraSalvando.get(rule.id);
@@ -7114,11 +7217,110 @@ export default function App() {
             );
           })()}
 
-          {/* ── Cobradores: criar e excluir (abre pelas abas da Carteira) ── */}
+          {/* ── Modal Global: Gerenciar Responsáveis (acessível de qualquer aba) ── */}
           {showRepModal && (
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
               onClick={(e) => e.target === e.currentTarget && setShowRepModal(false)}
+            >
+              <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+                {/* Header */}
+                <div className="flex items-center justify-between p-5 border-b border-zinc-800 flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-zinc-500" />
+                    <h3 className="text-sm font-bold text-white">Responsáveis</h3>
+                  </div>
+                  <button onClick={() => setShowRepModal(false)} className="text-zinc-500 hover:text-white transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* List */}
+                <div className="overflow-y-auto flex-1 p-5 space-y-2">
+                  {representatives.length === 0 ? (
+                    <p className="text-xs text-zinc-500 text-center py-4">Nenhum responsável cadastrado.</p>
+                  ) : representatives.map((r) => {
+                    const assignedCount = debtors.filter((d) => d.representativeId === r.id).length;
+                    return (
+                      <div key={r.id} className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/60 border border-zinc-800 gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className={`w-3 h-3 rounded-full flex-shrink-0 ${r.color}`} />
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-zinc-200 truncate">{r.name}</p>
+                            <p className="text-[10px] text-zinc-500">{r.role} · {assignedCount} devedor{assignedCount !== 1 ? "es" : ""}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => void handleDeleteRep(r.id)}
+                          className="text-zinc-600 hover:text-rose-400 transition-colors flex-shrink-0 p-1 rounded"
+                          title="Excluir responsável"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Add form */}
+                <div className="border-t border-zinc-800 p-5 space-y-3 flex-shrink-0">
+                  <p className="text-xs font-bold text-zinc-300">Adicionar novo responsável</p>
+                  {repModalError && (
+                    <p className="text-xs text-rose-400">{repModalError}</p>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Nome *</label>
+                      <input aria-label="Nome *"
+                        type="text"
+                        value={repModalForm.name}
+                        onChange={(e) => setRepModalForm((f) => ({ ...f, name: e.target.value }))}
+                        placeholder="Ex: João Silva"
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Cargo</label>
+                      <input aria-label="Cargo"
+                        type="text"
+                        value={repModalForm.role}
+                        onChange={(e) => setRepModalForm((f) => ({ ...f, role: e.target.value }))}
+                        placeholder="Ex: Cobrança"
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Telefone WhatsApp</label>
+                    <input aria-label="Telefone WhatsApp"
+                      type="text"
+                      value={repModalForm.phone}
+                      onChange={(e) => setRepModalForm((f) => ({ ...f, phone: e.target.value }))}
+                      placeholder="5511999990000"
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <button
+                    onClick={() => void handleAddRepFromModal()}
+                    disabled={isSavingRep}
+                    className="w-full py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isSavingRep ? (
+                      <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Salvando...</>
+                    ) : (
+                      <><UserPlus className="w-3.5 h-3.5" /> Adicionar Responsável</>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Cobradores: criar e excluir (abre pelas abas da Carteira) ── */}
+          {showCobradoresModal && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={(e) => e.target === e.currentTarget && setShowCobradoresModal(false)}
             >
               <div role="dialog" aria-modal="true" aria-labelledby="cobradores-titulo" className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]">
                 <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-zinc-800/80 flex-shrink-0">
@@ -7126,14 +7328,14 @@ export default function App() {
                     <h3 id="cobradores-titulo" className="text-sm font-bold text-white">Cobradores</h3>
                     <p className="text-xs text-zinc-500 mt-0.5">Cada cobrador ganha uma aba na Carteira com os devedores dele.</p>
                   </div>
-                  <button type="button" onClick={() => setShowRepModal(false)} aria-label="Fechar" className="text-zinc-500 hover:text-white transition-colors cursor-pointer">
+                  <button type="button" onClick={() => setShowCobradoresModal(false)} aria-label="Fechar" className="text-zinc-500 hover:text-white transition-colors cursor-pointer">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
 
                 <form
                   className="px-5 py-4 border-b border-zinc-800/80 space-y-3 flex-shrink-0"
-                  onSubmit={(e) => { e.preventDefault(); void handleAddRepFromModal(); }}
+                  onSubmit={(e) => { e.preventDefault(); void criarCobrador(); }}
                 >
                   <div className="grid grid-cols-1 sm:grid-cols-[1fr_10rem] gap-2">
                     <div>
@@ -7142,8 +7344,8 @@ export default function App() {
                         id="cobrador-nome"
                         type="text"
                         autoFocus
-                        value={repModalForm.name}
-                        onChange={(e) => setRepModalForm((f) => ({ ...f, name: e.target.value }))}
+                        value={cobradorForm.name}
+                        onChange={(e) => setCobradorForm((f) => ({ ...f, name: e.target.value }))}
                         placeholder="Ex.: Vanessa"
                         className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500"
                       />
@@ -7154,32 +7356,32 @@ export default function App() {
                         id="cobrador-whats"
                         type="tel"
                         inputMode="tel"
-                        value={repModalForm.phone}
-                        onChange={(e) => setRepModalForm((f) => ({ ...f, phone: mascaraTelefone(e.target.value) }))}
+                        value={cobradorForm.phone}
+                        onChange={(e) => setCobradorForm((f) => ({ ...f, phone: mascaraTelefone(e.target.value) }))}
                         placeholder="(00) 00000-0000"
                         className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-sm text-white font-mono tabular-nums placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500"
                       />
                     </div>
                   </div>
-                  {repModalError && <p role="alert" className="text-xs text-rose-400">{repModalError}</p>}
+                  {cobradorErro && <p role="alert" className="text-xs text-rose-400">{cobradorErro}</p>}
                   <button
                     type="submit"
-                    disabled={isSavingRep || !repModalForm.name.trim()}
+                    disabled={salvandoCobrador || !cobradorForm.name.trim()}
                     className="w-full py-2 rounded-md bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    {isSavingRep
+                    {salvandoCobrador
                       ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Salvando…</>
                       : <><UserPlus className="w-3.5 h-3.5" /> Criar cobrador</>}
                   </button>
                 </form>
 
                 <div className="overflow-y-auto flex-1 px-5 py-3">
-                  {representatives.length === 0 ? (
+                  {cobradores.length === 0 ? (
                     <p className="text-xs text-zinc-500 text-center py-4">Nenhum cobrador ainda.</p>
                   ) : (
                     <ul className="divide-y divide-zinc-900">
-                      {representatives.map((r) => {
-                        const qtd = debtors.filter((d) => d.representativeId === r.id).length;
+                      {cobradores.map((r) => {
+                        const qtd = debtors.filter((d) => d.cobradorId === r.id).length;
                         return (
                           <li key={r.id} className="flex items-center justify-between gap-3 py-2.5">
                             <div className="flex items-center gap-2.5 min-w-0">
@@ -7191,7 +7393,7 @@ export default function App() {
                             </div>
                             <button
                               type="button"
-                              onClick={() => void handleDeleteRep(r.id)}
+                              onClick={() => void excluirCobrador(r.id)}
                               className="text-zinc-600 hover:text-rose-400 transition-colors flex-shrink-0 p-1 rounded cursor-pointer"
                               aria-label={`Excluir o cobrador ${r.name}`}
                               title="Excluir cobrador (os títulos dele ficam sem cobrador)"

@@ -95,7 +95,7 @@ const mapRule = (r: RuleRow): AutomationRule => ({
   maxDailySends:   r.max_daily_sends != null ? Number(r.max_daily_sends) : null,
   scheduleMode:    (r.schedule_mode as ScheduleMode | null) ?? "daily",
   skipHolidays:    Boolean(r.skip_holidays),
-  cobradorId:      r.representative_id ? String(r.representative_id) : null,
+  cobradorId:      r.cobrador_id ? String(r.cobrador_id) : null,
   lastRunAt:       (r.last_run_at  as string | null) ?? null,
   nextRunAt:       (r.next_run_at  as string | null) ?? null,
   createdAt:       r.created_at ? String(r.created_at) : undefined,
@@ -168,8 +168,8 @@ export const automationService = {
         schedule_mode:     payload.scheduleMode    ?? "daily",
         skip_holidays:     payload.skipHolidays    ?? false,
         // Só manda a coluna quando há cobrador: a conta sem a migration
-        // 20261110120000 continua criando regras da carteira toda.
-        ...(payload.cobradorId ? { representative_id: payload.cobradorId } : {}),
+        // 20261110150000 continua criando regras da carteira toda.
+        ...(payload.cobradorId ? { cobrador_id: payload.cobradorId } : {}),
         enabled:           true,
       })
       .select("*")
@@ -222,7 +222,7 @@ export const automationService = {
     if (patch.scheduleMode     !== undefined) row.schedule_mode     = patch.scheduleMode;
     if (patch.skipHolidays     !== undefined) row.skip_holidays     = patch.skipHolidays;
     if (patch.enabled          !== undefined) row.enabled           = patch.enabled;
-    if (patch.cobradorId       !== undefined && (patch.cobradorId || patch.cobradorIdAntes)) row.representative_id = patch.cobradorId;
+    if (patch.cobradorId       !== undefined && (patch.cobradorId || patch.cobradorIdAntes)) row.cobrador_id = patch.cobradorId;
     const { error } = await supabase.from("user_automation_rules").update(row).eq("id", id);
     if (error) throw new Error(error.message);
   },

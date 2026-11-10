@@ -149,9 +149,9 @@ const processRule = async (rule: RuleRow, vagasDoDia: VagasDoDia): Promise<void>
       return;
     }
 
-    // Regra de um cobrador: só os títulos dele (coluna da migration 20261110120000).
-    if (rule.representative_id) {
-      debtorQuery = debtorQuery.eq("representative_id", String(rule.representative_id));
+    // Regra de um cobrador: só os títulos dele (user_cobradores, migration 20261110150000).
+    if (rule.cobrador_id) {
+      debtorQuery = debtorQuery.eq("cobrador_id", String(rule.cobrador_id));
     }
 
     const { data: candidates } = await debtorQuery.limit(MAX_JOBS_PER_RULE);
