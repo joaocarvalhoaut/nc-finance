@@ -51,7 +51,7 @@ export function repetidosNaCarteira(debtors: Debtor[]): { fica: Debtor; saem: De
     grupos.set(k, [...(grupos.get(k) ?? []), d]);
   }
   const quando = (d: Debtor) => Date.parse(d.updatedAt ?? d.createdAt ?? "") || 0;
-  const fechado = (d: Debtor) => (d.category === "liquidado" ? 2 : d.category === "desabilitado" ? 1 : 0);
+  const fechado = (d: Debtor) => (d.category === "liquidado" || d.category === "pago_banco" ? 2 : d.category === "desabilitado" ? 1 : 0);
   return [...grupos.values()]
     .filter((g) => g.length > 1)
     .map((g) => {

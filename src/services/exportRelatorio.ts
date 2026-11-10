@@ -5,6 +5,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Debtor, Representative } from "../types";
+import { estaPago } from "../config/categories";
 
 const BRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -13,7 +14,9 @@ const CATEGORY_LABEL: Record<string, string> = {
   vencidos:     "Vencido",
   a_vencer:     "A Vencer",
   recompra:     "Recompra",
+  em_negociacao: "Em negociação",
   liquidado:    "Liquidado",
+  pago_banco:   "Pago pro banco",
   // Antes ausente: desabilitado saía em branco no relatório.
   desabilitado: "Desabilitado",
 };
@@ -72,7 +75,8 @@ export function exportRelatorio(
   const vencidos      = debtors.filter(d => d.category === "vencidos");
   const aVencer       = debtors.filter(d => d.category === "a_vencer");
   const recompras     = debtors.filter(d => d.category === "recompra");
-  const liquidados    = debtors.filter(d => d.category === "liquidado");
+  // Pagos: liquidado ou pago direto ao banco.
+  const liquidados    = debtors.filter(d => estaPago(d.category));
 
   const totalValor    = debtors.reduce((s, d) => s + (d.updatedValue || d.value), 0);
   const vencidosVal   = vencidos.reduce((s, d) => s + (d.updatedValue || d.value), 0);
@@ -95,8 +99,8 @@ export function exportRelatorio(
       cards.push({ label: "A Vencer",  value: String(aVencer.length),   sub: BRL(aVencerVal),   color: [245, 158, 11] });
     if (categoriesPresent.has("recompra"))
       cards.push({ label: "Recompra",  value: String(recompras.length), sub: BRL(recompraVal),  color: [14, 165, 233] });
-    if (categoriesPresent.has("liquidado"))
-      cards.push({ label: "Liquidados", value: String(liquidados.length), sub: BRL(liquidadoVal), color: [16, 185, 129] });
+    if (categoriesPresent.has("liquidado") || categoriesPresent.has("pago_banco"))
+      cards.push({ label: "Pagos", value: String(liquidados.length), sub: BRL(liquidadoVal), color: [16, 185, 129] });
   }
 
   const cardW = (pageW - 20) / cards.length;
@@ -163,7 +167,7 @@ export function exportRelatorio(
       "Valor Original",
       "Valor Atualizado",
       "Categoria",
-      "Representante",
+      "Cobrador",
     ]],
     body: rows,
     styles: {

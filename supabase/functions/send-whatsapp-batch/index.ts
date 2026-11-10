@@ -42,7 +42,7 @@ import { insertBillingLog }                from "../_shared/billingLog.ts";
 import { lerSituacaoDoDia }                from "../_shared/limiteDiario.ts";
 import { mensagemLimiteAtingido, motivoDoLimite } from "../_shared/protecaoNumero.ts";
 import { buildGroupMessage }               from "../_shared/messageBuilder.ts";
-import { chaveDeAgrupamento, linhasDeBoleto } from "../_shared/agrupamento.ts";
+import { chaveDeAgrupamento, linhasDeBoleto, FORA_DO_LOTE } from "../_shared/agrupamento.ts";
 import { loadCompanyName }                 from "../_shared/empresa.ts";
 import { loadZApiCredentialsForUser }       from "../_shared/platformIntegrations.ts";
 import { sanitizeError }                   from "../_shared/sanitize.ts";
@@ -336,7 +336,7 @@ Deno.serve(async (request: Request) => {
       ((linhasDevedores ?? []) as unknown as Array<Record<string, unknown>>).map((r) => [String(r.id), r]),
     );
     const cobravel = (r: Record<string, unknown>) =>
-      r.category !== "liquidado" && r.status !== "liquidado" && r.category !== "desabilitado" &&
+      !FORA_DO_LOTE.has(String(r.category ?? "")) && r.status !== "liquidado" &&
       !r.archived_at && Number(r.amount ?? 0) > 0;
     // Títulos que já foram junto na mensagem de outro título do mesmo cliente.
     const jaEnviadosJunto = new Set<string>();
@@ -362,8 +362,9 @@ Deno.serve(async (request: Request) => {
 
       const dr = debtorRow as unknown as Record<string, unknown>;
 
-      // a.1 NUNCA cobrar liquidados (já pagos), desabilitados nem arquivados — trava no servidor
-      if (dr.category === "liquidado" || dr.status === "liquidado" || dr.category === "desabilitado" || dr.archived_at) {
+      // a.1 NUNCA cobrar pagos (liquidado ou ao banco), desabilitados, em negociação
+      // (só envio um a um) nem arquivados — trava no servidor
+      if (FORA_DO_LOTE.has(String(dr.category ?? "")) || dr.status === "liquidado" || dr.archived_at) {
         results.push({
           debtorId,
           clientName:  String(dr.client_name ?? ""),
@@ -375,6 +376,10 @@ Deno.serve(async (request: Request) => {
             ? "Cliente arquivado — cobrança bloqueada."
             : dr.category === "desabilitado"
             ? "Cliente desabilitado — cobrança bloqueada."
+            : dr.category === "em_negociacao"
+            ? "Em negociação — só envio um a um."
+            : dr.category === "pago_banco"
+            ? "Título pago direto ao banco — cobrança bloqueada."
             : "Cliente liquidado (já pago) — cobrança bloqueada.",
           sentWithPdf: false,
         });

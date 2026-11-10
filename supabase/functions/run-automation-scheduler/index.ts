@@ -24,7 +24,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.8";
 import { corsHeaders } from "../_shared/cors.ts";
 import { ACCESS_COLUMNS, canUseSubscription } from "../_shared/billingStatus.ts";
 import { reconcileAutoInstances } from "../_shared/zapiProvisioning.ts";
-import { chaveDeAgrupamento } from "../_shared/agrupamento.ts";
+import { chaveDeAgrupamento, FORA_DO_LOTE } from "../_shared/agrupamento.ts";
 import { lerSituacaoDoDia } from "../_shared/limiteDiario.ts";
 import { motivoSemEnvio } from "../_shared/diaDeEnvio.ts";
 
@@ -121,8 +121,8 @@ const processRule = async (rule: RuleRow, vagasDoDia: VagasDoDia): Promise<void>
       .eq("user_id", userId)
       .is("archived_at", null)         // arquivado nunca é cobrado
       .neq("status", "sent")            // não cobrar quem já foi marcado como enviado
-      // NUNCA cobrar liquidados (já pagos) nem clientes desabilitados
-      .or("category.is.null,category.not.in.(liquidado,desabilitado)")
+      // NUNCA cobrar pagos, desabilitados nem quem está em negociação
+      .or("category.is.null,category.not.in.(liquidado,pago_banco,desabilitado,em_negociacao)")
       .neq("status", "liquidado");      // rede de segurança caso o status marque liquidação
 
     // A regra segue a CATEGORIA (tipo) do devedor, não só a data. Assim, se o
@@ -147,6 +147,11 @@ const processRule = async (rule: RuleRow, vagasDoDia: VagasDoDia): Promise<void>
       await finalizeRun(runId, runStatus, 0, 0, 0, { reason: "unknown_rule_type", ruleType });
       await updateRule(ruleId);
       return;
+    }
+
+    // Regra de um cobrador: só os títulos dele (coluna da migration 20261110120000).
+    if (rule.representative_id) {
+      debtorQuery = debtorQuery.eq("representative_id", String(rule.representative_id));
     }
 
     const { data: candidates } = await debtorQuery.limit(MAX_JOBS_PER_RULE);
@@ -180,9 +185,8 @@ const processRule = async (rule: RuleRow, vagasDoDia: VagasDoDia): Promise<void>
     const eligible = (candidates ?? [] as DebtorRow[]).filter(
       (d: DebtorRow) =>
         !recentDebtorSet.has(String(d.id)) &&
-        // Defesa em profundidade: nunca cobrar liquidados (já pagos) nem desabilitados
-        d.category !== "liquidado" &&
-        d.category !== "desabilitado" &&
+        // Defesa em profundidade: nunca cobrar pagos, desabilitados nem em negociação
+        !FORA_DO_LOTE.has(String(d.category ?? "")) &&
         !d.archived_at &&
         d.status !== "liquidado",
     );

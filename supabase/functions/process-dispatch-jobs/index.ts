@@ -34,7 +34,7 @@ import { getUsageSnapshot, incrementChargesSent } from "../_shared/usageGuard.ts
 import { checkPilotGuard, incrementPilotDailyCount } from "../_shared/pilotGuard.ts";
 import { insertBillingLog }                      from "../_shared/billingLog.ts";
 import { buildGroupMessage }                     from "../_shared/messageBuilder.ts";
-import { chaveDeAgrupamento, linhasDeBoleto }      from "../_shared/agrupamento.ts";
+import { chaveDeAgrupamento, linhasDeBoleto, FORA_DO_LOTE } from "../_shared/agrupamento.ts";
 import { loadCompanyName }                       from "../_shared/empresa.ts";
 import { loadZApiCredentialsForUser }             from "../_shared/platformIntegrations.ts";
 import { sanitizeError }                         from "../_shared/sanitize.ts";
@@ -308,12 +308,15 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
       return;
     }
 
-    // NUNCA cobrar liquidados (já pagos) nem clientes desabilitados
-    if (dr.category === "liquidado" || dr.status === "liquidado" || dr.category === "desabilitado") {
+    // NUNCA cobrar pagos (liquidado ou ao banco), desabilitados nem em negociação
+    // (este só recebe envio um a um, nunca automação).
+    if (FORA_DO_LOTE.has(String(dr.category ?? "")) || dr.status === "liquidado") {
       await markJob("skipped", {
         last_error: dr.category === "desabilitado"
           ? "Cliente desabilitado — cobranca bloqueada."
-          : "Cliente liquidado (ja pago) — cobranca bloqueada.",
+          : dr.category === "em_negociacao"
+          ? "Em negociacao — fora da automacao."
+          : "Cliente pago — cobranca bloqueada.",
       });
       return;
     }
@@ -369,7 +372,7 @@ const processJob = async (job: Record<string, unknown>): Promise<void> => {
         .eq("user_id", userId)
         .in("id", grupoIds);
       juntos = ((linhas ?? []) as unknown as Array<Record<string, unknown>>).filter((r) =>
-        !r.archived_at && r.category !== "liquidado" && r.status !== "liquidado" && r.category !== "desabilitado" &&
+        !r.archived_at && !FORA_DO_LOTE.has(String(r.category ?? "")) && r.status !== "liquidado" &&
         Number(r.amount ?? 0) > 0 &&
         chaveDeAgrupamento(String(r.client_name ?? ""), String(r.phone ?? ""), String(r.category ?? "")) === chave);
     }

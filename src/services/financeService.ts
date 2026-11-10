@@ -4,7 +4,7 @@ import { ensureNinthDigit } from "../../supabase/functions/_shared/brPhone.ts";
 import { normalizarDigitosTelefone } from "./localDocumentExtraction/regexExtractors";
 import { semRepetidos } from "../utils/tituloUnico";
 
-type FinancialCategory = "vencidos" | "a_vencer" | "recompra" | "liquidado" | "desabilitado";
+type FinancialCategory = "vencidos" | "a_vencer" | "recompra" | "em_negociacao" | "liquidado" | "pago_banco" | "desabilitado";
 type FinancialStatus = "pending" | "sent" | "failed";
 
 interface FinancialRecordRow {
@@ -194,6 +194,20 @@ export const financeService = {
     if (error) throw new Error(error.message || "Falha ao arquivar.");
   },
 
+  /**
+   * Passa títulos para um cobrador (ou tira o cobrador, com null). Por id —
+   * ou, com `deCobrador`, todos os títulos daquele cobrador (usado ao excluí-lo).
+   */
+  async setCobrador(userId: string, alvo: { ids: string[] } | { deCobrador: string }, cobradorId: string | null) {
+    if ("ids" in alvo && !alvo.ids.length) return;
+    if (cobradorId !== null && !isValidUUID(cobradorId)) throw new Error("Cobrador inválido.");
+    const supabase = getSupabaseClient();
+    let q = supabase.from(TABLE_NAME).update({ representative_id: cobradorId }).eq("user_id", userId);
+    q = "ids" in alvo ? q.in("id", alvo.ids) : q.eq("representative_id", alvo.deCobrador);
+    const { error } = await q;
+    if (error) throw new Error("Não foi possível trocar o cobrador. Tente de novo.");
+  },
+
   async create(userId: string, debtor: Debtor) {
     const supabase = getSupabaseClient();
     const payload = mapDebtorToRow(userId, debtor);
@@ -239,6 +253,11 @@ export const financeService = {
         delete row.id;
         return row;
       });
+      // Nenhum título do lote traz cobrador: a coluna fica fora do upsert, e o
+      // título que já existe mantém o cobrador que tinha (reimportar não apaga).
+      if (rawWithDoc.every((row) => !row.representative_id)) {
+        rawWithDoc.forEach((row) => { delete row.representative_id; });
+      }
 
       // Mesmo título = mesmo documento + cliente + vencimento (migration
       // 20261106120000_titulo_unico_doc_cliente_venc). Documento igual com outro
@@ -392,8 +411,8 @@ export const financeService = {
    * reconcileLiquidations — marca como liquidado devedores existentes que
    * correspondem aos registros do arquivo de liquidação (por número de documento).
    *
-   * Regra: apenas altera registros em category "vencidos", "a_vencer" ou
-   * "recompra". Sem recompra aqui, uma recompra já paga continuaria sendo
+   * Regra: apenas altera registros em category "vencidos", "a_vencer",
+   * "recompra" ou "em_negociacao". Sem recompra aqui, uma recompra já paga continuaria sendo
    * cobrada depois de importado o arquivo de liquidação.
    * Nunca cria cobranças para registros de liquidação.
    *
@@ -419,7 +438,7 @@ export const financeService = {
       .from(TABLE_NAME)
       .select("id, document_number")
       .eq("user_id", userId)
-      .in("category", ["vencidos", "a_vencer", "recompra"]);
+      .in("category", ["vencidos", "a_vencer", "recompra", "em_negociacao"]);
 
     if (fetchErr) return 0; // non-critical — não bloqueia o fluxo
 

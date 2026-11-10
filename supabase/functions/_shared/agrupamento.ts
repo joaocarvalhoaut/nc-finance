@@ -11,8 +11,15 @@
 
 import { aplicarEmpresa } from "./assinatura.ts";
 
-/** Tipos que recebem cobrança. Liquidado e desabilitado nunca agrupam. */
-const TIPOS_COBRAVEIS = new Set(["vencidos", "a_vencer", "recompra"]);
+/** Tipos que recebem cobrança. Pagos (liquidado, pago ao banco) e desabilitado nunca agrupam. */
+const TIPOS_COBRAVEIS = new Set(["vencidos", "a_vencer", "recompra", "em_negociacao"]);
+
+/**
+ * Fora de envio em massa (lote, "Enviar todos", automação): pagos, desabilitado
+ * e em negociação — este último só recebe mensagem um a um. Igual a foraDoLote
+ * em src/config/categories.ts.
+ */
+export const FORA_DO_LOTE: ReadonlySet<string> = new Set(["liquidado", "pago_banco", "desabilitado", "em_negociacao"]);
 
 /**
  * Chave do grupo: nome sem acento/caixa/espaços extras + últimos 8 dígitos do

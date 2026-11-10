@@ -26,6 +26,8 @@ export interface AutomationRule {
   maxDailySends:   number | null;
   scheduleMode:    ScheduleMode;    // "daily" | "weekdays"
   skipHolidays:    boolean;         // pular feriados nacionais
+  /** Só cobra os títulos deste cobrador. null = carteira toda. */
+  cobradorId:      string | null;
   lastRunAt:       string | null;
   nextRunAt:       string | null;
   createdAt?: string;
@@ -43,6 +45,7 @@ export interface AutomationRuleCreate {
   maxDailySends?:   number | null;
   scheduleMode?:    ScheduleMode;
   skipHolidays?:    boolean;
+  cobradorId?:      string | null;
 }
 
 export interface AutomationRun {
@@ -92,6 +95,7 @@ const mapRule = (r: RuleRow): AutomationRule => ({
   maxDailySends:   r.max_daily_sends != null ? Number(r.max_daily_sends) : null,
   scheduleMode:    (r.schedule_mode as ScheduleMode | null) ?? "daily",
   skipHolidays:    Boolean(r.skip_holidays),
+  cobradorId:      r.representative_id ? String(r.representative_id) : null,
   lastRunAt:       (r.last_run_at  as string | null) ?? null,
   nextRunAt:       (r.next_run_at  as string | null) ?? null,
   createdAt:       r.created_at ? String(r.created_at) : undefined,
@@ -163,6 +167,9 @@ export const automationService = {
         max_daily_sends:   payload.maxDailySends   ?? null,
         schedule_mode:     payload.scheduleMode    ?? "daily",
         skip_holidays:     payload.skipHolidays    ?? false,
+        // Só manda a coluna quando há cobrador: a conta sem a migration
+        // 20261110120000 continua criando regras da carteira toda.
+        ...(payload.cobradorId ? { representative_id: payload.cobradorId } : {}),
         enabled:           true,
       })
       .select("*")
@@ -200,7 +207,7 @@ export const automationService = {
 
   async updateRule(
     id: string,
-    patch: Partial<AutomationRuleCreate & { enabled: boolean }>,
+    patch: Partial<AutomationRuleCreate & { enabled: boolean; cobradorIdAntes: string | null }>,
   ): Promise<void> {
     const supabase = getSupabaseClient();
     const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -215,6 +222,7 @@ export const automationService = {
     if (patch.scheduleMode     !== undefined) row.schedule_mode     = patch.scheduleMode;
     if (patch.skipHolidays     !== undefined) row.skip_holidays     = patch.skipHolidays;
     if (patch.enabled          !== undefined) row.enabled           = patch.enabled;
+    if (patch.cobradorId       !== undefined && (patch.cobradorId || patch.cobradorIdAntes)) row.representative_id = patch.cobradorId;
     const { error } = await supabase.from("user_automation_rules").update(row).eq("id", id);
     if (error) throw new Error(error.message);
   },

@@ -204,7 +204,7 @@ export interface CruzamentoDeContatos {
 export function cruzarComCarteira(contatos: ContatoLido[], debtors: Debtor[]): CruzamentoDeContatos {
   const porCliente = new Map<string, { nome: string; titulos: Debtor[] }>();
   for (const d of debtors) {
-    if (d.category === "liquidado") continue;
+    if (d.category === "liquidado" || d.category === "pago_banco") continue;
     const k = contactKeyFromName(d.client);
     if (!k) continue;
     const g = porCliente.get(k) ?? { nome: d.client.trim(), titulos: [] };

@@ -206,12 +206,14 @@ Deno.serve(async (request: Request) => {
         .eq("user_id", userId)
         .maybeSingle();
       const chk = debtorChk as { category?: string; status?: string; archived_at?: string | null } | null;
-      if (chk && (chk.category === "liquidado" || chk.status === "liquidado" || chk.category === "desabilitado" || chk.archived_at)) {
+      if (chk && (chk.category === "liquidado" || chk.category === "pago_banco" || chk.status === "liquidado" || chk.category === "desabilitado" || chk.archived_at)) {
         return errResponse(409, {
           error:  chk.archived_at
             ? "Cliente arquivado — cobrança bloqueada."
             : chk.category === "desabilitado"
             ? "Cliente desabilitado — cobrança bloqueada."
+            : chk.category === "pago_banco"
+            ? "Título pago direto ao banco — cobrança bloqueada."
             : "Cliente liquidado (já pago) — cobrança bloqueada.",
           status: "bloqueado_liquidado",
         });
@@ -238,7 +240,7 @@ Deno.serve(async (request: Request) => {
         .in("id", grupoIds);
       titulosJuntos = (rows ?? []) as TituloJunto[];
       const bloqueado = titulosJuntos.some((t) =>
-        t.category === "liquidado" || t.status === "liquidado" || t.category === "desabilitado" || t.archived_at);
+        t.category === "liquidado" || t.category === "pago_banco" || t.status === "liquidado" || t.category === "desabilitado" || t.archived_at);
       if (titulosJuntos.length !== grupoIds.length || bloqueado) {
         return errResponse(409, {
           error:  "Um dos títulos desta mensagem mudou (pago, arquivado ou removido). Atualize a página e envie de novo.",

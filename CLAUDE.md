@@ -104,6 +104,17 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   **Ligado em produção em 09/11/2026** (chave na Vercel + secret no Supabase; login testado pelo dono).
   Caixa sempre visível (`appearance: "always"`): com "interaction-only" ela sumia e o login travava calado.
   Senha mínima: 8 caracteres (cadastro, recuperação e troca).
+- **Tipos novos (10/11/2026):** `em_negociacao` (corre multa/juros, mas fica fora de lote, "Enviar
+  todos" e automação — só envio um a um) e `pago_banco` (conta como pago/recuperado, nunca cobrado).
+  Regras em `src/config/categories.ts` (`estaPago`, `bloqueiaCobranca`, `foraDoLote`, `correEncargos`);
+  no servidor `FORA_DO_LOTE` em `_shared/agrupamento.ts` e `COM_ENCARGOS` em `_shared/encargos.ts`.
+  Sem CHECK no banco: tipo novo não precisa de migration.
+- **Cobradores (10/11/2026, pedido do dono):** tabela `user_representantes` (antes "responsáveis").
+  Carteira tem abas Geral / uma por cobrador / Sem cobrador (`repFilter`, vale também em Preparar
+  envios). Cadastro manual, Importar e importação guiada escolhem "Quem vai cobrar"; seleção da
+  Carteira tem "Passar para cobrador". Excluir cobrador deixa os títulos sem cobrador. Regra de
+  automação pode ser só de um cobrador (`representative_id`, migration `20261110120000` — cascade).
+  `createMany` não manda `representative_id` quando nenhum título do lote tem: reimportar não apaga.
 - Bucket `charge-pdfs`: público para o link do boleto, mas SELECT em `storage.objects` só do dono
   (migration `20261109120000`) — antes qualquer um listava os boletos de todos.
 - **Tokens da Z-API no Supabase Vault** (09/11/2026): `token`/`client_token` de `user_zapi_config` e

@@ -1,5 +1,5 @@
 import { isValidDueDate, parseManualAmount } from "./utils/manualDebtorValidation";
-import { CATEGORY_BADGE, CATEGORY_CYCLE, CATEGORY_LABEL, CATEGORY_TINT, cobraComoVencido } from "./config/categories";
+import { CATEGORY_BADGE, CATEGORY_CYCLE, CATEGORY_LABEL, CATEGORY_TINT, CATEGORY_COR, bloqueiaCobranca, cobraComoVencido, correEncargos, estaPago, foraDoLote } from "./config/categories";
 import React, { useState, useEffect, useMemo, useCallback, lazy } from "react";
 import * as XLSX from "xlsx";
 import Sidebar from "./components/Sidebar";
@@ -322,7 +322,9 @@ export default function App() {
   const [patternTemplates, setPatternTemplates] = useState<PatternMessage[]>(DEFAULT_PATTERNS);
 
   // Extraction screen properties
-  const [importCategory, setImportCategory] = useState<"vencidos" | "a_vencer" | "recompra" | "liquidado">("vencidos");
+  const [importCategory, setImportCategory] = useState<Exclude<Debtor["category"], "desabilitado">>("vencidos");
+  // Quem vai cobrar os títulos importados ("" = sem cobrador / mantém o que já tinham).
+  const [importCobrador, setImportCobrador] = useState("");
   const [extractedDebtors, setExtractedDebtors] = useState<Debtor[]>([]);
   const [extractedSelectedIds, setExtractedSelectedIds] = useState<Set<string>>(new Set());
   // Revisão da importação: leitura com dúvida (vem da extração) e registros
@@ -466,7 +468,8 @@ export default function App() {
     dueDate:  "",
     value:    "",
     phone:    "",
-    category: "vencidos" as "vencidos" | "a_vencer" | "recompra" | "liquidado",
+    category: "vencidos" as Exclude<Debtor["category"], "desabilitado">,
+    representativeId: "",
   });
 
   // Billing Tab specific interactive properties
@@ -858,8 +861,8 @@ export default function App() {
     today.setHours(0, 0, 0, 0);
 
     const updated = debtors.map(d => {
-      // Liquidado / Desabilitado: mantém valor original sem encargos
-      if (d.category === "liquidado" || d.category === "desabilitado") {
+      // Pago (liquidado ou ao banco) / Desabilitado: mantém valor original sem encargos
+      if (bloqueiaCobranca(d.category)) {
         return { ...d, interestApplied: 0, fineApplied: 0, updatedValue: d.value };
       }
 
@@ -988,11 +991,11 @@ export default function App() {
   const handleBatchSend = async () => {
     if (selectedDebtorIds.size === 0 || isBatchSending) return;
 
-    // Nunca envia cobranças para títulos liquidados ou clientes desabilitados
+    // Nunca envia em lote para pagos, desabilitados nem quem está em negociação
     const cobráveis: string[] = Array.from(selectedDebtorIds).filter((id): id is string => {
       const d = debtors.find(x => x.id === id);
       if (!d) return false;
-      if (d.category === "liquidado" || d.category === "desabilitado") return false;
+      if (foraDoLote(d.category)) return false;
       // Valor nao cobravel: enviar "R$ 0,00" a um devedor e pior que nao enviar.
       if (!(d.value > 0)) return false;
       return true;
@@ -1230,12 +1233,14 @@ export default function App() {
       maxDailySends: newRuleForm.maxDailySends ?? null,
       scheduleMode: newRuleForm.scheduleMode ?? "daily",
       skipHolidays: newRuleForm.skipHolidays ?? false,
+      cobradorId: newRuleForm.cobradorId || null,
     };
     try {
       if (editingRuleId) {
         const erro = validateNewAutomationRule(payload);
         if (erro) throw new Error(erro);
-        await automationService.updateRule(editingRuleId, payload);
+        const antes = automationRules.find((r) => r.id === editingRuleId)?.cobradorId ?? null;
+        await automationService.updateRule(editingRuleId, { ...payload, cobradorIdAntes: antes });
         setAutomationRules((prev) => prev.map((r) => (r.id === editingRuleId ? {
           ...r,
           name: payload.name,
@@ -1248,6 +1253,7 @@ export default function App() {
           maxDailySends: payload.maxDailySends ?? null,
           scheduleMode: payload.scheduleMode ?? r.scheduleMode,
           skipHolidays: payload.skipHolidays ?? r.skipHolidays,
+          cobradorId: payload.cobradorId ?? null,
         } : r)));
       } else {
         const created = await automationService.createRule(payload);
@@ -1283,6 +1289,7 @@ export default function App() {
       maxDailySends: rule.maxDailySends,
       scheduleMode: rule.scheduleMode,
       skipHolidays: rule.skipHolidays,
+      cobradorId: rule.cobradorId,
     });
     setShowCreateRuleForm(true);
     setTimeout(() => document.getElementById("form-regra")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
@@ -1432,8 +1439,8 @@ export default function App() {
     void saveDebtorFieldToDB(d.id, amount);
   };
 
-  // Valor cobrado na mensagem: vencidos e recompra com multa + juros ao dia;
-  // a vencer, liquidado e desabilitado no valor original. Calculado aqui e não
+  // Valor cobrado na mensagem: vencidos, recompra e em negociação com multa + juros ao dia;
+  // a vencer, pagos e desabilitado no valor original. Calculado aqui e não
   // lido de updatedValue para não depender de o recálculo já ter rodado.
   // Dias de atraso reais, contados do vencimento (DD/MM/AAAA). Antes era fixo
   // em "12": os tons Firme e Jurídico diziam a todo vencido que o título
@@ -1447,7 +1454,7 @@ export default function App() {
   };
 
   const valorDaMensagem = (debtor: Debtor): number => {
-    if (!cobraComoVencido(debtor.category)) return debtor.value;
+    if (!correEncargos(debtor.category)) return debtor.value;
     const multa = debtor.value * (globalFinePct / 100);
     const juros = debtor.value * (globalInterestDayPct / 100) * diasDeAtrasoDe(debtor);
     return Math.round((debtor.value + multa + juros) * 100) / 100;
@@ -1630,7 +1637,7 @@ export default function App() {
     if (d.client.trim().length < 2) falta.push("cliente");
     if (!isValidDueDate(d.dueDate)) falta.push("vencimento");
     if (!(Number(d.value) > 0)) falta.push("valor");
-    if (d.category !== "liquidado" && !normalizarDigitosTelefone(d.phone || "")) falta.push("WhatsApp");
+    if (!estaPago(d.category) && !normalizarDigitosTelefone(d.phone || "")) falta.push("WhatsApp");
     if (!conferidosIds.has(d.id)) {
       if (!d.document.trim() || /^DOC-\d+$/.test(d.document)) falta.push("documento");
       if (duvidaLeituraIds.has(d.id)) falta.push("leitura");
@@ -1672,16 +1679,17 @@ export default function App() {
   const alinharComCarteira = (lista: Debtor[]): Debtor[] => lista.map((d) => {
     const k = chaveDoTitulo(d);
     const mesmo = k ? debtors.find((x) => chaveDoTitulo(x) === k) : undefined;
-    if (mesmo) return { ...d, client: mesmo.client, document: mesmo.document, dueDate: mesmo.dueDate };
+    // O upsert grava a linha inteira: sem isso, reimportar tirava o cobrador do título.
+    if (mesmo) return { ...d, client: mesmo.client, document: mesmo.document, dueDate: mesmo.dueDate, representativeId: d.representativeId || mesmo.representativeId };
 
-    if (d.category !== "liquidado" || !docBase(d.document)) return d;
+    if (!estaPago(d.category) || !docBase(d.document)) return d;
     const doc = docBase(d.document);
     const abertosDoDoc = debtors.filter((x) =>
-      x.category !== "liquidado" && x.category !== "desabilitado" && docBase(x.document) === doc);
+      !bloqueiaCobranca(x.category) && docBase(x.document) === doc);
     const doCliente = abertosDoDoc.filter((x) => nomeBase(x.client) === nomeBase(d.client));
     const candidatos = doCliente.length ? doCliente : abertosDoDoc;
     const alvo = candidatos.find((x) => x.dueDate === d.dueDate) ?? (candidatos.length === 1 ? candidatos[0] : null);
-    return alvo ? { ...d, client: alvo.client, document: alvo.document, dueDate: alvo.dueDate } : d;
+    return alvo ? { ...d, client: alvo.client, document: alvo.document, dueDate: alvo.dueDate, representativeId: d.representativeId || alvo.representativeId } : d;
   });
 
   // Título repetido (mesmo cliente, documento e vencimento) nunca entra duas
@@ -1690,7 +1698,7 @@ export default function App() {
     const { lista, removidos } = semRepetidos(toSend);
     const chavesCarteira = new Set(debtors.map(chaveDoTitulo).filter(Boolean));
     const jaNaCarteira = lista.filter((d) => { const k = chaveDoTitulo(d); return !!k && chavesCarteira.has(k); }).length;
-    const finalList = alinharComCarteira(lista);
+    const finalList = alinharComCarteira(importCobrador ? lista.map((d) => ({ ...d, representativeId: importCobrador })) : lista);
 
     try {
       const savedDebtors = await financeService.createMany(currentOwnerUserId!, finalList);
@@ -2087,8 +2095,8 @@ export default function App() {
       setAddDebtorError("Informe um vencimento válido no formato DD/MM/AAAA.");
       return;
     }
-    // Sem WhatsApp não há cobrança: obrigatório, exceto na Liquidação (sem envio).
-    if (addDebtorForm.category !== "liquidado" && !normalizarDigitosTelefone(addDebtorForm.phone)) {
+    // Sem WhatsApp não há cobrança: obrigatório, exceto em pago (sem envio).
+    if (!estaPago(addDebtorForm.category) && !normalizarDigitosTelefone(addDebtorForm.phone)) {
       setAddDebtorError(addDebtorForm.phone.trim()
         ? "WhatsApp inválido: informe DDD + número, ex.: (11) 98765-4321."
         : "Informe o WhatsApp do cliente — é para ele que a cobrança vai.");
@@ -2106,10 +2114,11 @@ export default function App() {
       // Só dígitos: o campo mostra "(11) 98765-4321", mas o envio usa o número.
       phone:    addDebtorForm.phone.replace(/\D/g, ""),
       category: addDebtorForm.category,
+      representativeId: addDebtorForm.representativeId || undefined,
       status:   "pending",
-      interestApplied: addDebtorForm.category === "liquidado" ? 0 : globalInterestDayPct,
-      fineApplied:     addDebtorForm.category === "liquidado" ? 0 : globalFinePct,
-      updatedValue:    addDebtorForm.category === "liquidado"
+      interestApplied: estaPago(addDebtorForm.category) ? 0 : globalInterestDayPct,
+      fineApplied:     estaPago(addDebtorForm.category) ? 0 : globalFinePct,
+      updatedValue:    estaPago(addDebtorForm.category)
         ? val
         : Math.round(val * (1 + globalFinePct / 100) * 100) / 100,
     };
@@ -2141,7 +2150,7 @@ export default function App() {
       setArquivados(prev => prev.filter(a => a.id !== saved.id));
       // Aprende o contato (telefone) para sugerir em cadastros/importações futuras
       void learnContactsFromDebtors([saved]);
-      setAddDebtorForm({ client: "", supplier: "", document: "", dueDate: "", value: "", phone: "", category: "vencidos" });
+      setAddDebtorForm({ client: "", supplier: "", document: "", dueDate: "", value: "", phone: "", category: "vencidos", representativeId: "" });
       setShowAddDebtorModal(false);
     } catch (err) {
       setAddDebtorError(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
@@ -2233,14 +2242,43 @@ export default function App() {
     }
   };
 
-  // Delete representative from modal
+  // Passa títulos para um cobrador (null = sem cobrador). Muda na tela e
+  // salva; se o banco recusar, a tela volta como estava.
+  const passarParaCobrador = async (ids: string[], cobradorId: string | null) => {
+    if (!currentOwnerUserId || !ids.length) return;
+    const antes = new Map(debtors.filter(d => ids.includes(d.id)).map(d => [d.id, d.representativeId] as const));
+    const trocar = (volta: boolean) => setDebtors(prev => prev.map(d => antes.has(d.id)
+      ? { ...d, representativeId: volta ? antes.get(d.id) : cobradorId ?? undefined } : d));
+    trocar(false);
+    setSelectedDebtorIds(new Set());
+    try {
+      await financeService.setCobrador(currentOwnerUserId, { ids: [...antes.keys()] }, cobradorId);
+      const nome = cobradorId ? representatives.find(r => r.id === cobradorId)?.name ?? "o cobrador" : "sem cobrador";
+      setAvisoImportacao(`${antes.size} título${antes.size === 1 ? "" : "s"} ${cobradorId ? `passou${antes.size === 1 ? "" : "aram"} para ${nome}` : `ficou${antes.size === 1 ? "" : "aram"} sem cobrador`}.`);
+    } catch (error) {
+      trocar(true);
+      setAvisoImportacao(error instanceof Error ? error.message : "Não foi possível trocar o cobrador.");
+    }
+  };
+
+  // Excluir cobrador: os títulos dele ficam sem cobrador (nada é apagado).
   const handleDeleteRep = async (repId: string) => {
     if (!currentOwnerUserId) return;
+    const rep = representatives.find((r) => r.id === repId);
+    const qtd = debtors.filter((d) => d.representativeId === repId).length;
+    const regras = automationRules.filter((r) => r.cobradorId === repId).length;
+    if (!window.confirm(`Excluir o cobrador ${rep?.name ?? ""}?${qtd ? ` ${qtd} título${qtd === 1 ? "" : "s"} ${qtd === 1 ? "fica" : "ficam"} sem cobrador.` : ""}${regras ? ` ${regras} regra${regras === 1 ? "" : "s"} de automação dele também ${regras === 1 ? "é excluída" : "são excluídas"}.` : ""} Nenhum título é apagado.`)) return;
     try {
+      await financeService.setCobrador(currentOwnerUserId, { deCobrador: repId }, null);
       await representativesService.remove(currentOwnerUserId, repId);
       setRepresentatives((prev) => prev.filter((r) => r.id !== repId));
+      const limpa = (d: Debtor) => (d.representativeId === repId ? { ...d, representativeId: undefined } : d);
+      setDebtors((prev) => prev.map(limpa));
+      setArquivados((prev) => prev.map(limpa));
+      if (repFilter === repId) setRepFilter("all");
+      setAutomationRules((prev) => prev.filter((r) => r.cobradorId !== repId)); // o banco apaga junto (cascade)
     } catch (error) {
-      setRepModalError(error instanceof Error ? error.message : "Falha ao excluir responsável.");
+      setRepModalError(error instanceof Error ? error.message : "Falha ao excluir o cobrador.");
     }
   };
 
@@ -2248,7 +2286,11 @@ export default function App() {
   const handleAddRepFromModal = async () => {
     if (!currentOwnerUserId) return;
     if (!repModalForm.name.trim()) {
-      setRepModalError("Nome é obrigatório.");
+      setRepModalError("Escreva o nome do cobrador.");
+      return;
+    }
+    if (representatives.some((r) => r.name.trim().toLowerCase() === repModalForm.name.trim().toLowerCase())) {
+      setRepModalError("Já existe um cobrador com esse nome.");
       return;
     }
     setIsSavingRep(true);
@@ -2257,16 +2299,18 @@ export default function App() {
     const newRep: Representative = {
       id: `rep-${Date.now()}`,
       name: repModalForm.name.trim(),
-      phone: repModalForm.phone.trim() || "5577999880000",
-      role: repModalForm.role.trim() || "Cobrança",
+      // WhatsApp do cobrador é opcional (a coluna não aceita nulo: vai vazio).
+      phone: repModalForm.phone.replace(/\D/g, ""),
+      role: "Cobrador",
       color: colors[representatives.length % colors.length],
     };
     try {
       const saved = await representativesService.create(currentOwnerUserId, newRep);
       setRepresentatives((prev) => [...prev, saved]);
       setRepModalForm({ name: "", phone: "", role: "", color: "bg-emerald-500" });
+      setRepFilter(saved.id); // já abre a aba do novo cobrador
     } catch (error) {
-      setRepModalError(error instanceof Error ? error.message : "Falha ao salvar responsável.");
+      setRepModalError(error instanceof Error ? error.message : "Falha ao salvar o cobrador.");
     } finally {
       setIsSavingRep(false);
     }
@@ -2313,14 +2357,8 @@ export default function App() {
 
   // Excel (.xlsx) export with proper formatting
   const downloadExcelFormat = () => {
-    const CATEGORY_PT: Record<string, string> = {
-      vencidos:     "Vencido",
-      a_vencer:     "A Vencer",
-      recompra:     "Recompra",
-      liquidado:    "Liquidado",
-      // Antes ausente: desabilitado saía em branco na planilha exportada.
-      desabilitado: "Desabilitado",
-    };
+    // Mesmo rótulo da tela (config/categories): tipo novo nunca sai em branco.
+    const CATEGORY_PT: Record<string, string> = CATEGORY_LABEL;
 
     const rows = debtors.map((d) => {
       const rep = representatives.find((r) => r.id === d.representativeId);
@@ -2335,7 +2373,7 @@ export default function App() {
         "Valor Atualizado (R$)":(d.updatedValue || d.value),
         "Telefone":             d.phone ? String(d.phone) : "",
         "Categoria":            CATEGORY_PT[d.category] ?? d.category,
-        "Responsável":          rep ? rep.name : "Nenhum",
+        "Cobrador":             rep ? rep.name : "Sem cobrador",
         "Observações":          d.notes || "",
       };
     });
@@ -2392,13 +2430,14 @@ export default function App() {
   const handleSendMessage = async () => {
     if (!selectedDebtorForMessage) return;
 
-    // Liquidados / desabilitados nunca devem receber cobrança
-    if (selectedDebtorForMessage.category === "liquidado" || selectedDebtorForMessage.category === "desabilitado") {
+    // Pagos (liquidado ou ao banco) e desabilitados nunca recebem cobrança.
+    // Em negociação recebe: o envio avulso é o único caminho para eles.
+    if (bloqueiaCobranca(selectedDebtorForMessage.category)) {
       setMessageFeedback({
         success: false,
         text: selectedDebtorForMessage.category === "desabilitado"
           ? "Este cliente está desabilitado. Cobranças não são enviadas para clientes desabilitados."
-          : "Este título está marcado como liquidado. Cobranças não são enviadas para títulos pagos.",
+          : `Este título está marcado como ${CATEGORY_LABEL[selectedDebtorForMessage.category].toLowerCase()}. Cobranças não são enviadas para títulos pagos.`,
       });
       return;
     }
@@ -2510,21 +2549,28 @@ export default function App() {
     criticalDebtors,
     criticalValue,
     liquidadoValue,
+    emNegociacaoCount,
+    emNegociacaoValue,
+    pagoBancoCount,
+    pagoBancoValue,
   } = useMemo(() => {
-    // Em aberto: exclui liquidados (já pagos) e desabilitados
+    // Em aberto: exclui pagos (liquidado ou ao banco) e desabilitados
     const totalOriginalVolumeStatus = debtors
-      .filter(d => d.category !== "liquidado" && d.category !== "desabilitado")
+      .filter(d => !bloqueiaCobranca(d.category))
       .reduce((acc, d) => acc + d.value, 0);
     const totalUpdatedVolumeStatus = debtors.reduce((acc, d) => acc + (d.updatedValue || d.value), 0);
 
     let vencidosCount = 0, aVencerCount = 0, liquidadoCount = 0, desabilitadoCount = 0;
     let vencidosValue = 0, aVencerValue = 0, liquidadoValue = 0;
+    let emNegociacaoCount = 0, emNegociacaoValue = 0, pagoBancoCount = 0, pagoBancoValue = 0;
     for (const d of debtors) {
       const v = d.updatedValue || d.value;
       // Recompra é cobrada como vencido e soma nos totais de vencidos.
       if (cobraComoVencido(d.category))       { vencidosCount++;     vencidosValue += v; }
       else if (d.category === "a_vencer")     { aVencerCount++;      aVencerValue += v; }
       else if (d.category === "liquidado")    { liquidadoCount++;    liquidadoValue += d.value; }
+      else if (d.category === "em_negociacao") { emNegociacaoCount++; emNegociacaoValue += v; }
+      else if (d.category === "pago_banco")   { pagoBancoCount++;    pagoBancoValue += d.value; }
       else if (d.category === "desabilitado") { desabilitadoCount++; }
     }
 
@@ -2560,8 +2606,24 @@ export default function App() {
       criticalDebtors,
       criticalValue,
       liquidadoValue,
+      emNegociacaoCount,
+      emNegociacaoValue,
+      pagoBancoCount,
+      pagoBancoValue,
     };
   }, [debtors, criticalDays, criticalWithInterest, globalFinePct]);
+
+  // Cobradores: ids que existem. Título com cobrador excluído conta como "sem cobrador".
+  const cobradorIds = new Set(representatives.map(r => r.id));
+  const doCobrador = (d: Debtor, filtro: string) =>
+    filtro === "all" ? true
+      : filtro === "unassigned" ? !d.representativeId || !cobradorIds.has(d.representativeId)
+      : d.representativeId === filtro;
+  // Cor do cobrador vira um ponto (cadastros antigos guardam "text-x bg-x/10").
+  const pontoDoCobrador = (cor: string) => {
+    const m = /bg-([a-z]+)-500/.exec(cor || "");
+    return m ? `bg-${m[1]}-500` : "bg-zinc-500";
+  };
 
   // Apply filters to display debtors lists
   const filteredDebtors = (() => {
@@ -2571,7 +2633,7 @@ export default function App() {
                             d.supplier.toLowerCase().includes(searchFilter.toLowerCase());
       const matchesCategory = categoryFilter === "all" ? true : d.category === categoryFilter;
       const matchesStatus = statusFilter === "all" ? true : d.status === statusFilter;
-      const matchesRep = repFilter === "all" ? true : repFilter === "unassigned" ? !d.representativeId : d.representativeId === repFilter;
+      const matchesRep = doCobrador(d, repFilter);
       return matchesSearch && matchesCategory && matchesStatus && matchesRep;
     });
     const cmp = (a: string, b: string) =>
@@ -2849,6 +2911,8 @@ export default function App() {
                     globalFinePct={globalFinePct}
                     globalInterestDayPct={globalInterestDayPct}
                     knownContacts={contactsByKey}
+                    cobradores={representatives}
+                    cobradorInicial={cobradorIds.has(repFilter) ? repFilter : ""}
                     onLearnContacts={learnContactsFromDebtors}
                     onBatchSent={(result) => {
                       setBatchSendResult(result);
@@ -2889,11 +2953,13 @@ export default function App() {
                   { key: "vencidos",  label: "Vencidos",   count: vencidosCount,  value: vencidosValue,  cor: "#e11d48",
                     nota: recompraCount > 0 ? `com multa e juros · inclui ${recompraCount} recompra${recompraCount !== 1 ? "s" : ""}` : "com multa e juros" },
                   { key: "a_vencer",  label: "A vencer",   count: aVencerCount,   value: aVencerValue,   cor: "#d97706", nota: "ainda no prazo" },
+                  ...(emNegociacaoCount > 0 ? [{ key: "em_negociacao", label: "Em negociação", count: emNegociacaoCount, value: emNegociacaoValue, cor: CATEGORY_COR.em_negociacao, nota: "com multa e juros · fora do envio em massa" }] : []),
                   { key: "liquidado", label: "Liquidados", count: liquidadoCount, value: liquidadoValue, cor: "#059669", nota: "valor original recebido" },
+                  ...(pagoBancoCount > 0 ? [{ key: "pago_banco", label: "Pagos ao banco", count: pagoBancoCount, value: pagoBancoValue, cor: CATEGORY_COR.pago_banco, nota: "valor original · pago direto ao banco" }] : []),
                 ];
                 const maxSituacao = Math.max(1, ...situacoes.map(s => s.value));
                 const somaSituacoes = situacoes.reduce((a, s) => a + s.value, 0) || 1;
-                const totalClientes = vencidosCount + aVencerCount + liquidadoCount;
+                const totalClientes = vencidosCount + aVencerCount + liquidadoCount + emNegociacaoCount + pagoBancoCount;
                 const enviosUsados = operationalMetrics?.usageThisMonth?.chargesUsed ?? (usage?.chargesSent ?? 0);
                 const enviosLimite = operationalMetrics?.usageThisMonth?.planLimit ?? getPlanDefinition(plan).monthlyChargeLimit;
                 const enviosRestantes = operationalMetrics?.usageThisMonth?.remaining ?? remainingCharges ?? 0;
@@ -2904,7 +2970,7 @@ export default function App() {
                 <div className="space-y-6">
 
                   <div className="flex rounded-lg border border-zinc-800 overflow-hidden w-fit" role="tablist" aria-label="Visão do dashboard">
-                    {([["geral", "Visão geral"], ["responsaveis", "Por responsável"]] as const).map(([v, txt]) => (
+                    {([["geral", "Visão geral"], ["responsaveis", "Por cobrador"]] as const).map(([v, txt]) => (
                       <button
                         key={v}
                         role="tab"
@@ -2990,10 +3056,14 @@ export default function App() {
                         <p className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 flex items-center gap-1.5">
                           <CheckCircle className="w-3 h-3" /> Recebido
                         </p>
-                        <span className="text-[11px] text-zinc-500 font-mono">{titulos(liquidadoCount)}</span>
+                        <span className="text-[11px] text-zinc-500 font-mono">{titulos(liquidadoCount + pagoBancoCount)}</span>
                       </div>
-                      <p className="mt-3 text-2xl font-bold text-white font-mono tabular-nums"><CountUp to={liquidadoValue} prefix="R$ " decimals={2} /></p>
-                      <p className="mt-1.5 text-[11px] text-zinc-500">Títulos liquidados e confirmados.</p>
+                      <p className="mt-3 text-2xl font-bold text-white font-mono tabular-nums"><CountUp to={liquidadoValue + pagoBancoValue} prefix="R$ " decimals={2} /></p>
+                      <p className="mt-1.5 text-[11px] text-zinc-500">
+                        {pagoBancoCount > 0
+                          ? `Liquidados ${formatBRL(liquidadoValue)} · pagos ao banco ${formatBRL(pagoBancoValue)}.`
+                          : "Títulos liquidados e confirmados."}
+                      </p>
                     </div>
                   </div>
 
@@ -3151,12 +3221,12 @@ export default function App() {
                   {dashView === "responsaveis" && (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-                    {/* ── Responsáveis ────────────────────────────────────────── */}
+                    {/* ── Cobradores ──────────────────────────────────────────── */}
                     <section className={`${card} lg:col-span-5`}>
                       <header className={cabecalho}>
                         <div>
-                          <h4 className="text-sm font-bold text-white">Responsáveis</h4>
-                          <p className="text-xs text-zinc-500 mt-0.5">Quem cuida de cada carteira</p>
+                          <h4 className="text-sm font-bold text-white">Cobradores</h4>
+                          <p className="text-xs text-zinc-500 mt-0.5">Quem cobra cada devedor</p>
                         </div>
                         <button
                           onClick={() => setShowRepModal(true)}
@@ -3166,7 +3236,7 @@ export default function App() {
                         </button>
                       </header>
                       {representatives.length === 0 ? (
-                        <p className="px-5 py-6 text-xs text-zinc-500 text-center">Nenhum responsável cadastrado.</p>
+                        <p className="px-5 py-6 text-xs text-zinc-500 text-center">Nenhum cobrador ainda. Crie na Carteira ou aqui.</p>
                       ) : (
                         <div className="max-h-[340px] overflow-y-auto divide-y divide-zinc-900">
                           {representatives.map(r => {
@@ -3182,11 +3252,8 @@ export default function App() {
                                   className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left hover:bg-zinc-900/60 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-default"
                                 >
                                   <span className="flex items-center gap-2.5 min-w-0">
-                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${r.color}`} />
-                                    <span className="min-w-0">
-                                      <span className="block text-xs font-semibold text-zinc-200 truncate">{r.name}</span>
-                                      <span className="block text-[10px] text-zinc-500">{r.role}</span>
-                                    </span>
+                                    <span className={`w-2 h-2 rounded-sm flex-shrink-0 ${pontoDoCobrador(r.color)}`} />
+                                    <span className="block text-xs font-semibold text-zinc-200 truncate min-w-0">{r.name}</span>
                                   </span>
                                   <span className={`text-[11px] font-mono flex-shrink-0 ${assignedCount === 0 ? "text-zinc-600" : "text-zinc-300"}`}>
                                     {assignedCount} {assignedCount === 1 ? "devedor" : "devedores"}{assignedCount > 0 && (isExpanded ? " ▴" : " ▾")}
@@ -3217,11 +3284,11 @@ export default function App() {
                       )}
                     </section>
 
-                    {/* ── Resumo por responsável ──────────────────────────────── */}
+                    {/* ── Resumo por cobrador ─────────────────────────────────── */}
                     <section className={`${card} lg:col-span-7`}>
                       <header className={cabecalho}>
                         <div>
-                          <h4 className="text-sm font-bold text-white flex items-center gap-2"><Users className="w-3.5 h-3.5 text-zinc-500" /> Resumo por responsável</h4>
+                          <h4 className="text-sm font-bold text-white flex items-center gap-2"><Users className="w-3.5 h-3.5 text-zinc-500" /> Resumo por cobrador</h4>
                           <p className="text-xs text-zinc-500 mt-0.5">Clientes e valores de cada carteira</p>
                         </div>
                       </header>
@@ -3238,11 +3305,11 @@ export default function App() {
                         const rows = Array.from(repGroups.entries())
                           .map(([key, { rep, items }]) => ({
                             key,
-                            name: rep ? rep.name : "Sem responsável",
+                            name: rep ? rep.name : "Sem cobrador",
                             total: items.length,
                             vencidos: items.filter(d => cobraComoVencido(d.category)).length,
                             aVencer: items.filter(d => d.category === "a_vencer").length,
-                            liquidados: items.filter(d => d.category === "liquidado").length,
+                            liquidados: items.filter(d => estaPago(d.category)).length,
                             valorTotal: items.reduce((s, d) => s + (d.updatedValue || d.value), 0),
                           }))
                           .filter(r => r.total > 0)
@@ -3259,11 +3326,11 @@ export default function App() {
                             <table className="w-full text-xs text-left text-zinc-300">
                               <thead className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 border-b border-zinc-800">
                                 <tr>
-                                  <th className={`${th} pl-5`}>Responsável</th>
+                                  <th className={`${th} pl-5`}>Cobrador</th>
                                   <th className={`${th} text-right`}>Clientes</th>
                                   <th className={`${th} text-right`}><span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm" style={{ background: "#e11d48" }} />Vencidos</span></th>
                                   <th className={`${th} text-right`}><span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm" style={{ background: "#d97706" }} />A vencer</span></th>
-                                  <th className={`${th} text-right`}><span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm" style={{ background: "#059669" }} />Liquidados</span></th>
+                                  <th className={`${th} text-right`}><span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm" style={{ background: "#059669" }} />Pagos</span></th>
                                   <th className={`${th} pr-5 text-right`}>Valor</th>
                                 </tr>
                               </thead>
@@ -3303,7 +3370,9 @@ export default function App() {
                   { value: "vencidos",  label: "Vencidos",   cor: "#e11d48", description: "Cobrados com multa e juros" },
                   { value: "a_vencer",  label: "A vencer",   cor: "#d97706", description: "Aviso preventivo, tom amigável" },
                   { value: "recompra",  label: "Recompra",   cor: "#0284c7", description: "Cobrados como vencidos" },
+                  { value: "em_negociacao", label: "Em negociação", cor: CATEGORY_COR.em_negociacao, description: "Só envio um a um" },
                   { value: "liquidado", label: "Liquidação", cor: "#059669", description: "Marca como pago, sem cobrança" },
+                  { value: "pago_banco", label: "Pago pro banco", cor: CATEGORY_COR.pago_banco, description: "Pago direto ao banco, sem cobrança" },
                 ] as const;
                 const todosMarcados = extractedDebtors.length > 0 && extractedDebtors.every(d => extractedSelectedIds.has(d.id));
 
@@ -3380,13 +3449,28 @@ export default function App() {
                               );
                             })}
                           </div>
-                          {importCategory === "liquidado" && (
+                          {estaPago(importCategory) && (
                             <p className="mt-2 flex items-start gap-2 text-[11px] text-emerald-300 bg-emerald-500/5 border border-emerald-500/20 rounded-lg px-3 py-2">
                               <HandCoins className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
                               <span>Os títulos encontrados serão marcados como pagos na carteira. Nenhuma cobrança é enviada.</span>
                             </p>
                           )}
                         </div>
+
+                        {representatives.length > 0 && (
+                          <div>
+                            <label htmlFor="importar-cobrador" className={`${rotulo} mb-1.5`}>Quem vai cobrar</label>
+                            <select
+                              id="importar-cobrador"
+                              value={importCobrador}
+                              onChange={(e) => setImportCobrador(e.target.value)}
+                              className={`${campo} text-xs`}
+                            >
+                              <option value="">Sem cobrador (ou mantém o que já tinha)</option>
+                              {representatives.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                            </select>
+                          </div>
+                        )}
 
                         {extractionAlert && (
                           <p className="text-[11px] rounded-lg flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 text-amber-300 px-3 py-2">
@@ -3656,7 +3740,7 @@ export default function App() {
                     );
                   })()}
                   {(() => {
-                    const semWhats = debtors.filter(d => d.category !== "liquidado" && d.category !== "desabilitado" && !normalizarDigitosTelefone(d.phone || "")).length;
+                    const semWhats = debtors.filter(d => !bloqueiaCobranca(d.category) && !normalizarDigitosTelefone(d.phone || "")).length;
                     if (!semWhats) return null;
                     return (
                       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-lg border border-zinc-800 bg-zinc-950">
@@ -3670,8 +3754,44 @@ export default function App() {
                     );
                   })()}
 
+                  {/* ── Abas por cobrador ───────────────────────────────────────
+                      Geral = carteira toda; uma aba por cobrador; Sem cobrador.
+                      A aba escolhida vale também em Preparar envios. */}
+                  <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] border-b border-zinc-800/80 pb-2" role="tablist" aria-label="Carteira por cobrador">
+                    {[
+                      { id: "all", nome: "Geral", ponto: "", qtd: debtors.length },
+                      ...representatives.map(r => ({ id: r.id, nome: r.name, ponto: pontoDoCobrador(r.color), qtd: debtors.filter(d => d.representativeId === r.id).length })),
+                      ...(representatives.length > 0 ? [{ id: "unassigned", nome: "Sem cobrador", ponto: "", qtd: debtors.filter(d => doCobrador(d, "unassigned")).length }] : []),
+                    ].map(a => {
+                      const ativo = repFilter === a.id;
+                      return (
+                        <button
+                          key={a.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={ativo}
+                          onClick={() => { setRepFilter(a.id); setSelectedDebtorIds(new Set()); }}
+                          className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                            ativo ? "bg-emerald-500/15 text-emerald-300" : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900"
+                          }`}
+                        >
+                          {a.ponto && <span className={`w-2 h-2 rounded-sm ${a.ponto}`} />}
+                          {a.nome}
+                          <span className="font-mono text-[10px] text-zinc-500">{a.qtd}</span>
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => { setRepModalError(""); setShowRepModal(true); }}
+                      className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 whitespace-nowrap transition-colors cursor-pointer"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" /> {representatives.length ? "Cobradores" : "Criar cobrador"}
+                    </button>
+                  </div>
+
                   {/* ── Barra da carteira ───────────────────────────────────────
-                      Configurações (encargos, responsáveis) viram botões que abrem
+                      Configurações (encargos) viram botões que abrem
                       no lugar, para a tabela ser o foco da tela. */}
                   <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex flex-wrap items-center gap-2">
                     <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 w-full sm:w-auto sm:flex-1 sm:min-w-[200px] focus-within:border-zinc-600">
@@ -3739,14 +3859,6 @@ export default function App() {
                       )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setShowRepModal(true)}
-                      className="px-3 py-2 rounded-lg border border-zinc-800 hover:border-zinc-700 text-xs text-zinc-300 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
-                    >
-                      <Users className="w-3.5 h-3.5 text-zinc-500" /> Responsáveis
-                    </button>
-
                     <div className="relative">
                       <button
                         onClick={() => setShowExportMenu((v) => !v)}
@@ -3793,7 +3905,11 @@ export default function App() {
                     </div>
 
                     <button
-                      onClick={() => { setShowAddDebtorModal(true); setAddDebtorError(""); }}
+                      onClick={() => {
+                        // Aberto na aba de um cobrador: o título já entra com ele.
+                        setAddDebtorForm(f => ({ ...f, representativeId: cobradorIds.has(repFilter) ? repFilter : "" }));
+                        setShowAddDebtorModal(true); setAddDebtorError("");
+                      }}
                       className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 text-xs whitespace-nowrap"
                     >
                       <PlusCircle className="w-3.5 h-3.5" /> Adicionar devedor
@@ -3986,6 +4102,22 @@ export default function App() {
                           )}
                         </button>
 
+                        {representatives.length > 0 && (
+                          <select
+                            aria-label="Passar selecionados para um cobrador"
+                            value=""
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              if (v) void passarParaCobrador([...selectedDebtorIds], v === "nenhum" ? null : v);
+                            }}
+                            className="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 text-xs font-bold rounded-xl cursor-pointer focus:outline-none focus:border-emerald-500"
+                          >
+                            <option value="">Passar para cobrador…</option>
+                            {representatives.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                            <option value="nenhum">Sem cobrador</option>
+                          </select>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => void handleBulkDisable()}
@@ -4027,7 +4159,7 @@ export default function App() {
                   {selectedDebtorIds.size > 0 && plan !== "basic" && (() => {
                     const mensagens = new Set(
                       debtors
-                        .filter((d) => selectedDebtorIds.has(d.id) && d.category !== "liquidado" && d.category !== "desabilitado" && d.value > 0)
+                        .filter((d) => selectedDebtorIds.has(d.id) && !foraDoLote(d.category) && d.value > 0)
                         .map((d) => chaveDeAgrupamento(d.client, d.phone || "", d.category) ?? d.id),
                     ).size;
                     return mensagens > 0 ? <AvisoBloqueioNumero mensagens={mensagens} compacto situacao={situacaoHoje} /> : null;
@@ -4144,7 +4276,9 @@ export default function App() {
                             <option value="vencidos">Vencidos</option>
                             <option value="a_vencer">A vencer</option>
                             <option value="recompra">Recompra</option>
+                            <option value="em_negociacao">Em negociação</option>
                             <option value="liquidado">Liquidados</option>
+                            <option value="pago_banco">Pagos ao banco</option>
                             <option value="desabilitado">Desabilitados</option>
                           </select>
                           <select aria-label="Ordenar" value={ordem} onChange={(e) => mudarOrdem(e.target.value)} className={filtroCls}>
@@ -4279,11 +4413,11 @@ export default function App() {
                                         onBlur={() => saveDebtorFieldToDB(d.id)} className={campoCartao} />
                                     </div>
                                     <div className="col-span-2">
-                                      <label htmlFor={`c-resp-${d.id}`} className={rotuloCampo}>Responsável</label>
+                                      <label htmlFor={`c-resp-${d.id}`} className={rotuloCampo}>Cobrador</label>
                                       <select id={`c-resp-${d.id}`} value={d.representativeId || ""}
                                         onChange={(e) => updateGeneralDebtorField(d.id, "representativeId", e.target.value || undefined)}
                                         className={campoCartao}>
-                                        <option value="">Não atribuído</option>
+                                        <option value="">Sem cobrador</option>
                                         {representatives.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                       </select>
                                     </div>
@@ -4507,30 +4641,16 @@ export default function App() {
                                     <option value="vencidos">Vencidos</option>
                                     <option value="a_vencer">A vencer</option>
                                     <option value="recompra">Recompra</option>
+                                    <option value="em_negociacao">Em negociação</option>
                                     <option value="liquidado">Liquidado</option>
+                                    <option value="pago_banco">Pago pro banco</option>
                                     <option value="desabilitado">Desabilitados</option>
                                   </select>
                                 </div>
                               </div>
                             </th>
-                            {/* Responsável — com filtro inline */}
-                            <th className="px-4 py-2">
-                              <div className="flex flex-col gap-1.5">
-                                <span>RESPONSÁVEL</span>
-                                <select
-                                  value={repFilter}
-                                  onChange={(e) => setRepFilter(e.target.value)}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className={`bg-zinc-900 border rounded-lg text-[9px] px-1.5 py-0.5 cursor-pointer transition-colors focus:outline-none normal-case tracking-normal font-normal w-full ${repFilter !== "all" ? "border-emerald-500/50 text-emerald-300" : "border-zinc-700 text-zinc-400"}`}
-                                >
-                                  <option value="all">Todos</option>
-                                  <option value="unassigned">Não atribuído</option>
-                                  {representatives.map(r => (
-                                    <option key={r.id} value={r.id}>{r.name}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            </th>
+                            {/* Cobrador — o filtro fica nas abas acima da tabela */}
+                            <th className="px-4 py-3">COBRADOR</th>
                             <th className="px-4 py-3 text-center">NOTAS</th>
                             <th className="px-4 py-3 text-center">BOLETO</th>
                             <th className="px-5 py-3 text-right"><span className="sr-only">Ações</span></th>
@@ -4644,7 +4764,7 @@ export default function App() {
                                     {formatBRL(d.updatedValue || d.value)}
                                   </td>
                                   <td className="px-4 py-3 text-center">
-                                    {/* Vencido → A vencer → Recompra → Liquidado → Desabilitado → Vencido */}
+                                    {/* Ordem do clique: CATEGORY_CYCLE (config/categories) */}
                                     <button
                                       type="button"
                                       onClick={() => ciclarTipo(d.id)}
@@ -4662,7 +4782,7 @@ export default function App() {
                                       onChange={(e) => updateGeneralDebtorField(d.id, "representativeId", e.target.value || undefined)}
                                       className="bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-300 rounded px-2 py-1 max-w-[140px] truncate focus:outline-none"
                                     >
-                                      <option value="">Não Atribuído</option>
+                                      <option value="">Sem cobrador</option>
                                       {representatives.map(r => (
                                         <option key={r.id} value={r.id}>{r.name}</option>
                                       ))}
@@ -4898,7 +5018,9 @@ export default function App() {
                     { value: "vencidos",  label: "Vencidos",   cor: "#e11d48", description: "Multa e juros" },
                     { value: "a_vencer",  label: "A vencer",   cor: "#d97706", description: "Aviso preventivo" },
                     { value: "recompra",  label: "Recompra",   cor: "#0284c7", description: "Como vencido" },
+                    { value: "em_negociacao", label: "Em negociação", cor: CATEGORY_COR.em_negociacao, description: "Só um a um" },
                     { value: "liquidado", label: "Liquidação", cor: "#059669", description: "Sem cobrança" },
+                    { value: "pago_banco", label: "Pago pro banco", cor: CATEGORY_COR.pago_banco, description: "Sem cobrança" },
                   ] as const;
                   const match = contactsByKey.get(contactKeyFromName(addDebtorForm.client));
                   const sugerirTelefone = Boolean(
@@ -4937,7 +5059,7 @@ export default function App() {
                             {/* Tipo do título */}
                             <div>
                               <span className={rotulo}>Tipo do título</span>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-label="Tipo do título">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" role="radiogroup" aria-label="Tipo do título">
                                 {tipos.map(cat => {
                                   const ativo = addDebtorForm.category === cat.value;
                                   return (
@@ -4959,7 +5081,7 @@ export default function App() {
                                   );
                                 })}
                               </div>
-                              {addDebtorForm.category === "liquidado" && (
+                              {estaPago(addDebtorForm.category) && (
                                 <p className="mt-2 flex items-start gap-2 text-[11px] text-emerald-300 bg-emerald-500/5 border border-emerald-500/20 rounded-md px-3 py-2">
                                   <HandCoins className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
                                   O título entra como pago na carteira. Nenhuma cobrança é enviada.
@@ -5030,12 +5152,12 @@ export default function App() {
                                 />
                               </div>
                               <div>
-                                <label htmlFor="novo-telefone" className={rotulo}>WhatsApp{addDebtorForm.category === "liquidado" && opcional}</label>
+                                <label htmlFor="novo-telefone" className={rotulo}>WhatsApp{estaPago(addDebtorForm.category) && opcional}</label>
                                 <input
                                   id="novo-telefone"
                                   type="tel"
                                   inputMode="tel"
-                                  required={addDebtorForm.category !== "liquidado"}
+                                  required={!estaPago(addDebtorForm.category)}
                                   value={addDebtorForm.phone}
                                   onChange={e => setAddDebtorForm(f => ({ ...f, phone: mascaraTelefone(e.target.value) }))}
                                   placeholder="(00) 00000-0000"
@@ -5043,6 +5165,21 @@ export default function App() {
                                 />
                               </div>
                             </div>
+
+                            {representatives.length > 0 && (
+                              <div>
+                                <label htmlFor="novo-cobrador" className={rotulo}>Quem vai cobrar{opcional}</label>
+                                <select
+                                  id="novo-cobrador"
+                                  value={addDebtorForm.representativeId}
+                                  onChange={e => setAddDebtorForm(f => ({ ...f, representativeId: e.target.value }))}
+                                  className={campo}
+                                >
+                                  <option value="">Sem cobrador</option>
+                                  {representatives.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                </select>
+                              </div>
+                            )}
 
                             {jaNaCarteira && (
                               <div role="alert" className="text-xs bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2.5">
@@ -5150,11 +5287,15 @@ export default function App() {
                   { id: "vencidos", label: "Vencidos", cor: "#e11d48" },
                   { id: "a_vencer", label: "A vencer", cor: "#d97706" },
                   { id: "recompra", label: "Recompra", cor: "#0284c7" },
+                  { id: "em_negociacao", label: "Em negociação", cor: CATEGORY_COR.em_negociacao },
                   { id: "liquidado", label: "Liquidados", cor: "#059669" },
+                  { id: "pago_banco", label: "Pagos ao banco", cor: CATEGORY_COR.pago_banco },
                   { id: "desabilitado", label: "Desabilitados", cor: "#71717a" },
                 ];
+                // Cobrador escolhido (mesma aba da Carteira): lista, contagens e "Enviar todos" ficam só com os dele.
+                const daAba = debtors.filter(d => doCobrador(d, repFilter));
                 const porTipo = new Map<string, number>();
-                debtors.forEach(d => porTipo.set(d.category, (porTipo.get(d.category) ?? 0) + 1));
+                daAba.forEach(d => porTipo.set(d.category, (porTipo.get(d.category) ?? 0) + 1));
                 // Última cobrança de cada título, tirada do Histórico (só envios que
                 // saíram). O log não guarda o id do devedor: casa por cliente + documento.
                 const chaveLog = (cliente: string, doc: string) => `${cliente.trim().toLowerCase()}|${(doc || "").trim().toLowerCase()}`;
@@ -5193,7 +5334,7 @@ export default function App() {
                   });
                 };
 
-                const filtrados = debtors.filter(d =>
+                const filtrados = daAba.filter(d =>
                   (tipoEnvio === "todos" || d.category === tipoEnvio) &&
                   (!termo || d.client.toLowerCase().includes(termo) || (d.document || "").toLowerCase().includes(termo)));
                 const enviadosHoje = umPorMensagem(filtrados.filter(cobradoHoje)
@@ -5201,15 +5342,16 @@ export default function App() {
                 // Quem nunca foi cobrado vem primeiro; depois quem foi cobrado há mais
                 // tempo. Liquidados e desabilitados não recebem cobrança: vão para o fim.
                 // Empate mantém a ordem da carteira (o sort é estável).
-                const naoCobravel = (d: Debtor) => d.category === "liquidado" || d.category === "desabilitado";
+                const naoCobravel = (d: Debtor) => bloqueiaCobranca(d.category);
                 const faltamEnviar = umPorMensagem(filtrados.filter(d => !cobradoHoje(d))
                   .sort((a, b) => Number(naoCobravel(a)) - Number(naoCobravel(b)) || (ultimaDe(a) ?? 0) - (ultimaDe(b) ?? 0)));
                 const listaEnvio = abaEnvio === "hoje" ? enviadosHoje : faltamEnviar;
 
                 // "Enviar todos": títulos do tipo filtrado que ainda não foram cobrados
                 // hoje (ignora a busca). Conta mensagens — o servidor junta os títulos.
-                const paraTodos = tipoEnvio === "liquidado" || tipoEnvio === "desabilitado" ? [] : debtors.filter(d =>
-                  (tipoEnvio === "todos" || d.category === tipoEnvio) && !naoCobravel(d) && d.value > 0 && !cobradoHoje(d));
+                // Em negociação fica de fora: só recebe envio um a um.
+                const paraTodos = tipoEnvio !== "todos" && foraDoLote(tipoEnvio) ? [] : daAba.filter(d =>
+                  (tipoEnvio === "todos" || d.category === tipoEnvio) && !foraDoLote(d.category) && d.value > 0 && !cobradoHoje(d));
                 const mensagensTodos = new Set(paraTodos.map(d => chaveEnvio(d) ?? d.id)).size;
                 const rotuloTodos = tipoEnvio === "vencidos" ? "Enviar todos os vencidos"
                   : tipoEnvio === "a_vencer" ? "Enviar todos a vencer"
@@ -5275,6 +5417,18 @@ export default function App() {
                             );
                           })}
                         </div>
+                        {representatives.length > 0 && (
+                          <select
+                            aria-label="Cobrador"
+                            value={repFilter}
+                            onChange={(e) => setRepFilter(e.target.value)}
+                            className={`mb-2 w-full bg-zinc-900 border rounded-lg px-3 py-2 text-xs focus:outline-none cursor-pointer ${repFilter !== "all" ? "border-emerald-500/50 text-emerald-300" : "border-zinc-800 text-zinc-300"}`}
+                          >
+                            <option value="all">Todos os cobradores</option>
+                            {representatives.map(r => <option key={r.id} value={r.id}>Cobranças de {r.name}</option>)}
+                            <option value="unassigned">Sem cobrador</option>
+                          </select>
+                        )}
                         <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 focus-within:border-zinc-600">
                           <Search className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
                           <input
@@ -5288,7 +5442,7 @@ export default function App() {
                         </div>
                         {/* Filtro por tipo: só aparecem os tipos que existem na carteira. */}
                         <div className="mt-2 flex gap-1.5 overflow-x-auto [scrollbar-width:none]" role="radiogroup" aria-label="Filtrar por tipo">
-                          {[{ id: "todos" as const, label: "Todos", cor: "", n: debtors.length },
+                          {[{ id: "todos" as const, label: "Todos", cor: "", n: daAba.length },
                             ...TIPOS_ENVIO.filter(t => porTipo.get(t.id)).map(t => ({ ...t, n: porTipo.get(t.id) ?? 0 }))].map(t => {
                             const ativo = tipoEnvio === t.id;
                             return (
@@ -6254,6 +6408,20 @@ export default function App() {
                           </div>
                         </div>
 
+                        {representatives.length > 0 && (
+                          <div className="sm:col-span-2">
+                            <label htmlFor="regra-cobrador" className={rotulo}>Cobrador</label>
+                            <select id="regra-cobrador"
+                              value={newRuleForm.cobradorId ?? ""}
+                              onChange={(e) => setNewRuleForm((p) => ({ ...p, cobradorId: e.target.value || null }))}
+                              className={campo}
+                            >
+                              <option value="">Todos os cobradores</option>
+                              {representatives.map(r => <option key={r.id} value={r.id}>Só as cobranças de {r.name}</option>)}
+                            </select>
+                          </div>
+                        )}
+
                         {newRuleForm.ruleType === "due_in_days" && (
                           <div>
                             <label htmlFor="regra-dias" className={rotulo}>Dias antes do vencimento</label>
@@ -6495,6 +6663,7 @@ export default function App() {
                                 {rule.skipHolidays && " · pula feriados"}
                                 {rule.sendWindowStart && rule.sendWindowEnd && ` · ${rule.sendWindowStart}–${rule.sendWindowEnd}`}
                                 {rule.maxDailySends != null && ` · máx ${rule.maxDailySends}/dia`}
+                                {rule.cobradorId && ` · só ${representatives.find(r => r.id === rule.cobradorId)?.name ?? "um cobrador"}`}
                               </p>
                               {(() => {
                                 const estado = regraSalvando.get(rule.id);
@@ -6945,100 +7114,95 @@ export default function App() {
             );
           })()}
 
-          {/* ── Modal Global: Gerenciar Responsáveis (acessível de qualquer aba) ── */}
+          {/* ── Cobradores: criar e excluir (abre pelas abas da Carteira) ── */}
           {showRepModal && (
             <div
               className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
               onClick={(e) => e.target === e.currentTarget && setShowRepModal(false)}
             >
-              <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
-                {/* Header */}
-                <div className="flex items-center justify-between p-5 border-b border-zinc-800 flex-shrink-0">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-zinc-500" />
-                    <h3 className="text-sm font-bold text-white">Responsáveis</h3>
+              <div role="dialog" aria-modal="true" aria-labelledby="cobradores-titulo" className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]">
+                <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-zinc-800/80 flex-shrink-0">
+                  <div>
+                    <h3 id="cobradores-titulo" className="text-sm font-bold text-white">Cobradores</h3>
+                    <p className="text-xs text-zinc-500 mt-0.5">Cada cobrador ganha uma aba na Carteira com os devedores dele.</p>
                   </div>
-                  <button onClick={() => setShowRepModal(false)} className="text-zinc-500 hover:text-white transition-colors">
+                  <button type="button" onClick={() => setShowRepModal(false)} aria-label="Fechar" className="text-zinc-500 hover:text-white transition-colors cursor-pointer">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
 
-                {/* List */}
-                <div className="overflow-y-auto flex-1 p-5 space-y-2">
-                  {representatives.length === 0 ? (
-                    <p className="text-xs text-zinc-500 text-center py-4">Nenhum responsável cadastrado.</p>
-                  ) : representatives.map((r) => {
-                    const assignedCount = debtors.filter((d) => d.representativeId === r.id).length;
-                    return (
-                      <div key={r.id} className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/60 border border-zinc-800 gap-3">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className={`w-3 h-3 rounded-full flex-shrink-0 ${r.color}`} />
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-zinc-200 truncate">{r.name}</p>
-                            <p className="text-[10px] text-zinc-500">{r.role} · {assignedCount} devedor{assignedCount !== 1 ? "es" : ""}</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => void handleDeleteRep(r.id)}
-                          className="text-zinc-600 hover:text-rose-400 transition-colors flex-shrink-0 p-1 rounded"
-                          title="Excluir responsável"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Add form */}
-                <div className="border-t border-zinc-800 p-5 space-y-3 flex-shrink-0">
-                  <p className="text-xs font-bold text-zinc-300">Adicionar novo responsável</p>
-                  {repModalError && (
-                    <p className="text-xs text-rose-400">{repModalError}</p>
-                  )}
-                  <div className="grid grid-cols-2 gap-2">
+                <form
+                  className="px-5 py-4 border-b border-zinc-800/80 space-y-3 flex-shrink-0"
+                  onSubmit={(e) => { e.preventDefault(); void handleAddRepFromModal(); }}
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_10rem] gap-2">
                     <div>
-                      <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Nome *</label>
-                      <input aria-label="Nome *"
+                      <label htmlFor="cobrador-nome" className="block mb-1 text-[10px] font-mono uppercase tracking-widest text-zinc-500">Nome</label>
+                      <input
+                        id="cobrador-nome"
                         type="text"
+                        autoFocus
                         value={repModalForm.name}
                         onChange={(e) => setRepModalForm((f) => ({ ...f, name: e.target.value }))}
-                        placeholder="Ex: João Silva"
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                        placeholder="Ex.: Vanessa"
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Cargo</label>
-                      <input aria-label="Cargo"
-                        type="text"
-                        value={repModalForm.role}
-                        onChange={(e) => setRepModalForm((f) => ({ ...f, role: e.target.value }))}
-                        placeholder="Ex: Cobrança"
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                      <label htmlFor="cobrador-whats" className="block mb-1 text-[10px] font-mono uppercase tracking-widest text-zinc-500">WhatsApp <span className="normal-case tracking-normal text-zinc-600">· opcional</span></label>
+                      <input
+                        id="cobrador-whats"
+                        type="tel"
+                        inputMode="tel"
+                        value={repModalForm.phone}
+                        onChange={(e) => setRepModalForm((f) => ({ ...f, phone: mascaraTelefone(e.target.value) }))}
+                        placeholder="(00) 00000-0000"
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-sm text-white font-mono tabular-nums placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500"
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Telefone WhatsApp</label>
-                    <input aria-label="Telefone WhatsApp"
-                      type="text"
-                      value={repModalForm.phone}
-                      onChange={(e) => setRepModalForm((f) => ({ ...f, phone: e.target.value }))}
-                      placeholder="5511999990000"
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
+                  {repModalError && <p role="alert" className="text-xs text-rose-400">{repModalError}</p>}
                   <button
-                    onClick={() => void handleAddRepFromModal()}
-                    disabled={isSavingRep}
-                    className="w-full py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    type="submit"
+                    disabled={isSavingRep || !repModalForm.name.trim()}
+                    className="w-full py-2 rounded-md bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    {isSavingRep ? (
-                      <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Salvando...</>
-                    ) : (
-                      <><UserPlus className="w-3.5 h-3.5" /> Adicionar Responsável</>
-                    )}
+                    {isSavingRep
+                      ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Salvando…</>
+                      : <><UserPlus className="w-3.5 h-3.5" /> Criar cobrador</>}
                   </button>
+                </form>
+
+                <div className="overflow-y-auto flex-1 px-5 py-3">
+                  {representatives.length === 0 ? (
+                    <p className="text-xs text-zinc-500 text-center py-4">Nenhum cobrador ainda.</p>
+                  ) : (
+                    <ul className="divide-y divide-zinc-900">
+                      {representatives.map((r) => {
+                        const qtd = debtors.filter((d) => d.representativeId === r.id).length;
+                        return (
+                          <li key={r.id} className="flex items-center justify-between gap-3 py-2.5">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className={`w-2 h-2 rounded-sm flex-shrink-0 ${pontoDoCobrador(r.color)}`} />
+                              <div className="min-w-0">
+                                <p className="text-sm text-white truncate">{r.name}</p>
+                                <p className="text-[11px] text-zinc-500 font-mono">{qtd} título{qtd !== 1 ? "s" : ""}{r.phone ? ` · ${mascaraTelefone(r.phone)}` : ""}</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteRep(r.id)}
+                              className="text-zinc-600 hover:text-rose-400 transition-colors flex-shrink-0 p-1 rounded cursor-pointer"
+                              aria-label={`Excluir o cobrador ${r.name}`}
+                              title="Excluir cobrador (os títulos dele ficam sem cobrador)"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </div>
               </div>
             </div>

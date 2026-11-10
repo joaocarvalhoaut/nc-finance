@@ -52,7 +52,7 @@ import BatchConfirmModal, { type BatchConfirmData } from "./BatchConfirmModal";
 import { chaveDeAgrupamento } from "../../supabase/functions/_shared/agrupamento.ts";
 import type { SituacaoDoDia } from "../../supabase/functions/_shared/protecaoNumero.ts";
 import BoletoResponsibilityModal from "./BoletoResponsibilityModal";
-import type { Debtor, MessageTone } from "../types";
+import type { Debtor, MessageTone, Representative } from "../types";
 
 // ─── Tone options ─────────────────────────────────────────────────────────────
 
@@ -99,6 +99,10 @@ interface ClientDashboardProps {
   companyName?: string | null;
   /** Limite de mensagens de hoje (aquecimento + limite diário da conta). */
   situacaoHoje?: SituacaoDoDia | null;
+  /** Cobradores da conta: o importado entra com quem vai cobrar. */
+  cobradores?: Representative[];
+  /** Cobrador já escolhido (aba aberta na Carteira). */
+  cobradorInicial?: string;
 }
 
 // ─── Step type ────────────────────────────────────────────────────────────────
@@ -118,7 +122,12 @@ export default function ClientDashboard({
   onGoToSettings,
   companyName = null,
   situacaoHoje = null,
+  cobradores = [],
+  cobradorInicial = "",
 }: ClientDashboardProps) {
+  // Quem vai cobrar os títulos deste arquivo ("" = sem cobrador / mantém o que já tinham).
+  const [cobrador, setCobrador] = useState(cobradorInicial);
+  const comCobrador = (lista: Debtor[]) => cobrador ? lista.map(d => ({ ...d, representativeId: cobrador })) : lista;
   // ── WhatsApp status ──────────────────────────────────────────────────────────
   const [waConnected, setWaConnected]   = useState<boolean | null>(null);
   const [waChecking,  setWaChecking]    = useState(false);
@@ -398,7 +407,7 @@ export default function ClientDashboard({
 
     try {
       // 1. Salva na base consolidada como "liquidado"
-      await financeService.createMany(userId, selected);
+      await financeService.createMany(userId, comCobrador(selected));
 
       // Aprende contatos (telefone) dos registros salvos
       void onLearnContacts?.(selected);
@@ -489,7 +498,7 @@ export default function ClientDashboard({
 
       let persisted: typeof cobráveis;
       try {
-        persisted = await financeService.createMany(userId, cobráveis);
+        persisted = await financeService.createMany(userId, comCobrador(cobráveis));
       } catch (persistErr) {
         throw new Error(
           "Falha ao salvar devedores antes do envio: " +
@@ -690,6 +699,21 @@ export default function ClientDashboard({
                   <HandCoins className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
                   <span>Os títulos encontrados serão marcados como pagos na carteira. Nenhuma cobrança é enviada.</span>
                 </p>
+              )}
+
+              {cobradores.length > 0 && (
+                <div className="mt-3">
+                  <label htmlFor="guiado-cobrador" className="block text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-1.5">Quem vai cobrar</label>
+                  <select
+                    id="guiado-cobrador"
+                    value={cobrador}
+                    onChange={(e) => setCobrador(e.target.value)}
+                    className="w-full sm:w-72 bg-zinc-900 border border-zinc-800 rounded-md px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="">Sem cobrador (ou mantém o que já tinha)</option>
+                    {cobradores.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                </div>
               )}
             </div>
 
