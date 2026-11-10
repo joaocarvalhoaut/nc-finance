@@ -462,7 +462,7 @@ export default function App() {
   const [showRepModal, setShowRepModal] = useState(false);
   const [expandedRepId, setExpandedRepId] = useState<string | null>(null);
   // Dashboard em duas visões para não lotar a tela: o dia a dia e a divisão por responsável.
-  const [dashView, setDashView] = useState<"geral" | "responsaveis">("geral");
+  const [dashView, setDashView] = useState<"geral" | "responsaveis" | "cobradores">("geral");
   const [repModalForm, setRepModalForm] = useState({ name: "", phone: "", role: "", color: "bg-emerald-500" });
   const [isSavingRep, setIsSavingRep] = useState(false);
   const [repModalError, setRepModalError] = useState("");
@@ -3029,7 +3029,7 @@ export default function App() {
                 <div className="space-y-6">
 
                   <div className="flex rounded-lg border border-zinc-800 overflow-hidden w-fit" role="tablist" aria-label="Visão do dashboard">
-                    {([["geral", "Visão geral"], ["responsaveis", "Por responsável"]] as const).map(([v, txt]) => (
+                    {([["geral", "Visão geral"], ["cobradores", "Por cobrador"], ["responsaveis", "Por responsável"]] as const).map(([v, txt]) => (
                       <button
                         key={v}
                         role="tab"
@@ -3415,6 +3415,93 @@ export default function App() {
                     </section>
                   </div>
                   )}
+
+                  {dashView === "cobradores" && (() => {
+                    // Uma linha por cobrador (e "Sem cobrador"). Clicar abre a Carteira na aba dele.
+                    const grupos = new Map<string, { cob: Cobrador | null; itens: Debtor[] }>();
+                    cobradores.forEach(c => grupos.set(c.id, { cob: c, itens: [] }));
+                    grupos.set("unassigned", { cob: null, itens: [] });
+                    debtors.forEach(d => grupos.get(d.cobradorId && grupos.has(d.cobradorId) ? d.cobradorId : "unassigned")!.itens.push(d));
+                    const linhas = [...grupos.entries()]
+                      .map(([id, { cob, itens }]) => ({
+                        id,
+                        nome: cob ? cob.name : "Sem cobrador",
+                        ponto: cob ? pontoDoCobrador(cob.color) : "",
+                        titulos: itens.length,
+                        vencidos: itens.filter(d => cobraComoVencido(d.category)).length,
+                        aVencer: itens.filter(d => d.category === "a_vencer").length,
+                        negociacao: itens.filter(d => d.category === "em_negociacao").length,
+                        pagos: itens.filter(d => estaPago(d.category)).length,
+                        aberto: itens.filter(d => !bloqueiaCobranca(d.category)).reduce((s, d) => s + (d.updatedValue || d.value), 0),
+                        recuperado: itens.filter(d => estaPago(d.category)).reduce((s, d) => s + d.value, 0),
+                      }))
+                      .filter(l => l.titulos > 0 || l.id !== "unassigned")
+                      // Sem cobrador por último; os outros pelo valor em aberto.
+                      .sort((a, b) => Number(a.id === "unassigned") - Number(b.id === "unassigned") || b.aberto - a.aberto);
+                    const th = "px-3 py-2.5 font-medium";
+                    const pontoTipo = (cor: string) => <span className="w-1.5 h-1.5 rounded-sm" style={{ background: cor }} />;
+                    return (
+                      <section className={card}>
+                        <header className={cabecalho}>
+                          <div>
+                            <h4 className="text-sm font-bold text-white">Por cobrador</h4>
+                            <p className="text-xs text-zinc-500 mt-0.5">Quanto cada um tem para cobrar e quanto já recuperou. Clique para abrir a carteira dele.</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { setCobradorErro(""); setShowCobradoresModal(true); }}
+                            className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                          >
+                            <UserPlus className="w-3 h-3" /> Novo cobrador
+                          </button>
+                        </header>
+                        {cobradores.length === 0 ? (
+                          <p className="px-5 py-8 text-xs text-zinc-500 text-center">Nenhum cobrador ainda. Crie um para dividir a carteira.</p>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs text-left text-zinc-300">
+                              <thead className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 border-b border-zinc-800">
+                                <tr>
+                                  <th className={`${th} pl-5`}>Cobrador</th>
+                                  <th className={`${th} text-right`}>Títulos</th>
+                                  <th className={`${th} text-right`}><span className="inline-flex items-center gap-1">{pontoTipo(CATEGORY_COR.vencidos)}Vencidos</span></th>
+                                  <th className={`${th} text-right`}><span className="inline-flex items-center gap-1">{pontoTipo(CATEGORY_COR.a_vencer)}A vencer</span></th>
+                                  <th className={`${th} text-right`}><span className="inline-flex items-center gap-1">{pontoTipo(CATEGORY_COR.em_negociacao)}Negociação</span></th>
+                                  <th className={`${th} text-right`}><span className="inline-flex items-center gap-1">{pontoTipo(CATEGORY_COR.liquidado)}Pagos</span></th>
+                                  <th className={`${th} text-right`}>Em aberto</th>
+                                  <th className={`${th} pr-5 text-right`}>Recuperado</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-zinc-900">
+                                {linhas.map(l => (
+                                  <tr
+                                    key={l.id}
+                                    onClick={() => { setCobradorFiltro(l.id); setSelectedDebtorIds(new Set()); setCurrentTab("visao_geral"); }}
+                                    className="hover:bg-zinc-900/60 transition-colors cursor-pointer"
+                                    title={`Abrir a carteira de ${l.nome}`}
+                                  >
+                                    <td className="px-3 pl-5 py-2.5 font-semibold text-zinc-200">
+                                      <span className="inline-flex items-center gap-2">
+                                        {l.ponto ? <span className={`w-2 h-2 rounded-sm ${l.ponto}`} /> : <span className="w-2 h-2 rounded-sm border border-zinc-600" />}
+                                        {l.nome}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-white">{l.titulos}</td>
+                                    <td className="px-3 py-2.5 text-right font-mono tabular-nums">{l.vencidos}</td>
+                                    <td className="px-3 py-2.5 text-right font-mono tabular-nums">{l.aVencer}</td>
+                                    <td className="px-3 py-2.5 text-right font-mono tabular-nums">{l.negociacao}</td>
+                                    <td className="px-3 py-2.5 text-right font-mono tabular-nums">{l.pagos}</td>
+                                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-white">{formatBRL(l.aberto)}</td>
+                                    <td className="px-3 pr-5 py-2.5 text-right font-mono tabular-nums text-emerald-300">{formatBRL(l.recuperado)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })()}
 
                 </div>
                 );
