@@ -22,10 +22,12 @@ export interface AplicarTelefones {
   contatos: { clientName: string; phone: string }[];
 }
 
+type Resultado = { titulos: number; falhas: number; contatos: number; erroAgenda?: boolean };
+
 interface Props {
   debtors: Debtor[];
   onClose: () => void;
-  onAplicar: (dados: AplicarTelefones) => Promise<{ titulos: number; falhas: number; contatos: number }>;
+  onAplicar: (dados: AplicarTelefones) => Promise<Resultado>;
 }
 
 const ACEITA = ".vcf,.xlsx,.xls,.ods,.csv,.txt";
@@ -42,7 +44,7 @@ export default function ImportarTelefones({ debtors, onClose, onAplicar }: Props
   const [trocarOutros, setTrocarOutros] = useState(false);
   const [guardarFora, setGuardarFora] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const [resultado, setResultado] = useState<{ titulos: number; falhas: number; contatos: number } | null>(null);
+  const [resultado, setResultado] = useState<Resultado | null>(null);
 
   const lerEscolhido = async (f: File) => {
     setArquivo(f.name);
@@ -167,6 +169,7 @@ export default function ImportarTelefones({ debtors, onClose, onAplicar }: Props
                 {plural(resultado.titulos, "título ganhou WhatsApp", "títulos ganharam WhatsApp")}
                 {resultado.contatos > 0 && ` · ${plural(resultado.contatos, "contato salvo", "contatos salvos")} na agenda`}.
               </p>
+              {resultado.erroAgenda && <p className="text-amber-300">Os contatos não foram salvos na agenda. Os telefones dos títulos estão salvos.</p>}
               {resultado.falhas > 0 && <p className="text-amber-300">{plural(resultado.falhas, "título não foi salvo", "títulos não foram salvos")} — tente de novo.</p>}
             </div>
           )}

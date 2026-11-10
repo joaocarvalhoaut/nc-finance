@@ -4,7 +4,7 @@
  */
 
 import type { Debtor } from "../../types";
-import { contatosDaTabela, cruzarComCarteira, lerVcf } from "../importarTelefones";
+import { contatosDaTabela, cruzarComCarteira, lerVcf, telefoneDe } from "../importarTelefones";
 
 let passed = 0;
 let failed = 0;
@@ -78,6 +78,24 @@ iguais(cruz.fora.map(c => c.nome), ["Ana", "Pedro"], "uma palavra só nunca casa
 const ambiguo = cruzarComCarteira([{ nome: "Ana Paula", telefone: "11911112222" }],
   [t({ id: "f", client: "Ana Paula Souza" }), t({ id: "g", client: "Ana Paula Lima" })]);
 iguais(ambiguo.casados.length, 0, "dois clientes começam igual: não chuta");
+
+// ── Casos achados na revisão de 10/11/2026 ──
+iguais(telefoneDe("015 11 98765-1111"), "11987651111", "código de operadora (015) sai");
+iguais(telefoneDe("0xx77 99932-3232"), "77999323232", "0xx + DDD");
+iguais(telefoneDe("11 3333-4444 / 11 98765-4321"), "11987654321", "dois números na célula: fica o celular");
+iguais(telefoneDe("1439/005"), null, "documento não vira telefone");
+iguais(lerVcf("BEGIN:VCARD\nVERSION:4.0\nFN:Ana Paula\nTEL;VALUE=uri;TYPE=cell:tel:+55-77-99932-3232\nEND:VCARD\n").contatos,
+  [{ nome: "Ana Paula", telefone: "77999323232" }], "vCard 4.0 com tel: URI");
+iguais(contatosDaTabela([
+  ["Cliente", "Número", "Vencimento", "Telefone"],
+  ["MARIA SILVA", "1439/005", "10/10/2026", "(11) 98765-4321"],
+  ["JOSE SOUZA", "1440", "10/10/2026", "77 99932 3232"],
+])?.contatos.map((c) => c.telefone), ["11987654321", "77999323232"], "coluna Número (documento) antes de Telefone não engana");
+iguais(contatosDaTabela([["Contato", "Nome"], ["11 98765-4321", "MARIA SILVA"]])?.contatos,
+  [{ nome: "MARIA SILVA", telefone: "11987654321" }], "coluna Contato com número não vira nome");
+const maior = cruzarComCarteira([{ nome: "OSCAR SANTANA DO CARMO LTDA", telefone: "11987654322" }],
+  [t({ id: "z", client: "Oscar Santana do Carmo" })]);
+iguais(maior.casados.map((c) => [c.cliente, c.tipo]), [["Oscar Santana do Carmo", "parecido"]], "nome do arquivo maior que o da carteira casa como parecido");
 
 console.log(`\n  Tests: ${passed + failed}  ✓ passed: ${passed}  ✗ failed: ${failed}\n`);
 if (failed > 0) process.exit(1);

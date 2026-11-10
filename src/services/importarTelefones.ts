@@ -26,6 +26,27 @@ export interface LeituraDeContatos {
   repetidos: number;
 }
 
+/**
+ * Telefone válido de uma célula/campo. Além do formato normal aceita o código
+ * de operadora ("015 11 98765-4321", "0xx11…") e dois números na mesma célula
+ * ("11 98765-4321 / 11 3333-4444") — fica o primeiro celular, senão o primeiro.
+ */
+export function telefoneDe(valor: string): string | null {
+  const direto = normalizarDigitosTelefone(valor);
+  if (direto) return direto;
+  const semOperadora = (v: string) => {
+    const d = v.replace(/\D/g, "");
+    const m = /^0\d{2}(\d{10,11})$/.exec(d);
+    return m ? normalizarDigitosTelefone(m[1]) : null;
+  };
+  const op = semOperadora(valor);
+  if (op) return op;
+  const partes = valor.split(/[/;,|\n]|\s+(?:e|ou)\s+/i).map((p) => p.trim()).filter(Boolean);
+  if (partes.length < 2) return null;
+  const validos = partes.map((p) => normalizarDigitosTelefone(p) ?? semOperadora(p)).filter((t): t is string => !!t);
+  return validos.find((t) => t.length === 11) ?? validos[0] ?? null;
+}
+
 // ── vCard (.vcf) ─────────────────────────────────────────────────────────────
 
 /** Quoted-printable (vCard 2.1 do Android): "=C3=A7" → "ç", "=" no fim junta linhas. */
@@ -100,7 +121,7 @@ export function lerVcf(texto: string): LeituraDeContatos {
   return consolidar(brutos.map((b) => {
     // Preferido > celular > o primeiro; só vale número brasileiro válido.
     const ordem = [...b.telefones].sort((x, y) => Number(y.pref) - Number(x.pref) || Number(y.celular) - Number(x.celular));
-    const valido = ordem.map((t) => normalizarDigitosTelefone(t.numero)).find(Boolean) ?? null;
+    const valido = ordem.map((t) => telefoneDe(t.numero)).find(Boolean) ?? null;
     return { nome: b.nome, telefone: valido };
   }));
 }
@@ -110,7 +131,7 @@ export function lerVcf(texto: string): LeituraDeContatos {
 const TITULO_NOME = /\b(nome|cliente|raz[aã]o|contato|sacado|devedor|empresa|fantasia|pagador)\b/i;
 const TITULO_FONE = /\b(telefone|celular|whats?app|whats|fone|tel|cel|n[uú]mero)\b/i;
 
-const pareceTelefone = (v: string) => Boolean(normalizarDigitosTelefone(v));
+const pareceTelefone = (v: string) => Boolean(telefoneDe(v));
 const pareceNome = (v: string) => /[A-Za-zÀ-ÿ]{2,}/.test(v) && !/@/.test(v) && v.replace(/\D/g, "").length < 6;
 
 /**
@@ -125,11 +146,24 @@ export function contatosDaTabela(rows: string[][]): LeituraDeContatos | null {
   let colNome = -1;
   let colFone = -1;
 
-  for (let r = 0; r < Math.min(5, rows.length) && (colNome < 0 || colFone < 0); r++) {
+  // Várias colunas podem ter título de telefone ("Número" do documento antes de
+  // "Telefone") ou de nome ("Contato" com o número): fica a que tem mais
+  // telefones (ou nomes) de verdade nas linhas de baixo.
+  const contarEm = (de: number, col: number, teste: (v: string) => boolean) =>
+    rows.slice(de, de + 200).filter((r) => teste(r[col] ?? "")).length;
+  const melhorColuna = (cols: number[], de: number, teste: (v: string) => boolean) =>
+    cols.reduce((best, c) => (best < 0 || contarEm(de, c, teste) > contarEm(de, best, teste) ? c : best), -1);
+  for (let r = 0; r < Math.min(5, rows.length); r++) {
     const row = rows[r];
-    const fone = row.findIndex((c) => TITULO_FONE.test(c) && !pareceTelefone(c));
-    const nome = row.findIndex((c, i) => i !== fone && TITULO_NOME.test(c) && !pareceTelefone(c));
-    if (fone >= 0) { colFone = fone; colNome = nome; inicio = r + 1; }
+    const fones = row.map((c, i) => (TITULO_FONE.test(c) && !pareceTelefone(c) ? i : -1)).filter((i) => i >= 0);
+    const fone = melhorColuna(fones, r + 1, pareceTelefone);
+    if (fone < 0 || contarEm(r + 1, fone, pareceTelefone) === 0) continue;
+    const nomes = row.map((c, i) => (i !== fone && TITULO_NOME.test(c) && !pareceTelefone(c) ? i : -1)).filter((i) => i >= 0);
+    const nome = melhorColuna(nomes, r + 1, pareceNome);
+    colFone = fone;
+    colNome = nome >= 0 && contarEm(r + 1, nome, pareceNome) > 0 ? nome : -1;
+    inicio = r + 1;
+    break;
   }
 
   const amostra = rows.slice(inicio, inicio + 200);
@@ -153,7 +187,7 @@ export function contatosDaTabela(rows: string[][]): LeituraDeContatos | null {
 
   return consolidar(rows.slice(inicio).map((r) => ({
     nome: (r[colNome] ?? "").replace(/\s+/g, " ").trim(),
-    telefone: normalizarDigitosTelefone(r[colFone] ?? ""),
+    telefone: telefoneDe(r[colFone] ?? ""),
   })));
 }
 
@@ -197,9 +231,10 @@ export interface CruzamentoDeContatos {
 
 /**
  * Casa cada contato com um cliente da carteira. Exato: mesmo nome normalizado.
- * Parecido (pede confirmação na tela): o contato tem 2+ palavras e o nome do
- * cliente começa exatamente por elas — "Oscar Santana" → "OSCAR SANTANA DO
- * CARMO" — e só um cliente começa assim. Liquidados não entram na conta.
+ * Parecido (pede confirmação na tela): um nome é o começo do outro, com 2+
+ * palavras no menor — "Oscar Santana" → "OSCAR SANTANA DO CARMO", ou
+ * "OSCAR SANTANA DO CARMO LTDA" → "Oscar Santana do Carmo" — e só um cliente
+ * casa assim. Pagos (liquidado, pago ao banco) não entram na conta.
  */
 export function cruzarComCarteira(contatos: ContatoLido[], debtors: Debtor[]): CruzamentoDeContatos {
   const porCliente = new Map<string, { nome: string; titulos: Debtor[] }>();
@@ -239,9 +274,9 @@ export function cruzarComCarteira(contatos: ContatoLido[], debtors: Debtor[]): C
   }
   for (const c of pendentes) {
     const k = contactKeyFromName(c.nome);
-    const candidatos = k.split(" ").length >= 2
-      ? chaves.filter((ck) => !usados.has(ck) && ck.startsWith(k + " "))
-      : [];
+    const candidatos = chaves.filter((ck) => !usados.has(ck) && (
+      (k.split(" ").length >= 2 && ck.startsWith(k + " ")) ||
+      (ck.split(" ").length >= 2 && k.startsWith(ck + " "))));
     if (candidatos.length === 1) { usados.add(candidatos[0]); casados.push(montar(c, candidatos[0], "parecido")); }
     else fora.push(c);
   }

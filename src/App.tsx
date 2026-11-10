@@ -2074,13 +2074,20 @@ export default function App() {
       r.forEach((x) => { if (x.status === "fulfilled") salvos.set(x.value.id, x.value); else falhas++; });
     }
     if (salvos.size) setDebtors((prev) => prev.map((d) => salvos.get(d.id) ?? d));
+    // A agenda é extra: se falhar, os títulos já salvos continuam valendo e a
+    // tela avisa só da agenda (antes o erro dava a entender que nada salvou).
     let gravados = 0;
+    let erroAgenda = false;
     if (contatos.length) {
-      gravados = await contactsService.upsertMany(dono, contatos);
-      const refreshed = await contactsService.listByUser(dono).catch(() => null);
-      if (refreshed) setContactsByKey(new Map(refreshed.map((c) => [c.contactKey, c])));
+      try {
+        gravados = await contactsService.upsertMany(dono, contatos);
+        const refreshed = await contactsService.listByUser(dono).catch(() => null);
+        if (refreshed) setContactsByKey(new Map(refreshed.map((c) => [c.contactKey, c])));
+      } catch {
+        erroAgenda = true;
+      }
     }
-    return { titulos: salvos.size, falhas, contatos: gravados };
+    return { titulos: salvos.size, falhas, contatos: gravados, erroAgenda };
   };
 
   const learnContactsFromDebtors = async (list: Debtor[]) => {
