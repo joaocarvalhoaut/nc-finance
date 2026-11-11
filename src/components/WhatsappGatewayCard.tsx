@@ -12,8 +12,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Wifi, WifiOff, RefreshCw, QrCode, Save, Eye, EyeOff,
-  CheckCircle, AlertTriangle, Clock, Smartphone,
+  CheckCircle, AlertTriangle, Clock, Smartphone, MessageCircle,
 } from "lucide-react";
+import { CONTATO_WHATSAPP_LINK, CONTATO_WHATSAPP_NUMERO } from "../content/landing";
+import { abrirWhatsapp } from "../utils/abrirWhatsapp";
 import {
   whatsappGatewayService,
   type GatewayStatus,
@@ -36,6 +38,8 @@ const PREPARO_MAX_TENTATIVAS = 8;
 const PRAZO_ATIVACAO_HORAS = 24;
 const prazoAtivacao = (requestedAt: string) =>
   new Date(Date.parse(requestedAt) + PRAZO_ATIVACAO_HORAS * 60 * 60 * 1000);
+// Mensagem pronta do botão "Chamar o suporte" — genérica, nada da conta na URL.
+const MENSAGEM_SUPORTE = "Olá! Pedi para conectar meu número de WhatsApp na NC Finance.";
 const formatarPrazo = (d: Date) =>
   d.toLocaleString("pt-BR", {
     timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
@@ -443,6 +447,15 @@ export default function WhatsappGatewayCard() {
                 <p className="text-amber-300/80">
                   Quando estiver pronto, volte aqui e clique em &quot;Conectar WhatsApp&quot; para escanear o código.
                 </p>
+                <a
+                  href={CONTATO_WHATSAPP_LINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => abrirWhatsapp(e, CONTATO_WHATSAPP_NUMERO, MENSAGEM_SUPORTE)}
+                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-colors"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" /> Chamar o suporte no WhatsApp
+                </a>
               </div>
             )}
 
