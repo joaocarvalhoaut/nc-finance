@@ -18,6 +18,7 @@ import {
 import type { AuthCredentials, SignUpPayload } from "../types";
 import { PLAN_LIST } from "../config/plans";
 import { abrirWhatsapp } from "../utils/abrirWhatsapp";
+import { salvarPlanoEscolhido } from "../utils/planoEscolhido";
 import { CONTATO_EMAIL, CONTATO_WHATSAPP, CONTATO_WHATSAPP_LINK, CONTATO_WHATSAPP_NUMERO, DEFINICAO, DIAS_TESTE, DIFERENCIAIS, PASSOS, PERGUNTAS } from "../content/landing";
 const Suporte = lazy(() => import("./Suporte"));
 
@@ -165,7 +166,7 @@ export default function LandingPage({
                 Ver como a mensagem chega
               </a>
             </div>
-            <p className="mt-4 text-xs text-zinc-500">Sem cartão de crédito · Cancele quando quiser</p>
+            <p className="mt-4 text-xs text-zinc-500">Nada é cobrado no teste · Cancele quando quiser</p>
           </div>
           <div className="lg:col-span-5 flex justify-center">
             <PhoneDispatchSimulation />
@@ -289,7 +290,7 @@ export default function LandingPage({
             <div className="max-w-2xl">
               <h2 id="titulo-planos" className={titulo2}>Planos e preços</h2>
               <p className="mt-4 text-zinc-400 leading-relaxed">
-                Todos com {DIAS_TESTE} dias grátis, sem cartão. Sem fidelidade e sem taxa por boleto pago.
+                Todos com {DIAS_TESTE} dias grátis. Sem fidelidade e sem taxa por boleto pago.
               </p>
             </div>
             <div className="mt-12 grid md:grid-cols-3 gap-4 items-stretch">
@@ -321,7 +322,7 @@ export default function LandingPage({
                     </ul>
                     <button
                       type="button"
-                      onClick={abrirCadastro}
+                      onClick={() => { salvarPlanoEscolhido(p.id); abrirCadastro(); }}
                       className={`mt-6 px-4 py-3 text-sm ${destaque ? botaoPrimario : botaoSecundario}`}
                     >
                       Testar o {p.name} grátis
@@ -331,7 +332,7 @@ export default function LandingPage({
               })}
             </div>
             <p className="mt-6 text-xs text-zinc-500">
-              A assinatura é cobrada pelo Asaas, por boleto ou cartão. Todos os planos enviam pelo seu próprio número de WhatsApp.
+              No teste, o cartão fica cadastrado no Asaas e só é cobrado no fim dos {DIAS_TESTE} dias. Todos os planos enviam pelo seu próprio número de WhatsApp.
             </p>
           </div>
         </section>
@@ -358,7 +359,7 @@ export default function LandingPage({
         <section className="border-t border-zinc-900">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20 text-center">
             <h2 className={titulo2}>Comece a cobrar ainda hoje</h2>
-            <p className="mt-4 text-zinc-400">{DIAS_TESTE} dias grátis, sem cartão. Você conecta o WhatsApp e importa a carteira em poucos minutos.</p>
+            <p className="mt-4 text-zinc-400">{DIAS_TESTE} dias grátis. Você importa a carteira em minutos e o suporte conecta seu WhatsApp em até 24 horas.</p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
               <button type="button" onClick={abrirCadastro} className={`${botaoPrimario} px-6 py-3.5 text-base`}>
                 Criar conta grátis <ArrowRight className="w-4 h-4" />
@@ -628,7 +629,7 @@ function PainelAcesso({
 
   const titulo = modo === "cadastro" ? "Criar conta" : modo === "senha" ? "Recuperar senha" : "Entrar";
   const subtitulo = modo === "cadastro"
-    ? `${DIAS_TESTE} dias grátis, sem cartão. CPF e endereço são pedidos depois, no primeiro acesso.`
+    ? `${DIAS_TESTE} dias grátis. Os dados da empresa e o cartão são pedidos depois, no primeiro acesso.`
     : modo === "senha"
       ? "Digite o e-mail da sua conta e enviaremos um link para criar uma nova senha."
       : "Acesse o painel da NC Finance.";

@@ -2,6 +2,8 @@ import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import type { AuthCredentials, SignUpPayload } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
 import { identifyUser, resetAnalytics, track } from "../lib/analytics";
+import { eventoMeta } from "../lib/metaPixel";
+import { origemParaCadastro, utmsDaOrigem } from "../lib/origemVisita";
 
 export const getSession = async () => {
   const supabase = getSupabaseClient();
@@ -50,6 +52,9 @@ export const signUp = async ({ email, password, name, captchaToken }: SignUpPayl
       data: {
         full_name: name.trim(),
         accepted_terms_at: new Date().toISOString(),
+        // Origem da visita (UTM) e, com consentimento, os ids do clique da
+        // Meta — para saber qual anúncio traz assinante. Ver lib/origemVisita.
+        ...origemParaCadastro(),
       }
     }
   });
@@ -59,7 +64,8 @@ export const signUp = async ({ email, password, name, captchaToken }: SignUpPayl
   if (data.user) {
     // Analytics (opt-in): identifica pelo UUID e marca o cadastro — sem PII.
     identifyUser(data.user.id);
-    track("signed_up");
+    track("signed_up", utmsDaOrigem());
+    eventoMeta("CompleteRegistration", undefined, `cadastro-${data.user.id}`);
   }
 
   return data;

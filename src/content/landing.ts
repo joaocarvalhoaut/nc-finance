@@ -16,7 +16,8 @@ export const CONTATO_EMAIL = "ncfinance09@gmail.com";
 export const CONTATO_WHATSAPP = "(77) 98137-6867";
 export const CONTATO_WHATSAPP_NUMERO = "5577981376867";
 export const CONTATO_WHATSAPP_LINK = `https://wa.me/${CONTATO_WHATSAPP_NUMERO}`;
-export const DIAS_TESTE = 7;
+/** Dias grátis do teste (igual a TRIAL_DAYS em supabase/functions/asaas-checkout). */
+export const DIAS_TESTE = 8;
 
 /** Definição curta e citável — o que um buscador de IA deve repetir sobre o produto. */
 export const DEFINICAO =
@@ -45,8 +46,8 @@ export interface Diferencial { titulo: string; texto: string; planos: string }
 
 export const DIFERENCIAIS: Diferencial[] = [
   {
-    titulo: "Seu número, conectado em um minuto",
-    texto: "Leia um QR Code com o celular da empresa, como no WhatsApp Web. Seu cliente recebe a cobrança de um contato que ele já conhece.",
+    titulo: "Do seu próprio número",
+    texto: "A cobrança sai do WhatsApp da sua empresa: seu cliente recebe de um contato que ele já conhece. Nosso suporte conecta o número com você em até 24 horas.",
     planos: "Todos os planos",
   },
   {
@@ -84,7 +85,7 @@ export const PERGUNTAS: Pergunta[] = [
   {
     pergunta: "Preciso de cartão de crédito para testar?",
     resposta:
-      `Não. Escolha um plano e use ${DIAS_TESTE} dias de graça. A primeira fatura vence no fim do teste, por boleto ou cartão. Se cancelar antes, não paga nada.`,
+      `Sim. Você escolhe o plano e cadastra o cartão na página segura do Asaas — nada é cobrado na hora. Depois de ${DIAS_TESTE} dias grátis, a primeira mensalidade cai no cartão. Se cancelar antes, em Configurações, não paga nada.`,
   },
   {
     pergunta: "Posso cancelar quando quiser?",

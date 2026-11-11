@@ -1,7 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 import type { AccountProfile } from "../types";
 import { getSupabaseClient } from "./supabaseClient";
-import { isValidCPF } from "../utils/cpf";
+import { isValidCpfOuCnpj } from "../utils/cpf";
 
 export interface UserProfileData {
   full_name: string;
@@ -53,7 +53,7 @@ export const isProfileComplete = (p: UserProfileData | null): boolean => {
   const digitos = (v: string | null | undefined) => (v ?? "").replace(/\D/g, "");
   return Boolean(
     p.full_name?.trim() &&
-    isValidCPF(digitos(p.cpf)) &&
+    isValidCpfOuCnpj(digitos(p.cpf)) &&
     digitos(p.phone).length >= 10 &&
     digitos(p.cep).length === 8 &&
     p.address?.trim() && p.city?.trim() && p.state?.trim(),

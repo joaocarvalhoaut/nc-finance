@@ -95,6 +95,7 @@ export default function PoliticaPrivacidade({ onClose }: Props) {
                   <tr><td className="py-2 pr-4">Envio de notificações do serviço</td><td className="py-2">Legítimo interesse (art. 7º, IX)</td></tr>
                   <tr><td className="py-2 pr-4">Prevenção a fraudes e abusos</td><td className="py-2">Legítimo interesse (art. 7º, IX)</td></tr>
                   <tr><td className="py-2 pr-4">Cumprimento de obrigações legais</td><td className="py-2">Obrigação legal (art. 7º, II)</td></tr>
+                  <tr><td className="py-2 pr-4">Medição de anúncios (Meta) e analytics de produto</td><td className="py-2">Consentimento (art. 7º, I) — só com "Aceitar" no aviso de cookies</td></tr>
                 </tbody>
               </table>
             </div>
@@ -111,9 +112,10 @@ export default function PoliticaPrivacidade({ onClose }: Props) {
               <li><strong className="text-zinc-300">Resend</strong> — envio de e-mails do serviço, como recuperação de senha (recebe apenas o e-mail do usuário)</li>
               <li><strong className="text-zinc-300">Short.io</strong> — encurtamento do link do boleto incluído nas mensagens</li>
               <li><strong className="text-zinc-300">Vercel</strong> — hospedagem da aplicação web</li>
+              <li><strong className="text-zinc-300">Meta (Facebook/Instagram)</strong> — medição dos nossos anúncios, só com seu consentimento no aviso de cookies: o Pixel registra a visita, o cadastro e o início do teste; o servidor informa o início do teste e a assinatura com o e-mail em hash SHA-256 (irreversível), os cookies do clique no anúncio e o navegador. Nunca dados de devedores</li>
             </ul>
             <p className="mt-2">
-              Não vendemos, alugamos ou compartilhamos dados com terceiros para fins de marketing.
+              Não vendemos nem alugamos dados. Dados de devedores nunca são compartilhados para fins de marketing; a medição de anúncios acima só acontece com o seu consentimento, que pode ser recusado sem perder nenhuma função.
             </p>
           </section>
 

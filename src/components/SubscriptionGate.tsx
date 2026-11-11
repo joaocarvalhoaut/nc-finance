@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
-  ArrowLeft,
   BadgeCheck,
   CreditCard,
   LogOut,
@@ -11,6 +10,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { PLAN_LIST } from "../config/plans";
+import { DIAS_TESTE } from "../content/landing";
 import type { PlanId, UserSubscription, UserUsageCounter } from "../types";
 
 interface SubscriptionGateProps {
@@ -26,7 +26,6 @@ interface SubscriptionGateProps {
   onSubmitDocument?: (planId: PlanId, cpfCnpj: string) => void;
   onCancelDocument?: () => void;
   onRefresh: () => void;
-  onBack: () => void;
   onLogout: () => void;
   subscription: UserSubscription | null;
   usage: UserUsageCounter | null;
@@ -57,7 +56,6 @@ export default function SubscriptionGate({
   onSelectPlan,
   onManageSubscription,
   onRefresh,
-  onBack,
   onLogout,
   subscription,
   usage,
@@ -72,21 +70,17 @@ export default function SubscriptionGate({
   const documentoValido = documentoDigitos.length === 11 || documentoDigitos.length === 14;
   // Fatura a pagar: assinatura criada mas sem pagamento, ou vencida além da tolerância.
   const temFatura = subscription?.status === "incomplete" || subscription?.status === "past_due";
+  // Primeira assinatura: teste grátis com cartão (checkout do Asaas). Quem já
+  // usou o teste assina direto, pela fatura.
+  const comTeste = !(subscription?.billingProvider === "asaas" && subscription?.trialStart);
+  const primeiraCobranca = new Date(Date.now() + DIAS_TESTE * 24 * 60 * 60 * 1000).toLocaleDateString("pt-BR");
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white px-4 py-10 sm:px-8">
       <div className="mx-auto max-w-6xl space-y-8">
 
         {/* ── Top navigation row ─────────────────────────────────────────── */}
-        <div className="flex items-center justify-between gap-4">
-          <button
-            onClick={onBack}
-            className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-zinc-600 hover:text-white cursor-pointer"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar para início
-          </button>
-
+        <div className="flex items-center justify-end gap-4">
           <button
             onClick={onLogout}
             className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm font-medium text-rose-400 transition hover:border-rose-500/40 hover:bg-rose-500/10 cursor-pointer"
@@ -101,15 +95,18 @@ export default function SubscriptionGate({
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">
-                <ShieldCheck className="h-4 w-4" /> Assinatura obrigatória
+                <ShieldCheck className="h-4 w-4" /> {comTeste ? `${DIAS_TESTE} dias grátis` : "Escolha seu plano"}
               </div>
               <div>
                 <h1 className="text-3xl font-black tracking-tight sm:text-4xl">
-                  Ative seu acesso ao NC Finance
+                  {comTeste ? `Comece seus ${DIAS_TESTE} dias grátis` : "Ative seu acesso ao NC Finance"}
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm text-zinc-400 sm:text-base">
-                  Na primeira assinatura você tem 7 dias grátis, sem cartão. A fatura mensal
-                  pode ser paga por Pix, boleto ou cartão, e você cancela quando quiser.
+                  {comTeste
+                    ? <>Escolha o plano e cadastre o cartão na página segura do Asaas. <strong className="text-zinc-200">Nada é cobrado agora:</strong> a
+                        primeira mensalidade só cai no cartão em <strong className="text-zinc-200">{primeiraCobranca}</strong>. Cancele antes, em
+                        Configurações, e não paga nada.</>
+                    : <>A fatura mensal pode ser paga por Pix, boleto ou cartão, e você cancela quando quiser.</>}
                 </p>
               </div>
             </div>
@@ -152,11 +149,10 @@ export default function SubscriptionGate({
             <RefreshCw className="h-5 w-5 text-emerald-400 animate-spin flex-shrink-0" />
             <div>
               <p className="text-sm font-semibold text-emerald-200">
-                Sincronizando pagamento…
+                Confirmando sua assinatura…
               </p>
               <p className="text-xs text-emerald-400/70 mt-0.5">
-                O pagamento foi confirmado. Aguardando atualização da assinatura — isso pode
-                levar alguns segundos.
+                Recebemos a volta do Asaas. Seu acesso libera em alguns segundos.
               </p>
             </div>
           </div>
@@ -228,7 +224,9 @@ export default function SubscriptionGate({
         )}
 
         {/* ── Assinatura existente mas status bloqueado ───────────────────── */}
-        {subscription && !isSyncing && (
+        {/* Esperando o cartão (checkout aberto e não concluído) não é "fatura":
+            os planos abaixo reabrem o checkout. */}
+        {subscription && !isSyncing && !comTeste && (
           <div className="rounded-[28px] border border-zinc-800 bg-zinc-900/50 p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="space-y-2">
@@ -326,7 +324,7 @@ export default function SubscriptionGate({
                   className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-black transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <CreditCard className="h-4 w-4" />
-                  {isSyncing ? "Aguardando confirmação…" : `Assinar o ${plan.name}`}
+                  {isSyncing ? "Aguardando confirmação…" : comTeste ? `Começar ${DIAS_TESTE} dias grátis` : `Assinar o ${plan.name}`}
                   {!isSyncing && <ArrowRight className="h-4 w-4" />}
                   {isSyncing && (
                     <RefreshCw className="h-4 w-4 animate-spin" />

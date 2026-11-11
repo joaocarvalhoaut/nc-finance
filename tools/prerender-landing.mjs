@@ -131,7 +131,7 @@ const llms = [
   "## Planos (mensalidade)",
   ...c.planos.map((p) => `- **${p.nome} — R$ ${p.preco}/mês**: ${p.descricao} Inclui: ${p.recursos.join("; ")}.`),
   "",
-  `Todos os planos têm ${c.diasTeste} dias grátis, sem cartão de crédito, e não têm fidelidade. A assinatura é cobrada pelo Asaas, por boleto ou cartão. As cobranças saem do número de WhatsApp do próprio cliente.`,
+  `Todos os planos têm ${c.diasTeste} dias grátis e não têm fidelidade. O teste começa com o cartão cadastrado no Asaas; a primeira mensalidade é cobrada no cartão ao fim do teste e pode ser cancelada antes, sem custo. As cobranças saem do número de WhatsApp do próprio cliente.`,
   "",
   "## Perguntas frequentes",
   ...c.perguntas.flatMap((q) => ["", `### ${q.pergunta}`, q.resposta]),

@@ -277,7 +277,7 @@ export default function GerenciarAssinatura({
               <div className="rounded-lg border border-emerald-700/50 bg-emerald-500/5 p-3 space-y-2.5">
                 <p className="text-xs text-zinc-300 leading-relaxed">
                   {semAsaas
-                    ? <>Ativar o <strong className="text-white">{escolhido.name}</strong> por {brl(escolhido.priceBRL)}/mês. Na primeira assinatura a fatura só vence depois de 7 dias grátis.</>
+                    ? <>Ativar o <strong className="text-white">{escolhido.name}</strong> por {brl(escolhido.priceBRL)}/mês. Na primeira assinatura você cadastra o cartão e a cobrança só vem depois de 8 dias grátis.</>
                     : <>Mudar para o <strong className="text-white">{escolhido.name}</strong> por {brl(escolhido.priceBRL)}/mês. O limite muda na hora e a fatura em aberto passa a ter o novo valor.</>}
                 </p>
                 {semAsaas && pedirDocumento && (

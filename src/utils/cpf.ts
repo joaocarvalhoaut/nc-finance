@@ -22,3 +22,25 @@ export const isValidCPF = (cpf: string): boolean => {
   if (r === 10 || r === 11) r = 0;
   return r === parseInt(d[10]);
 };
+
+/** Validação de CNPJ (dígitos verificadores), nos mesmos moldes do CPF. */
+export const isValidCNPJ = (cnpj: string): boolean => {
+  const d = (cnpj ?? "").replace(/\D/g, "");
+  if (d.length !== 14 || /^(\d)\1{13}$/.test(d)) return false;
+  const digito = (base: string) => {
+    let soma = 0;
+    let peso = base.length - 7;
+    for (let i = 0; i < base.length; i++) {
+      soma += parseInt(base[i]) * peso--;
+      if (peso < 2) peso = 9;
+    }
+    const r = soma % 11;
+    return r < 2 ? 0 : 11 - r;
+  };
+  const d1 = digito(d.slice(0, 12));
+  const d2 = digito(d.slice(0, 12) + d1);
+  return d1 === parseInt(d[12]) && d2 === parseInt(d[13]);
+};
+
+/** CPF (pessoa física) ou CNPJ (empresa) válido — o documento da conta. */
+export const isValidCpfOuCnpj = (doc: string): boolean => isValidCPF(doc) || isValidCNPJ(doc);

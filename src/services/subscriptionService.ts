@@ -179,13 +179,19 @@ export const subscriptionService = {
   },
 
   /**
-   * Inicia a assinatura no Asaas. Primeira assinatura: volta "trialing" e o
-   * acesso já está liberado. Depois disso: volta o link da fatura a pagar.
+   * Inicia a assinatura no Asaas. Primeira assinatura: volta o link do
+   * checkout com cartão (teste grátis; o cartão é digitado na página do
+   * Asaas). Depois disso: volta o link da fatura a pagar.
    * cpfCnpj só é enviado quando o cadastro não tem documento (vai direto ao
    * Asaas; não é gravado).
    */
   async createCheckoutSession(planId: PlanId, cpfCnpj?: string) {
-    const data = await invokeBilling<{ status: string; invoice_url?: string | null; trial_end?: string | null }>(
+    const data = await invokeBilling<{
+      status: string;
+      checkout_url?: string | null;
+      invoice_url?: string | null;
+      trial_end?: string | null;
+    }>(
       "asaas-checkout",
       cpfCnpj ? { planId, cpfCnpj } : { planId },
       "Falha ao iniciar a assinatura.",

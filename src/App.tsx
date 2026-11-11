@@ -19,6 +19,8 @@ import CompletarCadastro from "./components/CompletarCadastro";
 import { fetchMyProfileOrThrow, isProfileComplete, type UserProfileData } from "./services/accountService";
 const ClientDashboard = lazy(() => import("./components/ClientDashboard"));
 import { PLAN_LIST, getPlanDefinition } from "./config/plans";
+import { eventoMeta } from "./lib/metaPixel";
+import { track } from "./lib/analytics";
 import { useAccount } from "./hooks/useAccount";
 import { useSubscription } from "./hooks/useSubscription";
 import { billingLogsService } from "./services/billingLogsService";
@@ -53,6 +55,7 @@ import {
 } from "./services/localDocumentExtraction";
 import { normalizarDigitosTelefone } from "./services/localDocumentExtraction/regexExtractors";
 import { exportRelatorio } from "./services/exportRelatorio";
+import { lerPlanoEscolhido } from "./utils/planoEscolhido";
 const Suporte = lazy(() => import("./components/Suporte"));
 const AvisoConectarNumero = lazy(() => import("./components/AvisoConectarNumero"));
 const ImportarTelefones = lazy(() => import("./components/ImportarTelefones"));
@@ -522,7 +525,8 @@ export default function App() {
   const campoPadraoRef = React.useRef<HTMLTextAreaElement>(null);
   const [isSendingMessage, setIsSendingMessage] = useState<boolean>(false);
   const [messageFeedback, setMessageFeedback] = useState<{success: boolean; text: string} | null>(null);
-  const [selectedPlanId, setSelectedPlanId] = useState<PlanId | null>(PLAN_LIST[1]?.id || "pro");
+  // Plano clicado na landing vem já marcado na tela de planos.
+  const [selectedPlanId, setSelectedPlanId] = useState<PlanId | null>(() => lerPlanoEscolhido() ?? PLAN_LIST[1]?.id ?? "pro");
 
   // Billing history logs state
   const [billingLogs, setBillingLogs] = useState<BillingLog[]>([]);
@@ -621,9 +625,13 @@ export default function App() {
     setCurrentTab("inicio");
   };
 
-  // Retorno com ?checkout=success: aguarda o webhook atualizar a assinatura
-  // (polling). O fluxo do Asaas não usa mais esse parâmetro — quem volta da
-  // fatura é tratado pelo efeito de visibilidade abaixo.
+  // Volta do checkout com sucesso: espera o teste confirmar para o evento StartTrial.
+  const aguardandoTesteRef = React.useRef(false);
+
+  // Volta do checkout do Asaas (teste grátis com cartão): ?checkout=success.
+  // O polling chama o "sync", que liga a assinatura criada no checkout mesmo
+  // antes do webhook chegar. Quem volta da fatura é tratado pelo efeito de
+  // visibilidade abaixo.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const checkoutResult = params.get("checkout");
@@ -636,15 +644,28 @@ export default function App() {
 
     if (checkoutResult === "success" && userId) {
       // Inicia polling aguardando o webhook atualizar o status
+      aguardandoTesteRef.current = true;
       startCheckoutPolling();
     }
     // canceled: apenas limpa URL, não faz nada (usuário volta para SubscriptionGate)
   }, [userId]);
 
+  // Teste confirmado depois do checkout → evento StartTrial do Pixel da Meta
+  // (o anúncio otimiza por quem cadastra o cartão). O mesmo eventID sai do
+  // servidor pela API de Conversões e o Meta conta uma vez só.
+  useEffect(() => {
+    if (!aguardandoTesteRef.current || !userId || subscription?.status !== "trialing") return;
+    aguardandoTesteRef.current = false;
+    const planoTeste = getPlanDefinition(subscription.plan);
+    eventoMeta("StartTrial", { value: planoTeste.priceBRL, currency: "BRL", content_name: planoTeste.id }, `trial-${userId}`);
+    track("trial_started", { plan: planoTeste.id });
+  }, [subscription?.status, subscription?.plan, userId]);
+
   // Carregamento inicial de dados da conta autenticada
 
-  // Assinatura pelo Asaas. Primeira vez: teste grátis, acesso liberado na hora.
-  // Depois disso: vai para a fatura (Pix, boleto ou cartão).
+  // Assinatura pelo Asaas. Primeira vez: checkout com cartão (teste grátis,
+  // cobrança só no fim do teste). Depois disso: vai para a fatura (Pix, boleto
+  // ou cartão).
   const handleStartCheckout = async (planId: PlanId, cpfCnpj?: string) => {
     setIsSubscriptionActionLoading(true);
     setSubscriptionGateError("");
@@ -652,6 +673,12 @@ export default function App() {
     try {
       const result = await subscriptionService.createCheckoutSession(planId, cpfCnpj);
       setDocumentPromptPlanId(null);
+      if (result.checkout_url) {
+        const planoCheckout = getPlanDefinition(planId);
+        eventoMeta("InitiateCheckout", { value: planoCheckout.priceBRL, currency: "BRL", content_name: planoCheckout.id });
+        window.location.assign(result.checkout_url);
+        return;
+      }
       if (result.invoice_url) {
         window.location.assign(result.invoice_url);
         return;
@@ -2872,10 +2899,6 @@ export default function App() {
           onSubmitDocument={(planId, cpfCnpj) => void handleStartCheckout(planId, cpfCnpj)}
           onCancelDocument={() => setDocumentPromptPlanId(null)}
           onRefresh={() => void syncSubscription()}
-          onBack={() => {
-            setSubscriptionGateError("");
-            setCurrentTab("inicio");
-          }}
           onLogout={() => void handleSignOut()}
           subscription={subscription}
           usage={usage}

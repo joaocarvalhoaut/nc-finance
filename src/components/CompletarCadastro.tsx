@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Loader2, LogOut } from "lucide-react";
 import { saveMyProfile, type UserProfileData } from "../services/accountService";
-import { isValidCPF } from "../utils/cpf";
+import { isValidCpfOuCnpj } from "../utils/cpf";
 
 /**
  * Complete seu cadastro — obrigatório para contas sem CPF, telefone ou
@@ -23,12 +23,20 @@ interface Props {
 
 const digitos = (v: string) => v.replace(/\D/g, "");
 
+// CPF (até 11 dígitos) ou CNPJ (12 a 14), formatado enquanto digita.
 const formatCPF = (v: string) => {
-  const d = digitos(v).slice(0, 11);
+  const d = digitos(v).slice(0, 14);
+  if (d.length <= 11) {
+    return d
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  }
   return d
-    .replace(/(\d{3})(\d)/, "$1.$2")
-    .replace(/(\d{3})(\d)/, "$1.$2")
-    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1/$2")
+    .replace(/(\d{4})(\d)/, "$1-$2");
 };
 
 const formatPhone = (v: string) => {
@@ -49,8 +57,8 @@ const Rotulo = ({ htmlFor, children }: { htmlFor: string; children: React.ReactN
 );
 
 export default function CompletarCadastro({ userId, email, displayName, perfil, termsAcceptedAt, onSaved, onLogout }: Props) {
-  // CPF válido já gravado não muda por aqui (é a identidade da conta).
-  const cpfTravado = Boolean(perfil?.cpf && isValidCPF(perfil.cpf));
+  // CPF/CNPJ válido já gravado não muda por aqui (é a identidade da conta).
+  const cpfTravado = Boolean(perfil?.cpf && isValidCpfOuCnpj(perfil.cpf));
 
   const [nome, setNome] = useState(perfil?.full_name || (displayName !== "Conta autenticada" ? displayName : ""));
   const [cpf, setCpf] = useState(formatCPF(perfil?.cpf ?? ""));
@@ -87,7 +95,7 @@ export default function CompletarCadastro({ userId, email, displayName, perfil, 
     e.preventDefault();
     if (!nome.trim()) return setErro("Digite seu nome completo.");
     if (!empresa.trim()) return setErro("Digite o nome da empresa — ele assina as mensagens de cobrança.");
-    if (!isValidCPF(cpf)) return setErro("CPF inválido. Verifique o número.");
+    if (!isValidCpfOuCnpj(cpf)) return setErro("CPF ou CNPJ inválido. Verifique o número.");
     if (digitos(telefone).length < 10) return setErro("Digite um telefone válido com DDD.");
     if (digitos(cep).length !== 8) return setErro("Digite o CEP completo.");
     if (!endereco.trim() || !cidade.trim() || !uf.trim()) return setErro("Preencha o endereço completo.");
@@ -114,10 +122,10 @@ export default function CompletarCadastro({ userId, email, displayName, perfil, 
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center px-4 py-10">
       <form onSubmit={(e) => void salvar(e)} className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-xl">
         <header className="px-6 py-5 border-b border-zinc-800/80">
-          <p className="text-[10px] font-mono uppercase tracking-widest text-emerald-400">Último passo</p>
+          <p className="text-[10px] font-mono uppercase tracking-widest text-emerald-400">Passo 1 de 2</p>
           <h1 className="mt-1.5 text-xl font-black text-white tracking-tight">Complete seu cadastro</h1>
           <p className="mt-1 text-xs text-zinc-500 leading-relaxed">
-            Precisamos destes dados para emitir as faturas da assinatura e manter sua conta segura.
+            Precisamos destes dados para emitir as faturas da assinatura e manter sua conta segura. Depois, você escolhe o plano.
             Conta: <span className="text-zinc-300">{email}</span>
           </p>
         </header>
@@ -136,9 +144,9 @@ export default function CompletarCadastro({ userId, email, displayName, perfil, 
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Rotulo htmlFor="cc-cpf">CPF</Rotulo>
+              <Rotulo htmlFor="cc-cpf">CPF ou CNPJ</Rotulo>
               <input
-                id="cc-cpf" value={cpf} disabled={cpfTravado} inputMode="numeric" placeholder="000.000.000-00"
+                id="cc-cpf" value={cpf} disabled={cpfTravado} inputMode="numeric" placeholder="CPF ou CNPJ da empresa"
                 onChange={(e) => { setCpf(formatCPF(e.target.value)); setErro(""); }} className={`${inputCls} font-mono`}
               />
             </div>

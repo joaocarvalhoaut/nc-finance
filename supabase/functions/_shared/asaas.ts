@@ -20,6 +20,7 @@ import {
   type AsaasPaymentLite,
 } from "./billingStatus.ts";
 import { isPlanId, planFromValue, type PlanId } from "./billingPlans.ts";
+import { enviarConversaoMeta } from "./metaCapi.ts";
 
 // deno-lint-ignore no-explicit-any
 type AdminClient = ReturnType<typeof createClient<any, any, any>>;
@@ -110,6 +111,7 @@ export interface AsaasSubscription {
   status: string;          // ACTIVE | INACTIVE | EXPIRED
   deleted?: boolean;
   nextDueDate?: string;
+  dateCreated?: string;
   externalReference?: string | null;
 }
 
@@ -178,6 +180,63 @@ export const createSubscription = (params: {
     description: params.description,
     externalReference: params.userId,
   });
+
+// ─── Teste grátis com cartão (checkout hospedado) ───────────────────────────
+//
+// O cliente digita o cartão na página do Asaas: o número nunca passa por aqui.
+// O checkout RECURRENT cria a assinatura mensal com a 1ª cobrança em
+// `nextDueDate` — os dias até lá são o teste grátis. A assinatura criada não
+// volta na resposta: quando o checkout é concluído, vincularAssinaturaDoCheckout
+// acha a assinatura ativa do NOSSO cliente (o checkout vai com `customer`).
+
+const CHECKOUT_HOST = {
+  sandbox: "https://sandbox.asaas.com",
+  production: "https://www.asaas.com",
+} as const;
+
+export const createCardTrialCheckout = async (params: {
+  customer: string;
+  value: number;
+  nextDueDate: string;     // "YYYY-MM-DD" — 1ª cobrança (fim do teste)
+  itemName: string;        // até 30 caracteres
+  description: string;     // até 150 caracteres
+  userId: string;
+  successUrl: string;
+  cancelUrl: string;
+}): Promise<{ id: string; link: string }> => {
+  const created = await asaasRequest<{ id: string; link?: string | null }>("POST", "/checkouts", {
+    billingTypes: ["CREDIT_CARD"],
+    chargeTypes: ["RECURRENT"],
+    minutesToExpire: 120,
+    customer: params.customer,
+    externalReference: params.userId,
+    callback: {
+      successUrl: params.successUrl,
+      cancelUrl: params.cancelUrl,
+      expiredUrl: params.cancelUrl,
+    },
+    items: [{
+      name: params.itemName.slice(0, 30),
+      description: params.description.slice(0, 150),
+      quantity: 1,
+      value: params.value,
+    }],
+    subscription: { cycle: "MONTHLY", nextDueDate: params.nextDueDate },
+  });
+  const key = Deno.env.get("ASAAS_API_KEY") || "";
+  const link = created.link || `${CHECKOUT_HOST[ambiente(key)]}/checkoutSession/show/${encodeURIComponent(created.id)}`;
+  return { id: created.id, link };
+};
+
+/** Assinaturas ativas (não apagadas) de um cliente, da mais nova para a mais antiga. */
+export const listActiveSubscriptionsOfCustomer = async (customer: string): Promise<AsaasSubscription[]> => {
+  const page = await asaasRequest<AsaasList<AsaasSubscription>>(
+    "GET", `/subscriptions?customer=${encodeURIComponent(customer)}&status=ACTIVE&limit=100`,
+  );
+  return (page?.data ?? [])
+    .filter((s) => !s.deleted && s.status === "ACTIVE")
+    .sort((a, b) => (b.dateCreated || "").localeCompare(a.dateCreated || ""));
+};
 
 /** null quando a assinatura não existe mais no Asaas. */
 export const getSubscription = async (id: string): Promise<AsaasSubscription | null> => {
@@ -248,6 +307,82 @@ export const openInvoice = (payments: AsaasPayment[]): AsaasPayment | null =>
 // ─── Sincronização com o banco ──────────────────────────────────────────────
 
 /**
+ * Checkout com cartão concluído: liga a assinatura que o Asaas criou à conta.
+ *
+ * Só age quando a linha da conta está esperando o checkout (tem cliente no
+ * Asaas e ainda não tem assinatura). Pega a assinatura ativa mais nova desse
+ * cliente; se o checkout foi concluído duas vezes, encerra as outras para não
+ * cobrar em dobro. O teste vai até a 1ª cobrança (nextDueDate).
+ *
+ * Devolve o id da assinatura ligada, ou null se ainda não há o que ligar
+ * (checkout não concluído). Seguro de chamar várias vezes.
+ */
+export const vincularAssinaturaDoCheckout = async (
+  admin: AdminClient,
+  userId: string,
+): Promise<string | null> => {
+  const { data: row, error } = await admin
+    .from("user_subscriptions")
+    .select("asaas_customer_id, asaas_subscription_id, billing_provider")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row || row.billing_provider !== "asaas" || !row.asaas_customer_id) return null;
+  if (row.asaas_subscription_id) return row.asaas_subscription_id;
+
+  const ativas = await listActiveSubscriptionsOfCustomer(row.asaas_customer_id);
+  const [assinatura, ...sobrando] = ativas;
+  if (!assinatura) return null;
+
+  const pagamentos = await listSubscriptionPayments(assinatura.id);
+  const jaPagou = pagamentos.some((p) => !p.deleted && ["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"].includes(p.status));
+  const primeiraCobranca = pagamentos
+    .filter((p) => !p.deleted)
+    .map((p) => p.dueDate)
+    .sort()[0] ?? assinatura.nextDueDate ?? null;
+  const fimDoTeste = !jaPagou && primeiraCobranca ? `${primeiraCobranca.slice(0, 10)}T03:00:00.000Z` : null;
+
+  // Grava só se ninguém ligou outra assinatura no meio tempo (webhook e volta
+  // do usuário chegando juntos).
+  const { data: ligada, error: upErr } = await admin
+    .from("user_subscriptions")
+    .update({
+      asaas_subscription_id: assinatura.id,
+      trial_start: new Date().toISOString(),
+      trial_end: fimDoTeste,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId)
+    .is("asaas_subscription_id", null)
+    .select("asaas_subscription_id")
+    .maybeSingle();
+  if (upErr) throw upErr;
+  if (!ligada) {
+    const { data: atual } = await admin
+      .from("user_subscriptions").select("asaas_subscription_id").eq("user_id", userId).maybeSingle();
+    return atual?.asaas_subscription_id ?? null;
+  }
+
+  for (const extra of sobrando) {
+    await deleteSubscription(extra.id).catch(() => {});
+  }
+
+  console.log(JSON.stringify({
+    source: "asaas.checkout.linked", user_id: userId, trial: Boolean(fimDoTeste), extras_encerradas: sobrando.length,
+  }));
+
+  // Cartão cadastrado = teste começou: avisa o Meta Ads (com consentimento).
+  if (fimDoTeste) {
+    await enviarConversaoMeta(admin, userId, "StartTrial", {
+      value: assinatura.value,
+      plano: planFromValue(assinatura.value) ?? undefined,
+      eventId: `trial-${userId}`,
+    });
+  }
+  return assinatura.id;
+};
+
+/**
  * Recalcula a linha de user_subscriptions a partir do estado ATUAL no Asaas.
  *
  * Usado pelo webhook, pelo botão "Atualizar assinatura" e depois de cada ação
@@ -265,11 +400,12 @@ export const syncAsaasSubscription = async (
 ) => {
   const { data: row, error: rowError } = await admin
     .from("user_subscriptions")
-    .select("plan, trial_end, asaas_subscription_id")
+    .select("plan, status, trial_end, asaas_subscription_id")
     .eq("user_id", userId)
     .maybeSingle();
   if (rowError) throw rowError;
   if (!row || row.asaas_subscription_id !== subscriptionId) return null;
+  const statusAntes = row.status as string | null;
 
   const subscription = await getSubscription(subscriptionId);
   const payments = subscription ? await listSubscriptionPayments(subscriptionId) : [];
@@ -299,6 +435,17 @@ export const syncAsaasSubscription = async (
     source: "asaas.sync", user_id: userId, plan, status: state.status,
     cancel_at_period_end: state.cancelAtPeriodEnd, payments: payments.length,
   }));
+
+  // Primeira mensalidade paga = virou assinante: avisa o Meta Ads (com
+  // consentimento). Só na 1ª — renovação ou volta de atraso não contam de novo.
+  const pagas = payments.filter((p) => !p.deleted && ["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"].includes(p.status));
+  if (saved && state.status === "active" && statusAntes !== "active" && pagas.length === 1) {
+    await enviarConversaoMeta(admin, userId, "Subscribe", {
+      value: pagas[0].value,
+      plano: plan,
+      eventId: `assinatura-${subscriptionId}`,
+    });
+  }
 
   return { row: saved, payments };
 };

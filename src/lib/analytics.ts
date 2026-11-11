@@ -1,4 +1,5 @@
 import posthog from "posthog-js";
+import { iniciarPixel } from "./metaPixel";
 
 /**
  * Analytics de produto (PostHog) — com privacidade máxima por padrão (LGPD).
@@ -106,14 +107,15 @@ const initPostHog = () => {
  * de analytics salvo — senão fica dormente até o usuário aceitar.
  */
 export const bootstrapAnalytics = () => {
-  if (hasAnalyticsConsent()) initPostHog();
+  if (hasAnalyticsConsent()) { initPostHog(); iniciarPixel(); }
 };
 
-/** Usuário aceitou analytics no banner → persiste e liga agora. */
+/** Usuário aceitou analytics no banner → persiste e liga agora (PostHog + Pixel da Meta). */
 export const grantAnalyticsConsent = () => {
   persistConsent(true);
   initPostHog();
   if (initialized) posthog.opt_in_capturing();
+  iniciarPixel();
 };
 
 /** Usuário recusou analytics (só essenciais) → persiste e garante desligado. */

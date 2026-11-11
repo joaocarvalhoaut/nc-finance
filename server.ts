@@ -26,12 +26,12 @@ const IS_DEV = process.env.NODE_ENV !== "production";
 const CSP = [
   "default-src 'self'",
   IS_DEV
-    ? "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://us-assets.i.posthog.com https://challenges.cloudflare.com"
-    : "script-src 'self' 'wasm-unsafe-eval' https://us-assets.i.posthog.com https://challenges.cloudflare.com",
+    ? "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://us-assets.i.posthog.com https://challenges.cloudflare.com https://connect.facebook.net"
+    : "script-src 'self' 'wasm-unsafe-eval' https://us-assets.i.posthog.com https://challenges.cloudflare.com https://connect.facebook.net",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: https:",
-  `connect-src 'self'${IS_DEV ? " ws:" : ""} https://hiabmnyyxbedtkigcjdx.supabase.co wss://hiabmnyyxbedtkigcjdx.supabase.co https://viacep.com.br https://*.sentry.io https://us.i.posthog.com https://us-assets.i.posthog.com`,
+  `connect-src 'self'${IS_DEV ? " ws:" : ""} https://hiabmnyyxbedtkigcjdx.supabase.co wss://hiabmnyyxbedtkigcjdx.supabase.co https://viacep.com.br https://*.sentry.io https://us.i.posthog.com https://us-assets.i.posthog.com https://www.facebook.com https://connect.facebook.net`,
   // CAPTCHA do login (Cloudflare Turnstile): script + iframe do desafio.
   "frame-src 'self' https://challenges.cloudflare.com",
   "object-src 'none'",

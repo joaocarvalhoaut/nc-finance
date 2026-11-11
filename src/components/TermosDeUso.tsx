@@ -59,7 +59,7 @@ export default function TermosDeUso({ onClose }: Props) {
           <section className="space-y-2">
             <h3 className="text-white font-semibold text-base">4. Planos e Pagamentos</h3>
             <p>
-              O serviço é oferecido mediante assinatura mensal nos planos disponíveis (Básico, Pro e Premium), com cobranças recorrentes processadas pelo Asaas, pagáveis por Pix, boleto ou cartão. Na primeira assinatura há 7 dias de teste grátis, e a primeira fatura vence ao fim do teste; as seguintes vencem a cada mês, antecipadamente.
+              O serviço é oferecido mediante assinatura mensal nos planos disponíveis (Básico, Pro e Premium), com cobranças recorrentes processadas pelo Asaas, pagáveis por Pix, boleto ou cartão. Na primeira assinatura há 8 dias de teste grátis, iniciados com o cadastro de um cartão de crédito; ao fim do teste a primeira mensalidade é cobrada automaticamente nesse cartão, salvo se a assinatura for cancelada antes. As seguintes vencem a cada mês, antecipadamente.
             </p>
             <p>
               Não há reembolso por períodos não utilizados. O cancelamento da assinatura impede novas cobranças, mas o acesso permanece ativo até o final do período já pago.

@@ -9,9 +9,10 @@ import {
 // Statuses que significam "webhook processado — pode parar o polling"
 const SETTLED_STATUSES = new Set(["trialing", "active", "canceled", "past_due", "unpaid"]);
 
-// Polling: tenta a cada 2 s por até 22 s
-const POLL_INTERVAL_MS  = 2_000;
-const POLL_MAX_ATTEMPTS = 11;
+// Polling: tenta a cada 3 s por até ~60 s (o Asaas pode levar alguns segundos
+// para criar a assinatura depois do checkout com cartão).
+const POLL_INTERVAL_MS  = 3_000;
+const POLL_MAX_ATTEMPTS = 20;
 
 export const useSubscription = (userId: string | null) => {
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
@@ -94,6 +95,9 @@ export const useSubscription = (userId: string | null) => {
 
       pollAttemptRef.current += 1;
 
+      // "sync" relê o Asaas e liga a assinatura do checkout com cartão, sem
+      // depender do webhook.
+      try { await subscriptionService.billingAction("sync"); } catch { /* tenta de novo */ }
       const sub = await refreshSubscription();
       if (!isMountedRef.current) return;
 

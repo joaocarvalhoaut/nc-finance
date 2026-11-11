@@ -149,7 +149,7 @@ const byDueDate = (a: AsaasPaymentLite, b: AsaasPaymentLite) => a.dueDate.locale
  * webhooks chegam, nem se algum se perdeu: o resultado é o mesmo.
  *
  * `trialEnd` vem do banco (gravado no checkout): o Asaas não tem o conceito de
- * período de teste — o teste é só a primeira cobrança vencendo 7 dias depois.
+ * período de teste — o teste é só a primeira cobrança vencendo alguns dias depois (TRIAL_DAYS).
  */
 export const computeSubscriptionState = (
   subscription: AsaasSubscriptionLite | null,

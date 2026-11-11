@@ -16,7 +16,7 @@
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
-import { syncAsaasSubscription } from "../_shared/asaas.ts";
+import { syncAsaasSubscription, vincularAssinaturaDoCheckout } from "../_shared/asaas.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -39,9 +39,30 @@ const sameToken = (a: string, b: string) => {
 interface AsaasEvent {
   id?: string;
   event?: string;
-  payment?: { subscription?: string | null; externalReference?: string | null } | null;
-  subscription?: { id?: string; externalReference?: string | null } | null;
+  payment?: { subscription?: string | null; customer?: string | null; externalReference?: string | null } | null;
+  subscription?: { id?: string; customer?: string | null; externalReference?: string | null } | null;
+  checkout?: { id?: string; customer?: string | null; externalReference?: string | null } | null;
 }
+
+/**
+ * Teste grátis com cartão: a assinatura nasce no checkout do Asaas e ainda não
+ * está na nossa tabela. Acha a conta pelo cliente do Asaas (gravado quando o
+ * checkout foi aberto) e liga a assinatura. null = evento de outra coisa.
+ */
+const ligarPeloCliente = async (event: AsaasEvent): Promise<string | null> => {
+  const customer = event.checkout?.customer || event.subscription?.customer || event.payment?.customer || null;
+  if (!customer) return null;
+  const { data: pendente } = await admin
+    .from("user_subscriptions")
+    .select("user_id")
+    .eq("asaas_customer_id", customer)
+    .is("asaas_subscription_id", null)
+    .maybeSingle();
+  if (!pendente?.user_id) return null;
+  const ligada = await vincularAssinaturaDoCheckout(admin, pendente.user_id);
+  if (ligada) await syncAsaasSubscription(admin, pendente.user_id, ligada);
+  return ligada ? pendente.user_id : null;
+};
 
 Deno.serve(async (request) => {
   if (request.method !== "POST") return reply(405, { error: "Metodo nao permitido." });
@@ -76,25 +97,30 @@ Deno.serve(async (request) => {
       if (seen) return reply(200, { received: true, duplicate: true });
     }
 
-    // Cobrança avulsa, sem assinatura: não é do NC Finance.
-    if (!subscriptionId) {
-      console.log(JSON.stringify({ source: "asaas-webhook.ignored", event_type: eventType, reason: "sem_assinatura" }));
-      return reply(200);
+    const { data: row } = subscriptionId
+      ? await admin
+        .from("user_subscriptions")
+        .select("user_id")
+        .eq("asaas_subscription_id", subscriptionId)
+        .maybeSingle()
+      : { data: null };
+
+    let userId: string | null = row?.user_id ?? null;
+    if (userId && subscriptionId) {
+      await syncAsaasSubscription(admin, userId, subscriptionId);
+    } else {
+      // Checkout com cartão concluído (CHECKOUT_PAID, SUBSCRIPTION_CREATED…):
+      // a assinatura ainda não está ligada à conta.
+      userId = await ligarPeloCliente(event);
+      if (!userId) {
+        // Cobrança avulsa, assinatura antiga (já substituída) ou criada à mão.
+        console.log(JSON.stringify({
+          source: "asaas-webhook.ignored", event_type: eventType,
+          reason: subscriptionId ? "assinatura_desconhecida" : "sem_assinatura",
+        }));
+        return reply(200);
+      }
     }
-
-    const { data: row } = await admin
-      .from("user_subscriptions")
-      .select("user_id")
-      .eq("asaas_subscription_id", subscriptionId)
-      .maybeSingle();
-
-    if (!row?.user_id) {
-      // Assinatura antiga (já substituída) ou criada à mão no painel.
-      console.log(JSON.stringify({ source: "asaas-webhook.ignored", event_type: eventType, reason: "assinatura_desconhecida" }));
-      return reply(200);
-    }
-
-    await syncAsaasSubscription(admin, row.user_id, subscriptionId);
 
     // Marca como processado só DEPOIS de sincronizar: se falhar antes, o
     // reenvio do Asaas processa de novo.
@@ -104,7 +130,7 @@ Deno.serve(async (request) => {
         .upsert({ event_id: eventId, event_type: eventType }, { onConflict: "event_id" });
     }
 
-    console.log(JSON.stringify({ source: "asaas-webhook.processed", event_type: eventType, user_id: row.user_id }));
+    console.log(JSON.stringify({ source: "asaas-webhook.processed", event_type: eventType, user_id: userId }));
     return reply(200);
   } catch (error) {
     console.log(JSON.stringify({

@@ -25,6 +25,7 @@ import {
   openInvoice,
   syncAsaasSubscription,
   updateSubscription,
+  vincularAssinaturaDoCheckout,
 } from "../_shared/asaas.ts";
 import { isPlanId, PLAN_PRICE_BRL } from "../_shared/billingPlans.ts";
 import { ACCESS_COLUMNS, canUseSubscription, todayBr } from "../_shared/billingStatus.ts";
@@ -68,7 +69,11 @@ Deno.serve(async (request) => {
       .maybeSingle();
     if (rowError) throw rowError;
 
-    const subscriptionId: string | null = row?.asaas_subscription_id ?? null;
+    let subscriptionId: string | null = row?.asaas_subscription_id ?? null;
+    // Voltou do checkout com cartão antes do webhook: liga a assinatura agora.
+    if (!subscriptionId && body.action === "sync") {
+      subscriptionId = await vincularAssinaturaDoCheckout(admin, user.id);
+    }
     if (!subscriptionId) {
       // "Atualizar" sem assinatura no Asaas não é erro: só não há o que sincronizar.
       if (body.action === "sync") return json(200, { synced: false });

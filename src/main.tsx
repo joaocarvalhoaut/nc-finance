@@ -5,10 +5,12 @@ import ErrorBoundary from './components/ErrorBoundary.tsx';
 import CookieConsent from './components/CookieConsent.tsx';
 import { initMonitoring } from './lib/monitoring.ts';
 import { bootstrapAnalytics } from './lib/analytics.ts';
+import { capturarOrigem } from './lib/origemVisita.ts';
 import './index.css';
 
 initMonitoring();
 bootstrapAnalytics();
+capturarOrigem();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

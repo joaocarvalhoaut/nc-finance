@@ -64,6 +64,13 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   02/11/2026; `billing_provider = 'cortesia'` libera sem cobrança (conta do dono).
   Conta Asaas verificada em 08/11/2026. Pix nas faturas não precisa de código (assinatura usa
   `billingType: "UNDEFINED"`): aparece quando a conta tem chave Pix cadastrada no painel.
+- **Teste grátis só com cartão** (11/11/2026, pedido do dono): 8 dias (`TRIAL_DAYS`/`DIAS_TESTE`) a partir do
+  cartão. 1ª assinatura abre o checkout hospedado do Asaas (`createCardTrialCheckout`, `POST /v3/checkouts`,
+  só cartão, `RECURRENT`, 1ª cobrança em hoje+8): o cartão nunca passa por nós. Linha pendente = asaas +
+  `asaas_customer_id` + sem `asaas_subscription_id`; `vincularAssinaturaDoCheckout` liga a assinatura ativa
+  do cliente (webhook CHECKOUT_*/SUBSCRIPTION_CREATED, volta `?checkout=success` ou "sync" do polling) e grava
+  `trial_start` só aí — quem desiste do checkout segue com direito ao teste. Sem cartão, sem teste.
+  A documentação do Asaas não deixa claro se cobra só no vencimento: confirmar com cartão real.
 - Planos: R$ 149 / 197 / 297 (`_shared/billingPlans.ts`, fonte única — landing lê de lá). Cobrem a
   instância Z-API (~R$ 90/cliente). Todo plano usa o número do próprio cliente.
 - WhatsApp por conta: "Conectar WhatsApp" cria a instância pela API de parceiro da Z-API
@@ -135,3 +142,10 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   evento, em silencio. Corrigido no `vercel.json` e no `server.ts`. Ao mexer no CSP,
   lembre que o session replay carrega o gravador de `us-assets.i.posthog.com`, entao
   esse host precisa do `script-src` alem do `connect-src`.
+- **Meta Ads** (11/11/2026): Pixel no navegador (`src/lib/metaPixel.ts`, precisa `VITE_META_PIXEL_ID` na Vercel)
+  e API de Conversões no servidor (`_shared/metaCapi.ts`, secrets `META_PIXEL_ID` + `META_CAPI_TOKEN`). Os dois
+  só com "Aceitar" no banner de cookies (`user_metadata.consentimento_marketing`). Eventos: CompleteRegistration
+  (cadastro), InitiateCheckout, StartTrial (cartão cadastrado, eventID `trial-<userId>` nos dois lados) e
+  Subscribe (1ª mensalidade paga, em `syncAsaasSubscription`). Origem da visita (utm_*, fbclid → fbc, 1º toque)
+  em `src/lib/origemVisita.ts`, vai para `user_metadata.origem` no cadastro. CSP libera `connect.facebook.net`
+  (script + connect) e `www.facebook.com` (connect).

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Cookie, X } from "lucide-react";
 import { getConsent, grantAnalyticsConsent, declineAnalyticsConsent } from "../lib/analytics";
+import { gravarConsentimentoNaConta } from "../lib/origemVisita";
 
 /**
  * Consentimento de cookies/analytics (LGPD) com BLOQUEIO PRÉVIO.
@@ -9,6 +10,8 @@ import { getConsent, grantAnalyticsConsent, declineAnalyticsConsent } from "../l
  * o serviço. O analytics de produto (PostHog) é OPT-IN: só liga se o usuário
  * clicar em "Aceitar". Enquanto ele não escolher, nada de analytics carrega.
  * A escolha é lembrada; some o banner após decidir.
+ * "Aceitar" também liga o Pixel da Meta (medição dos anúncios) — ver lib/metaPixel.
+ * No celular o banner fica no topo: embaixo cobria o botão fixo "Começar grátis".
  */
 export default function CookieConsent() {
   const [visible, setVisible] = useState(false);
@@ -20,6 +23,7 @@ export default function CookieConsent() {
 
   const acceptAll = () => {
     grantAnalyticsConsent();
+    void gravarConsentimentoNaConta();
     setVisible(false);
   };
 
@@ -35,7 +39,7 @@ export default function CookieConsent() {
       role="dialog"
       aria-live="polite"
       aria-label="Preferências de cookies"
-      className="fixed bottom-3 inset-x-3 sm:bottom-5 sm:left-5 sm:right-auto sm:max-w-md z-[60]
+      className="fixed top-3 inset-x-3 sm:top-auto sm:bottom-5 sm:left-5 sm:right-auto sm:max-w-md z-[60]
                  bg-zinc-900/95 backdrop-blur border border-zinc-800 rounded-2xl shadow-2xl p-4 sm:p-5"
     >
       <div className="flex items-start gap-3">
@@ -47,7 +51,8 @@ export default function CookieConsent() {
           <p className="text-xs text-zinc-400 leading-relaxed mt-1">
             Usamos cookies <strong className="text-zinc-300">essenciais</strong> para manter você
             conectado com segurança. Com sua permissão, usamos também
-            <strong className="text-zinc-300"> analytics de produto</strong> (com minimização de dados) para melhorar o app. Você pode recusar sem perder nenhuma função.
+            <strong className="text-zinc-300"> analytics de produto</strong> (com minimização de dados) para melhorar o app
+            e a <strong className="text-zinc-300">medição de anúncios da Meta</strong> (Facebook/Instagram). Você pode recusar sem perder nenhuma função.
             Detalhes na Política de Privacidade.
           </p>
           <div className="flex flex-wrap items-center gap-2 mt-3">

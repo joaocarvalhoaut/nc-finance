@@ -46,7 +46,7 @@ const PERGUNTAS: Pergunta[] = [
   {
     tema: "Primeiros passos",
     pergunta: "Como funciona o teste grátis?",
-    resposta: `Escolha um plano e use ${DIAS_TESTE} dias de graça, sem cartão de crédito. A primeira fatura vence no fim do teste, por boleto ou cartão. Se cancelar antes, não paga nada.`,
+    resposta: `Escolha um plano e cadastre o cartão na página segura do Asaas — nada é cobrado na hora. Você usa ${DIAS_TESTE} dias de graça e a primeira mensalidade cai no cartão no fim do teste. Se cancelar antes, em Configurações, não paga nada.`,
   },
   {
     tema: "Primeiros passos",
@@ -59,8 +59,8 @@ const PERGUNTAS: Pergunta[] = [
     tema: "WhatsApp e envios",
     pergunta: "Como conecto meu WhatsApp?",
     resposta:
-      "Em Configurações, clique em “Conectar WhatsApp” e escaneie o código com o celular do número (WhatsApp › Aparelhos conectados › Conectar um aparelho). Leva menos de um minuto e está incluído em todos os planos.\n" +
-      "Se aparecer “Recebemos seu pedido”, o número está sendo preparado: a tela mostra o prazo, e depois é só voltar e escanear o código.",
+      `Chame o suporte no WhatsApp ${CONTATO_WHATSAPP}: nós preparamos o seu número em até 24 horas. Está incluído em todos os planos.\n` +
+      "Quando estiver pronto, em Configurações, clique em “Conectar WhatsApp” e escaneie o código com o celular do número (WhatsApp › Aparelhos conectados › Conectar um aparelho).",
   },
   {
     tema: "WhatsApp e envios",
