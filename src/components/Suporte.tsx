@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, Copy, Mail, Search, X } from "lucide-react";
-import { CONTATO_EMAIL, DIAS_TESTE } from "../content/landing";
+import { Check, ChevronDown, Copy, Mail, MessageCircle, Search, X } from "lucide-react";
+import { CONTATO_EMAIL, CONTATO_WHATSAPP, CONTATO_WHATSAPP_LINK, DIAS_TESTE } from "../content/landing";
 
 /**
  * Central de ajuda (perguntas frequentes). Abre no app e na landing.
@@ -441,14 +441,14 @@ export default function Suporte({ onClose }: Props) {
         </div>
 
         {/* Contato */}
-        <footer className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 border-t border-zinc-800/80 flex-shrink-0">
+        <footer className="flex flex-col gap-3 px-5 py-3.5 border-t border-zinc-800/80 flex-shrink-0">
           <div className="min-w-0">
             <p className="text-sm text-zinc-300">Não achou a resposta?</p>
             <p className="text-xs text-zinc-500">
-              <span className="text-zinc-400 break-all">{CONTATO_EMAIL}</span> · respondemos em até 1 dia útil
+              WhatsApp <span className="text-zinc-400">{CONTATO_WHATSAPP}</span> · <span className="text-zinc-400 break-all">{CONTATO_EMAIL}</span>
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => void copiarEmail()}
@@ -458,9 +458,17 @@ export default function Suporte({ onClose }: Props) {
             </button>
             <a
               href={`mailto:${CONTATO_EMAIL}?subject=${encodeURIComponent("Suporte NC Finance")}`}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-800 hover:border-zinc-700 text-xs text-zinc-300 transition-colors"
             >
               <Mail className="w-3.5 h-3.5" /> Enviar e-mail
+            </a>
+            <a
+              href={CONTATO_WHATSAPP_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-colors"
+            >
+              <MessageCircle className="w-3.5 h-3.5" /> Chamar no WhatsApp
             </a>
           </div>
         </footer>

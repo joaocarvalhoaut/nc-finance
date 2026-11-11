@@ -48,7 +48,7 @@ const jsonLd = {
       url: site,
       logo: `${site}favicon.png`,
       email: c.email,
-      contactPoint: { "@type": "ContactPoint", contactType: "customer support", email: c.email, availableLanguage: ["pt-BR"] },
+      contactPoint: { "@type": "ContactPoint", contactType: "customer support", email: c.email, telephone: c.telefone, availableLanguage: ["pt-BR"] },
     },
     {
       "@type": "WebSite",
@@ -119,7 +119,7 @@ const llms = [
   "",
   `- Site: ${site}`,
   "- Idioma: português (Brasil)",
-  `- Contato: ${c.email}`,
+  `- Contato: ${c.email} · WhatsApp ${c.whatsapp}`,
   `- Atualizado em: ${hoje}`,
   "",
   "## Como funciona",

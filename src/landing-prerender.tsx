@@ -8,7 +8,7 @@
 import { renderToString } from "react-dom/server";
 import LandingPage from "./components/LandingPage";
 import { PLAN_LIST } from "./config/plans";
-import { CONTATO_EMAIL, DEFINICAO, DIAS_TESTE, DIFERENCIAIS, PASSOS, PERGUNTAS, SITE_URL } from "./content/landing";
+import { CONTATO_EMAIL, CONTATO_WHATSAPP, DEFINICAO, DIAS_TESTE, DIFERENCIAIS, PASSOS, PERGUNTAS, SITE_URL } from "./content/landing";
 
 export function renderLanding(): string {
   return renderToString(
@@ -24,6 +24,8 @@ export function renderLanding(): string {
 export const conteudo = {
   siteUrl: SITE_URL,
   email: CONTATO_EMAIL,
+  whatsapp: CONTATO_WHATSAPP,
+  telefone: "+55-77-98137-6867",
   definicao: DEFINICAO,
   diasTeste: DIAS_TESTE,
   passos: PASSOS,
