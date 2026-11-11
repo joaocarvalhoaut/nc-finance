@@ -838,6 +838,18 @@ export default function ClientDashboard({
                   </button>
                 ))}
               </div>
+              {/* A mensagem cita a empresa na abertura e na assinatura ({empresa}).
+                  Sem nome cadastrado, as frases saem sem ele — avisa onde cadastrar. */}
+              {!companyName?.trim() && (
+                <p className="mt-3 text-[11px] text-amber-300/90 leading-relaxed">
+                  Cadastre o nome da sua empresa para ele aparecer nas mensagens.{" "}
+                  {onGoToSettings && (
+                    <button type="button" onClick={onGoToSettings} className="underline underline-offset-2 hover:text-amber-200 cursor-pointer">
+                      Cadastrar em Configurações
+                    </button>
+                  )}
+                </p>
+              )}
             </div>
           )}
 

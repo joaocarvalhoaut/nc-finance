@@ -33,7 +33,7 @@ import { preencherMensagem } from "./agrupamento.ts";
 
 const DEFAULT_TEMPLATES: Record<string, string> = {
   amigavel: `Olá {nome_cliente}, tudo bem? 😊
-Passando para lembrar sobre o boleto abaixo em nosso acompanhamento.
+Aqui é do financeiro {empresa}. Passando para lembrar sobre o boleto abaixo em nosso acompanhamento.
 
 Documento: {documento}
 Vencimento: {vencimento}
@@ -46,7 +46,7 @@ Equipe financeira {empresa}.`,
 
   neutro: `Prezado(a) {nome_cliente},
 
-Informamos que identificamos o boleto abaixo em aberto em nosso sistema:
+Aqui é do financeiro {empresa}. Informamos que identificamos o boleto abaixo em aberto em nosso sistema:
 
 Documento: {documento}
 Vencimento: {vencimento}
@@ -59,7 +59,7 @@ Equipe financeira {empresa}.`,
 
   firme: `Caro(a) {nome_cliente},
 
-Consta em nosso sistema o boleto abaixo com vencimento em {vencimento} no valor de R$ {valor_atualizado} (Documento: {documento}), ainda em aberto.
+Aqui é da equipe de cobrança {empresa}. Consta em nosso sistema o boleto com vencimento em {vencimento} no valor de R$ {valor_atualizado} (Documento: {documento}), ainda em aberto.
 
 Solicitamos a regularização imediata para evitar a incidência de multa e juros adicionais.
 
@@ -67,7 +67,7 @@ Equipe de cobrança {empresa}.`,
 
   juridico: `Sr./Sra. {nome_cliente},
 
-Notificamos V.Sa. acerca do débito referente ao documento {documento}, com vencimento em {vencimento} e valor de R$ {valor_atualizado}, até o momento sem quitação em nosso sistema.
+O departamento administrativo {empresa} notifica V.Sa. acerca do débito referente ao documento {documento}, com vencimento em {vencimento} e valor de R$ {valor_atualizado}, até o momento sem quitação em nosso sistema.
 
 Solicitamos manifestação no prazo de 48 horas para evitar medidas administrativas e jurídicas cabíveis.
 
