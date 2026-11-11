@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Copy, Mail, MessageCircle, Search, X } from "lucide-react";
-import { CONTATO_EMAIL, CONTATO_WHATSAPP, CONTATO_WHATSAPP_LINK, DIAS_TESTE } from "../content/landing";
+import { CONTATO_EMAIL, CONTATO_WHATSAPP, CONTATO_WHATSAPP_LINK, CONTATO_WHATSAPP_NUMERO, DIAS_TESTE } from "../content/landing";
+import { abrirWhatsapp } from "../utils/abrirWhatsapp";
 
 /**
  * Central de ajuda (perguntas frequentes). Abre no app e na landing.
@@ -466,6 +467,7 @@ export default function Suporte({ onClose }: Props) {
               href={CONTATO_WHATSAPP_LINK}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={(e) => abrirWhatsapp(e, CONTATO_WHATSAPP_NUMERO)}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-colors"
             >
               <MessageCircle className="w-3.5 h-3.5" /> Chamar no WhatsApp

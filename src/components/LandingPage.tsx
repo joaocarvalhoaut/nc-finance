@@ -17,7 +17,8 @@ import {
 } from "lucide-react";
 import type { AuthCredentials, SignUpPayload } from "../types";
 import { PLAN_LIST } from "../config/plans";
-import { CONTATO_EMAIL, CONTATO_WHATSAPP, CONTATO_WHATSAPP_LINK, DEFINICAO, DIAS_TESTE, DIFERENCIAIS, PASSOS, PERGUNTAS } from "../content/landing";
+import { abrirWhatsapp } from "../utils/abrirWhatsapp";
+import { CONTATO_EMAIL, CONTATO_WHATSAPP, CONTATO_WHATSAPP_LINK, CONTATO_WHATSAPP_NUMERO, DEFINICAO, DIAS_TESTE, DIFERENCIAIS, PASSOS, PERGUNTAS } from "../content/landing";
 const Suporte = lazy(() => import("./Suporte"));
 
 /**
@@ -377,7 +378,7 @@ export default function LandingPage({
             <p className="font-display font-black text-sm text-white">N<span className="text-emerald-400">C Finance</span></p>
             <p className="leading-relaxed">Software de cobrança pelo WhatsApp para pequenas e médias empresas.</p>
             <p>Contato: <a href={`mailto:${CONTATO_EMAIL}`} className="text-zinc-300 hover:text-white">{CONTATO_EMAIL}</a></p>
-            <p>WhatsApp: <a href={CONTATO_WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="text-zinc-300 hover:text-white">{CONTATO_WHATSAPP}</a></p>
+            <p>WhatsApp: <a href={CONTATO_WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" onClick={(e) => abrirWhatsapp(e, CONTATO_WHATSAPP_NUMERO)} className="text-zinc-300 hover:text-white">{CONTATO_WHATSAPP}</a></p>
           </div>
           <div className="space-y-3 sm:text-right">
             <nav aria-label="Documentos" className="flex flex-wrap gap-x-4 gap-y-2 sm:justify-end">

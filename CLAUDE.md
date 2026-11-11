@@ -70,6 +70,10 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   (`_shared/zapiProvisioning.ts`); assina ao conectar, cancela quando a assinatura acaba
   (verificação diária no run-automation-scheduler). Falta o usuário entrar no programa Partner
   e gravar `ZAPI_PARTNER_TOKEN`; até lá, instância manual via formulário de suporte (e-mail do cliente).
+  **Aviso do primeiro uso** (11/11/2026, pedido do dono): conta sem número conectado vê uma vez
+  (`ncf-aviso-conectar-v1:<userId>` no localStorage) o `AvisoConectarNumero` — chamar o suporte no
+  WhatsApp (77) 98137-6867, conexão em até 24 h. Contato em `src/content/landing.ts`
+  (`CONTATO_WHATSAPP*`); links abrem a conversa direto por `utils/abrirWhatsapp.ts`.
 - **Boleto:** só anexado um a um (upload do PDF → Storage `charge-pdfs`, `drive_file_id = 'uploaded'`),
   enviado como link na mensagem. A busca/sugestão de boletos pelo Google Drive saiu da interface em
   30/10/2026 a pedido do dono e os envios ignoram sugestão do Drive; as Edge Functions de Drive

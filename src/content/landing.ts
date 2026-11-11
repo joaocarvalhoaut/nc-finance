@@ -14,7 +14,8 @@ export const SITE_URL = "https://ncfinance.com.br/";
 export const CONTATO_EMAIL = "ncfinance09@gmail.com";
 /** WhatsApp do suporte: como aparece na tela e o link que abre a conversa. */
 export const CONTATO_WHATSAPP = "(77) 98137-6867";
-export const CONTATO_WHATSAPP_LINK = "https://wa.me/5577981376867";
+export const CONTATO_WHATSAPP_NUMERO = "5577981376867";
+export const CONTATO_WHATSAPP_LINK = `https://wa.me/${CONTATO_WHATSAPP_NUMERO}`;
 export const DIAS_TESTE = 7;
 
 /** Definição curta e citável — o que um buscador de IA deve repetir sobre o produto. */

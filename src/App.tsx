@@ -54,6 +54,7 @@ import {
 import { normalizarDigitosTelefone } from "./services/localDocumentExtraction/regexExtractors";
 import { exportRelatorio } from "./services/exportRelatorio";
 const Suporte = lazy(() => import("./components/Suporte"));
+const AvisoConectarNumero = lazy(() => import("./components/AvisoConectarNumero"));
 const ImportarTelefones = lazy(() => import("./components/ImportarTelefones"));
 import type { AplicarTelefones } from "./components/ImportarTelefones";
 import { PdfPreviewModal, openPdfPreview } from "./components/PdfPreviewModal";
@@ -287,6 +288,8 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<string>("inicio"); // Defaults to apresentacao so user can read landing page
   const isLoggedIn = Boolean(session);
   const [showSuporte, setShowSuporte] = useState(false);
+  /** Aviso do primeiro uso: conta sem número de WhatsApp conectado. */
+  const [showAvisoConectar, setShowAvisoConectar] = useState(false);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [subscriptionGateError, setSubscriptionGateError] = useState("");
   // Plano à espera do CPF/CNPJ (cadastro sem documento) e modal de gerenciar.
@@ -704,6 +707,32 @@ export default function App() {
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [userId, canUseApp]);
+
+  // Primeiro uso: se a conta ainda não tem número conectado, avisa uma vez
+  // (por conta, neste navegador) que é o suporte quem conecta e que leva até
+  // 24 h. Lê o status salvo (getStatus), sem consultar a Z-API.
+  const cadastroCompleto = perfilCadastro.completo;
+  useEffect(() => {
+    if (!userId || !canUseApp || !cadastroCompleto) return;
+    const chave = `ncf-aviso-conectar-v1:${userId}`;
+    try { if (localStorage.getItem(chave) === "1") return; } catch { return; }
+    let ativo = true;
+    void whatsappGatewayService.getStatus().then((s) => {
+      if (!ativo) return;
+      // Conectado, ou conta do suporte (ela é quem conecta): não precisa do aviso.
+      if (s.connected || s.can_manage_instances) {
+        try { localStorage.setItem(chave, "1"); } catch { /* ignore */ }
+      } else if (s.status !== "error") {
+        setShowAvisoConectar(true);
+      }
+    }).catch(() => { /* sem status: não incomoda agora, tenta no próximo acesso */ });
+    return () => { ativo = false; };
+  }, [userId, canUseApp, cadastroCompleto]);
+
+  const fecharAvisoConectar = () => {
+    try { if (userId) localStorage.setItem(`ncf-aviso-conectar-v1:${userId}`, "1"); } catch { /* ignore */ }
+    setShowAvisoConectar(false);
+  };
 
   // Future service calls should derive ownership from the authenticated account, never from client-supplied ownership fields.
   const currentOwnerUserId = userId;
@@ -7505,6 +7534,14 @@ export default function App() {
           )}
 
           {showSuporte && <Suporte onClose={() => setShowSuporte(false)} />}
+          {showAvisoConectar && (
+            <React.Suspense fallback={null}>
+              <AvisoConectarNumero
+                onClose={fecharAvisoConectar}
+                onAbrirConfiguracoes={() => { fecharAvisoConectar(); setCurrentTab("minha_conta"); }}
+              />
+            </React.Suspense>
+          )}
           {showDeleteAccount && (
             <DeleteAccountModal
               onClose={() => setShowDeleteAccount(false)}
