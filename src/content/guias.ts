@@ -1158,4 +1158,257 @@ export const GUIAS: Guia[] = [
       },
     ],
   },
+  {
+    slug: "mensagem-de-lembrete-de-pagamento",
+    titulo: "Mensagem de lembrete de pagamento: modelos prontos",
+    tituloSeo: "Mensagem de lembrete de pagamento: modelos para WhatsApp",
+    descricao:
+      "Modelos de lembrete de pagamento para WhatsApp: antes do vencimento, no dia, com Pix, para empresa e para cobrança mensal. Quando mandar e o que não pode faltar.",
+    resumo:
+      "O lembrete de pagamento vai 2 ou 3 dias antes do vencimento, ou no próprio dia, e é curto: quem envia, o que vence, o valor, a data e o boleto ou a chave Pix. " +
+      "Não é cobrança, então o tom é de favor ao cliente, e termina com \"se já pagou, desconsidere\". Abaixo estão modelos prontos: troque o que está entre colchetes.",
+    publicadoEm: "2026-11-12",
+    atualizadoEm: "2026-11-12",
+    secoes: [
+      {
+        titulo: "Quando mandar",
+        lista: [
+          "De 2 a 3 dias antes do vencimento: dá tempo de o cliente se organizar.",
+          "No dia do vencimento, de manhã: para quem paga no último dia.",
+          "Uma mensagem só por vencimento. Repetir o lembrete vira cobrança antes da hora.",
+        ],
+      },
+      {
+        titulo: "Lembrete antes do vencimento",
+        modelo:
+          "Olá, [Nome]! Aqui é o financeiro da [Empresa].\n" +
+          "Passando para lembrar que o boleto de R$ [valor] vence em [data].\n\n" +
+          "Boleto: [link]\n" +
+          "Se já pagou, pode desconsiderar. Obrigado!",
+      },
+      {
+        titulo: "Lembrete no dia do vencimento",
+        modelo:
+          "Bom dia, [Nome]! O boleto de R$ [valor] da [Empresa] vence hoje.\n\n" +
+          "Boleto: [link]\n" +
+          "Qualquer dúvida, é só responder aqui.",
+      },
+      {
+        titulo: "Lembrete com Pix",
+        modelo:
+          "Olá, [Nome]! Lembrete da [Empresa]: R$ [valor] com vencimento em [data].\n\n" +
+          "Chave Pix ([tipo da chave]): [chave]\n" +
+          "Favorecido: [razão social]\n\n" +
+          "Depois de pagar, se puder, me mande o comprovante por aqui. Obrigado!",
+        fecho: "Sempre diga em nome de quem está a chave: o cliente confere antes de pagar e confia mais.",
+      },
+      {
+        titulo: "Lembrete para empresa",
+        modelo:
+          "Olá, [Nome], aqui é o financeiro da [Empresa].\n" +
+          "A nota [número], de R$ [valor], vence em [data].\n\n" +
+          "Boleto: [link]\n" +
+          "Se faltar algum dado para o lançamento (pedido de compra, centro de custo), me avise que eu ajusto.",
+      },
+      {
+        titulo: "Lembrete de mensalidade",
+        modelo:
+          "Olá, [Nome]! Sua mensalidade de [mês] na [Empresa], de R$ [valor], vence dia [dia].\n\n" +
+          "Boleto: [link]\n" +
+          "Obrigado por estar com a gente!",
+      },
+      {
+        titulo: "O que não pode faltar",
+        lista: [
+          "O nome da empresa logo no começo.",
+          "O valor e a data.",
+          "O boleto ou o Pix na própria mensagem.",
+          "Um jeito de tirar dúvida: responder a mensagem.",
+        ],
+      },
+    ],
+    noNcFinance: [
+      "Regra automática \"vencem em X dias\" e regra \"vencem hoje\" (planos Pro e Premium), com o tom que você escolher ou um texto próprio.",
+      "O boleto em PDF vai como link na mensagem.",
+      "Os envios automáticos saem às 8h e podem ficar só nos dias úteis, pulando os feriados nacionais.",
+      "A mensagem sai do WhatsApp da sua empresa, assinada com o nome dela.",
+    ],
+    perguntas: [
+      {
+        pergunta: "Quantos dias antes do vencimento mandar o lembrete?",
+        resposta:
+          "De 2 a 3 dias antes funciona para a maioria: o cliente ainda lembra quando for pagar e tem tempo de se organizar. Para quem costuma pagar no último dia, um aviso na manhã do vencimento também ajuda.",
+      },
+      {
+        pergunta: "Lembrete de pagamento é cobrança?",
+        resposta:
+          "Não. Antes do vencimento não há dívida em atraso, então o lembrete é um aviso, e o tom deve ser de favor ao cliente, sem falar em multa ou juros.",
+      },
+      {
+        pergunta: "Posso mandar o lembrete para todos os clientes de uma vez?",
+        resposta:
+          "Pode, desde que cada mensagem leve o nome, o valor e a data de cada cliente, e que o volume não seja um pico brusco para o seu número. Espalhar os envios ao longo da manhã reduz o risco de bloqueio.",
+      },
+    ],
+  },
+  {
+    slug: "notificacao-extrajudicial-de-cobranca",
+    titulo: "Notificação extrajudicial de cobrança: como fazer (com modelo)",
+    tituloSeo: "Notificação extrajudicial de cobrança: modelo e como enviar",
+    descricao:
+      "O que é a notificação extrajudicial de cobrança, quando ela é necessária, como enviar (carta com AR ou cartório) e um modelo pronto para adaptar.",
+    resumo:
+      "Notificação extrajudicial de cobrança é um aviso formal, por escrito, que informa a dívida, dá um prazo para pagar e diz o que acontece depois. Pode ser enviada por carta com aviso de recebimento ou pelo Cartório de Registro de Títulos e Documentos (artigo 160 da Lei 6.015/1973). " +
+      "Quando a dívida tem data de vencimento, o atraso já existe sem aviso (artigo 397 do Código Civil); a notificação serve como prova da cobrança e como último aviso antes do protesto, da negativação ou da ação. Sem data de vencimento, ela é o que coloca o devedor em atraso.",
+    publicadoEm: "2026-11-12",
+    atualizadoEm: "2026-11-12",
+    secoes: [
+      {
+        titulo: "Quando usar",
+        lista: [
+          "Como último aviso, depois das mensagens de cobrança sem resposta.",
+          "Antes de protestar, negativar ou entrar na Justiça, para registrar que você tentou resolver.",
+          "Quando a dívida não tem data de vencimento definida: aí a notificação é o que constitui o devedor em mora (artigo 397, parágrafo único, do Código Civil).",
+          "Quando o contrato exige aviso prévio para rescindir ou cobrar multa.",
+        ],
+      },
+      {
+        titulo: "Como enviar",
+        lista: [
+          "Carta com aviso de recebimento (AR) dos Correios: barata, e o AR prova a entrega no endereço.",
+          "Cartório de Registro de Títulos e Documentos: o cartório entrega e certifica, o que dá mais força como prova (artigo 160 da Lei 6.015/1973).",
+          "E-mail ou WhatsApp: valem como registro, mais fracos como prova de recebimento. Guarde a confirmação de leitura ou a resposta.",
+        ],
+      },
+      {
+        titulo: "O que a notificação precisa ter",
+        lista: [
+          "Quem notifica: nome, CPF ou CNPJ e endereço.",
+          "Quem é notificado: nome, CPF ou CNPJ e endereço.",
+          "A dívida: documentos, vencimentos, valor original e valor atualizado.",
+          "Um prazo para pagar ou procurar você.",
+          "O que acontece se não houver pagamento: só o que você vai mesmo fazer.",
+          "Como pagar e como entrar em contato.",
+        ],
+        rotuloModelo: "Modelo",
+        modelo:
+          "NOTIFICAÇÃO EXTRAJUDICIAL\n\n" +
+          "Notificante: [Empresa], CNPJ [número], com sede em [endereço].\n" +
+          "Notificado(a): [Nome], CPF/CNPJ [número], residente/com sede em [endereço].\n\n" +
+          "Pela presente, fica V.Sa. notificado(a) de que consta em aberto o débito abaixo, referente a [produto ou serviço]:\n\n" +
+          "Documento [número], vencido em [data], valor original de R$ [valor].\n" +
+          "Valor atualizado até [data], com multa e juros previstos em [contrato/boleto]: R$ [valor].\n\n" +
+          "Concedemos o prazo de [número] dias, contados do recebimento desta, para o pagamento ou para nos procurar e negociar, pelo telefone [número] ou e-mail [e-mail].\n\n" +
+          "Não havendo pagamento nem contato no prazo, o débito será encaminhado a [protesto do título / inclusão em cadastro de inadimplentes / cobrança judicial].\n\n" +
+          "[Cidade], [data].\n\n" +
+          "[Nome e assinatura do responsável]\n" +
+          "[Empresa]",
+        fecho:
+          "Escreva no mesmo tom de um documento: sem ofensa, sem ameaça e sem prometer o que você não vai fazer (artigos 42 e 71 do Código de Defesa do Consumidor).",
+      },
+    ],
+    noNcFinance: [
+      "O tom jurídico das mensagens funciona como aviso formal pelo WhatsApp antes da notificação por escrito.",
+      "O painel mostra o valor atualizado de cada título, com multa e juros, para usar na notificação.",
+      "O histórico de envios registra quando cada cliente foi cobrado.",
+    ],
+    perguntas: [
+      {
+        pergunta: "A notificação extrajudicial é obrigatória antes de cobrar na Justiça?",
+        resposta:
+          "Em geral, não. Quando a dívida tem data de vencimento, o devedor já está em atraso a partir dela (artigo 397 do Código Civil). A notificação é obrigatória quando não há data de vencimento ou quando o contrato exige aviso prévio. Mesmo quando não é obrigatória, ela ajuda como prova e muitas vezes resolve sem processo.",
+      },
+      {
+        pergunta: "Notificação pelo WhatsApp vale?",
+        resposta:
+          "Vale como registro da cobrança, e a resposta do devedor é uma prova útil. Como prova de recebimento, a carta com aviso de recebimento ou a notificação pelo cartório são mais fortes.",
+      },
+      {
+        pergunta: "Quanto custa a notificação pelo cartório?",
+        resposta:
+          "Depende do estado: os valores seguem a tabela de emolumentos de cada Tribunal de Justiça. A carta com aviso de recebimento dos Correios costuma sair bem mais barata.",
+      },
+      {
+        pergunta: "Qual prazo dar na notificação?",
+        resposta:
+          "Não há prazo fixado em lei para a notificação de cobrança. Prazos de 5 a 10 dias são comuns: curtos o bastante para mostrar seriedade e longos o bastante para o devedor se organizar.",
+      },
+    ],
+  },
+  {
+    slug: "protesto-de-boleto-como-funciona",
+    titulo: "Protesto de boleto: como funciona e quando vale a pena",
+    tituloSeo: "Protesto de boleto vencido: como funciona, prazos e custos",
+    descricao:
+      "Como funciona o protesto de boleto e de duplicata em cartório: quem pode protestar, prazos, quem paga as custas, o que acontece com o devedor e como cancelar.",
+    resumo:
+      "Protestar um boleto vencido é levar a dívida ao Tabelionato de Protesto, que intima o devedor a pagar. Se ele não paga no prazo, o protesto é registrado (em até três dias úteis da apresentação, pela Lei 9.492/1997) " +
+      "e o nome ou o CNPJ passa a constar como protestado, o que costuma bloquear crédito. O pedido pode ser feito no cartório, pelo banco que emitiu o boleto ou pelas centrais eletrônicas de protesto. Depois do pagamento, o protesto é cancelado.",
+    publicadoEm: "2026-11-12",
+    atualizadoEm: "2026-11-12",
+    secoes: [
+      {
+        titulo: "Como funciona, passo a passo",
+        numerada: true,
+        lista: [
+          "Você apresenta o título vencido ao tabelionato de protesto: boleto, duplicata, cheque, nota promissória ou contrato com valor certo.",
+          "O cartório intima o devedor, que pode pagar direto no cartório dentro do prazo.",
+          "Se pagar, o cartório repassa o valor a você e não há protesto.",
+          "Se não pagar, o protesto é registrado, em até três dias úteis contados da apresentação (artigo 12 da Lei 9.492/1997).",
+          "Depois de pago, o protesto é cancelado no cartório, com o título ou uma carta de anuência sua (artigo 26 da Lei 9.492/1997).",
+        ],
+      },
+      {
+        titulo: "Duplicata e boleto",
+        paragrafos: [
+          "A duplicata mercantil ou de prestação de serviços pode ser protestada por indicação, só com os dados enviados por meio eletrônico, sem o papel (artigo 8º, parágrafo único, da Lei 9.492/1997). É assim que os bancos protestam o boleto vencido: muitos permitem marcar a instrução de protesto automático já na emissão.",
+        ],
+      },
+      {
+        titulo: "Quem paga as custas",
+        paragrafos: [
+          "As custas do protesto seguem a tabela de cada estado. Em vários estados, quem apresenta o título não paga nada adiantado: as custas são pagas pelo devedor, quando ele paga ou cancela o protesto. Consulte o tabelionato ou a central de protesto do seu estado.",
+        ],
+      },
+      {
+        titulo: "Quando vale a pena",
+        lista: [
+          "Depois da régua de cobrança e de um último aviso sem resposta.",
+          "Para dívidas de valor certo, com documento: boleto, duplicata, contrato.",
+          "Contra empresas: o protesto pesa no crédito e costuma resolver rápido.",
+          "Antes da execução da duplicata não aceita: o protesto é um dos requisitos (artigo 15 da Lei 5.474/1968).",
+        ],
+      },
+      {
+        titulo: "Cuidados",
+        lista: [
+          "Só proteste dívida certa e vencida. Protesto indevido gera indenização por dano moral.",
+          "Confira valor, vencimento e dados do devedor antes de enviar.",
+          "Depois do pagamento, dê a carta de anuência ou peça o cancelamento sem demora.",
+        ],
+      },
+    ],
+    noNcFinance: [
+      "A régua de mensagens pelo WhatsApp vem antes do protesto: amigável, neutro, firme e jurídico.",
+      "O tom jurídico avisa formalmente antes de você levar o título ao cartório.",
+      "O painel mostra as pendências críticas, a partir dos dias de atraso que você define: um bom ponto de corte para decidir o protesto.",
+    ],
+    perguntas: [
+      {
+        pergunta: "Quanto tempo depois do vencimento posso protestar?",
+        resposta:
+          "A partir do dia seguinte ao vencimento o título já pode ser protestado. Na prática, muitas empresas esperam a régua de cobrança terminar, de 15 a 30 dias, antes de protestar.",
+      },
+      {
+        pergunta: "Protesto e negativação são a mesma coisa?",
+        resposta:
+          "Não. O protesto é feito em cartório e é um ato público; a negativação é a inclusão em cadastros de inadimplentes como SPC e Serasa. Os birôs de crédito costumam consultar os protestos, então o protesto também aparece nas consultas de crédito.",
+      },
+      {
+        pergunta: "Como o devedor cancela o protesto?",
+        resposta:
+          "Pagando a dívida e levando ao cartório o título ou a carta de anuência do credor, e pagando as custas (artigo 26 da Lei 9.492/1997). Por isso, depois de receber, entregue a carta de anuência logo.",
+      },
+    ],
+  },
 ];
