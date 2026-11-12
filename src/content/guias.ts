@@ -726,4 +726,201 @@ export const GUIAS: Guia[] = [
       },
     ],
   },
+  {
+    slug: "como-cobrar-cliente-que-nao-responde",
+    titulo: "Como cobrar cliente que não responde",
+    tituloSeo: "Cliente não responde a cobrança? O que fazer, passo a passo",
+    descricao:
+      "O que fazer quando o cliente some e não responde a cobrança: conferir o contato, mudar a mensagem e o canal, oferecer saídas e, por fim, notificação, protesto ou Juizado.",
+    resumo:
+      "Quando o cliente não responde, primeiro confira se o número e a pessoa estão certos e se a mensagem diz quem cobra. Depois mande uma mensagem curta, com uma pergunta fácil de responder e uma saída concreta " +
+      "(nova data, parcelamento ou desconto à vista), e tente outro canal e outro horário. Sem resposta depois de algumas tentativas espaçadas, parta para os passos formais: notificação por escrito, protesto, negativação ou o Juizado Especial Cível.",
+    publicadoEm: "2026-11-12",
+    atualizadoEm: "2026-11-12",
+    secoes: [
+      {
+        titulo: "Por que o cliente some",
+        lista: [
+          "O número está errado ou é de outra pessoa da empresa.",
+          "Ele não reconheceu quem mandou e ignorou a mensagem.",
+          "Não tem o dinheiro agora e tem vergonha de dizer.",
+          "Discorda do valor ou do serviço e está esperando você desistir.",
+          "Recebeu tantas mensagens que parou de ler.",
+        ],
+        fecho: "Cada motivo pede uma resposta diferente. Por isso, o primeiro passo é conferir o básico.",
+      },
+      {
+        titulo: "Confira antes de insistir",
+        lista: [
+          "O telefone é do responsável pelo pagamento? Confirme no cadastro, no contrato ou na nota.",
+          "A mensagem foi entregue? Um tique só por dias costuma ser número errado ou fora de uso.",
+          "A primeira linha diz o nome da sua empresa?",
+          "O valor e o documento estão certos? Cobrança errada faz o cliente sumir.",
+        ],
+      },
+      {
+        titulo: "O que fazer, nesta ordem",
+        numerada: true,
+        lista: [
+          "Mande uma mensagem curta, com uma pergunta simples de responder.",
+          "Ofereça saídas concretas: nova data, parcelamento ou desconto para pagamento à vista.",
+          "Mude o horário e o dia do contato.",
+          "Mude o canal: ligação, e-mail ou carta.",
+          "Espace as tentativas. Insistir todo dia aumenta a resistência e as denúncias do número.",
+        ],
+        rotuloModelo: "Modelo para quem não responde",
+        modelo:
+          "[Nome], aqui é o financeiro da [Empresa].\n" +
+          "Tentei falar sobre o documento [número], de R$ [valor], e não tive retorno.\n\n" +
+          "Consigo te ajudar de três jeitos:\n" +
+          "1. pagar até [data] pelo boleto: [link]\n" +
+          "2. parcelar em [quantidade] vezes\n" +
+          "3. combinar outra data\n\n" +
+          "É só responder com o número da opção.",
+      },
+      {
+        titulo: "Esgotou as tentativas? Os passos formais",
+        lista: [
+          "Notificação por escrito: carta com aviso de recebimento ou notificação extrajudicial pelo cartório. Registra a cobrança e dá um prazo final.",
+          "Protesto do título em cartório (Lei 9.492/1997): é prova do atraso e costuma fazer o devedor procurar você.",
+          "Negativação em SPC ou Serasa: o consumidor precisa ser avisado por escrito antes (artigo 43, §2º, do CDC), e o aviso é feito pelo birô de crédito.",
+          "Juizado Especial Cível (Lei 9.099/1995): para causas de até 40 salários mínimos; até 20, sem advogado. Empresa só pode entrar como autora se for microempresa ou empresa de pequeno porte.",
+        ],
+        fecho:
+          "Não demore demais: a cobrança na Justiça de dívida que consta de contrato ou outro documento prescreve em 5 anos (artigo 206, §5º, inciso I, do Código Civil).",
+      },
+      {
+        titulo: "O que não fazer",
+        lista: [
+          "Procurar o devedor por parentes, colegas ou pelo chefe dele: isso o expõe, e o artigo 42 do CDC proíbe.",
+          "Cobrar em público, em grupo ou em comentário de rede social.",
+          "Ameaçar com o que você não vai fazer ou com o que a lei não permite.",
+          "Mandar várias mensagens no mesmo dia.",
+        ],
+      },
+    ],
+    noNcFinance: [
+      "Importa os telefones de uma agenda (.vcf do iPhone ou Android) ou de uma planilha e casa com os clientes pelo nome, para corrigir números errados.",
+      "Quatro tons de mensagem, e o texto pode ser ajustado antes de enviar.",
+      "Cliente em negociação fica fora do lote e da automação; o cliente marcado em \"Não contatar\" não recebe mais mensagens.",
+      "Histórico de envios, para ver quem já foi cobrado e quando.",
+      "As regras automáticas não cobram o mesmo cliente duas vezes em menos de 20 horas.",
+    ],
+    perguntas: [
+      {
+        pergunta: "Quantas vezes devo tentar antes de partir para o protesto ou a negativação?",
+        resposta:
+          "Não há número fixo. Na prática, de 4 a 6 contatos espaçados ao longo de 3 a 6 semanas, mudando o tom, o canal e o horário, já mostram se o cliente vai responder. Depois disso, os passos formais costumam funcionar melhor do que mais mensagens.",
+      },
+      {
+        pergunta: "Posso ligar para o trabalho ou para um parente do devedor?",
+        resposta:
+          "Para parentes, colegas ou o chefe, não: expor a dívida a terceiros é proibido pelo artigo 42 do CDC e pode ser crime (artigo 71). O contato deve ser feito só com o próprio devedor, sem atrapalhar o trabalho dele.",
+      },
+      {
+        pergunta: "O que é notificação extrajudicial?",
+        resposta:
+          "É um aviso formal por escrito, enviado por carta com aviso de recebimento ou pelo cartório de títulos e documentos, dizendo o que é devido e o prazo para pagar. Não é processo, mas registra a cobrança e costuma ser o último passo antes do protesto ou da ação.",
+      },
+      {
+        pergunta: "Vale a pena entrar no Juizado Especial Cível?",
+        resposta:
+          "Para dívidas de até 40 salários mínimos, o Juizado é o caminho mais simples e barato (Lei 9.099/1995); até 20 salários mínimos, nem é preciso advogado. Como autora, a empresa precisa ser microempresa ou empresa de pequeno porte.",
+      },
+    ],
+  },
+  {
+    slug: "como-cobrar-empresa-cliente-pj",
+    titulo: "Como cobrar uma empresa que está em atraso",
+    tituloSeo: "Como cobrar empresa (cliente PJ) em atraso: passo a passo",
+    descricao:
+      "Como cobrar outra empresa em atraso: com quem falar, o que conferir, modelo de mensagem, juros e multa entre empresas, protesto de duplicata, execução e ação monitória.",
+    resumo:
+      "Para cobrar uma empresa, fale com o contas a pagar e não só com o comprador, confira se a nota e o boleto chegaram a quem paga e respeite o ciclo de pagamento dela. " +
+      "Entre empresas, em geral não vale o Código de Defesa do Consumidor: multa e juros seguem o contrato. Se não houver pagamento, a duplicata pode ser protestada, " +
+      "e a duplicata protestada com o comprovante de entrega da mercadoria vale como título executivo (artigo 15 da Lei 5.474/1968).",
+    publicadoEm: "2026-11-12",
+    atualizadoEm: "2026-11-12",
+    secoes: [
+      {
+        titulo: "Confira antes de cobrar",
+        lista: [
+          "A nota fiscal e o boleto chegaram ao setor que paga, e não só ao comprador?",
+          "O cliente exige número de pedido de compra na nota? Sem ele, muitas empresas não lançam o pagamento.",
+          "Os dados da nota (CNPJ, endereço, valor) estão certos?",
+          "O vencimento respeita o prazo combinado e o dia de pagamento da empresa?",
+        ],
+        fecho: "Boa parte do atraso entre empresas é nota que não foi lançada, e não falta de dinheiro.",
+      },
+      {
+        titulo: "Com quem falar",
+        lista: [
+          "Contas a pagar ou financeiro: é quem libera o pagamento.",
+          "O comprador ou quem pediu o produto ou serviço: ajuda a destravar a aprovação interna.",
+          "O sócio ou o dono, em empresa pequena e em atraso longo.",
+        ],
+      },
+      {
+        titulo: "Modelo de mensagem para empresa",
+        modelo:
+          "Olá, [Nome], aqui é o financeiro da [Empresa].\n" +
+          "Consta em aberto a nota [número], com vencimento em [data], no valor de R$ [valor].\n\n" +
+          "Boleto: [link]\n" +
+          "Se a nota não chegou ou falta algum dado para o lançamento (pedido de compra, centro de custo), me avise que eu reenvio hoje.\n\n" +
+          "Obrigado,\n" +
+          "Financeiro [Empresa]",
+      },
+      {
+        titulo: "Juros e multa entre empresas",
+        paragrafos: [
+          "Entre empresas, em geral não se aplica o Código de Defesa do Consumidor (a exceção é a empresa que compra como destinatária final e em situação de vulnerabilidade). " +
+            "Por isso, o limite de 2% de multa do CDC não vale: vale o que o contrato diz. Mas a multa não pode passar do valor da dívida (artigo 412 do Código Civil), e o juiz pode reduzir uma multa excessiva (artigo 413).",
+        ],
+      },
+      {
+        titulo: "Se não pagar: protesto, execução e ação monitória",
+        lista: [
+          "Protesto da duplicata em cartório (Lei 9.492/1997 e Lei 5.474/1968): avisa o mercado e costuma resolver rápido.",
+          "Negativação do CNPJ em birôs de crédito.",
+          "Execução: a duplicata aceita, ou a não aceita que foi protestada e tem o comprovante de entrega da mercadoria ou da prestação do serviço, é título executivo (artigo 15 da Lei 5.474/1968). A execução é mais rápida do que um processo comum.",
+          "Ação monitória (artigo 700 do Código de Processo Civil): para quem tem prova escrita da dívida, como e-mails, pedidos e notas, mas não tem um título executivo.",
+        ],
+      },
+      {
+        titulo: "Cuidado com a exposição",
+        paragrafos: [
+          "Empresa também pode sofrer dano moral (Súmula 227 do STJ). Expor o devedor em rede social, em grupo do setor ou para os clientes dele pode gerar indenização. Cobre de forma privada, com quem decide o pagamento.",
+        ],
+      },
+    ],
+    noNcFinance: [
+      "Cobradores: você define quem cobra cada cliente, e a Carteira tem uma aba por cobrador.",
+      "Títulos do mesmo cliente vão juntos numa mensagem só, com o vencimento mais antigo primeiro.",
+      "O boleto em PDF vai como link na própria mensagem.",
+      "Importa a carteira de Excel, CSV, PDF, TXT, foto do relatório ou Google Sheets, e o relatório de pagos dá baixa nos títulos.",
+      "Quatro tons de mensagem, do amigável ao jurídico, assinados com o nome da sua empresa.",
+    ],
+    perguntas: [
+      {
+        pergunta: "O Código de Defesa do Consumidor vale na cobrança entre empresas?",
+        resposta:
+          "Em geral, não. O CDC protege o consumidor, e a empresa que compra para usar no próprio negócio normalmente não é consumidora. A exceção é a empresa que compra como destinatária final e está em situação de vulnerabilidade. Fora disso, vale o contrato e o Código Civil.",
+      },
+      {
+        pergunta: "Qual a multa máxima por atraso entre empresas?",
+        resposta:
+          "Vale o que o contrato diz. O limite de 2% do CDC não se aplica, mas a multa não pode passar do valor da dívida (artigo 412 do Código Civil), e o juiz pode reduzi-la se for excessiva (artigo 413).",
+      },
+      {
+        pergunta: "Como protestar uma duplicata?",
+        resposta:
+          "Leve o título ou a indicação da duplicata ao cartório de protesto da praça de pagamento (Lei 9.492/1997). O cartório intima o devedor, que tem um prazo para pagar. Sem pagamento, o título é protestado. Muitos bancos e sistemas de cobrança também enviam o boleto vencido a protesto.",
+      },
+      {
+        pergunta: "Posso negativar o CNPJ de um cliente?",
+        resposta:
+          "Pode, se a dívida for certa e estiver vencida. A inclusão é feita pelos birôs de crédito, que avisam o devedor antes. Depois do pagamento, peça a retirada do registro.",
+      },
+    ],
+  },
 ];

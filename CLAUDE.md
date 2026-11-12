@@ -39,6 +39,8 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   `/` (retornos do Asaas e do Supabase usam `?query`/`#hash`). Caminho inexistente recebe
   `dist/404.html` (noindex, gerado no prerender) com status 404; `server.ts` faz o mesmo.
   Rota nova no app por caminho? Precisa de rewrite explícito para ela.
+  **IndexNow** (Bing/ChatGPT Search): chave pública em `public/<chave>.txt`; depois de um deploy
+  com página nova ou alterada, rodar `npm run seo:indexnow` (lê o sitemap no ar e avisa).
 
 - **Importação de arquivos** (`src/services/localDocumentExtraction/`, 100% no navegador, nada sai
   dele): `leitores.ts` lê cada formato (Excel/ODS com tipos reais, CSV/TXT com detecção de

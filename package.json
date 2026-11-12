@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "seo:indexnow": "node tools/indexnow.mjs",
     "dev": "node tools/ocr-assets.mjs && tsx server.ts",
     "build": "node tools/ocr-assets.mjs && vite build && vite build --ssr src/landing-prerender.tsx --outDir dist-ssr && node tools/prerender-landing.mjs && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",

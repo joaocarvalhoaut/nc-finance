@@ -133,6 +133,7 @@ export default function LandingPage({
             <a href="#como-funciona" className="hover:text-white transition-colors">Como funciona</a>
             <a href="#planos" className="hover:text-white transition-colors">Planos</a>
             <a href="#perguntas" className="hover:text-white transition-colors">Perguntas</a>
+            <a href="/guias" className="hover:text-white transition-colors">Guias</a>
           </nav>
           <div className="flex items-center gap-2">
             <button type="button" onClick={abrirEntrar} className="px-3 py-2 text-sm font-semibold text-zinc-300 hover:text-white transition-colors cursor-pointer">
