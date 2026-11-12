@@ -412,4 +412,108 @@ export const GUIAS: Guia[] = [
       },
     ],
   },
+  {
+    slug: "como-evitar-bloqueio-do-whatsapp-ao-cobrar",
+    titulo: "Como evitar o bloqueio do WhatsApp ao cobrar clientes",
+    tituloSeo: "Como evitar bloqueio do WhatsApp ao cobrar clientes",
+    descricao:
+      "Por que o WhatsApp bloqueia números que cobram clientes e o que fazer para evitar: aquecimento do número novo, limite por dia, mensagens e sinais de alerta.",
+    resumo:
+      "O WhatsApp não publica um limite de mensagens por dia para o aplicativo comum ou Business. O bloqueio costuma vir de denúncias, de picos de volume e de número novo mandando para quem nunca falou com ele. " +
+      "Para evitar: cobre só quem é seu cliente, identifique a empresa em toda mensagem, mande para cada cliente no máximo uma mensagem por dia, " +
+      "espalhe os envios ao longo do dia e, se o número for novo, comece com cerca de 30 mensagens por dia e aumente aos poucos ao longo de um mês.",
+    publicadoEm: "2026-11-12",
+    atualizadoEm: "2026-11-12",
+    secoes: [
+      {
+        titulo: "Por que números são bloqueados",
+        paragrafos: [
+          "O WhatsApp não diz quantas mensagens um número pode mandar. O que se observa é que o bloqueio vem de comportamento que parece spam:",
+        ],
+        lista: [
+          "Denúncias: quem recebe pode tocar em \"Denunciar\" e \"Bloquear\". Poucas denúncias já pesam.",
+          "Pico de volume: um número que mandava 10 mensagens por dia e de repente manda 300.",
+          "Número novo: chip recém-ativado, sem histórico de conversas, mandando muitas mensagens.",
+          "Contatos frios: mensagens para quem nunca conversou com o número e não tem ele salvo.",
+        ],
+        fecho:
+          "Este guia trata do WhatsApp comum e do WhatsApp Business (aplicativo). Na API oficial da Meta (WhatsApp Business Platform), os limites são publicados e as mensagens que a empresa inicia usam modelos aprovados.",
+      },
+      {
+        titulo: "Aqueça o número novo",
+        paragrafos: [
+          "Número novo precisa de histórico antes de mandar volume. Uma referência prudente para os primeiros 30 dias:",
+        ],
+        rotuloModelo: "Mensagens por dia",
+        modelo:
+          "Dias 1 a 3: até 30\n" +
+          "Dias 4 a 7: até 50\n" +
+          "Dias 8 a 14: até 80\n" +
+          "Dias 15 a 21: até 120\n" +
+          "Dias 22 a 30: até 200",
+        fecho:
+          "Nesse período, converse de verdade: responda quem responde, peça para os clientes salvarem o número e evite mandar tudo de uma vez.",
+      },
+      {
+        titulo: "Boas práticas em toda cobrança",
+        lista: [
+          "Cobre só quem é seu cliente e conhece o seu número.",
+          "Diga o nome da empresa na primeira linha: quem não reconhece o remetente denuncia.",
+          "No máximo uma mensagem por dia para cada cliente. Se ele tem vários títulos, mande todos na mesma mensagem.",
+          "Espalhe os envios ao longo do dia, em horário comercial e em dia útil.",
+          "Personalize: nome do cliente, documento e valor de cada um.",
+          "Comece pelos tons amigável e neutro. Mensagem agressiva gera mais denúncia.",
+          "Responda quem responde. Conversa nos dois sentidos é o contrário de spam.",
+          "Tire da lista os números errados: quem não é o devedor e recebe cobrança denuncia.",
+          "Complete o perfil: nome da empresa, foto e descrição.",
+        ],
+      },
+      {
+        titulo: "Sinais de alerta",
+        lista: [
+          "Muitas mensagens ficam com um tique só (não entregues).",
+          "Vários clientes deixam de responder de uma vez ou dizem que não reconhecem o número.",
+          "O aplicativo mostra aviso de restrição ou pede para confirmar o número de novo.",
+        ],
+        fecho:
+          "Diante de qualquer um desses sinais, pare os envios em volume por alguns dias e volte com menos mensagens por dia.",
+      },
+      {
+        titulo: "Se o número for bloqueado",
+        paragrafos: [
+          "O próprio aplicativo mostra a opção de pedir uma análise do bloqueio. Explique que o número é de uma empresa e que as mensagens são para clientes dela. Se o número voltar, recomece com volume baixo, como num número novo.",
+        ],
+      },
+    ],
+    noNcFinance: [
+      "Limite diário de mensagens escolhido por você, que vale para todo envio: um a um, em lote e automático, em qualquer plano.",
+      "Opção \"Meu número é novo\": aquecimento de 30 dias (30, 50, 80, 120 e 200 mensagens por dia). O que passar do limite não sai naquele dia.",
+      "Títulos do mesmo cliente vão juntos numa mensagem só, e ela conta uma vez no limite.",
+      "Aviso na Carteira e no envio em lote com quantas mensagens ainda podem sair hoje.",
+      "As regras automáticas não cobram o mesmo cliente duas vezes em menos de 20 horas.",
+      "A cobrança sai do número da sua empresa, assinada com o nome dela.",
+    ],
+    perguntas: [
+      {
+        pergunta: "Quantas mensagens posso mandar por dia no WhatsApp sem ser bloqueado?",
+        resposta:
+          "O WhatsApp não publica esse número para o aplicativo comum ou Business. Depende do histórico do número e das denúncias. Num número novo, comece com cerca de 30 mensagens por dia e aumente aos poucos; num número antigo, que já conversa com os clientes, o volume pode ser maior, sem picos bruscos.",
+      },
+      {
+        pergunta: "O WhatsApp Business evita o bloqueio?",
+        resposta:
+          "Não evita, mas ajuda: o perfil com nome, foto e descrição da empresa faz o cliente reconhecer quem está cobrando, e isso reduz denúncias. As regras de volume e de denúncia valem do mesmo jeito.",
+      },
+      {
+        pergunta: "Mandar a mesma mensagem para todos dá bloqueio?",
+        resposta:
+          "Aumenta o risco. Texto idêntico para muita gente parece disparo em massa. Use um modelo, mas com o nome, o documento e o valor de cada cliente.",
+      },
+      {
+        pergunta: "Meu número foi bloqueado. E agora?",
+        resposta:
+          "Peça a análise pelo próprio aplicativo, explicando que é um número de empresa falando com os próprios clientes. Se ele voltar, recomece com poucas mensagens por dia e suba aos poucos.",
+      },
+    ],
+  },
 ];
