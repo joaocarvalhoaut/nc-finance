@@ -634,4 +634,96 @@ export const GUIAS: Guia[] = [
       },
     ],
   },
+  {
+    slug: "regua-de-cobranca",
+    titulo: "Régua de cobrança: o que é e como montar a sua",
+    tituloSeo: "Régua de cobrança: o que é, exemplo e como montar",
+    descricao:
+      "O que é régua de cobrança, um exemplo pronto do lembrete antes do vencimento ao aviso formal, como montar a sua e quando parar de cobrar.",
+    resumo:
+      "Régua de cobrança é a sequência planejada de contatos com o cliente, marcada em dias antes e depois do vencimento, em que cada etapa tem um canal e um tom. " +
+      "Um exemplo simples: lembrete 3 dias antes, aviso no dia, mensagem amigável logo após o vencimento, neutra com uma semana, firme com duas semanas e um aviso formal com um mês de atraso. " +
+      "A régua para assim que o cliente paga, negocia ou pede para não ser contatado por aquele canal.",
+    publicadoEm: "2026-11-12",
+    atualizadoEm: "2026-11-12",
+    secoes: [
+      {
+        titulo: "Por que ter uma régua",
+        lista: [
+          "Ninguém fica sem cobrança por esquecimento, e ninguém é cobrado demais.",
+          "O tom sobe aos poucos: o bom cliente que atrasou não é tratado como caloteiro.",
+          "A equipe sabe o que fazer em cada dia, sem depender de quem lembra.",
+          "Dá para medir em que etapa as pessoas pagam e ajustar.",
+        ],
+      },
+      {
+        titulo: "Exemplo de régua",
+        paragrafos: [
+          "Ponto de partida para quem vende a prazo com boleto ou Pix. D-3 quer dizer 3 dias antes do vencimento; D+7, 7 dias depois.",
+        ],
+        rotuloModelo: "Régua",
+        modelo:
+          "D-3 · Lembrete com o boleto (tom amigável)\n" +
+          "D0 · Aviso de vencimento hoje\n" +
+          "D+3 · Não identificamos o pagamento (amigável)\n" +
+          "D+7 · Valor atualizado e convite para negociar (neutro)\n" +
+          "D+15 · Prazo para regularizar (firme)\n" +
+          "D+30 · Aviso formal com o próximo passo do contrato\n" +
+          "D+45 · Protesto, negativação ou cobrança judicial, se for o caso",
+        fecho:
+          "Se o vencimento cair em fim de semana ou feriado, o cliente pode pagar no primeiro dia útil seguinte sem juros (Lei 7.089/1983): conte o atraso a partir daí.",
+      },
+      {
+        titulo: "Como montar a sua",
+        numerada: true,
+        lista: [
+          "Separe os clientes: valor em aberto, pessoa física ou empresa, quem costuma atrasar e quem nunca atrasa.",
+          "Defina as etapas e os dias. Menos etapas, bem espaçadas, funcionam melhor do que mensagem todo dia.",
+          "Escreva a mensagem de cada etapa: quem cobra, qual título, valor atualizado, vencimento, boleto ou Pix e como negociar.",
+          "Defina quando parar: pagou, mandou comprovante, entrou em negociação ou pediu para não ser contatado.",
+          "Acompanhe quantos pagam em cada etapa e ajuste os dias e os textos.",
+        ],
+      },
+      {
+        titulo: "Erros comuns",
+        lista: [
+          "Continuar cobrando quem já pagou: confira os pagamentos antes de cada etapa.",
+          "Mandar a régua inteira para quem está negociando.",
+          "Pular do lembrete direto para a ameaça.",
+          "Prometer protesto ou negativação e não fazer: a régua perde a força.",
+          "Mandar tudo no mesmo horário, para centenas de clientes de uma vez, de um número novo.",
+        ],
+      },
+    ],
+    noNcFinance: [
+      "Regras automáticas (planos Pro e Premium) de três tipos: X dias antes do vencimento, no dia do vencimento e vencidos.",
+      "Cada regra tem o seu tom (amigável, neutro, firme ou jurídico) ou um texto próprio.",
+      "A regra pode rodar só em dias úteis e pular feriados nacionais; no Premium, também tem janela de horário e limite de envios por dia.",
+      "O mesmo cliente não é cobrado duas vezes em menos de 20 horas, e títulos do mesmo cliente vão numa mensagem só.",
+      "Quem está em negociação fica fora da automação; título pago ou na lista \"Não contatar\" não recebe mensagem.",
+      "O valor da mensagem é o atualizado do dia, com multa e juros.",
+    ],
+    perguntas: [
+      {
+        pergunta: "O que é régua de cobrança?",
+        resposta:
+          "É a sequência planejada de contatos de cobrança, marcada em dias antes e depois do vencimento (D-3, D0, D+7…), em que cada etapa tem um canal e um tom. Serve para cobrar todo mundo no momento certo, sem esquecer ninguém e sem exagerar.",
+      },
+      {
+        pergunta: "Quantas etapas a régua deve ter?",
+        resposta:
+          "Para a maioria dos negócios, de 4 a 7: um lembrete antes do vencimento, um aviso no dia e de 2 a 5 mensagens depois, espaçadas em dias. Mais do que isso tende a irritar o cliente e aumentar as denúncias do número.",
+      },
+      {
+        pergunta: "A régua para empresas é diferente da régua para pessoas físicas?",
+        resposta:
+          "Costuma ser. Empresas têm setor financeiro, prazos de aprovação e datas fixas de pagamento: vale falar com o responsável pelo contas a pagar e dar mais tempo entre as etapas. Com pessoa física, valem os limites do Código de Defesa do Consumidor, como a multa de no máximo 2%.",
+      },
+      {
+        pergunta: "Quando parar a régua?",
+        resposta:
+          "Quando o cliente paga ou manda o comprovante, quando entra em negociação (aí vale o que foi combinado) e quando pede para não ser contatado por aquele canal. Cobrar quem já pagou pode obrigar a devolver em dobro o que ele pagar a mais (artigo 42 do CDC).",
+      },
+    ],
+  },
 ];

@@ -4,7 +4,7 @@
  * Run:  npx tsx supabase/functions/_shared/__tests__/diasUteis.test.ts
  */
 
-import { ehDiaUtil, feriadosBancarios, hojeLocal, noPrazoDoDiaUtil, pascoa, proximoDiaUtil, ymdDeDataBr } from "../diasUteis.ts";
+import { ehDiaUtil, hojeLocal, noPrazoDoDiaUtil, proximoDiaUtil, ymdDeDataBr } from "../diasUteis.ts";
 
 let passed = 0;
 let failed = 0;
@@ -14,11 +14,10 @@ function iguais(got: unknown, want: unknown, label: string) {
   else { failed++; console.error(`  ✗ ${label}\n    → ${JSON.stringify(got)}\n    esperado ${JSON.stringify(want)}`); }
 }
 
-// ── Páscoa e feriados móveis ─────────────────────────────────────────────────
-iguais([2024, 2025, 2026, 2027].map(pascoa), ["2024-03-31", "2025-04-20", "2026-04-05", "2027-03-28"], "Páscoa");
-const f2026 = feriadosBancarios(2026);
-iguais(["2026-02-16", "2026-02-17", "2026-04-03", "2026-06-04", "2026-11-20", "2026-11-02"].every((d) => f2026.has(d)), true, "Carnaval, Sexta Santa, Corpus Christi, 20/11, Finados");
-iguais(feriadosBancarios(2023).has("2023-11-20"), false, "20/11 só a partir de 2024");
+// ── Feriados (lista de diaDeEnvio.ts) ────────────────────────────────────────
+iguais(["2026-02-16", "2026-02-17", "2026-04-03", "2026-06-04", "2026-11-20", "2026-11-02"].map(ehDiaUtil),
+  [false, false, false, false, false, false], "Carnaval, Sexta Santa, Corpus Christi, 20/11, Finados");
+iguais(ehDiaUtil("2026-02-18"), true, "quarta de Cinzas é dia útil");
 
 // ── Dia útil ─────────────────────────────────────────────────────────────────
 iguais(ehDiaUtil("2026-11-13"), true, "sexta comum");
