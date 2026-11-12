@@ -56,6 +56,9 @@ export const iniciarPixel = (): void => {
     document.head.appendChild(s);
   }
 
+  // Sem coleta automática (cliques, conteúdo da página, campos de formulário):
+  // dentro do app a tela tem dados de devedores. Só saem os eventos nomeados.
+  window.fbq("set", "autoConfig", false, PIXEL_ID);
   window.fbq("init", PIXEL_ID);
   window.fbq("track", "PageView");
 };
