@@ -517,4 +517,121 @@ export const GUIAS: Guia[] = [
       },
     ],
   },
+  {
+    slug: "o-que-a-lei-permite-na-cobranca-de-clientes",
+    titulo: "O que a lei permite (e proíbe) na cobrança de clientes",
+    tituloSeo: "Cobrança de clientes: o que a lei permite e proíbe (CDC e LGPD)",
+    descricao:
+      "O que pode e o que não pode na cobrança de dívidas pelo WhatsApp, telefone ou e-mail: Código de Defesa do Consumidor, LGPD, negativação, protesto e cobrança indevida.",
+    resumo:
+      "Cobrar uma dívida é direito de quem vendeu, e pode ser feito pelo WhatsApp. A lei proíbe a forma abusiva: expor o devedor ao ridículo, constranger, ameaçar, mentir ou atrapalhar o trabalho, o descanso ou o lazer dele " +
+      "(artigos 42 e 71 do Código de Defesa do Consumidor). Os dados do cliente podem ser usados para cobrar, pela LGPD, mas só para isso e sem passar a terceiros. " +
+      "Quem cobra valor que não é devido pode ter de devolver o dobro do que recebeu a mais.",
+    publicadoEm: "2026-11-12",
+    atualizadoEm: "2026-11-12",
+    secoes: [
+      {
+        titulo: "O que pode",
+        lista: [
+          "Cobrar pelo WhatsApp, telefone, e-mail ou carta, direto com o devedor.",
+          "Mandar lembretes antes e depois do vencimento, em intervalos razoáveis.",
+          "Cobrar multa e juros previstos no contrato ou no boleto (em relação de consumo, multa de no máximo 2%, pelo artigo 52, §1º, do CDC).",
+          "Propor acordo, desconto ou parcelamento.",
+          "Avisar dos próximos passos que você vai mesmo tomar: protesto do título, inclusão em cadastro de inadimplentes ou ação judicial.",
+          "Contratar uma empresa de cobrança, que deve seguir as mesmas regras.",
+        ],
+      },
+      {
+        titulo: "O que não pode",
+        paragrafos: [
+          "O artigo 42 do Código de Defesa do Consumidor diz que, na cobrança, o consumidor inadimplente não será exposto a ridículo, nem submetido a constrangimento ou ameaça. " +
+            "O artigo 71 torna crime (detenção de 3 meses a 1 ano e multa) cobrar com ameaça, coação, constrangimento físico ou moral, afirmações falsas, incorretas ou enganosas, " +
+            "ou de qualquer outro jeito que exponha o consumidor ao ridículo ou interfira com o trabalho, o descanso ou o lazer dele. Na prática:",
+        ],
+        lista: [
+          "Cobrar em grupo, no status, em rede social ou em qualquer lugar que outras pessoas vejam.",
+          "Contar da dívida para parentes, vizinhos, colegas ou o chefe do devedor.",
+          "Ligar ou mandar mensagem várias vezes por dia, de madrugada, no fim de semana ou no feriado.",
+          "Ameaçar com prisão, polícia ou qualquer consequência que a lei não prevê ou que você não vai aplicar.",
+          "Dizer que o nome já está negativado, ou que haverá processo, quando não for verdade.",
+          "Usar palavras ofensivas, ironia ou tom de humilhação.",
+        ],
+      },
+      {
+        titulo: "Identificação de quem cobra",
+        paragrafos: [
+          "O artigo 42-A do CDC exige que todo documento de cobrança apresentado ao consumidor traga o nome, o endereço e o CPF ou CNPJ de quem cobra. O boleto normalmente já traz esses dados. " +
+            "Se você cobra só com chave Pix, sem boleto, vale colocá-los na mensagem. E em toda mensagem diga o nome da empresa: cobrança anônima não é paga e ainda é denunciada.",
+        ],
+      },
+      {
+        titulo: "Dados do cliente e LGPD",
+        paragrafos: [
+          "A Lei Geral de Proteção de Dados (Lei 13.709/2018) permite usar os dados do cliente para cobrar: é a execução do contrato e a proteção do crédito (artigo 7º, incisos V e X). Mas:",
+        ],
+        lista: [
+          "Use o telefone e os dados da dívida só para a cobrança daquela relação, e não para propaganda.",
+          "Não compartilhe a lista de devedores com quem não faz parte da cobrança.",
+          "Guarde os dados com segurança e só pelo tempo necessário.",
+          "Se o cliente pedir para não ser contatado por um canal, registre o pedido e passe a cobrar por outro.",
+        ],
+      },
+      {
+        titulo: "Negativação e protesto",
+        lista: [
+          "Antes de o nome entrar em cadastro de inadimplentes (SPC, Serasa), o consumidor tem de ser avisado por escrito (artigo 43, §2º, do CDC). Esse aviso cabe ao próprio birô de crédito (Súmula 359 do STJ).",
+          "Depois do pagamento total, quem negativou tem 5 dias úteis para pedir a retirada do nome (Súmula 548 do STJ).",
+          "A informação negativa não pode ficar no cadastro por mais de 5 anos (artigo 43, §1º, do CDC).",
+          "O protesto do título é feito em cartório (Lei 9.492/1997) e também serve como prova do atraso.",
+        ],
+      },
+      {
+        titulo: "Cobrou errado? Cuidado com a devolução em dobro",
+        paragrafos: [
+          "Pelo parágrafo único do artigo 42 do CDC, o consumidor cobrado em valor indevido tem direito a receber de volta o dobro do que pagou a mais, com correção e juros, salvo engano justificável. " +
+            "Por isso, confira os pagamentos antes de cada rodada de cobrança e pare de cobrar na hora em que o cliente mandar o comprovante.",
+        ],
+      },
+      {
+        titulo: "E quando o devedor é outra empresa?",
+        paragrafos: [
+          "Entre empresas, o CDC em geral não se aplica, e vale o que o contrato diz sobre multa e juros. Mas expor ou ameaçar continua proibido: ameaça é crime para qualquer um (artigo 147 do Código Penal), e a exposição pode gerar indenização por dano moral, também para empresa.",
+        ],
+      },
+    ],
+    noNcFinance: [
+      "Cada mensagem vai só para o devedor, do WhatsApp da sua empresa e assinada com o nome dela.",
+      "Os envios automáticos saem às 8h, e o mesmo cliente não é cobrado duas vezes em menos de 20 horas.",
+      "Título pago não é cobrado, e o relatório de pagos importado dá baixa nos títulos.",
+      "Lista \"Não contatar\": o cliente marcado não recebe mais mensagens, em nenhum tipo de envio.",
+      "Os dados de cada conta ficam separados: cada empresa só vê os próprios clientes.",
+    ],
+    perguntas: [
+      {
+        pergunta: "Cobrar pelo WhatsApp é legal?",
+        resposta:
+          "Sim. Nenhuma lei proíbe o canal. O que a lei proíbe é a cobrança abusiva: expor, constranger, ameaçar, mentir ou atrapalhar o trabalho, o descanso ou o lazer do devedor (artigos 42 e 71 do Código de Defesa do Consumidor).",
+      },
+      {
+        pergunta: "Posso cobrar no grupo ou mandar mensagem para um parente do devedor?",
+        resposta:
+          "Não. Isso expõe o devedor a terceiros, o que o artigo 42 do CDC proíbe e o artigo 71 trata como crime. A cobrança deve ser feita só com o próprio devedor.",
+      },
+      {
+        pergunta: "Existe horário proibido para cobrar?",
+        resposta:
+          "Não há horário fixado em lei federal, mas o artigo 71 do CDC proíbe a cobrança que interfira com o trabalho, o descanso ou o lazer do consumidor. Na prática, cobre em dia útil e em horário comercial.",
+      },
+      {
+        pergunta: "Posso dizer que vou negativar o nome do cliente?",
+        resposta:
+          "Pode, se for verdade e se você for mesmo fazer isso. O consumidor precisa ser avisado por escrito antes de entrar no cadastro (artigo 43, §2º, do CDC), e esse aviso é feito pelo birô de crédito. Usar a negativação só como ameaça pode ser visto como constrangimento.",
+      },
+      {
+        pergunta: "O que acontece se eu cobrar um valor que o cliente já pagou?",
+        resposta:
+          "Se ele pagar de novo, pode exigir a devolução em dobro do que pagou a mais, com correção e juros, salvo engano justificável (parágrafo único do artigo 42 do CDC). E a cobrança indevida pode gerar indenização por dano moral.",
+      },
+    ],
+  },
 ];
