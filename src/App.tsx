@@ -40,6 +40,7 @@ import { isBrazilHoliday, getBrazilHolidayName, isBusinessDay } from "./utils/br
 import { getMessageTemplate } from "./utils/messageTemplates";
 import { chaveDoTitulo, docBase, nomeBase, repetidosNaCarteira, semRepetidos } from "./utils/tituloUnico";
 import { chaveDeAgrupamento, preencherMensagem } from "../supabase/functions/_shared/agrupamento.ts";
+import { hojeLocal, noPrazoDoDiaUtil, ymdDeDataBr } from "../supabase/functions/_shared/diasUteis.ts";
 import {
   contarMensagens, hojeEmBrasilia, inicioDoDiaISO, limiteDeHoje, motivoDoLimite,
   type ProtecaoNumero, type SituacaoDoDia,
@@ -939,6 +940,12 @@ export default function App() {
         return { ...d, interestApplied: 0, fineApplied: 0, updatedValue: d.value };
       }
 
+      // Venceu em fim de semana/feriado e hoje ainda é o 1º dia útil: sem
+      // encargos (Lei 7.089/1983) — mesma regra do servidor (_shared/encargos.ts).
+      if (noPrazoDoDiaUtil(ymdDeDataBr(d.dueDate), hojeLocal(today))) {
+        return { ...d, interestApplied: 0, fineApplied: 0, updatedValue: d.value };
+      }
+
       // Vencido: calcula dias reais de atraso a partir do vencimento
       let delayDays = 0;
       if (d.dueDate) {
@@ -1518,11 +1525,13 @@ export default function App() {
     if (!m) return 0;
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
+    if (noPrazoDoDiaUtil(`${m[3]}-${m[2]}-${m[1]}`, hojeLocal(hoje))) return 0;
     return Math.max(0, Math.floor((hoje.getTime() - new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])).getTime()) / 86_400_000));
   };
 
   const valorDaMensagem = (debtor: Debtor): number => {
     if (!correEncargos(debtor.category)) return debtor.value;
+    if (noPrazoDoDiaUtil(ymdDeDataBr(debtor.dueDate), hojeLocal())) return debtor.value;
     const multa = debtor.value * (globalFinePct / 100);
     const juros = debtor.value * (globalInterestDayPct / 100) * diasDeAtrasoDe(debtor);
     return Math.round((debtor.value + multa + juros) * 100) / 100;

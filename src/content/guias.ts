@@ -388,6 +388,7 @@ export const GUIAS: Guia[] = [
       "O cálculo é o deste guia: multa uma vez e juros simples ao dia, os dois sobre o valor original.",
       "A mensagem de cobrança leva o valor atualizado no dia do envio, inclusive nas regras automáticas das 8h.",
       "Títulos a vencer e pagos ficam no valor original; título em negociação continua correndo multa e juros.",
+      "Título que vence em sábado, domingo ou feriado nacional fica sem multa e sem juros até o primeiro dia útil seguinte.",
     ],
     perguntas: [
       {

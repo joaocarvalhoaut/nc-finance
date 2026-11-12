@@ -8,6 +8,7 @@
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.8";
+import { noPrazoDoDiaUtil } from "./diasUteis.ts";
 
 // deno-lint-ignore no-explicit-any
 type AdminClient = ReturnType<typeof createClient<any, any, any>>;
@@ -38,9 +39,13 @@ const hojeBrasilia = (): string =>
 /** Tipos que correm multa e juros (em negociação segue vencido). Igual ao painel. */
 const COM_ENCARGOS = new Set(["vencidos", "recompra", "em_negociacao"]);
 
-/** Dias de atraso até hoje (Brasília); zero para quem não corre encargos. */
+/**
+ * Dias de atraso até hoje (Brasília); zero para quem não corre encargos e para
+ * o título vencido em fim de semana/feriado ainda no 1º dia útil (Lei 7.089/1983).
+ */
 export function diasDeAtraso(dueDate: string, category: string, hoje: string = hojeBrasilia()): number {
   if (!COM_ENCARGOS.has(category)) return 0;
+  if (noPrazoDoDiaUtil((dueDate || "").slice(0, 10), hoje)) return 0;
   const venc = Date.parse(`${(dueDate || "").slice(0, 10)}T00:00:00Z`);
   const ref  = Date.parse(`${hoje}T00:00:00Z`);
   return Number.isNaN(venc) ? 0 : Math.max(0, Math.floor((ref - venc) / 86_400_000));
@@ -59,6 +64,8 @@ export function valorAtualizado(
   hoje: string = hojeBrasilia(),
 ): number {
   if (!COM_ENCARGOS.has(category)) return amount;
+  // Vencido em dia sem expediente e ainda no 1º dia útil: sem multa e sem juros.
+  if (noPrazoDoDiaUtil((dueDate || "").slice(0, 10), hoje)) return amount;
   const dias  = diasDeAtraso(dueDate, category, hoje);
   const multa = amount * (enc.multaPct / 100);
   const juros = amount * (enc.jurosDiaPct / 100) * dias;

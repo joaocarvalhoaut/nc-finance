@@ -122,6 +122,10 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   **Ligado em produção em 09/11/2026** (chave na Vercel + secret no Supabase; login testado pelo dono).
   Caixa sempre visível (`appearance: "always"`): com "interaction-only" ela sumia e o login travava calado.
   Senha mínima: 8 caracteres (cadastro, recuperação e troca).
+- **Vencimento em fim de semana/feriado** (Lei 7.089/1983, 12/11/2026): até o 1º dia útil seguinte
+  o título não corre multa nem juros; depois, o atraso conta do vencimento original. Regra pura em
+  `_shared/diasUteis.ts` (feriados nacionais + Carnaval, Sexta Santa, Corpus Christi; sem
+  estaduais/municipais), usada por `_shared/encargos.ts` e pelo painel (`App.tsx`).
 - **Tipos novos (10/11/2026):** `em_negociacao` (corre multa/juros, mas fica fora de lote, "Enviar
   todos" e automação — só envio um a um) e `pago_banco` (conta como pago/recuperado, nunca cobrado).
   Regras em `src/config/categories.ts` (`estaPago`, `bloqueiaCobranca`, `foraDoLote`, `correEncargos`);
