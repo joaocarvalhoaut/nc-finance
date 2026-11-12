@@ -23,7 +23,9 @@ export interface SecaoGuia {
   lista?: string[];
   /** true = lista numerada (passo a passo). */
   numerada?: boolean;
-  /** Parágrafo depois da lista. */
+  /** Texto pronto para copiar (mantém as quebras de linha), depois da lista. */
+  modelo?: string;
+  /** Parágrafo depois da lista / do modelo. */
   fecho?: string;
 }
 
@@ -157,6 +159,151 @@ export const GUIAS: Guia[] = [
         pergunta: "E se o cliente disser que já pagou?",
         resposta:
           "Peça o comprovante, confira no seu extrato ou no banco e dê baixa no título. Pare as cobranças desse título até a conferência terminar.",
+      },
+    ],
+  },
+  {
+    slug: "modelos-de-mensagem-de-cobranca-whatsapp",
+    titulo: "Modelos de mensagem de cobrança pelo WhatsApp",
+    tituloSeo: "Modelos de mensagem de cobrança pelo WhatsApp (prontos)",
+    descricao:
+      "Modelos prontos de mensagem de cobrança para WhatsApp, do lembrete antes do vencimento ao aviso formal: amigável, neutro, firme e formal, mais respostas para negociar.",
+    resumo:
+      "Uma boa mensagem de cobrança pelo WhatsApp diz quem cobra, qual título está em aberto, o valor atualizado e o vencimento, e já leva o boleto ou o Pix. " +
+      "Comece com um lembrete antes do vencimento e um tom amigável nos primeiros dias de atraso; passe ao neutro, ao firme e, por fim, a um aviso formal só se não houver resposta. " +
+      "Abaixo estão modelos prontos para cada etapa: troque o que está entre colchetes.",
+    publicadoEm: "2026-11-12",
+    atualizadoEm: "2026-11-12",
+    secoes: [
+      {
+        titulo: "O que todo modelo precisa ter",
+        lista: [
+          "O nome do cliente e o da sua empresa, logo no começo.",
+          "O número do documento, o vencimento e o valor atualizado.",
+          "O boleto ou a chave Pix na própria mensagem.",
+          "Uma saída para quem já pagou (mandar o comprovante) e para quem quer negociar (responder a mensagem).",
+        ],
+        fecho:
+          "Troque tudo o que está entre colchetes antes de enviar. Mensagem com o nome e o valor de cada cliente funciona melhor do que um texto genérico.",
+      },
+      {
+        titulo: "1. Lembrete antes do vencimento",
+        paragrafos: [
+          "Mande dois ou três dias antes. Ainda não é cobrança: é um favor ao cliente, e evita boa parte dos atrasos.",
+        ],
+        modelo:
+          "Olá, [Nome]! Aqui é o financeiro da [Empresa].\n" +
+          "Passando para lembrar que o boleto abaixo vence em [data]:\n\n" +
+          "Documento: [número]\n" +
+          "Valor: R$ [valor]\n\n" +
+          "Boleto: [link]\n" +
+          "Se já pagou, pode desconsiderar. Obrigado!",
+      },
+      {
+        titulo: "2. Tom amigável (primeiros dias de atraso)",
+        paragrafos: [
+          "A maior parte dos atrasos curtos é esquecimento. Trate como tal: sem cobrança de juros no texto, sem pressão.",
+        ],
+        modelo:
+          "Olá, [Nome], tudo bem?\n" +
+          "Aqui é o financeiro da [Empresa]. Ainda não identificamos o pagamento do título abaixo:\n\n" +
+          "Documento: [número]\n" +
+          "Vencimento: [data]\n" +
+          "Valor atualizado: R$ [valor]\n\n" +
+          "Boleto atualizado: [link]\n" +
+          "Se já pagou, me mande o comprovante que eu dou baixa. Qualquer dúvida, é só responder aqui.",
+      },
+      {
+        titulo: "3. Tom neutro (cerca de uma semana de atraso)",
+        paragrafos: [
+          "Mais formal, ainda cordial. Já vale abrir a porta para negociar.",
+        ],
+        modelo:
+          "Prezado(a) [Nome],\n\n" +
+          "Aqui é o financeiro da [Empresa]. Consta em aberto em nosso sistema:\n\n" +
+          "Documento: [número]\n" +
+          "Vencimento: [data]\n" +
+          "Valor atualizado: R$ [valor]\n\n" +
+          "Pedimos que regularize o pagamento pelo boleto: [link]\n" +
+          "Se preferir combinar outra data ou parcelar, responda esta mensagem.\n\n" +
+          "Atenciosamente,\n" +
+          "Financeiro [Empresa]",
+      },
+      {
+        titulo: "4. Tom firme (duas a três semanas de atraso)",
+        paragrafos: [
+          "Direto e com prazo. Firme não é grosseiro: nada de ironia, letras maiúsculas ou ameaça.",
+        ],
+        modelo:
+          "[Nome], aqui é da cobrança da [Empresa].\n\n" +
+          "O documento [número], vencido em [data], segue em aberto. O valor atualizado, com multa e juros, é R$ [valor].\n\n" +
+          "Precisamos da regularização até [data limite]. Boleto: [link]\n" +
+          "Se houver algum problema com o pagamento, responda hoje para combinarmos uma solução.\n\n" +
+          "Cobrança [Empresa]",
+      },
+      {
+        titulo: "5. Aviso formal (atraso longo)",
+        paragrafos: [
+          "O último passo antes de medidas fora do WhatsApp. Diga qual é o próximo passo e quando ele acontece.",
+        ],
+        modelo:
+          "Sr(a). [Nome],\n\n" +
+          "A [Empresa] comunica que o débito do documento [número], vencido em [data], no valor atualizado de R$ [valor], segue sem pagamento.\n\n" +
+          "Pedimos que regularize ou entre em contato para negociar até [data limite]. Sem retorno, o débito seguirá para [próximo passo previsto no contrato: protesto do título, inclusão em cadastro de inadimplentes ou cobrança judicial].\n\n" +
+          "Departamento financeiro [Empresa]",
+        fecho:
+          "Escreva só o passo que você vai mesmo tomar. Ameaça que não se cumpre tira a credibilidade da cobrança e pode ser vista como constrangimento, o que os artigos 42 e 71 do Código de Defesa do Consumidor proíbem.",
+      },
+      {
+        titulo: "Respostas para quando o cliente responde",
+        paragrafos: ["Proposta de negociação:"],
+        modelo:
+          "Combinado, [Nome]. Podemos fazer assim:\n" +
+          "entrada de R$ [valor] até [data] e o restante em [quantidade] parcelas de R$ [valor], todo dia [dia].\n" +
+          "Se estiver de acordo, responda \"aceito\" que eu mando os boletos.",
+        fecho:
+          "Cliente disse que já pagou: \"Obrigado pelo retorno, [Nome]. Pode me mandar o comprovante? Assim confiro e dou baixa no título.\" E pare as cobranças desse título até conferir.",
+      },
+      {
+        titulo: "Erros que fazem o cliente não pagar (ou denunciar o número)",
+        lista: [
+          "Mensagem sem o nome da empresa: o cliente não sabe quem está cobrando.",
+          "Valor errado ou sem o boleto: o cliente precisa pedir, e a conversa morre ali.",
+          "Mesmo texto todo dia, ou mais de uma mensagem no mesmo dia.",
+          "Mensagem à noite, no fim de semana ou em feriado.",
+          "Cobrar quem já pagou ou quem já está negociando.",
+          "Pular direto para o aviso formal no primeiro atraso.",
+        ],
+      },
+    ],
+    noNcFinance: [
+      "Os quatro tons (amigável, neutro, firme e jurídico) já vêm prontos, com o nome do cliente, o documento, o vencimento e o valor atualizado preenchidos para cada título.",
+      "A mensagem é assinada com o nome da sua empresa e sai do WhatsApp dela.",
+      "Dá para ajustar o texto antes de enviar.",
+      "O boleto em PDF vai como link na própria mensagem.",
+      "Nos planos Pro e Premium, cada regra automática tem o seu tom ou um texto próprio: por exemplo, amigável para \"vencem em 3 dias\" e firme para os vencidos.",
+      "Cliente marcado como em negociação fica fora do lote e da automação: só recebe mensagem enviada um a um.",
+    ],
+    perguntas: [
+      {
+        pergunta: "Qual tom usar na primeira cobrança?",
+        resposta:
+          "O amigável. Nos primeiros dias, a maior parte dos atrasos é esquecimento, e uma mensagem cordial com o boleto resolve. Suba para o neutro e o firme só se não houver pagamento nem resposta.",
+      },
+      {
+        pergunta: "Posso dizer na mensagem que vou negativar o nome do cliente?",
+        resposta:
+          "Pode, se for verdade e se você for mesmo fazer isso. O consumidor tem de ser comunicado por escrito antes de entrar no cadastro de inadimplentes (artigo 43, parágrafo 2º, do Código de Defesa do Consumidor); em geral, o próprio birô de crédito manda esse aviso. Usar a negativação só como ameaça pode ser visto como constrangimento.",
+      },
+      {
+        pergunta: "Qual o melhor horário para mandar mensagem de cobrança?",
+        resposta:
+          "Em dia útil e em horário comercial. Mensagem à noite, no fim de semana ou em feriado incomoda, rende menos resposta e aumenta as denúncias do número.",
+      },
+      {
+        pergunta: "Posso usar o mesmo texto para todos os clientes?",
+        resposta:
+          "Pode usar o mesmo modelo, desde que cada mensagem leve o nome, o documento e o valor certos de cada cliente. Texto personalizado é lido como conversa; texto idêntico para muita gente parece disparo em massa.",
       },
     ],
   },

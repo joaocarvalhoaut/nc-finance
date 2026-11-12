@@ -49,6 +49,9 @@ p{margin:0 0 14px}
 ul,ol{margin:0 0 14px;padding-left:22px}
 li{margin:0 0 8px}
 li::marker{color:#34d399}
+.modelo{border:1px solid #27272a;border-left:3px solid #10b981;background:#0f0f12;border-radius:6px;padding:14px 16px;margin:0 0 16px}
+.modelo span{display:block;color:#71717a;font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.modelo p{margin:0;white-space:pre-wrap;color:#e4e4e7;font-size:16px;line-height:1.55}
 .cta{margin:44px 0 8px;border:1px solid #27272a;background:#18181b;border-radius:6px;padding:20px}
 .cta h2{margin-top:0}
 .cta .btn{margin-top:6px}
@@ -113,6 +116,7 @@ const secaoHtml = (s) => {
     const tag = s.numerada ? "ol" : "ul";
     partes.push(`<${tag}>${s.lista.map((i) => `<li>${esc(i)}</li>`).join("")}</${tag}>`);
   }
+  if (s.modelo) partes.push(`<div class="modelo"><span>Modelo para copiar</span><p>${esc(s.modelo)}</p></div>`);
   if (s.fecho) partes.push(`<p>${esc(s.fecho)}</p>`);
   return partes.join("\n");
 };
