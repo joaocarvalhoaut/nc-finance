@@ -169,7 +169,7 @@ export const GUIAS: Guia[] = [
     titulo: "Modelos de mensagem de cobrança pelo WhatsApp",
     tituloSeo: "Modelos de mensagem de cobrança pelo WhatsApp (prontos)",
     descricao:
-      "Modelos prontos de mensagem de cobrança para WhatsApp, do lembrete antes do vencimento ao aviso formal: amigável, neutro, firme e formal, mais respostas para negociar.",
+      "Modelos prontos de mensagem de cobrança para WhatsApp, do lembrete ao aviso formal: amigável, neutro, firme e formal, mais respostas para negociar.",
     resumo:
       "Uma boa mensagem de cobrança pelo WhatsApp diz quem cobra, qual título está em aberto, o valor atualizado e o vencimento, e já leva o boleto ou o Pix. " +
       "Comece com um lembrete antes do vencimento e um tom amigável nos primeiros dias de atraso; passe ao neutro, ao firme e, por fim, a um aviso formal só se não houver resposta. " +
@@ -522,7 +522,7 @@ export const GUIAS: Guia[] = [
     titulo: "O que a lei permite (e proíbe) na cobrança de clientes",
     tituloSeo: "Cobrança de clientes: o que a lei permite e proíbe (CDC e LGPD)",
     descricao:
-      "O que pode e o que não pode na cobrança de dívidas pelo WhatsApp, telefone ou e-mail: Código de Defesa do Consumidor, LGPD, negativação, protesto e cobrança indevida.",
+      "O que pode e o que não pode na cobrança de dívidas pelo WhatsApp, telefone ou e-mail: CDC, LGPD, negativação, protesto e cobrança indevida.",
     resumo:
       "Cobrar uma dívida é direito de quem vendeu, e pode ser feito pelo WhatsApp. A lei proíbe a forma abusiva: expor o devedor ao ridículo, constranger, ameaçar, mentir ou atrapalhar o trabalho, o descanso ou o lazer dele " +
       "(artigos 42 e 71 do Código de Defesa do Consumidor). Os dados do cliente podem ser usados para cobrar, pela LGPD, mas só para isso e sem passar a terceiros. " +
@@ -731,7 +731,7 @@ export const GUIAS: Guia[] = [
     titulo: "Como cobrar cliente que não responde",
     tituloSeo: "Cliente não responde a cobrança? O que fazer, passo a passo",
     descricao:
-      "O que fazer quando o cliente some e não responde a cobrança: conferir o contato, mudar a mensagem e o canal, oferecer saídas e, por fim, notificação, protesto ou Juizado.",
+      "O que fazer quando o cliente não responde a cobrança: conferir o contato, mudar mensagem e canal, oferecer saídas e, por fim, notificação, protesto ou Juizado.",
     resumo:
       "Quando o cliente não responde, primeiro confira se o número e a pessoa estão certos e se a mensagem diz quem cobra. Depois mande uma mensagem curta, com uma pergunta fácil de responder e uma saída concreta " +
       "(nova data, parcelamento ou desconto à vista), e tente outro canal e outro horário. Sem resposta depois de algumas tentativas espaçadas, parta para os passos formais: notificação por escrito, protesto, negativação ou o Juizado Especial Cível.",
@@ -834,7 +834,7 @@ export const GUIAS: Guia[] = [
     titulo: "Como cobrar uma empresa que está em atraso",
     tituloSeo: "Como cobrar empresa (cliente PJ) em atraso: passo a passo",
     descricao:
-      "Como cobrar outra empresa em atraso: com quem falar, o que conferir, modelo de mensagem, juros e multa entre empresas, protesto de duplicata, execução e ação monitória.",
+      "Como cobrar outra empresa em atraso: com quem falar, modelo de mensagem, juros e multa entre empresas, protesto de duplicata, execução e ação monitória.",
     resumo:
       "Para cobrar uma empresa, fale com o contas a pagar e não só com o comprador, confira se a nota e o boleto chegaram a quem paga e respeite o ciclo de pagamento dela. " +
       "Entre empresas, em geral não vale o Código de Defesa do Consumidor: multa e juros seguem o contrato. Se não houver pagamento, a duplicata pode ser protestada, " +
@@ -928,7 +928,7 @@ export const GUIAS: Guia[] = [
     titulo: "Como fazer acordo de pagamento com cliente inadimplente",
     tituloSeo: "Acordo de pagamento com cliente inadimplente: como fazer",
     descricao:
-      "Como negociar e formalizar um acordo de pagamento com cliente em atraso: o que oferecer, o que o acordo precisa ter, confissão de dívida e o que fazer se ele não cumprir.",
+      "Como negociar e formalizar acordo de pagamento com cliente em atraso: o que oferecer, o que o acordo precisa ter, confissão de dívida e se ele não cumprir.",
     resumo:
       "Para fazer um acordo com cliente inadimplente, ofereça poucas opções claras (pagamento à vista com desconto, entrada mais parcelas ou nova data), feche valores e datas por escrito e mande o boleto ou o Pix de cada parcela. " +
       "O acordo deve dizer o valor total, as parcelas, os vencimentos e o que acontece se uma parcela atrasar. Assinado pelo devedor e por duas testemunhas, ou por assinatura eletrônica conferida por provedor, o termo de confissão de dívida vale como título executivo (artigo 784, inciso III e §4º, do Código de Processo Civil).",
@@ -1023,7 +1023,7 @@ export const GUIAS: Guia[] = [
     titulo: "Como reduzir a inadimplência dos clientes",
     tituloSeo: "Como reduzir a inadimplência: 10 práticas que funcionam",
     descricao:
-      "Práticas para reduzir a inadimplência antes e depois do vencimento: análise de crédito, contrato claro, lembrete antes de vencer, meios de pagamento e régua de cobrança.",
+      "Como reduzir a inadimplência antes e depois do vencimento: análise de crédito, contrato claro, lembrete antes de vencer, meios de pagamento e régua de cobrança.",
     resumo:
       "A inadimplência cai quando a empresa age antes do vencimento, e não só depois: vende a prazo com critério, deixa multa, juros e datas claras no contrato, " +
       "manda um lembrete com o boleto ou o Pix alguns dias antes de vencer e facilita o pagamento. Depois do vencimento, uma régua de cobrança com tom que sobe aos poucos recupera a maior parte dos atrasos curtos.",
@@ -1163,7 +1163,7 @@ export const GUIAS: Guia[] = [
     titulo: "Mensagem de lembrete de pagamento: modelos prontos",
     tituloSeo: "Mensagem de lembrete de pagamento: modelos para WhatsApp",
     descricao:
-      "Modelos de lembrete de pagamento para WhatsApp: antes do vencimento, no dia, com Pix, para empresa e para cobrança mensal. Quando mandar e o que não pode faltar.",
+      "Modelos de lembrete de pagamento para WhatsApp: antes do vencimento, no dia, com Pix, para empresa e mensalidade. Quando mandar e o que não pode faltar.",
     resumo:
       "O lembrete de pagamento vai 2 ou 3 dias antes do vencimento, ou no próprio dia, e é curto: quem envia, o que vence, o valor, a data e o boleto ou a chave Pix. " +
       "Não é cobrança, então o tom é de favor ao cliente, e termina com \"se já pagou, desconsidere\". Abaixo estão modelos prontos: troque o que está entre colchetes.",
