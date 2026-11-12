@@ -32,6 +32,9 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   perguntas) e `src/config/plans.ts` (planos). Só prometer o que o código faz. A `LandingPage` não pode
   usar `window`/`document` fora de efeitos. `public/session-hint.js` esconde o HTML pré-renderizado
   para quem já tem sessão salva.
+  **Guias** (`/guias/<slug>`, 12/11/2026): conteúdo em `src/content/guias.ts`, HTML estático sem JS
+  gerado por `tools/guias-html.mjs` (Article + Breadcrumb + FAQ em JSON-LD), entram no sitemap e no
+  llms.txt. Resposta direta no `resumo`; lei sempre com artigo; produto só o que o código faz.
 
 - **Importação de arquivos** (`src/services/localDocumentExtraction/`, 100% no navegador, nada sai
   dele): `leitores.ts` lê cada formato (Excel/ODS com tipos reais, CSV/TXT com detecção de

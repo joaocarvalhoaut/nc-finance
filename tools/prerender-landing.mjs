@@ -12,13 +12,16 @@
  *     quem tem sessão salva nem vê — ver public/session-hint.js) e JSON-LD
  *     (Organization, WebSite, SoftwareApplication com os planos, FAQPage);
  *   - llms.txt: resumo em Markdown para IAs, da mesma fonte;
- *   - sitemap.xml: com a data do build.
+ *   - guias/ e guias/<slug>/index.html: páginas de conteúdo, HTML estático sem
+ *     JavaScript (src/content/guias.ts → tools/guias-html.mjs);
+ *   - sitemap.xml: com a data do build e os guias.
  *
  * Fonte única do conteúdo: src/content/landing.ts e src/config/plans.ts.
  */
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { renderGuia, renderIndiceGuias, urlGuia } from "./guias-html.mjs";
 
 const raiz = process.cwd();
 const ssrDir = resolve(raiz, "dist-ssr");
@@ -140,25 +143,43 @@ const llms = [
   `- Página principal: ${site}`,
   `- Planos e preços: ${site}#planos`,
   `- Perguntas frequentes: ${site}#perguntas`,
+  `- Guias: ${site}guias`,
+  "",
+  "## Guias",
+  ...c.guias.map((g) => `- [${g.titulo}](${urlGuia(site, g.slug)}): ${g.resumo}`),
   "",
 ].join("\n");
 writeFileSync(resolve(raiz, "dist", "llms.txt"), llms, "utf8");
 
+// ── guias ────────────────────────────────────────────────────────────────────
+// /guias/<slug> → dist/guias/<slug>/index.html (arquivo estático: a Vercel o
+// serve antes do rewrite da SPA).
+const guiasDir = resolve(raiz, "dist", "guias");
+mkdirSync(guiasDir, { recursive: true });
+writeFileSync(resolve(guiasDir, "index.html"), renderIndiceGuias(c), "utf8");
+for (const g of c.guias) {
+  const dir = resolve(guiasDir, g.slug);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(resolve(dir, "index.html"), renderGuia(g, c), "utf8");
+}
+
 // ── sitemap.xml ──────────────────────────────────────────────────────────────
+const urlSitemap = (loc, lastmod, freq, prio) =>
+  `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${freq}</changefreq>\n    <priority>${prio}</priority>\n  </url>`;
+const ultimoGuia = c.guias.map((g) => g.atualizadoEm).sort().at(-1) ?? hoje;
 writeFileSync(
   resolve(raiz, "dist", "sitemap.xml"),
-  `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${site}</loc>
-    <lastmod>${hoje}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
-  </url>
-</urlset>
-`,
+  [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    urlSitemap(site, hoje, "weekly", "1.0"),
+    urlSitemap(`${site}guias`, ultimoGuia, "weekly", "0.7"),
+    ...c.guias.map((g) => urlSitemap(urlGuia(site, g.slug), g.atualizadoEm, "monthly", "0.8")),
+    "</urlset>",
+    "",
+  ].join("\n"),
   "utf8",
 );
 
 rmSync(ssrDir, { recursive: true, force: true });
-console.log(`[prerender] landing pré-renderizada (${Math.round(html.length / 1024)} KB de HTML), JSON-LD, llms.txt e sitemap.xml gerados.`);
+console.log(`[prerender] landing pré-renderizada (${Math.round(html.length / 1024)} KB de HTML), JSON-LD, llms.txt, sitemap.xml e ${c.guias.length} guia(s) gerados.`);

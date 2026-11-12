@@ -9,6 +9,7 @@ import { renderToString } from "react-dom/server";
 import LandingPage from "./components/LandingPage";
 import { PLAN_LIST } from "./config/plans";
 import { CONTATO_EMAIL, CONTATO_WHATSAPP, DEFINICAO, DIAS_TESTE, DIFERENCIAIS, PASSOS, PERGUNTAS, SITE_URL } from "./content/landing";
+import { GUIAS } from "./content/guias";
 
 export function renderLanding(): string {
   return renderToString(
@@ -32,4 +33,5 @@ export const conteudo = {
   diferenciais: DIFERENCIAIS,
   perguntas: PERGUNTAS,
   planos: PLAN_LIST.map((p) => ({ nome: p.name, preco: p.priceBRL, descricao: p.description, recursos: p.features })),
+  guias: GUIAS,
 };

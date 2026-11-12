@@ -383,6 +383,8 @@ export default function LandingPage({
           </div>
           <div className="space-y-3 sm:text-right">
             <nav aria-label="Documentos" className="flex flex-wrap gap-x-4 gap-y-2 sm:justify-end">
+              {/* Guias: páginas estáticas (SEO/GEO) — link normal, sai da SPA. */}
+              <a href="/guias" className="hover:text-white">Guias de cobrança</a>
               <button type="button" onClick={() => setShowTermos(true)} className="hover:text-white cursor-pointer">Termos de Uso</button>
               <button type="button" onClick={() => setShowPrivacidade(true)} className="hover:text-white cursor-pointer">Privacidade</button>
               <button type="button" onClick={() => setShowAcordo(true)} className="hover:text-white cursor-pointer">Tratamento de dados</button>
