@@ -35,6 +35,10 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   **Guias** (`/guias/<slug>`, 12/11/2026): conteúdo em `src/content/guias.ts`, HTML estático sem JS
   gerado por `tools/guias-html.mjs` (Article + Breadcrumb + FAQ em JSON-LD), entram no sitemap e no
   llms.txt. Resposta direta no `resumo`; lei sempre com artigo; produto só o que o código faz.
+  **404 de verdade** (12/11/2026): o `vercel.json` não tem mais rewrite catch-all — o app só vive em
+  `/` (retornos do Asaas e do Supabase usam `?query`/`#hash`). Caminho inexistente recebe
+  `dist/404.html` (noindex, gerado no prerender) com status 404; `server.ts` faz o mesmo.
+  Rota nova no app por caminho? Precisa de rewrite explícito para ela.
 
 - **Importação de arquivos** (`src/services/localDocumentExtraction/`, 100% no navegador, nada sai
   dele): `leitores.ts` lê cada formato (Excel/ODS com tipos reais, CSV/TXT com detecção de

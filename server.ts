@@ -76,8 +76,10 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
+    // O app só vive em "/" (retornos usam ?query/#hash). Caminho que não é
+    // arquivo do dist é 404 de verdade — igual à Vercel (dist/404.html).
     app.get("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      res.status(404).sendFile(path.join(distPath, "404.html"));
     });
   }
 

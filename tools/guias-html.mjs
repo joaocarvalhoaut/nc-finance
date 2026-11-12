@@ -194,6 +194,39 @@ export function renderGuia(g, c) {
 `;
 }
 
+/**
+ * dist/404.html — a Vercel serve com status 404 para qualquer caminho que não
+ * existe (antes o rewrite da SPA devolvia a landing com 200: "soft 404").
+ */
+export function render404(c) {
+  return `<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Página não encontrada | NC Finance</title>
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#09090b" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..800&display=swap" rel="stylesheet" />
+    <style>${CSS}</style>
+  </head>
+  <body>${topo(c.diasTeste)}
+    <main>
+      <h1>Página não encontrada</h1>
+      <p>O endereço que você abriu não existe ou mudou de lugar.</p>
+      <p><a class="btn" href="/">Ir para a página inicial</a></p>
+      ${c.guias.length
+        ? `<h2>Guias de cobrança</h2><ul class="lista-guias">${c.guias.map((g) => `<li><a href="/guias/${g.slug}">${esc(g.titulo)}</a><p>${esc(g.descricao)}</p></li>`).join("")}</ul>`
+        : ""}
+    </main>${rodape(c)}
+  </body>
+</html>
+`;
+}
+
 export function renderIndiceGuias(c) {
   const site = c.siteUrl;
   const url = `${site}guias`;

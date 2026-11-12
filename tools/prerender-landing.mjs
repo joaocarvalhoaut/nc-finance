@@ -21,7 +21,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { renderGuia, renderIndiceGuias, urlGuia } from "./guias-html.mjs";
+import { render404, renderGuia, renderIndiceGuias, urlGuia } from "./guias-html.mjs";
 
 const raiz = process.cwd();
 const ssrDir = resolve(raiz, "dist-ssr");
@@ -162,6 +162,11 @@ for (const g of c.guias) {
   mkdirSync(dir, { recursive: true });
   writeFileSync(resolve(dir, "index.html"), renderGuia(g, c), "utf8");
 }
+
+// ── 404.html ─────────────────────────────────────────────────────────────────
+// Sem rewrite catch-all na Vercel: caminho que não existe recebe esta página
+// com status 404 (o app só vive em "/", e os retornos usam ?query ou #hash).
+writeFileSync(resolve(raiz, "dist", "404.html"), render404(c), "utf8");
 
 // ── sitemap.xml ──────────────────────────────────────────────────────────────
 const urlSitemap = (loc, lastmod, freq, prio) =>
