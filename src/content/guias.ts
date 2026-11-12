@@ -25,6 +25,8 @@ export interface SecaoGuia {
   numerada?: boolean;
   /** Texto pronto para copiar (mantém as quebras de linha), depois da lista. */
   modelo?: string;
+  /** Rótulo do bloco do `modelo` (padrão: "Modelo para copiar"). */
+  rotuloModelo?: string;
   /** Parágrafo depois da lista / do modelo. */
   fecho?: string;
 }
@@ -304,6 +306,109 @@ export const GUIAS: Guia[] = [
         pergunta: "Posso usar o mesmo texto para todos os clientes?",
         resposta:
           "Pode usar o mesmo modelo, desde que cada mensagem leve o nome, o documento e o valor certos de cada cliente. Texto personalizado é lido como conversa; texto idêntico para muita gente parece disparo em massa.",
+      },
+    ],
+  },
+  {
+    slug: "como-calcular-juros-e-multa-de-boleto-atrasado",
+    titulo: "Como calcular juros e multa de boleto atrasado",
+    tituloSeo: "Como calcular juros e multa de boleto atrasado (com exemplo)",
+    descricao:
+      "Fórmula e exemplo para calcular multa e juros de boleto em atraso: quanto pode cobrar, como contar os dias e como chegar ao valor atualizado.",
+    resumo:
+      "O valor atualizado de um boleto atrasado é o valor original mais a multa e os juros de mora. A multa é cobrada uma vez só, em percentual do valor original; " +
+      "os juros são cobrados por dia de atraso, também sobre o valor original. Exemplo: um boleto de R$ 1.000,00 com multa de 2% e juros de 1% ao mês, pago 15 dias depois do vencimento, " +
+      "fica em R$ 1.025,00 (R$ 20,00 de multa e R$ 5,00 de juros). Em relação de consumo, a multa não pode passar de 2%.",
+    publicadoEm: "2026-11-12",
+    atualizadoEm: "2026-11-12",
+    secoes: [
+      {
+        titulo: "A fórmula",
+        paragrafos: [
+          "Valor atualizado = valor original + multa + juros.",
+          "Multa = valor original × percentual da multa. Entra uma vez só, a partir do primeiro dia de atraso.",
+          "Juros = valor original × juros ao mês ÷ 30 × dias de atraso. Crescem a cada dia, sempre sobre o valor original (juros simples, sem juros sobre juros).",
+        ],
+      },
+      {
+        titulo: "Passo a passo",
+        numerada: true,
+        lista: [
+          "Confira no contrato ou no boleto os percentuais de multa e de juros. Sem previsão, a multa não pode ser cobrada.",
+          "Conte os dias de atraso: do dia seguinte ao vencimento até o dia do pagamento (ou até hoje).",
+          "Calcule a multa: valor original × percentual da multa.",
+          "Calcule os juros: valor original × juros ao mês ÷ 30 × dias de atraso. Juros de 1% ao mês dão cerca de 0,033% ao dia.",
+          "Some o valor original, a multa e os juros.",
+        ],
+      },
+      {
+        titulo: "Exemplo completo",
+        paragrafos: [
+          "Boleto de R$ 1.000,00, vencido em 1º de março, com multa de 2% e juros de 1% ao mês, pago em 16 de março (15 dias de atraso):",
+        ],
+        rotuloModelo: "Cálculo",
+        modelo:
+          "Valor original: R$ 1.000,00\n" +
+          "Multa (2%): R$ 1.000,00 × 2% = R$ 20,00\n" +
+          "Juros (1% a.m.): R$ 1.000,00 × 1% ÷ 30 × 15 = R$ 5,00\n" +
+          "Valor atualizado: R$ 1.025,00",
+        fecho:
+          "Se o mesmo boleto for pago com 45 dias de atraso, a multa continua R$ 20,00 e os juros vão a R$ 15,00: R$ 1.035,00.",
+      },
+      {
+        titulo: "Quanto se pode cobrar",
+        lista: [
+          "Multa em relação de consumo (empresa cobrando pessoa física): no máximo 2% do valor da prestação (artigo 52, §1º, do Código de Defesa do Consumidor).",
+          "Multa entre empresas: vale o contrato, mas o juiz pode reduzir uma multa excessiva (artigo 413 do Código Civil).",
+          "Juros de mora: o usual em boleto é 1% ao mês. Sem taxa combinada, vale a taxa legal do artigo 406 do Código Civil, que desde a Lei 14.905/2024 é a Selic menos a inflação (IPCA).",
+          "Correção monetária: só se o contrato prever, com o índice definido nele. O cálculo acima não inclui correção.",
+        ],
+        fecho:
+          "Em qualquer caso, os percentuais precisam estar no contrato ou no boleto que o cliente recebeu. Encargo que aparece só na hora de cobrar gera discussão e atrasa o pagamento.",
+      },
+      {
+        titulo: "Boleto que vence no fim de semana ou feriado",
+        paragrafos: [
+          "Se o vencimento cai em sábado, domingo ou feriado, o cliente pode pagar no primeiro dia útil seguinte sem juros de mora (Lei 7.089/1983). Se ele pagar nesse dia, não conte atraso.",
+        ],
+      },
+      {
+        titulo: "Erros comuns no cálculo",
+        lista: [
+          "Cobrar a multa de novo a cada mês: ela entra uma vez só.",
+          "Calcular os juros sobre o valor já com multa: os juros correm sobre o valor original.",
+          "Usar juros compostos (juros sobre juros) na cobrança do atraso.",
+          "Cobrar encargo que não está no contrato nem no boleto.",
+          "Mandar a mensagem com o valor de dias atrás: o valor muda todo dia.",
+        ],
+      },
+    ],
+    noNcFinance: [
+      "Você define uma vez a multa (%) e os juros ao dia (%), e o painel mostra o valor atualizado de cada título pelos dias de atraso.",
+      "O cálculo é o deste guia: multa uma vez e juros simples ao dia, os dois sobre o valor original.",
+      "A mensagem de cobrança leva o valor atualizado no dia do envio, inclusive nas regras automáticas das 8h.",
+      "Títulos a vencer e pagos ficam no valor original; título em negociação continua correndo multa e juros.",
+    ],
+    perguntas: [
+      {
+        pergunta: "Qual é a multa máxima por atraso de boleto?",
+        resposta:
+          "Quando uma empresa cobra uma pessoa física (relação de consumo), 2% do valor da prestação, pelo artigo 52, §1º, do Código de Defesa do Consumidor. Entre empresas vale o que o contrato diz, mas o juiz pode reduzir uma multa excessiva (artigo 413 do Código Civil).",
+      },
+      {
+        pergunta: "Quanto é 1% ao mês de juros por dia?",
+        resposta:
+          "Cerca de 0,033% ao dia (1% ÷ 30). Num boleto de R$ 1.000,00, isso dá aproximadamente R$ 0,33 por dia de atraso.",
+      },
+      {
+        pergunta: "A multa é cobrada todo mês?",
+        resposta:
+          "Não. A multa por atraso é cobrada uma vez só, no primeiro dia de atraso. O que cresce com o tempo são os juros.",
+      },
+      {
+        pergunta: "Os juros são sobre o valor com multa?",
+        resposta:
+          "Não. Multa e juros são calculados sobre o valor original do boleto e depois somados a ele.",
       },
     ],
   },

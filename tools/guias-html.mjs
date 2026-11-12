@@ -116,7 +116,7 @@ const secaoHtml = (s) => {
     const tag = s.numerada ? "ol" : "ul";
     partes.push(`<${tag}>${s.lista.map((i) => `<li>${esc(i)}</li>`).join("")}</${tag}>`);
   }
-  if (s.modelo) partes.push(`<div class="modelo"><span>Modelo para copiar</span><p>${esc(s.modelo)}</p></div>`);
+  if (s.modelo) partes.push(`<div class="modelo"><span>${esc(s.rotuloModelo ?? "Modelo para copiar")}</span><p>${esc(s.modelo)}</p></div>`);
   if (s.fecho) partes.push(`<p>${esc(s.fecho)}</p>`);
   return partes.join("\n");
 };
