@@ -923,4 +923,239 @@ export const GUIAS: Guia[] = [
       },
     ],
   },
+  {
+    slug: "acordo-de-pagamento-com-cliente-inadimplente",
+    titulo: "Como fazer acordo de pagamento com cliente inadimplente",
+    tituloSeo: "Acordo de pagamento com cliente inadimplente: como fazer",
+    descricao:
+      "Como negociar e formalizar um acordo de pagamento com cliente em atraso: o que oferecer, o que o acordo precisa ter, confissão de dívida e o que fazer se ele não cumprir.",
+    resumo:
+      "Para fazer um acordo com cliente inadimplente, ofereça poucas opções claras (pagamento à vista com desconto, entrada mais parcelas ou nova data), feche valores e datas por escrito e mande o boleto ou o Pix de cada parcela. " +
+      "O acordo deve dizer o valor total, as parcelas, os vencimentos e o que acontece se uma parcela atrasar. Assinado pelo devedor e por duas testemunhas, ou por assinatura eletrônica conferida por provedor, o termo de confissão de dívida vale como título executivo (artigo 784, inciso III e §4º, do Código de Processo Civil).",
+    publicadoEm: "2026-11-12",
+    atualizadoEm: "2026-11-12",
+    secoes: [
+      {
+        titulo: "Antes de negociar",
+        lista: [
+          "Saiba o valor atualizado, com multa e juros, e quanto você aceita receber no mínimo.",
+          "Defina o desconto máximo para pagamento à vista e o número máximo de parcelas.",
+          "Pergunte quanto o cliente consegue pagar por mês: acordo que não cabe no bolso dele vira novo atraso.",
+        ],
+      },
+      {
+        titulo: "O que oferecer",
+        lista: [
+          "À vista com desconto: tira os juros ou parte da multa para receber tudo agora.",
+          "Entrada mais parcelas: a entrada mostra o compromisso do cliente.",
+          "Nova data: para quem só precisa de alguns dias.",
+        ],
+        fecho:
+          "Ofereça duas ou três opções, não mais. Pergunta aberta (\"quanto você pode pagar?\") costuma terminar em proposta baixa.",
+      },
+      {
+        titulo: "O que o acordo precisa ter",
+        lista: [
+          "Nome e CPF ou CNPJ das duas partes.",
+          "A dívida original: documentos, vencimentos e valores.",
+          "O valor total do acordo, a entrada, o número de parcelas, o valor e o vencimento de cada uma.",
+          "Como pagar: boleto, Pix ou cartão.",
+          "O que acontece se uma parcela atrasar: por exemplo, vencimento antecipado do restante, com multa e juros.",
+          "Que, pago o acordo, a dívida fica quitada.",
+        ],
+        rotuloModelo: "Modelo de confirmação pelo WhatsApp",
+        modelo:
+          "[Nome], confirmando nosso acordo para o documento [número]:\n\n" +
+          "Total: R$ [valor]\n" +
+          "Entrada: R$ [valor] até [data]\n" +
+          "Restante: [quantidade] parcelas de R$ [valor], todo dia [dia]\n\n" +
+          "Se alguma parcela atrasar mais de [dias] dias, o saldo vence de uma vez, com multa e juros.\n" +
+          "Responda \"de acordo\" para confirmar que eu mando os boletos.",
+      },
+      {
+        titulo: "Confissão de dívida: quando vale a pena",
+        paragrafos: [
+          "Para valores maiores, formalize num termo de confissão de dívida. Assinado pelo devedor e por duas testemunhas, ele é título executivo extrajudicial (artigo 784, inciso III, do CPC): se o cliente não pagar, você pode ir direto à execução, sem precisar provar a dívida num processo comum.",
+          "Termo assinado eletronicamente também vale, e dispensa as testemunhas quando a integridade da assinatura é conferida por um provedor de assinatura (artigo 784, §4º, do CPC).",
+        ],
+      },
+      {
+        titulo: "Se o cliente não cumprir",
+        numerada: true,
+        lista: [
+          "Cobre a parcela atrasada como qualquer título vencido, começando pelo tom amigável.",
+          "Se o acordo prevê vencimento antecipado, avise por escrito que o saldo venceu.",
+          "Com termo de confissão de dívida, a execução pode ser proposta direto. Sem ele, valem protesto, negativação e o Juizado Especial Cível.",
+        ],
+      },
+    ],
+    noNcFinance: [
+      "Tipo \"Em negociação\": o título continua correndo multa e juros, mas sai do lote, do \"Enviar todos\" e da automação, e só recebe mensagem enviada um a um.",
+      "Valor e vencimento podem ser editados direto na Carteira, para registrar as novas datas.",
+      "Cada título aceita o boleto em PDF, que vai como link na mensagem.",
+      "O valor atualizado do título aparece no painel, para saber de onde partir na negociação.",
+    ],
+    perguntas: [
+      {
+        pergunta: "Posso dar desconto nos juros e na multa para fechar o acordo?",
+        resposta:
+          "Pode. Multa e juros são direitos de quem cobra, e abrir mão de parte deles é decisão sua. Desconto para pagamento à vista costuma ser o jeito mais rápido de receber.",
+      },
+      {
+        pergunta: "Acordo pelo WhatsApp tem validade?",
+        resposta:
+          "Sim, a conversa é prova escrita do que foi combinado. Para dar mais força, peça a confirmação do cliente na própria mensagem e guarde a conversa. Para valores maiores, prefira um termo de confissão de dívida assinado, que é título executivo.",
+      },
+      {
+        pergunta: "O que é confissão de dívida?",
+        resposta:
+          "É um documento em que o devedor reconhece quanto deve e se compromete a pagar nas condições combinadas. Assinado pelo devedor e por duas testemunhas, ou eletronicamente com conferência por provedor de assinatura, vale como título executivo (artigo 784, III e §4º, do CPC).",
+      },
+      {
+        pergunta: "Quantas parcelas oferecer?",
+        resposta:
+          "Depende do valor e do cliente, mas acordos curtos são cumpridos com mais frequência. Defina um teto antes de negociar e prefira parcelas que caibam no orçamento do cliente, com entrada.",
+      },
+    ],
+  },
+  {
+    slug: "como-reduzir-inadimplencia",
+    titulo: "Como reduzir a inadimplência dos clientes",
+    tituloSeo: "Como reduzir a inadimplência: 10 práticas que funcionam",
+    descricao:
+      "Práticas para reduzir a inadimplência antes e depois do vencimento: análise de crédito, contrato claro, lembrete antes de vencer, meios de pagamento e régua de cobrança.",
+    resumo:
+      "A inadimplência cai quando a empresa age antes do vencimento, e não só depois: vende a prazo com critério, deixa multa, juros e datas claras no contrato, " +
+      "manda um lembrete com o boleto ou o Pix alguns dias antes de vencer e facilita o pagamento. Depois do vencimento, uma régua de cobrança com tom que sobe aos poucos recupera a maior parte dos atrasos curtos.",
+    publicadoEm: "2026-11-12",
+    atualizadoEm: "2026-11-12",
+    secoes: [
+      {
+        titulo: "Antes da venda",
+        numerada: true,
+        lista: [
+          "Consulte o CPF ou CNPJ antes de vender a prazo para cliente novo.",
+          "Defina um limite de crédito por cliente e aumente conforme o histórico.",
+          "Peça entrada nas vendas maiores.",
+          "Deixe no contrato ou no pedido: vencimentos, multa, juros e o que acontece no atraso.",
+        ],
+      },
+      {
+        titulo: "Antes do vencimento",
+        numerada: true,
+        lista: [
+          "Mande o boleto ou o Pix junto com a nota, para o setor que paga.",
+          "Mande um lembrete 2 ou 3 dias antes de vencer: boa parte dos atrasos é esquecimento.",
+          "Ofereça mais de um meio de pagamento: Pix, boleto e cartão.",
+        ],
+      },
+      {
+        titulo: "Depois do vencimento",
+        numerada: true,
+        lista: [
+          "Cobre logo nos primeiros dias, com tom amigável: quanto mais tempo passa, menor a chance de receber.",
+          "Siga uma régua de cobrança, com o tom subindo aos poucos e um passo formal no fim.",
+          "Confira os pagamentos antes de cada rodada, para não cobrar quem já pagou.",
+        ],
+      },
+      {
+        titulo: "Acompanhe os números",
+        paragrafos: [
+          "Meça a taxa de inadimplência (valor vencido e não pago dividido pelo total que venceu no período) todo mês, e veja em que etapa da régua as pessoas pagam. " +
+            "Cliente que atrasa sempre merece limite menor ou pagamento antecipado.",
+        ],
+      },
+    ],
+    noNcFinance: [
+      "Regras automáticas (planos Pro e Premium) mandam o lembrete \"vencem em X dias\" e cobram os vencidos, cada uma com o seu tom.",
+      "O boleto em PDF vai junto da mensagem, como link.",
+      "Multa e juros calculados sozinhos, e a mensagem leva o valor atualizado.",
+      "O painel mostra o que está em aberto, os vencidos corrigidos e as pendências críticas (atrasos acima do número de dias que você escolhe).",
+      "O relatório de pagos importado dá baixa nos títulos, e quem pagou não é mais cobrado.",
+    ],
+    perguntas: [
+      {
+        pergunta: "O que mais reduz a inadimplência?",
+        resposta:
+          "Agir antes do vencimento: vender a prazo com critério e mandar um lembrete com o boleto ou o Pix alguns dias antes de vencer. Depois do vencimento, cobrar logo nos primeiros dias faz mais diferença do que cobrar com mais força mais tarde.",
+      },
+      {
+        pergunta: "Vale a pena dar desconto para pagamento em dia?",
+        resposta:
+          "Pode valer, se a margem permitir: o desconto de pontualidade incentiva o pagamento até o vencimento. Ele precisa estar claro no boleto ou no contrato.",
+      },
+      {
+        pergunta: "Lembrete antes do vencimento incomoda o cliente?",
+        resposta:
+          "Uma mensagem só, educada e com o boleto, costuma ser bem recebida: é um favor, e não uma cobrança. O que incomoda é repetir o lembrete ou mandar fora do horário comercial.",
+      },
+    ],
+  },
+  {
+    slug: "taxa-de-inadimplencia-como-calcular",
+    titulo: "Taxa de inadimplência: o que é e como calcular",
+    tituloSeo: "Taxa de inadimplência: o que é, fórmula e exemplo",
+    descricao:
+      "O que é a taxa de inadimplência, a fórmula com exemplo, a diferença para a taxa de recuperação e como acompanhar esses números todo mês.",
+    resumo:
+      "Taxa de inadimplência é a parte do que venceu num período que não foi paga. Fórmula: valor vencido e não pago ÷ valor total que venceu no período × 100. " +
+      "Exemplo: se venceram R$ 50.000,00 em março e R$ 4.000,00 continuam sem pagamento, a taxa é de 8%. Acompanhe também a taxa de recuperação: quanto do que estava atrasado foi recebido depois.",
+    publicadoEm: "2026-11-12",
+    atualizadoEm: "2026-11-12",
+    secoes: [
+      {
+        titulo: "A fórmula",
+        rotuloModelo: "Fórmula",
+        modelo:
+          "Taxa de inadimplência = valor vencido e não pago ÷ valor total que venceu no período × 100\n\n" +
+          "Exemplo: venceram R$ 50.000,00 em março\n" +
+          "Continuam sem pagamento: R$ 4.000,00\n" +
+          "Taxa: 4.000 ÷ 50.000 × 100 = 8%",
+        fecho:
+          "Use sempre o valor original dos títulos, sem multa e juros, para comparar um mês com outro. E defina a data de corte (por exemplo, o dia 10 do mês seguinte) e use sempre a mesma.",
+      },
+      {
+        titulo: "Por valor ou por cliente",
+        paragrafos: [
+          "A taxa por valor mostra o impacto no caixa. A taxa por cliente (clientes com atraso ÷ clientes com título vencido no período) mostra se o problema está espalhado ou concentrado em poucos clientes grandes. Vale olhar as duas.",
+        ],
+      },
+      {
+        titulo: "Taxa de recuperação",
+        paragrafos: [
+          "Mostra quanto do que atrasou foi recebido depois: valor recebido dos títulos atrasados ÷ valor que estava atrasado no início do período × 100. É o número que diz se a cobrança está funcionando.",
+        ],
+      },
+      {
+        titulo: "Outros números que ajudam",
+        lista: [
+          "Atraso médio: quantos dias, em média, os clientes levam para pagar depois do vencimento.",
+          "Inadimplência por faixa de atraso: até 30, de 31 a 60, de 61 a 90 e mais de 90 dias. Quanto mais velha a dívida, menor a chance de receber.",
+          "Inadimplência por cliente, vendedor ou cobrador: mostra onde agir primeiro.",
+        ],
+      },
+    ],
+    noNcFinance: [
+      "O painel mostra o total em aberto, os vencidos corrigidos com multa e juros e as pendências críticas, a partir do número de dias de atraso que você escolhe.",
+      "Na visão por cobrador, cada um tem o que está em aberto e o que foi recuperado.",
+      "A Carteira separa os títulos por tipo: a vencer, vencidos, em negociação, pagos.",
+    ],
+    perguntas: [
+      {
+        pergunta: "Qual é uma taxa de inadimplência normal?",
+        resposta:
+          "Depende muito do setor, do tipo de cliente e do prazo de venda, e não há um número único. O mais útil é comparar a sua taxa com ela mesma, mês a mês, usando sempre o mesmo critério e a mesma data de corte.",
+      },
+      {
+        pergunta: "Devo incluir multa e juros no cálculo?",
+        resposta:
+          "Para medir a inadimplência, não: use o valor original dos títulos, para que um mês seja comparável com outro. Multa e juros entram no valor que você cobra, não no indicador.",
+      },
+      {
+        pergunta: "Qual a diferença entre inadimplência e atraso?",
+        resposta:
+          "Na prática, muitas empresas chamam de atraso o título vencido há poucos dias e de inadimplência o que passou de um prazo (por exemplo, 30 ou 90 dias). Defina o seu corte e use sempre o mesmo.",
+      },
+    ],
+  },
 ];

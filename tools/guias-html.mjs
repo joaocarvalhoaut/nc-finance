@@ -163,7 +163,10 @@ export function renderGuia(g, c) {
     ],
   };
 
-  const outros = c.guias.filter((o) => o.slug !== g.slug);
+  // Até 5 outros guias, começando pelo seguinte a este (em rodízio): cada
+  // página aponta para guias diferentes e todos recebem links internos.
+  const i = c.guias.findIndex((o) => o.slug === g.slug);
+  const outros = [...c.guias.slice(i + 1), ...c.guias.slice(0, i)].slice(0, 5);
 
   return `${cabecalho({ titulo: g.tituloSeo, descricao: g.descricao, url, publicado: g.publicadoEm, atualizado: g.atualizadoEm, tipo: "article" })}
     ${jsonLdScript(ld)}
