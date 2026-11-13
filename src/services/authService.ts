@@ -49,6 +49,11 @@ export const signUp = async ({ email, password, name, captchaToken }: SignUpPayl
     password,
     options: {
       ...(captchaToken ? { captchaToken } : {}),
+      // O link de confirmação volta para a raiz do site (como a recuperação de
+      // senha), e não para a Site URL do painel: o app só vive em "/", e
+      // qualquer outro caminho é 404. Fora da lista de redirects, o Supabase
+      // usa a Site URL.
+      ...(typeof window !== "undefined" ? { emailRedirectTo: window.location.origin } : {}),
       data: {
         full_name: name.trim(),
         accepted_terms_at: new Date().toISOString(),
