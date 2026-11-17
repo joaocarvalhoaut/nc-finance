@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildContactSyncBatches, contactKeyFromName, mapaDeTelefonesConhecidos } from '../src/services/contactSync';
+import { acharTelefoneConhecido, buildContactSyncBatches, chaveDeSugestao, contactKeyFromName, mapaDeTelefonesConhecidos } from '../src/services/contactSync';
 import type { Debtor } from '../src/types';
 
 const REP_A = '11111111-1111-4111-8111-111111111111';
@@ -87,6 +87,44 @@ assert.equal(contactKeyFromName('João-Silva'), contactKeyFromName('JOAO SILVA')
     [devedor('Joao Silva', '77999137848')],
   );
   assert.equal(mapa.get(contactKeyFromName('Joao Silva'))?.phone, '77999137848');
+}
+
+// CPF/CNPJ colado no nome não impede a sugestão; número curto continua valendo.
+assert.equal(chaveDeSugestao('CARLOS MENDES ROCHA 12345678909'), 'carlos mendes rocha');
+assert.equal(chaveDeSugestao('Carlos Mendes Rocha - 123.456.789-09'), 'carlos mendes rocha');
+assert.equal(chaveDeSugestao('Loja 2'), 'loja 2');
+// Tipo de empresa no fim não conta.
+assert.equal(chaveDeSugestao('ALFA MOVEIS E ELETRO LTDA'), chaveDeSugestao('Alfa Moveis e Eletro EIRELI'));
+assert.equal(chaveDeSugestao('Mercado Bom Preco S/A'), 'mercado bom preco');
+assert.equal(chaveDeSugestao('LTDA'), 'ltda');
+
+{
+  const mapa = mapaDeTelefonesConhecidos([], [
+    devedor('CARLOS MENDES ROCHA', '77900001111'),
+    devedor('BETA MATERIAIS DE CONSTRUCAO', '77988881111'),
+    devedor('Joao Pedro Lima', '77911110000'),
+    devedor('Joao Pedro Santos', '77922220000'),
+  ]);
+  const cpf = acharTelefoneConhecido(mapa, 'CARLOS MENDES ROCHA 12345678909');
+  assert.equal(cpf?.tipo, 'exato', 'CPF no nome do arquivo');
+  assert.equal(cpf?.contato.phone, '77900001111');
+
+  // Nome cortado pelo relatório, nos dois sentidos.
+  assert.equal(acharTelefoneConhecido(mapa, 'CARLOS MENDES ROC')?.tipo, 'parecido');
+  assert.equal(acharTelefoneConhecido(mapa, 'BETA MATERIAIS DE CONSTRUCAO LTDA')?.contato.phone, '77988881111');
+
+  // Carteira com nome cortado, arquivo com nome completo + LTDA.
+  {
+    const m = mapaDeTelefonesConhecidos([], [devedor('ALFA MOVEIS E ELETRO', '77900002222')]);
+    assert.equal(acharTelefoneConhecido(m, 'ALFA MOVEIS E ELETRO LTDA')?.contato.phone, '77900002222');
+    const cortado = mapaDeTelefonesConhecidos([], [devedor('ALFA MOVEI', '77900002222')]);
+    assert.equal(acharTelefoneConhecido(cortado, 'ALFA MOVEIS E ELETRO LTDA')?.tipo, 'parecido');
+  }
+
+  // Dois clientes diferentes começam igual: não sugere nenhum.
+  assert.equal(acharTelefoneConhecido(mapa, 'Joao Pedro'), null);
+  // Uma palavra só não basta para "parecido".
+  assert.equal(acharTelefoneConhecido(mapa, 'Beta'), null);
 }
 
 console.log('PASS: aprendizado de contatos preserva o representante existente.');

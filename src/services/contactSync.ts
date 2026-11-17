@@ -33,6 +33,64 @@ export interface ContatoConhecido {
 }
 
 /**
+ * Chave do nome para SUGESTÃO de telefone: a de contactKeyFromName sem
+ * CPF/CNPJ ou código colado no nome ("CARLOS MENDES ROCHA 123.456.789-09" =
+ * "Carlos Mendes Rocha"). Sequência de números com 8+ dígitos sai; número
+ * curto fica ("Loja 2" ≠ "Loja 3"). Tipo de empresa no fim (LTDA, ME,
+ * EIRELI, S/A…) também sai. Não serve de contact_key no banco.
+ */
+export function chaveDeSugestao(nome: string): string {
+  const out: string[] = [];
+  let numeros: string[] = [];
+  const fechar = () => {
+    if (numeros.join("").length < 8) out.push(...numeros);
+    numeros = [];
+  };
+  for (const t of contactKeyFromName(nome).split(" ")) {
+    if (!t) continue;
+    if (/^\d+$/.test(t)) { numeros.push(t); continue; }
+    fechar();
+    out.push(t);
+  }
+  fechar();
+  // Tipo de empresa no fim não diferencia cliente: "Alfa Moveis LTDA" =
+  // "Alfa Moveis ME". Fica ao menos uma palavra.
+  while (out.length > 1 && TIPO_DE_EMPRESA.has(out[out.length - 1])) out.pop();
+  if (out.length > 2 && out[out.length - 2] === "s" && out[out.length - 1] === "a") out.splice(-2); // S/A, S.A.
+  return out.join(" ");
+}
+
+const TIPO_DE_EMPRESA = new Set(["ltda", "me", "epp", "eireli", "mei", "sa", "cia", "slu"]);
+
+/**
+ * Acha o telefone conhecido de um nome no mapa de mapaDeTelefonesConhecidos.
+ *
+ *  - exato: mesma chave (sem acento, caixa, pontuação e CPF/CNPJ);
+ *  - parecido: um nome é o começo do outro — relatório que corta o nome
+ *    ("CARLOS MENDES ROC") ou nome sem o último sobrenome. O mais curto
+ *    precisa de 2+ palavras e 10+ letras, e só vale com UM candidato.
+ */
+export function acharTelefoneConhecido(
+  mapa: Map<string, ContatoConhecido>,
+  nome: string,
+): { contato: ContatoConhecido; tipo: "exato" | "parecido" } | null {
+  const k = chaveDeSugestao(nome);
+  if (!k) return null;
+  const exato = mapa.get(k);
+  if (exato) return { contato: exato, tipo: "exato" };
+
+  const serve = (curta: string) => curta.length >= 10 && curta.includes(" ");
+  let achado: ContatoConhecido | null = null;
+  for (const [ck, c] of mapa) {
+    const parecido = (serve(k) && ck.startsWith(k)) || (serve(ck) && k.startsWith(ck));
+    if (!parecido) continue;
+    if (achado && achado.phone.replace(/\D/g, "") !== c.phone.replace(/\D/g, "")) return null; // ambíguo
+    achado = achado ?? c;
+  }
+  return achado ? { contato: achado, tipo: "parecido" } : null;
+}
+
+/**
  * Telefones conhecidos por cliente, para sugerir em importação e cadastro.
  *
  * Duas fontes:
@@ -43,6 +101,8 @@ export interface ContatoConhecido {
  *
  * Entre títulos do mesmo cliente com números diferentes vale o primeiro da
  * lista (quem chama passa a carteira antes dos arquivados).
+ *
+ * A chave do mapa é chaveDeSugestao — buscar com acharTelefoneConhecido.
  */
 export function mapaDeTelefonesConhecidos(
   contatos: Iterable<ContatoConhecido>,
@@ -51,12 +111,13 @@ export function mapaDeTelefonesConhecidos(
   const mapa = new Map<string, ContatoConhecido>();
   for (const t of titulos) {
     if (!hasValidPhone(t.phone)) continue;
-    const key = contactKeyFromName(t.client);
+    const key = chaveDeSugestao(t.client);
     if (!key || mapa.has(key)) continue;
-    mapa.set(key, { contactKey: key, clientName: t.client.trim(), phone: t.phone.trim() });
+    mapa.set(key, { contactKey: contactKeyFromName(t.client), clientName: t.client.trim(), phone: t.phone.trim() });
   }
   for (const c of contatos) {
-    if (c.contactKey && hasValidPhone(c.phone)) mapa.set(c.contactKey, c);
+    const key = chaveDeSugestao(c.contactKey);
+    if (key && hasValidPhone(c.phone)) mapa.set(key, c);
   }
   return mapa;
 }

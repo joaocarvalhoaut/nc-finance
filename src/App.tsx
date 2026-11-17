@@ -28,7 +28,7 @@ import { financeService } from "./services/financeService";
 import { cobradoresService } from "./services/cobradoresService";
 import { representativesService } from "./services/representativesService";
 import { contactsService, contactKeyFromName, type Contact } from "./services/contactsService";
-import { hasValidPhone, mapaDeTelefonesConhecidos } from "./services/contactSync";
+import { acharTelefoneConhecido, chaveDeSugestao, hasValidPhone, mapaDeTelefonesConhecidos } from "./services/contactSync";
 import { BillingError, subscriptionService } from "./services/subscriptionService";
 import { isStripeLegacy, STRIPE_LEGACY_CUTOFF } from "../supabase/functions/_shared/billingStatus.ts";
 import { userConfigService, MENSAGEM_PADRAO_KEY } from "./services/userConfigService";
@@ -378,11 +378,11 @@ export default function App() {
   // tem telefone salvo. "Agora não" vale até ler o próximo arquivo.
   const [sugestaoTelefoneDispensada, setSugestaoTelefoneDispensada] = useState(false);
   const sugestoesTelefoneImport = useMemo(() => {
-    const porId = new Map<string, string>();
+    const porId = new Map<string, { phone: string; parecido: boolean }>();
     for (const d of extractedDebtors) {
       if (hasValidPhone(d.phone)) continue;
-      const tel = telefonesConhecidos.get(contactKeyFromName(d.client))?.phone;
-      if (tel) porId.set(d.id, tel);
+      const achado = acharTelefoneConhecido(telefonesConhecidos, d.client);
+      if (achado) porId.set(d.id, { phone: achado.contato.phone, parecido: achado.tipo === "parecido" });
     }
     return porId;
   }, [extractedDebtors, telefonesConhecidos]);
@@ -1822,8 +1822,8 @@ export default function App() {
   // pessoa digitou depois da leitura não é sobrescrito.
   const aplicarSugestoesTelefoneImport = () => {
     setExtractedDebtors(prev => prev.map(d => {
-      const tel = sugestoesTelefoneImport.get(d.id);
-      return tel && !hasValidPhone(d.phone) ? { ...d, phone: tel } : d;
+      const sugestao = sugestoesTelefoneImport.get(d.id);
+      return sugestao && !hasValidPhone(d.phone) ? { ...d, phone: sugestao.phone } : d;
     }));
     setSugestaoTelefoneDispensada(true);
   };
@@ -3780,14 +3780,20 @@ export default function App() {
                               <p className="text-sm text-emerald-100 flex-1">
                                 {(() => {
                                   // Conta clientes, não títulos: o mesmo cliente com 3 boletos é 1.
-                                  const clientes = new Set(
-                                    extractedDebtors.filter(d => sugestoesTelefoneImport.has(d.id)).map(d => contactKeyFromName(d.client)),
+                                  const sugeridos = extractedDebtors.filter(d => sugestoesTelefoneImport.has(d.id));
+                                  const clientes = new Set(sugeridos.map(d => chaveDeSugestao(d.client))).size;
+                                  const parecidos = new Set(
+                                    sugeridos.filter(d => sugestoesTelefoneImport.get(d.id)?.parecido).map(d => chaveDeSugestao(d.client)),
                                   ).size;
                                   const titulos = sugestoesTelefoneImport.size;
                                   const quem = clientes === 1
                                     ? "1 cliente já tem telefone salvo no sistema"
                                     : `${clientes} clientes já têm telefone salvo no sistema`;
-                                  return titulos > clientes ? `${quem} (${titulos} registros sem telefone).` : `${quem}.`;
+                                  const detalhe = [
+                                    titulos > clientes ? `${titulos} registros sem telefone` : "",
+                                    parecidos > 0 ? `${parecidos} por nome parecido, confira` : "",
+                                  ].filter(Boolean).join("; ");
+                                  return detalhe ? `${quem} (${detalhe}).` : `${quem}.`;
                                 })()}{" "}
                                 Deseja preencher os telefones automaticamente?
                               </p>
@@ -5346,7 +5352,7 @@ export default function App() {
                     { value: "liquidado", label: "Liquidação", cor: "#059669", description: "Sem cobrança" },
                     { value: "pago_banco", label: "Pago pro banco", cor: CATEGORY_COR.pago_banco, description: "Sem cobrança" },
                   ] as const;
-                  const match = telefonesConhecidos.get(contactKeyFromName(addDebtorForm.client));
+                  const match = acharTelefoneConhecido(telefonesConhecidos, addDebtorForm.client)?.contato;
                   const sugerirTelefone = Boolean(
                     match?.phone && addDebtorForm.phone.replace(/\D/g, "").length < 10 && addDebtorForm.client.trim().length >= 3,
                   );

@@ -43,8 +43,8 @@ import {
 import { whatsappGatewayService } from "../services/whatsappGatewayService";
 import { whatsappBatchService, type BatchChargeResult } from "../services/whatsappBatchService";
 import { financeService } from "../services/financeService";
-import { contactsService, contactKeyFromName } from "../services/contactsService";
-import { hasValidPhone, type ContatoConhecido } from "../services/contactSync";
+import { contactsService } from "../services/contactsService";
+import { acharTelefoneConhecido, chaveDeSugestao, hasValidPhone, type ContatoConhecido } from "../services/contactSync";
 import { billingLogsService } from "../services/billingLogsService";
 import { pilotService } from "../services/pilotService";
 import { ACEITA_IMPORTACAO, interpretarDocumento, lerArquivo } from "../services/localDocumentExtraction";
@@ -333,8 +333,7 @@ export default function ClientDashboard({
         for (const d of extracted) {
           const missingPhone = !d.phone || d.phone.replace(/\D/g, "").length < 10;
           if (!missingPhone) continue;
-          const match = knownContacts.get(contactKeyFromName(d.client));
-          if (match && match.phone) suggestIds.add(d.id);
+          if (acharTelefoneConhecido(knownContacts, d.client)) suggestIds.add(d.id);
         }
       }
       setPhoneSuggestIds(suggestIds);
@@ -359,8 +358,8 @@ export default function ClientDashboard({
       if (!phoneSuggestIds.has(d.id)) return d;
       // Telefone digitado depois da sugestão não é sobrescrito.
       if (hasValidPhone(d.phone)) return d;
-      const match = knownContacts.get(contactKeyFromName(d.client));
-      return match && match.phone ? { ...d, phone: match.phone } : d;
+      const match = acharTelefoneConhecido(knownContacts, d.client);
+      return match ? { ...d, phone: match.contato.phone } : d;
     }));
     setPhoneSuggestIds(new Set());
     setPhoneSuggestDismissed(true);
@@ -800,12 +799,20 @@ export default function ClientDashboard({
               <p className="text-sm text-emerald-100 flex-1">
                 {(() => {
                   // Conta clientes, não títulos: o mesmo cliente com 3 boletos é 1.
-                  const clientes = new Set(debtors.filter(d => phoneSuggestIds.has(d.id)).map(d => contactKeyFromName(d.client))).size;
+                  const sugeridos = debtors.filter(d => phoneSuggestIds.has(d.id));
+                  const clientes = new Set(sugeridos.map(d => chaveDeSugestao(d.client))).size;
+                  const parecidos = new Set(sugeridos
+                    .filter(d => knownContacts && acharTelefoneConhecido(knownContacts, d.client)?.tipo === "parecido")
+                    .map(d => chaveDeSugestao(d.client))).size;
                   const titulos = phoneSuggestIds.size;
                   const quem = clientes === 1
                     ? "1 cliente já tem telefone salvo no sistema"
                     : `${clientes} clientes já têm telefone salvo no sistema`;
-                  return titulos > clientes ? `${quem} (${titulos} títulos sem telefone).` : `${quem}.`;
+                  const detalhe = [
+                    titulos > clientes ? `${titulos} títulos sem telefone` : "",
+                    parecidos > 0 ? `${parecidos} por nome parecido, confira` : "",
+                  ].filter(Boolean).join("; ");
+                  return detalhe ? `${quem} (${detalhe}).` : `${quem}.`;
                 })()}{" "}
                 Deseja preencher os telefones automaticamente?
               </p>
