@@ -40,6 +40,7 @@ import { validateNewAutomationRule } from "./utils/automationValidation";
 import { isBrazilHoliday, getBrazilHolidayName, isBusinessDay } from "./utils/brazilHolidays";
 import { getMessageTemplate } from "./utils/messageTemplates";
 import { chaveDoTitulo, docBase, nomeBase, repetidosNaCarteira, semRepetidos } from "./utils/tituloUnico";
+import { separarImportacao } from "./utils/mesclarTitulo";
 import { chaveDeAgrupamento, preencherMensagem } from "../supabase/functions/_shared/agrupamento.ts";
 import { hojeLocal, noPrazoDoDiaUtil, ymdDeDataBr } from "../supabase/functions/_shared/diasUteis.ts";
 import {
@@ -1861,21 +1862,35 @@ export default function App() {
   // vezes: no arquivo fica o primeiro; o que já está na carteira é atualizado.
   const doSendToOverview = async (toSend: typeof extractedDebtors) => {
     const { lista, removidos } = semRepetidos(toSend);
-    const chavesCarteira = new Set(debtors.map(chaveDoTitulo).filter(Boolean));
-    const jaNaCarteira = lista.filter((d) => { const k = chaveDoTitulo(d); return !!k && chavesCarteira.has(k); }).length;
     const finalList = alinharComCarteira(importCobrador ? lista.map((d) => ({ ...d, cobradorId: importCobrador })) : lista);
+    // Mesma regra do createMany (utils/mesclarTitulo.ts), só para o aviso:
+    // novo, igual (duplicata, não grava) ou atualizado (mantém o resto).
+    const separacao = separarImportacao(finalList, [...debtors, ...arquivados]);
 
     try {
       const savedDebtors = await financeService.createMany(currentOwnerUserId!, finalList);
       setDebtors((prev) => mesclarDevedores(prev, savedDebtors, "fim"));
+      // Arquivado que voltou no relatório saiu dos arquivados no banco.
+      const idsSalvos = new Set(savedDebtors.map((d) => d.id));
+      setArquivados((prev) => prev.filter((a) => !idsSalvos.has(a.id)));
       const sentIds = new Set(toSend.map(d => d.id));
       setExtractedDebtors(prev => prev.filter(d => !sentIds.has(d.id)));
       setExtractedSelectedIds(new Set());
+      const plural = (n: number, um: string, varios: string) => (n === 1 ? um : varios);
+      const nNovos = separacao.novos.length;
+      const nIguais = separacao.iguais.length;
+      const nAtualizados = separacao.atualizar.length;
       const partes = [
-        removidos > 0 ? `${removidos} título${removidos === 1 ? "" : "s"} repetido${removidos === 1 ? "" : "s"} no arquivo ficou de fora` : "",
-        jaNaCarteira > 0 ? `${jaNaCarteira} já estava${jaNaCarteira === 1 ? "" : "m"} na carteira e foi atualizado${jaNaCarteira === 1 ? "" : "s"}, sem criar outro` : "",
+        nNovos > 0 && (nIguais > 0 || nAtualizados > 0)
+          ? `${nNovos} ${plural(nNovos, "título novo entrou", "títulos novos entraram")}` : "",
+        nIguais > 0
+          ? `${nIguais} já ${plural(nIguais, "estava", "estavam")} na carteira ${plural(nIguais, "igual", "iguais")}: nada mudou` : "",
+        nAtualizados > 0
+          ? `${nAtualizados} já ${plural(nAtualizados, "estava", "estavam")} na carteira e ${plural(nAtualizados, "foi atualizado", "foram atualizados")} (valor, tipo ou dado novo), mantendo telefone, observações e envios`
+            + (separacao.voltaram > 0 ? `; ${separacao.voltaram} ${plural(separacao.voltaram, "voltou", "voltaram")} dos arquivados` : "") : "",
+        removidos > 0 ? `${removidos} ${plural(removidos, "título repetido", "títulos repetidos")} no próprio arquivo ${plural(removidos, "ficou", "ficaram")} de fora` : "",
       ].filter(Boolean);
-      setAvisoImportacao(partes.length ? `${partes.join(". ")}. Mesmo cliente, documento e vencimento é o mesmo título.` : "");
+      setAvisoImportacao(partes.length ? `${partes.join(". ")}. Mesmo cliente, documento e vencimento é o mesmo título; documento ou vencimento diferente é título novo.` : "");
       if (extractedDebtors.length === toSend.length) {
         setImportFileName("");
         setImportDoc(null);

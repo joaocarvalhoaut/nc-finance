@@ -3,6 +3,7 @@ import { getSupabaseClient } from "./supabaseClient";
 import { ensureNinthDigit } from "../../supabase/functions/_shared/brPhone.ts";
 import { normalizarDigitosTelefone } from "./localDocumentExtraction/regexExtractors";
 import { semRepetidos } from "../utils/tituloUnico";
+import { separarImportacao } from "../utils/mesclarTitulo";
 
 type FinancialCategory = "vencidos" | "a_vencer" | "recompra" | "em_negociacao" | "liquidado" | "pago_banco" | "desabilitado";
 type FinancialStatus = "pending" | "sent" | "failed";
@@ -246,10 +247,18 @@ export const financeService = {
     const withoutDoc = debtors.filter(d => !d.document?.trim());
 
     const results: FinancialRecordRow[] = [];
+    // Duplicatas (título já gravado, nada mudou) não são regravadas.
+    let iguais: Debtor[] = [];
 
     // Upsert por (user_id, document_number) — evita duplicatas em reimportações
     if (withDoc.length) {
-      const rawWithDoc = withDoc.map((debtor) => {
+      // Título que já existe: só grava se o arquivo muda algo, e mantém o que
+      // o arquivo não traz (telefone, observações, banco, situação, último
+      // envio) — utils/mesclarTitulo.ts. Documento novo continua sendo criado.
+      const separacao = separarImportacao(withDoc, await financeService.listByUser(userId));
+      iguais = separacao.iguais;
+      const gravarComDoc = [...separacao.novos, ...separacao.atualizar];
+      const rawWithDoc = gravarComDoc.map((debtor) => {
         const row = mapDebtorToRow(userId, debtor);
         if (debtor.representativeId && !row.representative_id) {
           console.warn("[finance.write] representativeId invalido ignorado");
@@ -300,18 +309,21 @@ export const financeService = {
         return r;
       };
 
-      let { data, error } = await gravarTudo(
-        comSufixo((r) => `${r.document_number}|${r.client_name}|${r.due_date}`),
-        "user_id,document_number,client_name,due_date",
-      );
-      // Antes da migration a chave do banco é só (user_id, document_number):
-      // volta à regra antiga para a importação não parar.
-      if (error && (error.code === "42P10" || /no unique or exclusion constraint/i.test(error.message ?? ""))) {
-        ({ data, error } = await gravarTudo(comSufixo((r) => String(r.document_number)), "user_id,document_number"));
-      }
+      // Tudo duplicata: nada a gravar.
+      if (rawWithDoc.length) {
+        let { data, error } = await gravarTudo(
+          comSufixo((r) => `${r.document_number}|${r.client_name}|${r.due_date}`),
+          "user_id,document_number,client_name,due_date",
+        );
+        // Antes da migration a chave do banco é só (user_id, document_number):
+        // volta à regra antiga para a importação não parar.
+        if (error && (error.code === "42P10" || /no unique or exclusion constraint/i.test(error.message ?? ""))) {
+          ({ data, error } = await gravarTudo(comSufixo((r) => String(r.document_number)), "user_id,document_number"));
+        }
 
-      if (error) throw new Error(error.message || "Falha ao salvar registros com documento.");
-      results.push(...((data || []) as FinancialRecordRow[]));
+        if (error) throw new Error(error.message || "Falha ao salvar registros com documento.");
+        results.push(...((data || []) as FinancialRecordRow[]));
+      }
     }
 
     // Insert simples para registros sem document_number (não há como deduplicar)
@@ -334,7 +346,7 @@ export const financeService = {
       results.push(...((data || []) as FinancialRecordRow[]));
     }
 
-    return results.map(mapRowToDebtor);
+    return [...results.map(mapRowToDebtor), ...iguais];
   },
 
   async update(userId: string, debtor: Debtor) {

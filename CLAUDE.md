@@ -103,6 +103,10 @@ Multi-tenant, dados financeiros de terceiros → **privacidade e segurança são
   (`supabase/functions/_shared/tituloUnico.ts`, cópia da do front). Edição direta na Carteira é livre
   (decisão do dono). No banco: constraint `uq_urf_user_doc_cliente_venc`
   (migration `20261106120000`, valores exatos); `createMany` cai na chave antiga se ela não rodou.
+  **Reimportar** (17/11/2026, `src/utils/mesclarTitulo.ts`, usado no `createMany`): título que chega é
+  novo (cria), igual (duplicata: não grava nada) ou atualização (grava valor/tipo/dado novo e MANTÉM
+  telefone, observações, banco, situação e último envio que o arquivo não traz). Antes o upsert gravava
+  a linha inteira e apagava o telefone de quem reimportava relatório sem telefone.
 - **Proteção do número contra bloqueio** (pedido do dono, feito em 04–05/11/2026). A Meta não publica
   teto para o WhatsApp comum (Z-API): o bloqueio vem de denúncias, pico de volume e envio para quem
   nunca falou com o número.
