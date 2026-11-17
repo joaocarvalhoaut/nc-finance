@@ -479,6 +479,8 @@ export default function App() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [repFilter, setRepFilter] = useState<string>("all");
+  // WhatsApp: "sem" = sem número válido (menos de 10 dígitos), "com" = com número.
+  const [telefoneFilter, setTelefoneFilter] = useState<"all" | "sem" | "com">("all");
   const [sortNameOrder, setSortNameOrder] = useState<"none" | "asc" | "desc">("asc");
   const [sortDateOrder, setSortDateOrder] = useState<"none" | "asc" | "desc">("none");
   const [sortBankOrder, setSortBankOrder] = useState<"none" | "asc" | "desc">("none");
@@ -2778,6 +2780,9 @@ export default function App() {
     return m ? `bg-${m[1]}-500` : "bg-zinc-500";
   };
 
+  // Quantos títulos da aba de cobrador atual estão sem telefone (rótulo do filtro).
+  const semTelefoneCount = debtors.filter(d => doCobrador(d, cobradorFiltro) && !hasValidPhone(d.phone)).length;
+
   // Apply filters to display debtors lists
   const filteredDebtors = (() => {
     const filtered = debtors.filter(d => {
@@ -2788,7 +2793,8 @@ export default function App() {
       const matchesStatus = statusFilter === "all" ? true : d.status === statusFilter;
       const matchesRep = repFilter === "all" ? true : repFilter === "unassigned" ? !d.representativeId : d.representativeId === repFilter;
       const matchesCobrador = doCobrador(d, cobradorFiltro);
-      return matchesSearch && matchesCategory && matchesStatus && matchesRep && matchesCobrador;
+      const matchesTelefone = telefoneFilter === "all" ? true : (telefoneFilter === "sem") !== hasValidPhone(d.phone);
+      return matchesSearch && matchesCategory && matchesStatus && matchesRep && matchesCobrador && matchesTelefone;
     });
     const cmp = (a: string, b: string) =>
       a.trim().localeCompare(b.trim(), "pt-BR", { sensitivity: "base", ignorePunctuation: true });
@@ -4595,6 +4601,13 @@ export default function App() {
                             <option value="valor_desc">Maior valor</option>
                             <option value="valor_asc">Menor valor</option>
                           </select>
+                          <select aria-label="Filtrar por telefone" value={telefoneFilter}
+                            onChange={(e) => setTelefoneFilter(e.target.value as "all" | "sem" | "com")}
+                            className={`${filtroCls} col-span-2 ${telefoneFilter !== "all" ? "border-emerald-500/50 text-emerald-300" : ""}`}>
+                            <option value="all">Com e sem telefone</option>
+                            <option value="sem">Sem telefone ({semTelefoneCount})</option>
+                            <option value="com">Com telefone</option>
+                          </select>
                         </div>
                         <div className="flex items-center justify-between px-1 py-1">
                           <button
@@ -4924,7 +4937,23 @@ export default function App() {
                                 </span>
                               </button>
                             </th>
-                            <th className="px-4 py-3 text-center">WHATSAPP</th>
+                            {/* WhatsApp — com filtro inline (sem telefone / com telefone) */}
+                            <th className="px-4 py-2 text-center">
+                              <div className="flex flex-col items-center gap-1.5">
+                                <span>WHATSAPP</span>
+                                <select
+                                  aria-label="Filtrar por telefone"
+                                  value={telefoneFilter}
+                                  onChange={(e) => setTelefoneFilter(e.target.value as "all" | "sem" | "com")}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className={`bg-zinc-900 border rounded-lg text-[9px] px-1.5 py-0.5 cursor-pointer transition-colors focus:outline-none normal-case tracking-normal font-normal ${telefoneFilter !== "all" ? "border-emerald-500/50 text-emerald-300" : "border-zinc-700 text-zinc-400"}`}
+                                >
+                                  <option value="all">Todos</option>
+                                  <option value="sem">Sem telefone ({semTelefoneCount})</option>
+                                  <option value="com">Com telefone</option>
+                                </select>
+                              </div>
+                            </th>
                             <th className="px-4 py-3 text-right">
                               <button
                                 type="button"
