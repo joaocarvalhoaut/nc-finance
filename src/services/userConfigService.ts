@@ -206,15 +206,17 @@ export const userConfigService = {
    * Grava a mensagem padrão do usuário (Preparar envios) sem tocar nos modelos
    * de tom: linha própria em user_message_templates, template_key "padrao".
    */
-  async saveDefaultMessage(userId: string, template: string) {
+  async saveDefaultMessage(userId: string, template: string, tipo = "") {
     const supabase = getSupabaseClient();
     const { error } = await supabase
       .from(MESSAGE_TEMPLATES_TABLE)
       .upsert({
         user_id: userId,
-        template_key: MENSAGEM_PADRAO_KEY,
-        name: "Mensagem padrão",
-        description: "Texto do usuário aplicado a todos os clientes em Preparar envios",
+        template_key: chaveDaMensagemPadrao(tipo),
+        name: tipo ? `Mensagem padrão (${tipo})` : "Mensagem padrão",
+        description: tipo
+          ? "Texto do usuário para este tipo de título em Preparar envios"
+          : "Texto do usuário aplicado a todos os clientes em Preparar envios",
         template,
         is_default: false,
       }, { onConflict: "user_id,template_key" });
@@ -222,8 +224,36 @@ export const userConfigService = {
     if (error) {
       throw new Error(error.message || "Falha ao salvar a mensagem padrão.");
     }
+  },
+
+  /** Apaga a mensagem própria de um tipo: ele volta a usar a geral. */
+  async deleteDefaultMessage(userId: string, tipo: string) {
+    if (!tipo) return; // a geral não é apagada por aqui
+    const supabase = getSupabaseClient();
+    const { error } = await supabase
+      .from(MESSAGE_TEMPLATES_TABLE)
+      .delete()
+      .eq("user_id", userId)
+      .eq("template_key", chaveDaMensagemPadrao(tipo));
+
+    if (error) {
+      throw new Error(error.message || "Falha ao apagar a mensagem.");
+    }
   }
 };
 
 /** template_key da mensagem padrão do usuário — não é um tom. */
 export const MENSAGEM_PADRAO_KEY = "padrao";
+
+/**
+ * Mensagem padrão por tipo de título: "padrao" = geral (todos os tipos);
+ * "padrao:vencidos", "padrao:a_vencer"… = texto próprio daquele tipo.
+ */
+export const chaveDaMensagemPadrao = (tipo: string): string =>
+  tipo ? `${MENSAGEM_PADRAO_KEY}:${tipo}` : MENSAGEM_PADRAO_KEY;
+
+/** "" para a geral, a categoria para as de tipo, null se não é mensagem padrão (é um tom). */
+export const tipoDaMensagemPadrao = (templateKey: string): string | null =>
+  templateKey === MENSAGEM_PADRAO_KEY ? ""
+    : templateKey.startsWith(`${MENSAGEM_PADRAO_KEY}:`) ? templateKey.slice(MENSAGEM_PADRAO_KEY.length + 1)
+    : null;

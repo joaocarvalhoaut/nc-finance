@@ -111,6 +111,7 @@ const PERGUNTAS: Pergunta[] = [
     pergunta: "Posso usar uma mensagem minha para todos os clientes?",
     resposta:
       "Sim. Em Preparar envios, escolha “Minha mensagem”, escreva o texto uma vez e salve. Os botões de campo (Nome, Documento, Vencimento, Valor, Dias de atraso, Empresa) entram no texto e são trocados pelos dados de cada título.\n" +
+      "Dá para ter uma mensagem por tipo de título: no editor, escolha Vencidos, A vencer, Recompra ou Em negociação e salve o texto daquele tipo. Tipo sem texto próprio usa a mensagem Geral.\n" +
       "Ao clicar em cada cliente, a mensagem já aparece preenchida para ele; dá para ajustar o texto antes de enviar.",
   },
   {

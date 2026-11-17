@@ -31,7 +31,7 @@ import { contactsService, contactKeyFromName, type Contact } from "./services/co
 import { acharTelefoneConhecido, chaveDeSugestao, hasValidPhone, mapaDeTelefonesConhecidos } from "./services/contactSync";
 import { BillingError, subscriptionService } from "./services/subscriptionService";
 import { isStripeLegacy, STRIPE_LEGACY_CUTOFF } from "../supabase/functions/_shared/billingStatus.ts";
-import { userConfigService, MENSAGEM_PADRAO_KEY } from "./services/userConfigService";
+import { userConfigService, tipoDaMensagemPadrao } from "./services/userConfigService";
 import { whatsappService, SEND_STATUS_LABELS, type SendChargeStatus } from "./services/whatsappService";
 import { googleSheetsService, type ImportResult as SheetsImportResult, type ExportResult as SheetsExportResult } from "./services/googleSheetsService";
 import { whatsappBatchService, BATCH_TOP_STATUS_LABELS, type BatchChargeResult, type BatchTopStatus } from "./services/whatsappBatchService";
@@ -250,6 +250,15 @@ const mascaraData = (v: string) => {
   if (d.length > 2) return `${d.slice(0, 2)}/${d.slice(2)}`;
   return d;
 };
+/** Abas da "Minha mensagem": "" = geral; as demais são tipos de título cobráveis. */
+const TIPOS_MENSAGEM_PADRAO: ReadonlyArray<readonly [string, string]> = [
+  ["", "Geral"],
+  ["vencidos", "Vencidos"],
+  ["a_vencer", "A vencer"],
+  ["recompra", "Recompra"],
+  ["em_negociacao", "Em negociação"],
+];
+
 const mascaraTelefone = (v: string) => {
   let d = v.replace(/\D/g, "");
   if (d.length > 11 && d.startsWith("55")) d = d.slice(2); // colado com DDI
@@ -519,7 +528,9 @@ export default function App() {
   const [abaEnvio, setAbaEnvio] = useState<"faltam" | "hoje">("faltam");
   // "Enviar todos" (Preparar envios): os títulos do tipo filtrado que faltam
   // cobrar hoje, numa confirmação de lote e depois no send-whatsapp-batch.
-  const [envioTodos, setEnvioTodos] = useState<{ ids: string[]; modelo: string; data: BatchConfirmData } | null>(null);
+  // modeloPorId: texto de cada título (com mensagem por tipo, tipos diferentes
+  // saem com textos diferentes); modelo = o do exemplo mostrado na confirmação.
+  const [envioTodos, setEnvioTodos] = useState<{ ids: string[]; modelo: string; modeloPorId: Record<string, string>; data: BatchConfirmData } | null>(null);
   const [preparandoTodos, setPreparandoTodos] = useState(false);
   const [enviandoTodos, setEnviandoTodos] = useState(false);
   const [resultadoTodos, setResultadoTodos] = useState<BatchChargeResult | null>(null);
@@ -530,9 +541,13 @@ export default function App() {
   const [execucaoAberta, setExecucaoAberta] = useState<string | null>(null);
   const [selectedTone, setSelectedTone] = useState<MessageTone>(DEFAULT_USER_CONFIG.selectedTone);
   const [customMessageDraft, setCustomMessageDraft] = useState<string>("");
-  // Mensagem padrão (Preparar envios): texto do usuário com variáveis, aplicado a
-  // todos os clientes; cada envio continua sendo um por um.
-  const [mensagemPadrao, setMensagemPadrao] = useState<string>("");
+  // Mensagem padrão (Preparar envios): texto do usuário com variáveis. Chave ""
+  // = geral (todos os tipos); "vencidos", "a_vencer"… = texto próprio do tipo,
+  // que vence a geral. Tipo sem texto próprio usa a geral.
+  const [mensagensPadrao, setMensagensPadrao] = useState<Record<string, string>>({});
+  const [tipoDoRascunho, setTipoDoRascunho] = useState<string>(""); // qual delas está em edição
+  const mensagemDoTipo = (categoria?: string): string =>
+    (categoria && mensagensPadrao[categoria]?.trim()) || mensagensPadrao[""]?.trim() || "";
   const [usarPadrao, setUsarPadrao] = useState<boolean>(() => {
     try { return localStorage.getItem("ncf-usar-padrao") === "1"; } catch { return false; }
   });
@@ -856,8 +871,12 @@ export default function App() {
             lastConnectionCheck: null
           }));
         // A mensagem padrão do usuário mora na mesma tabela, mas não é um tom.
-        const padraoSalva = templates.find((t) => (t.templateKey as string) === MENSAGEM_PADRAO_KEY);
-        const tons = templates.filter((t) => (t.templateKey as string) !== MENSAGEM_PADRAO_KEY);
+        const padroesSalvos: Record<string, string> = {};
+        for (const t of templates) {
+          const tipo = tipoDaMensagemPadrao(t.templateKey as string);
+          if (tipo !== null) padroesSalvos[tipo] = t.template;
+        }
+        const tons = templates.filter((t) => tipoDaMensagemPadrao(t.templateKey as string) === null);
         const hydratedTemplates = tons.length
           ? tons
           : await userConfigService.replaceMessageTemplates(currentOwnerUserId, DEFAULT_PATTERNS);
@@ -877,7 +896,7 @@ export default function App() {
         setGlobalInterestDayPctStr(String(hydratedConfig.globalInterestDayPct));
         setSelectedTone(hydratedConfig.selectedTone);
         setSheetUrlInput(hydratedConfig.sheetUrlInput || DEFAULT_USER_CONFIG.sheetUrlInput);
-        setMensagemPadrao(padraoSalva?.template ?? "");
+        setMensagensPadrao(padroesSalvos);
         setPatternTemplates(
           hydratedTemplates.map((template) => ({
             id: template.templateKey,
@@ -1019,19 +1038,30 @@ export default function App() {
   // Sync drafted text message when selected debitor or tone updates
   useEffect(() => {
     if (titulosDaMensagem.length) {
-      setCustomMessageDraft(usarPadrao && mensagemPadrao.trim()
-        ? preencherModelo(mensagemPadrao, titulosDaMensagem)
+      const padrao = usarPadrao ? mensagemDoTipo(titulosDaMensagem[0].category) : "";
+      setCustomMessageDraft(padrao
+        ? preencherModelo(padrao, titulosDaMensagem)
         : buildMessageText(titulosDaMensagem, selectedTone));
     }
-  }, [assinaturaTitulos, selectedTone, globalFinePct, globalInterestDayPct, usarPadrao, mensagemPadrao]);
+  }, [assinaturaTitulos, selectedTone, globalFinePct, globalInterestDayPct, usarPadrao, mensagensPadrao]);
+
+  const modeloDoTom = () => patternTemplates.find((p) => p.id === selectedTone)?.template ?? "";
+
+  // Abre o editor da mensagem de um tipo ("" = geral). Sem texto próprio, parte
+  // da geral; sem geral, do tom atual.
+  const editarMensagemPadrao = (tipo: string) => {
+    setErroPadrao("");
+    setTipoDoRascunho(tipo);
+    setRascunhoPadrao(mensagensPadrao[tipo]?.trim() || mensagensPadrao[""]?.trim() || modeloDoTom());
+  };
 
   const escolherPadrao = (ligar: boolean) => {
     setUsarPadrao(ligar);
     setErroPadrao("");
     try { localStorage.setItem("ncf-usar-padrao", ligar ? "1" : "0"); } catch { /* ignore */ }
-    // Sem mensagem salva, abre o editor partindo do tom atual.
-    if (ligar && !mensagemPadrao.trim()) {
-      setRascunhoPadrao(patternTemplates.find((p) => p.id === selectedTone)?.template ?? "");
+    // Sem mensagem salva, abre o editor da geral partindo do tom atual.
+    if (ligar && !Object.values(mensagensPadrao).some((t) => t.trim())) {
+      editarMensagemPadrao("");
     } else if (!ligar) {
       setRascunhoPadrao(null);
     }
@@ -1056,11 +1086,32 @@ export default function App() {
     setSalvandoPadrao(true);
     setErroPadrao("");
     try {
-      await userConfigService.saveDefaultMessage(currentOwnerUserId, texto);
-      setMensagemPadrao(texto);
+      await userConfigService.saveDefaultMessage(currentOwnerUserId, texto, tipoDoRascunho);
+      setMensagensPadrao((prev) => ({ ...prev, [tipoDoRascunho]: texto }));
       setRascunhoPadrao(null);
     } catch {
       setErroPadrao("Não foi possível salvar a mensagem. Tente de novo.");
+    } finally {
+      setSalvandoPadrao(false);
+    }
+  };
+
+  // Tira o texto próprio de um tipo: ele volta a usar a mensagem geral.
+  const usarGeralNoTipo = async () => {
+    const tipo = tipoDoRascunho;
+    if (!tipo || !currentOwnerUserId) return;
+    setSalvandoPadrao(true);
+    setErroPadrao("");
+    try {
+      if (mensagensPadrao[tipo] !== undefined) await userConfigService.deleteDefaultMessage(currentOwnerUserId, tipo);
+      setMensagensPadrao((prev) => {
+        const resto = { ...prev };
+        delete resto[tipo];
+        return resto;
+      });
+      setRascunhoPadrao(null);
+    } catch {
+      setErroPadrao("Não foi possível apagar a mensagem. Tente de novo.");
     } finally {
       setSalvandoPadrao(false);
     }
@@ -1150,19 +1201,23 @@ export default function App() {
       let conectado = false;
       try { conectado = (await whatsappGatewayService.validateConnection()).connected; } catch { conectado = false; }
 
-      const padraoAtivo = usarPadrao && !!mensagemPadrao.trim();
-      const modelo = padraoAtivo
-        ? mensagemPadrao
-        : patternTemplates.find((p) => p.id === selectedTone)?.template ?? getMessageTemplate(selectedTone);
+      const modeloTom = patternTemplates.find((p) => p.id === selectedTone)?.template ?? getMessageTemplate(selectedTone);
+      // Minha mensagem: cada título usa a do seu tipo (ou a geral); sem nenhuma, o tom.
+      const modeloDe = (d: Debtor) => (usarPadrao && mensagemDoTipo(d.category)) || modeloTom;
+      const modeloPorId = Object.fromEntries(titulos.map((d) => [d.id, modeloDe(d)]));
+      const padraoAtivo = usarPadrao && titulos.some((d) => mensagemDoTipo(d.category));
+      const variosTextos = new Set(Object.values(modeloPorId)).size > 1;
       const temTelefone = (d: Debtor) => (d.phone || "").replace(/\D/g, "").length >= 10;
       const chave = (d: Debtor) => chaveDeAgrupamento(d.client, d.phone || "", d.category) ?? d.id;
       const comTelefone = new Set(titulos.filter(temTelefone).map(chave));
       const semTelefone = new Set(titulos.filter((d) => !temTelefone(d)).map(chave));
       const exemplo = titulos.find(temTelefone) ?? titulos[0];
+      const modelo = modeloDe(exemplo);
 
       setEnvioTodos({
         ids: titulos.map((d) => d.id),
         modelo,
+        modeloPorId,
         data: {
           debtorCount:          comTelefone.size + semTelefone.size,
           validPhoneCount:      comTelefone.size,
@@ -1170,7 +1225,7 @@ export default function App() {
           messagePreview:       modelo,
           messagePreviewFilled: preencherModelo(modelo, grupoDoTitulo(exemplo)),
           sampleDebtorName:     exemplo.client,
-          tone:                 padraoAtivo ? "Mensagem padrão" : patternTemplates.find((p) => p.id === selectedTone)?.name ?? selectedTone,
+          tone:                 variosTextos ? "Minha mensagem, por tipo" : padraoAtivo ? "Mensagem padrão" : patternTemplates.find((p) => p.id === selectedTone)?.name ?? selectedTone,
           toneValue:            selectedTone,
           pilotRemaining:       null,
           whatsappConnected:    conectado,
@@ -1185,13 +1240,15 @@ export default function App() {
 
   const confirmarEnvioTodos = async (editada?: string | null) => {
     if (!envioTodos) return;
-    const { ids, modelo } = envioTodos;
+    const { ids, modelo, modeloPorId } = envioTodos;
     setEnvioTodos(null);
     setEnviandoTodos(true);
     try {
       // Em partes de até ~40 títulos: o servidor espera ~1 s entre mensagens e a
       // função tem tempo limitado. Os títulos do mesmo cliente ficam na mesma
-      // parte, senão sairiam em duas mensagens.
+      // parte, senão sairiam em duas mensagens. Cada parte leva um texto só:
+      // com mensagem por tipo, os tipos vão em partes separadas. Texto editado
+      // na confirmação vale para todos.
       const porId = new Map(debtors.map((d) => [d.id, d]));
       const grupos = new Map<string, string[]>();
       for (const id of ids) {
@@ -1199,13 +1256,22 @@ export default function App() {
         const k = (d && chaveDeAgrupamento(d.client, d.phone || "", d.category)) ?? id;
         grupos.set(k, [...(grupos.get(k) ?? []), id]);
       }
-      const partes: string[][] = [];
-      let atual: string[] = [];
+      const textoDe = (id: string) => editada || modeloPorId[id] || modelo;
+      const porTexto = new Map<string, string[][]>();
       for (const g of grupos.values()) {
-        if (atual.length > 0 && atual.length + g.length > 40) { partes.push(atual); atual = []; }
-        atual.push(...g);
+        const t = textoDe(g[0]);
+        porTexto.set(t, [...(porTexto.get(t) ?? []), g]);
       }
-      if (atual.length) partes.push(atual);
+      const partes: string[][] = [];
+      const textoDaParte: string[] = [];
+      for (const [texto, gs] of porTexto) {
+        let atual: string[] = [];
+        for (const g of gs) {
+          if (atual.length > 0 && atual.length + g.length > 40) { partes.push(atual); textoDaParte.push(texto); atual = []; }
+          atual.push(...g);
+        }
+        if (atual.length) { partes.push(atual); textoDaParte.push(texto); }
+      }
 
       setProgressoTodos({ feitas: 0, total: grupos.size });
       let result: BatchChargeResult | null = null;
@@ -1214,7 +1280,7 @@ export default function App() {
         const r = await whatsappBatchService.sendBatchCharges({
           debtorIds: partes[i],
           tone: selectedTone,
-          customMessage: editada || modelo,
+          customMessage: textoDaParte[i],
         });
         if (!result) result = r;
         else if (r.success) {
@@ -6245,7 +6311,34 @@ export default function App() {
                               <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 space-y-2.5">
                                 <div>
                                   <label htmlFor="mensagem-padrao" className={`${rotulo} block`}>Mensagem padrão</label>
-                                  <p className="text-[11px] text-zinc-500 mt-1">Vale para todos os clientes. Os campos entre chaves são trocados pelos dados de cada título.</p>
+                                  {/* Uma mensagem por tipo de título; "Geral" vale para quem não tem a sua. */}
+                                  <div className="mt-2 flex flex-wrap gap-1.5" role="tablist" aria-label="Tipo de título da mensagem">
+                                    {TIPOS_MENSAGEM_PADRAO.map(([tipo, nome]) => {
+                                      const ativo = tipoDoRascunho === tipo;
+                                      const temPropria = !!mensagensPadrao[tipo]?.trim();
+                                      return (
+                                        <button
+                                          key={tipo || "geral"}
+                                          type="button"
+                                          role="tab"
+                                          aria-selected={ativo}
+                                          onClick={() => editarMensagemPadrao(tipo)}
+                                          className={`px-2.5 py-1 rounded-md border text-[11px] font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                                            ativo ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300" : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                                          }`}
+                                        >
+                                          {nome}
+                                          {tipo && temPropria && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" aria-label="tem mensagem própria" />}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  <p className="text-[11px] text-zinc-500 mt-2">
+                                    {tipoDoRascunho
+                                      ? <>Só para títulos {TIPOS_MENSAGEM_PADRAO.find(([t]) => t === tipoDoRascunho)?.[1].toLowerCase()}. {mensagensPadrao[tipoDoRascunho]?.trim() ? "" : "Ainda sem texto próprio: hoje vale a geral."}</>
+                                      : <>Vale para todos os tipos que não têm mensagem própria.</>}{" "}
+                                    Os campos entre chaves são trocados pelos dados de cada título.
+                                  </p>
                                 </div>
                                 <textarea
                                   id="mensagem-padrao"
@@ -6280,33 +6373,65 @@ export default function App() {
                                 <div className="flex items-center justify-end gap-2">
                                   <button
                                     type="button"
-                                    onClick={() => { setErroPadrao(""); if (mensagemPadrao.trim()) setRascunhoPadrao(null); else escolherPadrao(false); }}
+                                    onClick={() => { setErroPadrao(""); if (Object.values(mensagensPadrao).some((t) => t.trim())) setRascunhoPadrao(null); else escolherPadrao(false); }}
                                     className="px-3 py-1.5 rounded-md text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
                                   >
                                     Cancelar
                                   </button>
+                                  {tipoDoRascunho && mensagensPadrao[tipoDoRascunho] !== undefined && (
+                                    <button
+                                      type="button"
+                                      onClick={() => void usarGeralNoTipo()}
+                                      disabled={salvandoPadrao}
+                                      className="px-3 py-1.5 rounded-md border border-zinc-700 text-xs text-zinc-300 hover:text-white hover:border-zinc-500 disabled:opacity-50 transition-colors cursor-pointer"
+                                      title="Apaga o texto deste tipo; ele passa a usar a mensagem geral"
+                                    >
+                                      Usar a geral
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     onClick={() => void salvarMensagemPadrao()}
                                     disabled={salvandoPadrao}
                                     className="px-3 py-1.5 rounded-md bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black text-xs font-bold transition-colors cursor-pointer"
                                   >
-                                    {salvandoPadrao ? "Salvando…" : "Salvar mensagem padrão"}
+                                    {salvandoPadrao ? "Salvando…" : tipoDoRascunho
+                                      ? `Salvar para ${TIPOS_MENSAGEM_PADRAO.find(([t]) => t === tipoDoRascunho)?.[1].toLowerCase()}`
+                                      : "Salvar mensagem geral"}
                                   </button>
                                 </div>
                               </div>
                             ) : (
                               <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2">
-                                <p className="text-[11px] text-emerald-300/90">
-                                  {mensagemPadrao.trim() ? "Usando sua mensagem padrão em todos os clientes." : "Você ainda não salvou uma mensagem padrão."}
-                                </p>
-                                <button
-                                  type="button"
-                                  onClick={() => { setErroPadrao(""); setRascunhoPadrao(mensagemPadrao || (patternTemplates.find((p) => p.id === selectedTone)?.template ?? "")); }}
-                                  className="text-[11px] text-zinc-300 hover:text-white inline-flex items-center gap-1 transition-colors cursor-pointer flex-shrink-0"
-                                >
-                                  <Pencil className="w-3 h-3" /> {mensagemPadrao.trim() ? "Editar" : "Criar"}
-                                </button>
+                                {(() => {
+                                  const tiposComPropria = TIPOS_MENSAGEM_PADRAO.filter(([t]) => t && mensagensPadrao[t]?.trim());
+                                  const nada = !Object.values(mensagensPadrao).some((t) => t.trim());
+                                  const propriaDoSel = !!(sel?.category && mensagensPadrao[sel.category]?.trim());
+                                  const nomeDoSel = TIPOS_MENSAGEM_PADRAO.find(([t]) => t === sel?.category)?.[1].toLowerCase();
+                                  return (
+                                    <>
+                                      <p className="text-[11px] text-emerald-300/90">
+                                        {nada
+                                          ? "Você ainda não salvou uma mensagem padrão."
+                                          : propriaDoSel
+                                            ? <>Este cliente recebe sua mensagem de títulos {nomeDoSel}.</>
+                                            : mensagensPadrao[""]?.trim()
+                                              ? <>Este cliente recebe sua mensagem geral.</>
+                                              : <>Sem mensagem para títulos {nomeDoSel ?? "deste tipo"}: vai o tom {patternTemplates.find((p) => p.id === selectedTone)?.name ?? selectedTone}.</>}
+                                        {tiposComPropria.length > 0 && (
+                                          <span className="text-zinc-500"> Com mensagem própria: {tiposComPropria.map(([, n]) => n).join(", ")}.</span>
+                                        )}
+                                      </p>
+                                      <button
+                                        type="button"
+                                        onClick={() => editarMensagemPadrao(propriaDoSel && sel ? sel.category : "")}
+                                        className="text-[11px] text-zinc-300 hover:text-white inline-flex items-center gap-1 transition-colors cursor-pointer flex-shrink-0"
+                                      >
+                                        <Pencil className="w-3 h-3" /> {nada ? "Criar" : "Editar"}
+                                      </button>
+                                    </>
+                                  );
+                                })()}
                               </div>
                             ))}
 
@@ -6612,10 +6737,10 @@ export default function App() {
                                     // O banco guarda o começo do texto: se ele bate com "Minha
                                     // mensagem", foi ela que saiu, não o modelo do tom.
                                     const inicio = (log.message || "").replace(/…$/, "").trim();
-                                    const daPadrao = mensagemPadrao.trim() ? montar(mensagemPadrao) : "";
-                                    const rebuilt = daPadrao && inicio.length > 20 && daPadrao.trim().startsWith(inicio) && !doTom.trim().startsWith(inicio)
-                                      ? daPadrao
-                                      : doTom;
+                                    const daPadrao = inicio.length > 20 && !doTom.trim().startsWith(inicio)
+                                      ? Object.values(mensagensPadrao).filter((t) => t.trim()).map(montar).find((m) => m.trim().startsWith(inicio))
+                                      : undefined;
+                                    const rebuilt = daPadrao ?? doTom;
                                     // Oculta valor e nº do documento com * (mantém a estrutura visível).
                                     let fullMessage = rebuilt.replace(/R\$\s*[\d.,]+/g, (m) => m.replace(/\d/g, "*"));
                                     for (const t of titulosLog) {
