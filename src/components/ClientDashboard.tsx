@@ -192,6 +192,28 @@ export default function ClientDashboard({
   const [debtors,         setDebtors]        = useState<Debtor[]>([]);
   const [selectedIds,     setSelectedIds]    = useState<Set<string>>(new Set());
   const [selectedTone,    setSelectedTone]   = useState<MessageTone>("amigavel");
+  // Mensagem personalizada: texto da pessoa no lugar do modelo do tom. Fica
+  // guardado neste navegador (por conta) para o próximo lote.
+  const chaveMsgPersonalizada = `ncf-msg-personalizada-v1:${userId}`;
+  const [personalizada,   setPersonalizada]  = useState(false);
+  const [textoPersonalizado, setTextoPersonalizado] = useState<string>(() => {
+    try { return localStorage.getItem(chaveMsgPersonalizada) ?? ""; } catch { return ""; }
+  });
+  const textoPersonalizadoRef = useRef<HTMLTextAreaElement>(null);
+  const mudarTextoPersonalizado = (texto: string) => {
+    setTextoPersonalizado(texto);
+    try { localStorage.setItem(chaveMsgPersonalizada, texto); } catch { /* sem armazenamento: vale só nesta tela */ }
+  };
+  const inserirVariavel = (variavel: string) => {
+    const el = textoPersonalizadoRef.current;
+    const ini = el?.selectionStart ?? textoPersonalizado.length;
+    const fim = el?.selectionEnd ?? ini;
+    mudarTextoPersonalizado(textoPersonalizado.slice(0, ini) + variavel + textoPersonalizado.slice(fim));
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(ini + variavel.length, ini + variavel.length);
+    });
+  };
   const [confirmData,     setConfirmData]    = useState<BatchConfirmData | null>(null);
   const [isSending,       setIsSending]      = useState(false);
   const [sendResult,      setSendResult]     = useState<BatchChargeResult | null>(null);
@@ -445,6 +467,10 @@ export default function ClientDashboard({
 
   const handleSendClick = () => {
     if (selectedIds.size === 0) return;
+    if (personalizada && !textoPersonalizado.trim()) {
+      textoPersonalizadoRef.current?.focus();
+      return;
+    }
 
     // Liquidações NÃO devem ir para cobrança
     const selected = debtors.filter(d => selectedIds.has(d.id));
@@ -464,7 +490,7 @@ export default function ClientDashboard({
     ).size;
     const invalidPhone = selected.length - validPhone;
 
-    const template = getMessageTemplate(selectedTone);
+    const template = personalizada ? textoPersonalizado.trim() : getMessageTemplate(selectedTone);
 
     // Build a filled example using the first valid-phone debtor (for preview display)
     const sampleDebtor = selected.find(d => d.phone && d.phone.replace(/\D/g, "").length >= 10) ?? selected[0];
@@ -485,7 +511,7 @@ export default function ClientDashboard({
       messagePreview:       template,
       messagePreviewFilled: filledPreview,
       sampleDebtorName:     sampleDebtor?.client ?? undefined,
-      tone:                 TONE_OPTIONS.find(t => t.value === selectedTone)?.label ?? selectedTone,
+      tone:                 personalizada ? "Personalizada" : TONE_OPTIONS.find(t => t.value === selectedTone)?.label ?? selectedTone,
       toneValue:            selectedTone,
       pilotRemaining,
       whatsappConnected:    waConnected ?? false,
@@ -567,7 +593,8 @@ export default function ClientDashboard({
       const result = await whatsappBatchService.sendBatchCharges({
         debtorIds:      validIds,
         tone:           selectedTone,
-        customMessage:  customMessage ?? undefined,
+        // Editada no modal > personalizada da tela > modelo do tom (servidor).
+        customMessage:  customMessage ?? (personalizada && textoPersonalizado.trim() ? textoPersonalizado.trim() : undefined),
         dryRun:         false,
         debtorPdfPaths: Object.keys(debtorPdfPaths).length > 0 ? debtorPdfPaths : undefined,
       });
@@ -847,21 +874,81 @@ export default function ClientDashboard({
           {!isLiquidacao && (
             <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
               <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2">Tom da mensagem</p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {TONE_OPTIONS.map(t => (
-                  <button
-                    key={t.value}
-                    onClick={() => setSelectedTone(t.value)}
-                    aria-pressed={selectedTone === t.value}
-                    className={`text-left px-3 py-2.5 rounded-lg border transition-colors cursor-pointer ${
-                      selectedTone === t.value ? "border-emerald-500/40 bg-emerald-500/10" : "border-zinc-800 hover:border-zinc-700"
-                    }`}
-                  >
-                    <span className={`block text-xs font-semibold ${selectedTone === t.value ? "text-emerald-300" : "text-zinc-300"}`}>{t.label}</span>
-                    <span className="block mt-0.5 text-[10px] text-zinc-500 leading-snug">{t.description}</span>
-                  </button>
-                ))}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {TONE_OPTIONS.map(t => {
+                  const ativo = !personalizada && selectedTone === t.value;
+                  return (
+                    <button
+                      key={t.value}
+                      onClick={() => { setSelectedTone(t.value); setPersonalizada(false); }}
+                      aria-pressed={ativo}
+                      className={`text-left px-3 py-2.5 rounded-lg border transition-colors cursor-pointer ${
+                        ativo ? "border-emerald-500/40 bg-emerald-500/10" : "border-zinc-800 hover:border-zinc-700"
+                      }`}
+                    >
+                      <span className={`block text-xs font-semibold ${ativo ? "text-emerald-300" : "text-zinc-300"}`}>{t.label}</span>
+                      <span className="block mt-0.5 text-[10px] text-zinc-500 leading-snug">{t.description}</span>
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => {
+                    setPersonalizada(true);
+                    // Primeira vez: começa do modelo do tom escolhido, para não partir do zero.
+                    if (!textoPersonalizado.trim()) mudarTextoPersonalizado(getMessageTemplate(selectedTone));
+                  }}
+                  aria-pressed={personalizada}
+                  className={`col-span-2 sm:col-span-1 text-left px-3 py-2.5 rounded-lg border transition-colors cursor-pointer ${
+                    personalizada ? "border-emerald-500/40 bg-emerald-500/10" : "border-zinc-800 hover:border-zinc-700"
+                  }`}
+                >
+                  <span className={`flex items-center gap-1.5 text-xs font-semibold ${personalizada ? "text-emerald-300" : "text-zinc-300"}`}>
+                    <Pencil className="w-3 h-3" /> Personalizada
+                  </span>
+                  <span className="block mt-0.5 text-[10px] text-zinc-500 leading-snug">Escreva a sua mensagem, com os dados de cada cliente</span>
+                </button>
               </div>
+
+              {personalizada && (
+                <div className="mt-3 space-y-2">
+                  <textarea
+                    ref={textoPersonalizadoRef}
+                    value={textoPersonalizado}
+                    onChange={e => mudarTextoPersonalizado(e.target.value)}
+                    rows={8}
+                    maxLength={2000}
+                    placeholder="Olá {nome_cliente}, ..."
+                    aria-label="Mensagem personalizada"
+                    className="w-full rounded-lg bg-zinc-900 border border-zinc-700 focus:border-emerald-500 focus:outline-none px-3 py-2.5 text-sm text-zinc-200 leading-relaxed resize-y"
+                  />
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] text-zinc-500 mr-1">Inserir:</span>
+                    {([
+                      ["{nome_cliente}", "Nome do cliente"],
+                      ["{documento}", "Documento"],
+                      ["{vencimento}", "Vencimento"],
+                      ["{valor_atualizado}", "Valor atualizado"],
+                      ["{empresa}", "Sua empresa"],
+                    ] as const).map(([variavel, rotulo]) => (
+                      <button
+                        key={variavel}
+                        type="button"
+                        onClick={() => inserirVariavel(variavel)}
+                        title={variavel}
+                        className="text-[10px] px-2 py-1 rounded border border-zinc-700 text-zinc-300 hover:border-emerald-500/50 hover:text-emerald-300 transition-colors cursor-pointer"
+                      >
+                        {rotulo}
+                      </button>
+                    ))}
+                    <span className="ml-auto text-[10px] font-mono text-zinc-600">{textoPersonalizado.length}/2000</span>
+                  </div>
+                  {!textoPersonalizado.trim() ? (
+                    <p className="text-[11px] text-amber-300/90">Escreva a mensagem para poder enviar.</p>
+                  ) : !textoPersonalizado.includes("{valor_atualizado}") && (
+                    <p className="text-[11px] text-zinc-500">Sem o valor na mensagem, o cliente não sabe quanto pagar. Use "Valor atualizado".</p>
+                  )}
+                </div>
+              )}
               {/* A mensagem cita a empresa na abertura e na assinatura ({empresa}).
                   Sem nome cadastrado, as frases saem sem ele — avisa onde cadastrar. */}
               {!companyName?.trim() && (
