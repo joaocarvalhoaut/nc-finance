@@ -28,6 +28,7 @@ import { financeService } from "./services/financeService";
 import { cobradoresService } from "./services/cobradoresService";
 import { representativesService } from "./services/representativesService";
 import { contactsService, contactKeyFromName, type Contact } from "./services/contactsService";
+import { hasValidPhone, mapaDeTelefonesConhecidos } from "./services/contactSync";
 import { BillingError, subscriptionService } from "./services/subscriptionService";
 import { isStripeLegacy, STRIPE_LEGACY_CUTOFF } from "../supabase/functions/_shared/billingStatus.ts";
 import { userConfigService, MENSAGEM_PADRAO_KEY } from "./services/userConfigService";
@@ -367,6 +368,24 @@ export default function App() {
   // própria da Carteira, de onde podem ser restaurados ou excluídos.
   const [arquivados, setArquivados] = useState<Debtor[]>([]);
   const [verArquivados, setVerArquivados] = useState(false);
+  // Telefone conhecido por cliente para sugestões: cadastro de contatos +
+  // telefones da carteira e dos arquivados (contactSync.mapaDeTelefonesConhecidos).
+  const telefonesConhecidos = useMemo(
+    () => mapaDeTelefonesConhecidos(contactsByKey.values(), [...debtors, ...arquivados]),
+    [contactsByKey, debtors, arquivados],
+  );
+  // Importar: sugestão de telefone para registros sem número cujo cliente já
+  // tem telefone salvo. "Agora não" vale até ler o próximo arquivo.
+  const [sugestaoTelefoneDispensada, setSugestaoTelefoneDispensada] = useState(false);
+  const sugestoesTelefoneImport = useMemo(() => {
+    const porId = new Map<string, string>();
+    for (const d of extractedDebtors) {
+      if (hasValidPhone(d.phone)) continue;
+      const tel = telefonesConhecidos.get(contactKeyFromName(d.client))?.phone;
+      if (tel) porId.set(d.id, tel);
+    }
+    return porId;
+  }, [extractedDebtors, telefonesConhecidos]);
   const [avisoArquivo, setAvisoArquivo] = useState<{ ids: string[]; texto: string; desfazerArquivando: boolean } | null>(null);
   const [notesPopover, setNotesPopover] = useState<{ debtorId: string; draft: string } | null>(null);
   const [isParsingImportFile, setIsParsingImportFile] = useState<boolean>(false);
@@ -1652,6 +1671,7 @@ export default function App() {
           result.records.flatMap((item, index) => item.confidenceScore < presenca(item) ? [`ext-${ts}-${index}`] : [])
         ));
         setConferidosIds(new Set());
+        setSugestaoTelefoneDispensada(false);
         setExtractedDebtors(parsedList);
 
         if (result.warnings.length > 0) {
@@ -1798,8 +1818,18 @@ export default function App() {
     }
   };
 
+  // Preenche o telefone salvo nos registros que seguem sem número. O que a
+  // pessoa digitou depois da leitura não é sobrescrito.
+  const aplicarSugestoesTelefoneImport = () => {
+    setExtractedDebtors(prev => prev.map(d => {
+      const tel = sugestoesTelefoneImport.get(d.id);
+      return tel && !hasValidPhone(d.phone) ? { ...d, phone: tel } : d;
+    }));
+    setSugestaoTelefoneDispensada(true);
+  };
+
   // Individual editable text change handler on the parsed list
-  const updateExtractedField = (id: string, field: keyof Debtor, val: Debtor[keyof Debtor]) => {
+  const updateExtractedField =(id: string, field: keyof Debtor, val: Debtor[keyof Debtor]) => {
     // Mexeu no registro = olhou para ele: a dúvida de leitura sai da contagem.
     // O que falta de fato (telefone, vencimento, valor) continua contando até
     // ser preenchido.
@@ -3030,7 +3060,7 @@ export default function App() {
                     situacaoHoje={situacaoHoje}
                     globalFinePct={globalFinePct}
                     globalInterestDayPct={globalInterestDayPct}
-                    knownContacts={contactsByKey}
+                    knownContacts={telefonesConhecidos}
                     cobradores={cobradores}
                     cobradorInicial={cobradorIds.has(cobradorFiltro) ? cobradorFiltro : ""}
                     onLearnContacts={learnContactsFromDebtors}
@@ -3743,6 +3773,42 @@ export default function App() {
                         </div>
                       ) : (
                         <>
+                          {/* Sugestão: cliente sem telefone no arquivo, mas com número já salvo no sistema */}
+                          {sugestoesTelefoneImport.size > 0 && !sugestaoTelefoneDispensada && (
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mx-5 mt-3 px-4 py-3 rounded-lg border border-emerald-500/25 bg-emerald-500/5">
+                              <UserCheck className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                              <p className="text-sm text-emerald-100 flex-1">
+                                {(() => {
+                                  // Conta clientes, não títulos: o mesmo cliente com 3 boletos é 1.
+                                  const clientes = new Set(
+                                    extractedDebtors.filter(d => sugestoesTelefoneImport.has(d.id)).map(d => contactKeyFromName(d.client)),
+                                  ).size;
+                                  const titulos = sugestoesTelefoneImport.size;
+                                  const quem = clientes === 1
+                                    ? "1 cliente já tem telefone salvo no sistema"
+                                    : `${clientes} clientes já têm telefone salvo no sistema`;
+                                  return titulos > clientes ? `${quem} (${titulos} registros sem telefone).` : `${quem}.`;
+                                })()}{" "}
+                                Deseja preencher os telefones automaticamente?
+                              </p>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setSugestaoTelefoneDispensada(true)}
+                                  className="px-3 py-1.5 rounded-lg text-xs text-zinc-300 hover:text-white border border-zinc-700 hover:border-zinc-500 transition-colors"
+                                >
+                                  Agora não
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={aplicarSugestoesTelefoneImport}
+                                  className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5"
+                                >
+                                  <Check className="w-3.5 h-3.5" strokeWidth={3} /> Preencher automaticamente
+                                </button>
+                              </div>
+                            </div>
+                          )}
                           <div className="flex items-center justify-between gap-3 px-5 py-2.5 border-b border-zinc-900 text-[11px]">
                             <button
                               type="button"
@@ -5280,7 +5346,7 @@ export default function App() {
                     { value: "liquidado", label: "Liquidação", cor: "#059669", description: "Sem cobrança" },
                     { value: "pago_banco", label: "Pago pro banco", cor: CATEGORY_COR.pago_banco, description: "Sem cobrança" },
                   ] as const;
-                  const match = contactsByKey.get(contactKeyFromName(addDebtorForm.client));
+                  const match = telefonesConhecidos.get(contactKeyFromName(addDebtorForm.client));
                   const sugerirTelefone = Boolean(
                     match?.phone && addDebtorForm.phone.replace(/\D/g, "").length < 10 && addDebtorForm.client.trim().length >= 3,
                   );

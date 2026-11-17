@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildContactSyncBatches, contactKeyFromName } from '../src/services/contactSync';
+import { buildContactSyncBatches, contactKeyFromName, mapaDeTelefonesConhecidos } from '../src/services/contactSync';
 import type { Debtor } from '../src/types';
 
 const REP_A = '11111111-1111-4111-8111-111111111111';
@@ -62,5 +62,31 @@ const devedor = (client: string, phone: string, representativeId?: string): Debt
 
 // Chave do contato ignora acento, caixa e pontuação.
 assert.equal(contactKeyFromName('João-Silva'), contactKeyFromName('JOAO SILVA'));
+
+// Sugestão de telefone: cliente só na carteira (nunca entrou no cadastro de
+// contatos) também é achado; o cadastro vence quando os dois têm número.
+{
+  const mapa = mapaDeTelefonesConhecidos(
+    [{ contactKey: contactKeyFromName('Maria Souza'), clientName: 'Maria Souza', phone: '77911112222' }],
+    [
+      devedor('GEOVANE DE JESUS SANTOS', '(77) 98888-7777'),
+      devedor('Geovane de Jesus Santos', '77900000000'),
+      devedor('MARIA SOUZA', '77933334444'),
+      devedor('Sem Numero', ''),
+    ],
+  );
+  assert.equal(mapa.get(contactKeyFromName('geovane de jesus santos'))?.phone, '(77) 98888-7777', 'carteira: primeiro título vale');
+  assert.equal(mapa.get(contactKeyFromName('Maria Souza'))?.phone, '77911112222', 'cadastro vence a carteira');
+  assert.equal(mapa.has(contactKeyFromName('Sem Numero')), false, 'título sem telefone não entra');
+}
+
+// Contato do cadastro sem telefone válido não apaga o número da carteira.
+{
+  const mapa = mapaDeTelefonesConhecidos(
+    [{ contactKey: contactKeyFromName('Joao Silva'), clientName: 'Joao Silva', phone: '' }],
+    [devedor('Joao Silva', '77999137848')],
+  );
+  assert.equal(mapa.get(contactKeyFromName('Joao Silva'))?.phone, '77999137848');
+}
 
 console.log('PASS: aprendizado de contatos preserva o representante existente.');

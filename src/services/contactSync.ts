@@ -25,6 +25,42 @@ export function hasValidPhone(phone: string | null | undefined): boolean {
   return Boolean(phone && phone.replace(/\D/g, "").length >= 10);
 }
 
+/** O mínimo de um contato que a sugestão de telefone usa. */
+export interface ContatoConhecido {
+  contactKey: string;
+  clientName: string;
+  phone: string;
+}
+
+/**
+ * Telefones conhecidos por cliente, para sugerir em importação e cadastro.
+ *
+ * Duas fontes:
+ *  - cadastro de contatos (`user_contatos`): vence quando tem telefone válido;
+ *  - títulos da carteira (e arquivados) com telefone válido: cobrem o cliente
+ *    que nunca entrou no cadastro — título importado pelo Importar ou telefone
+ *    editado direto na Carteira não passam pelo aprendizado de contatos.
+ *
+ * Entre títulos do mesmo cliente com números diferentes vale o primeiro da
+ * lista (quem chama passa a carteira antes dos arquivados).
+ */
+export function mapaDeTelefonesConhecidos(
+  contatos: Iterable<ContatoConhecido>,
+  titulos: Array<Pick<Debtor, "client" | "phone">>,
+): Map<string, ContatoConhecido> {
+  const mapa = new Map<string, ContatoConhecido>();
+  for (const t of titulos) {
+    if (!hasValidPhone(t.phone)) continue;
+    const key = contactKeyFromName(t.client);
+    if (!key || mapa.has(key)) continue;
+    mapa.set(key, { contactKey: key, clientName: t.client.trim(), phone: t.phone.trim() });
+  }
+  for (const c of contatos) {
+    if (c.contactKey && hasValidPhone(c.phone)) mapa.set(c.contactKey, c);
+  }
+  return mapa;
+}
+
 export interface ContactSyncRow {
   user_id: string;
   contact_key: string;

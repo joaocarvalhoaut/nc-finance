@@ -43,7 +43,8 @@ import {
 import { whatsappGatewayService } from "../services/whatsappGatewayService";
 import { whatsappBatchService, type BatchChargeResult } from "../services/whatsappBatchService";
 import { financeService } from "../services/financeService";
-import { contactsService, contactKeyFromName, type Contact } from "../services/contactsService";
+import { contactsService, contactKeyFromName } from "../services/contactsService";
+import { hasValidPhone, type ContatoConhecido } from "../services/contactSync";
 import { billingLogsService } from "../services/billingLogsService";
 import { pilotService } from "../services/pilotService";
 import { ACEITA_IMPORTACAO, interpretarDocumento, lerArquivo } from "../services/localDocumentExtraction";
@@ -82,8 +83,8 @@ interface ClientDashboardProps {
   userId:               string;
   globalFinePct:        number;
   globalInterestDayPct: number;
-  /** Cadastro de contatos (telefone salvo) por chave de cliente normalizada */
-  knownContacts?: Map<string, Contact>;
+  /** Telefone conhecido por cliente: cadastro de contatos + carteira (contactSync.mapaDeTelefonesConhecidos). */
+  knownContacts?: Map<string, ContatoConhecido>;
   /** Aprende contatos (telefone) a partir de devedores persistidos */
   onLearnContacts?: (debtors: Debtor[]) => void | Promise<void>;
   /** Chamado após envio de lote (sucesso ou falha) — atualiza logs no pai */
@@ -356,6 +357,8 @@ export default function ClientDashboard({
     if (!knownContacts) return;
     setDebtors(prev => prev.map(d => {
       if (!phoneSuggestIds.has(d.id)) return d;
+      // Telefone digitado depois da sugestão não é sobrescrito.
+      if (hasValidPhone(d.phone)) return d;
       const match = knownContacts.get(contactKeyFromName(d.client));
       return match && match.phone ? { ...d, phone: match.phone } : d;
     }));
@@ -795,10 +798,16 @@ export default function ClientDashboard({
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 rounded-lg border border-emerald-500/25 bg-emerald-500/5">
               <UserCheck className="w-5 h-5 text-emerald-400 flex-shrink-0" />
               <p className="text-sm text-emerald-100 flex-1">
-                {phoneSuggestIds.size === 1
-                  ? "1 cliente já está cadastrado no sistema com telefone salvo."
-                  : `${phoneSuggestIds.size} clientes já estão cadastrados no sistema com telefone salvo.`}{" "}
-                Deseja preencher os dados automaticamente?
+                {(() => {
+                  // Conta clientes, não títulos: o mesmo cliente com 3 boletos é 1.
+                  const clientes = new Set(debtors.filter(d => phoneSuggestIds.has(d.id)).map(d => contactKeyFromName(d.client))).size;
+                  const titulos = phoneSuggestIds.size;
+                  const quem = clientes === 1
+                    ? "1 cliente já tem telefone salvo no sistema"
+                    : `${clientes} clientes já têm telefone salvo no sistema`;
+                  return titulos > clientes ? `${quem} (${titulos} títulos sem telefone).` : `${quem}.`;
+                })()}{" "}
+                Deseja preencher os telefones automaticamente?
               </p>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
