@@ -3942,6 +3942,22 @@ export default function App() {
                                       <input aria-label="Celular (WhatsApp)" type="text" value={item.phone}
                                         onChange={(e) => updateExtractedField(item.id, "phone", e.target.value)}
                                         className={`${campo} font-mono`} />
+                                      {(() => {
+                                        // Telefone salvo do mesmo cliente, oferecido no próprio registro.
+                                        const sugestao = sugestoesTelefoneImport.get(item.id);
+                                        if (!sugestao) return null;
+                                        return (
+                                          <button
+                                            type="button"
+                                            onClick={() => updateExtractedField(item.id, "phone", sugestao.phone)}
+                                            title={sugestao.parecido ? "Nome parecido com um cliente da carteira — confira" : "Telefone já salvo para este cliente"}
+                                            className="mt-1 text-[10px] font-semibold text-emerald-300 hover:text-emerald-200 px-1.5 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                                          >
+                                            <UserCheck className="w-3 h-3" />
+                                            usar {mascaraTelefone(sugestao.phone)}{sugestao.parecido ? " ?" : ""}
+                                          </button>
+                                        );
+                                      })()}
                                     </div>
                                     <div>
                                       <label className={`${rotulo} mb-0.5`}>Banco</label>

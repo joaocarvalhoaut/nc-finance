@@ -55,6 +55,14 @@ import type { SituacaoDoDia } from "../../supabase/functions/_shared/protecaoNum
 import BoletoResponsibilityModal from "./BoletoResponsibilityModal";
 import type { Cobrador, Debtor, MessageTone } from "../types";
 
+/** "77999998888" → "(77) 99999-8888"; fora do padrão, devolve como veio. */
+function formatarTelefoneCurto(phone: string): string {
+  const d = phone.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return phone;
+}
+
 // ─── Tone options ─────────────────────────────────────────────────────────────
 
 const TONE_OPTIONS: { value: MessageTone; label: string; description: string }[] = [
@@ -899,6 +907,11 @@ export default function ClientDashboard({
               {debtors.map(d => {
                 const isSelected = selectedIds.has(d.id);
                 const hasPhone   = d.phone && d.phone.replace(/\D/g, "").length >= 10;
+                // Telefone salvo do mesmo cliente: oferecido na própria linha,
+                // porque o aviso do topo some de vista ao rolar a lista.
+                const sugerido = !hasPhone && !isLiquidacao && knownContacts
+                  ? acharTelefoneConhecido(knownContacts, d.client)
+                  : null;
 
                 return (
                   <div
@@ -1017,6 +1030,28 @@ export default function ClientDashboard({
                               className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
                             >
                               ✕
+                            </button>
+                          </div>
+                        ) : sugerido ? (
+                          <div className="flex items-center gap-1.5 justify-end mt-0.5" onClick={e => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() => setDebtors(prev => prev.map(x => x.id === d.id ? { ...x, phone: sugerido.contato.phone } : x))}
+                              title={sugerido.tipo === "parecido"
+                                ? `Nome parecido com "${sugerido.contato.clientName}" — confira`
+                                : "Telefone já salvo para este cliente"}
+                              className="text-[10px] font-semibold text-emerald-300 hover:text-emerald-200 px-1.5 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <UserCheck className="w-3 h-3" />
+                              usar {formatarTelefoneCurto(sugerido.contato.phone)}{sugerido.tipo === "parecido" ? " ?" : ""}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setEditingPhoneValue(""); setEditingPhoneId(d.id); }}
+                              aria-label="Digitar outro telefone"
+                              className="text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                            >
+                              <Pencil className="w-2.5 h-2.5 opacity-70" />
                             </button>
                           </div>
                         ) : (
