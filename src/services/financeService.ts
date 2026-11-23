@@ -77,6 +77,18 @@ const semColunaDeArquivo = (error: { code?: string; message?: string } | null) =
 
 const isValidUUID = (value: string | null | undefined) => Boolean(value && UUID_REGEX.test(value));
 
+/**
+ * Filtro `.in("id", ids)` vai na URL: com centenas de ids (arquivar a carteira
+ * toda, ~800 títulos) ela passa do limite e o servidor responde "Bad Request".
+ * Em partes de 100 (~3,7 KB de URL cada).
+ */
+const PARTE_DE_IDS = 100;
+const emPartes = <T,>(lista: T[], tamanho = PARTE_DE_IDS): T[][] => {
+  const partes: T[][] = [];
+  for (let i = 0; i < lista.length; i += tamanho) partes.push(lista.slice(i, i + tamanho));
+  return partes;
+};
+
 const normalizeDateToStorage = (value: string) => {
   if (!value) return new Date().toISOString().slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -188,15 +200,17 @@ export const financeService = {
   async setArchived(userId: string, ids: string[], archivedAt: string | null) {
     if (!ids.length) return;
     const supabase = getSupabaseClient();
-    const { error } = await supabase
-      .from(TABLE_NAME)
-      .update({ archived_at: archivedAt })
-      .in("id", ids)
-      .eq("user_id", userId);
-    if (semColunaDeArquivo(error)) {
-      throw new Error("Arquivar ainda não está disponível nesta conta. Tente de novo mais tarde.");
+    for (const parte of emPartes(ids)) {
+      const { error } = await supabase
+        .from(TABLE_NAME)
+        .update({ archived_at: archivedAt })
+        .in("id", parte)
+        .eq("user_id", userId);
+      if (semColunaDeArquivo(error)) {
+        throw new Error("Arquivar ainda não está disponível nesta conta. Tente de novo mais tarde.");
+      }
+      if (error) throw new Error(error.message || "Falha ao arquivar.");
     }
-    if (error) throw new Error(error.message || "Falha ao arquivar.");
   },
 
   /**
@@ -207,10 +221,14 @@ export const financeService = {
     if ("ids" in alvo && !alvo.ids.length) return;
     if (cobradorId !== null && !isValidUUID(cobradorId)) throw new Error("Cobrador inválido.");
     const supabase = getSupabaseClient();
-    let q = supabase.from(TABLE_NAME).update({ cobrador_id: cobradorId }).eq("user_id", userId);
-    q = "ids" in alvo ? q.in("id", alvo.ids) : q.eq("cobrador_id", alvo.deCobrador);
-    const { error } = await q;
-    if (error) throw new Error("Não foi possível trocar o cobrador. Tente de novo.");
+    const base = () => supabase.from(TABLE_NAME).update({ cobrador_id: cobradorId }).eq("user_id", userId);
+    const consultas = "ids" in alvo
+      ? emPartes(alvo.ids).map((parte) => base().in("id", parte))
+      : [base().eq("cobrador_id", alvo.deCobrador)];
+    for (const q of consultas) {
+      const { error } = await q;
+      if (error) throw new Error("Não foi possível trocar o cobrador. Tente de novo.");
+    }
   },
 
   async create(userId: string, debtor: Debtor) {
@@ -472,19 +490,22 @@ export const financeService = {
     if (!matchIds.length) return 0;
 
     const now = new Date().toISOString();
-    const { error: updErr } = await supabase
-      .from(TABLE_NAME)
-      .update({
-        category: "liquidado",
-        status: "sent",
-        notes: `Reconciliado por arquivo de liquidação em ${now.slice(0, 10)}`,
-        updated_at: now,
-      })
-      .in("id", matchIds)
-      .eq("user_id", userId);
+    let baixados = 0;
+    for (const parte of emPartes(matchIds)) {
+      const { error: updErr } = await supabase
+        .from(TABLE_NAME)
+        .update({
+          category: "liquidado",
+          status: "sent",
+          notes: `Reconciliado por arquivo de liquidação em ${now.slice(0, 10)}`,
+          updated_at: now,
+        })
+        .in("id", parte)
+        .eq("user_id", userId);
+      if (updErr) break;
+      baixados += parte.length;
+    }
 
-    if (updErr) return 0;
-
-    return matchIds.length;
+    return baixados;
   },
 };
