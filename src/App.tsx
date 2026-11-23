@@ -378,6 +378,8 @@ export default function App() {
   // própria da Carteira, de onde podem ser restaurados ou excluídos.
   const [arquivados, setArquivados] = useState<Debtor[]>([]);
   const [verArquivados, setVerArquivados] = useState(false);
+  // Arquivados marcados para restaurar de uma vez.
+  const [arquivadosMarcados, setArquivadosMarcados] = useState<Set<string>>(new Set());
   // Telefone conhecido por cliente para sugestões: cadastro de contatos +
   // telefones da carteira e dos arquivados (contactSync.mapaDeTelefonesConhecidos).
   const telefonesConhecidos = useMemo(
@@ -2200,18 +2202,21 @@ export default function App() {
     if (!currentOwnerUserId || !ids.length) return;
     const quando = arquivar ? new Date().toISOString() : null;
     const origem = arquivar ? debtors : arquivados;
-    const movidos = origem.filter(d => ids.includes(d.id)).map(d => ({ ...d, archivedAt: quando }));
+    const pedidos = new Set(ids);
+    const movidos = origem.filter(d => pedidos.has(d.id)).map(d => ({ ...d, archivedAt: quando }));
     if (!movidos.length) return;
     const idsMovidos = movidos.map(d => d.id);
+    const setMovidos = new Set(idsMovidos); // centenas de ids: Set, não includes
 
     if (arquivar) {
-      setDebtors(prev => prev.filter(d => !idsMovidos.includes(d.id)));
+      setDebtors(prev => prev.filter(d => !setMovidos.has(d.id)));
       setArquivados(prev => [...movidos, ...prev]);
       setSelectedDebtorIds(prev => { const n = new Set(prev); idsMovidos.forEach(i => n.delete(i)); return n; });
-      if (selectedDebtorForMessage && idsMovidos.includes(selectedDebtorForMessage.id)) setSelectedDebtorForMessage(null);
+      if (selectedDebtorForMessage && setMovidos.has(selectedDebtorForMessage.id)) setSelectedDebtorForMessage(null);
     } else {
-      setArquivados(prev => prev.filter(d => !idsMovidos.includes(d.id)));
+      setArquivados(prev => prev.filter(d => !setMovidos.has(d.id)));
       setDebtors(prev => mesclarDevedores(prev, movidos, "inicio"));
+      setArquivadosMarcados(prev => { const n = new Set(prev); idsMovidos.forEach(i => n.delete(i)); return n; });
     }
 
     try {
@@ -2221,10 +2226,10 @@ export default function App() {
     } catch (err) {
       // Desfaz na tela: o banco não mudou.
       if (arquivar) {
-        setArquivados(prev => prev.filter(d => !idsMovidos.includes(d.id)));
+        setArquivados(prev => prev.filter(d => !setMovidos.has(d.id)));
         setDebtors(prev => mesclarDevedores(prev, movidos.map(d => ({ ...d, archivedAt: null })), "inicio"));
       } else {
-        setDebtors(prev => prev.filter(d => !idsMovidos.includes(d.id)));
+        setDebtors(prev => prev.filter(d => !setMovidos.has(d.id)));
         setArquivados(prev => [...movidos.map(d => ({ ...d, archivedAt: new Date().toISOString() })), ...prev]);
       }
       setDebtorSaveError(err instanceof Error ? err.message : "Não foi possível arquivar. Tente de novo.");
@@ -4375,6 +4380,14 @@ export default function App() {
                     const ativoPorChave = new Map<string, Debtor>();
                     for (const a of debtors) { const k = chaveDoTitulo(a); if (k && !ativoPorChave.has(k)) ativoPorChave.set(k, a); }
                     const copiaDe = (d: Debtor) => { const k = chaveDoTitulo(d); return k ? ativoPorChave.get(k) : undefined; };
+                    // Seleção vale para o que está na tela (respeita a busca).
+                    const marcadosNaLista = lista.filter(d => arquivadosMarcados.has(d.id));
+                    const todosMarcadosArq = lista.length > 0 && marcadosNaLista.length === lista.length;
+                    const marcarArquivado = (id: string) => setArquivadosMarcados(prev => {
+                      const n = new Set(prev);
+                      if (n.has(id)) n.delete(id); else n.add(id);
+                      return n;
+                    });
                     return (
                       <section className="bg-zinc-950 border border-zinc-800 rounded-xl">
                         <header className="flex items-center justify-between gap-3 px-5 py-4 border-b border-zinc-800/80">
@@ -4382,10 +4395,34 @@ export default function App() {
                             <h4 className="text-sm font-bold text-white">Arquivados</h4>
                             <p className="text-xs text-zinc-500 mt-0.5">Fora da carteira ativa e de qualquer cobrança. Restaure para voltar a cobrar.</p>
                           </div>
-                          <button type="button" onClick={() => setVerArquivados(false)} className="text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer whitespace-nowrap">
+                          <button type="button" onClick={() => { setVerArquivados(false); setArquivadosMarcados(new Set()); }} className="text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer whitespace-nowrap">
                             Voltar à carteira
                           </button>
                         </header>
+                        {lista.length > 0 && (
+                          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 border-b border-zinc-900 text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() => setArquivadosMarcados(todosMarcadosArq ? new Set() : new Set(lista.map(d => d.id)))}
+                              className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                            >
+                              {todosMarcadosArq ? <CheckSquare className="w-3.5 h-3.5 text-emerald-400" /> : <Square className="w-3.5 h-3.5" />}
+                              {todosMarcadosArq ? "Desmarcar todos" : `Selecionar todos (${lista.length})`}
+                            </button>
+                            {marcadosNaLista.length > 0 && (
+                              <div className="flex items-center gap-3">
+                                <span className="font-mono text-zinc-500">{marcadosNaLista.length} selecionado{marcadosNaLista.length === 1 ? "" : "s"}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => void moverArquivo(marcadosNaLista.map(d => d.id), false)}
+                                  className="px-2.5 py-1.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                                >
+                                  <ArchiveRestore className="w-3.5 h-3.5" /> Restaurar {marcadosNaLista.length}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         {lista.length === 0 ? (
                           <div className="px-5 py-12 text-center">
                             <Archive className="w-7 h-7 text-zinc-700 mx-auto mb-3" />
@@ -4397,7 +4434,17 @@ export default function App() {
                         ) : (
                           <ul className="divide-y divide-zinc-900">
                             {lista.map(d => { const original = copiaDe(d); return (
-                              <li key={d.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
+                              <li key={d.id} className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 ${arquivadosMarcados.has(d.id) ? "bg-emerald-500/5" : ""}`}>
+                                <button
+                                  type="button"
+                                  role="checkbox"
+                                  aria-checked={arquivadosMarcados.has(d.id)}
+                                  aria-label={`Selecionar ${d.client}`}
+                                  onClick={() => marcarArquivado(d.id)}
+                                  className="flex-shrink-0 text-zinc-500 hover:text-white cursor-pointer"
+                                >
+                                  {arquivadosMarcados.has(d.id) ? <CheckSquare className="w-4 h-4 text-emerald-400" /> : <Square className="w-4 h-4" />}
+                                </button>
                                 <div className="flex-1 min-w-[180px]">
                                   <p className="text-sm font-medium text-zinc-200 truncate flex items-center gap-2">
                                     <span className="truncate">{d.client}</span>
