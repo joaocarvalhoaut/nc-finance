@@ -233,6 +233,22 @@ const docOcr = interpretarDocumento({
 assert(docOcr.method === "tabela-pdf-ocr", `tabela continua escolhida com registro a revisar (got ${docOcr.method})`);
 eq(docOcr.records.map((r) => r.confidenceScore < 75), [true, false], "a marcação de revisão chega ao resultado");
 
+section("Títulos com R$ e banco abreviado");
+{
+  const linhas = (titulos: string[], valor: (i: number) => string) => [
+    titulos,
+    ...[0, 1, 2, 3].map((i) => [`CLIENTE TESTE ${"ABCD"[i]} LTDA`, `${500 + i}`, `1${i}/11/2026`, valor(i), "SICOOB"]),
+  ];
+  // "R$" sem número no título não faz a linha de títulos parecer dado.
+  const comRs = interpretarTabela(linhas(["Cliente", "Nº Doc", "Vencimento", "Vlr R$", "Banco"], (i) => `${300 + i}`));
+  eq(comRs.candidates.map((c) => c.value), [300, 301, 302, 303], "\"Vlr R$\" é o valor, mesmo sem centavos");
+  const comParenteses = interpretarTabela(linhas(["Cliente", "Nº Doc", "Vencimento", "Valor (R$)", "Banco"], (i) => `${300 + i},5`));
+  eq(comParenteses.candidates.length, 4, "\"Valor (R$)\": título não vira registro");
+  // "Bco" e "Bco." são o banco.
+  const bco = interpretarTabela(linhas(["Cliente", "Nº Doc", "Vencimento", "Vlr", "Bco."], (i) => `${300 + i},5`));
+  eq([...new Set(bco.candidates.map((c) => c.bank))], ["SICOOB"], "\"Bco.\" é o banco");
+}
+
 console.log(`\n${"═".repeat(62)}`);
 console.log(`  Tests: ${passed + failed}  ✓ passed: ${passed}  ✗ failed: ${failed}`);
 console.log(`${"═".repeat(62)}\n`);

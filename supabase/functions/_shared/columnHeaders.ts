@@ -110,7 +110,10 @@ const FIELDS: Record<HeaderField, FieldSpec> = {
     excludes: ["cpf", "cnpj"],
   },
   bank: {
-    rules: [r("banco", 90), r("bank", 90), r("instituicao", 85), r("inst financeira", 85), r("portador", 80)],
+    rules: [
+      r("banco", 90), r("bank", 90), r("bco", 90), r("instituicao", 85), r("inst financeira", 85),
+      r("portador", 80),
+    ],
   },
   // ── Nomes: pontuam menos que os atributos ───────────────────────────────────
   client: {

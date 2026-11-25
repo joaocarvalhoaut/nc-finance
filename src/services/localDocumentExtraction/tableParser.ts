@@ -51,10 +51,11 @@ export function isHeaderLine(line: string): boolean {
   // Uma linha com data real (qualquer separador, ano 2 ou 4 dígitos, ou ISO)
   // ou valor monetário (com R$ ou em formato BR "1.234,56") é linha de DADOS,
   // mesmo que contenha palavras como "titulo" ou "vencimento".
+  // "R$" sozinho é título ("Vlr R$", "Valor (R$)"); só com número é dado.
   if (
     /\d{2}[/\-.]\d{2}[/\-.]\d{2,4}/.test(norm) ||
     /\d{4}-\d{2}-\d{2}/.test(norm) ||
-    /r\$/.test(norm) ||
+    /r\$\s*-?\d/.test(norm) ||
     /\b\d{1,3}(?:\.\d{3})*,\d{2}\b/.test(norm)
   ) {
     return false;
