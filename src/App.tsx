@@ -251,6 +251,25 @@ const mascaraData = (v: string) => {
   if (d.length > 2) return `${d.slice(0, 2)}/${d.slice(2)}`;
   return d;
 };
+/** Texto para busca: sem acento, minúsculo e sem quebrar com campo vazio (null). */
+const paraBusca = (s?: string | null) =>
+  (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+/**
+ * Busca da Carteira e dos Arquivados: nome, documento ou fornecedor, sem
+ * acento ("joao" acha "JOÃO"). Termo só de números também acha documento e
+ * telefone sem pontuação ("1439005" acha "1439/005").
+ * Antes, título com documento ou fornecedor vazio (null) derrubava a busca.
+ */
+const casaBusca = (d: Debtor, termo: string): boolean => {
+  const t = paraBusca(termo).trim();
+  if (!t) return true;
+  if ([d.client, d.document, d.supplier].some((c) => paraBusca(c).includes(t))) return true;
+  const digitos = t.replace(/\D/g, "");
+  return digitos.length >= 3 && /^[\d\s().\-/]+$/.test(t)
+    && [d.document, d.phone].some((c) => (c ?? "").replace(/\D/g, "").includes(digitos));
+};
+
 /** Abas da "Minha mensagem": "" = geral; as demais são tipos de título cobráveis. */
 const TIPOS_MENSAGEM_PADRAO: ReadonlyArray<readonly [string, string]> = [
   ["", "Geral"],
@@ -2872,9 +2891,7 @@ export default function App() {
   // Apply filters to display debtors lists
   const filteredDebtors = (() => {
     const filtered = debtors.filter(d => {
-      const matchesSearch = d.client.toLowerCase().includes(searchFilter.toLowerCase()) ||
-                            d.document.toLowerCase().includes(searchFilter.toLowerCase()) ||
-                            d.supplier.toLowerCase().includes(searchFilter.toLowerCase());
+      const matchesSearch = casaBusca(d, searchFilter);
       const matchesCategory = categoryFilter === "all" ? true : d.category === categoryFilter;
       const matchesStatus = statusFilter === "all" ? true : d.status === statusFilter;
       const matchesRep = repFilter === "all" ? true : repFilter === "unassigned" ? !d.representativeId : d.representativeId === repFilter;
@@ -4369,10 +4386,8 @@ export default function App() {
                   )}
 
                   {verArquivados && (() => {
-                    const termo = searchFilter.trim().toLowerCase();
-                    const lista = termo
-                      ? arquivados.filter(d => d.client.toLowerCase().includes(termo) || (d.document || "").toLowerCase().includes(termo))
-                      : arquivados;
+                    const termo = searchFilter.trim();
+                    const lista = termo ? arquivados.filter(d => casaBusca(d, termo)) : arquivados;
                     const dataCurta = (iso?: string | null) => iso ? new Date(iso).toLocaleDateString("pt-BR") : "—";
                     // Arquivado por duplicidade: tem um título ativo com o mesmo cliente,
                     // documento e vencimento (utils/tituloUnico.ts). Conferido na hora,
@@ -5839,7 +5854,7 @@ export default function App() {
 
                 const filtrados = daAba.filter(d =>
                   (tipoEnvio === "todos" || d.category === tipoEnvio) &&
-                  (!termo || d.client.toLowerCase().includes(termo) || (d.document || "").toLowerCase().includes(termo)));
+                  (!termo || casaBusca(d, termo)));
                 const enviadosHoje = umPorMensagem(filtrados.filter(cobradoHoje)
                   .sort((a, b) => (ultimaDe(b) ?? 0) - (ultimaDe(a) ?? 0))); // mais recente primeiro
                 // Quem nunca foi cobrado vem primeiro; depois quem foi cobrado há mais
