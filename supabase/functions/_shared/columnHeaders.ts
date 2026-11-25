@@ -81,7 +81,10 @@ const FIELDS: Record<HeaderField, FieldSpec> = {
   },
   value: {
     rules: [
-      r("valor original", 99), r("valor nominal", 99), r("valor titulo", 97),
+      // "Valor Aberto" vence "Valor Devido": o devido já traz multa e juros, e o
+      // app calcula os encargos por conta própria (somaria duas vezes).
+      r("valor original", 99), r("valor nominal", 99), r("valor aberto", 98), r("valor em aberto", 98),
+      r("vlr aberto", 98), r("valor titulo", 97),
       r("valor devido", 97), r("valor face", 97),
       r("valor", 90), r("vlr", 90), r("vl", 90), r("montante", 90), r("amount", 90),
       r("saldo", 85), r("debito", 85), r("total", 70),
@@ -113,6 +116,8 @@ const FIELDS: Record<HeaderField, FieldSpec> = {
     rules: [
       r("banco", 90), r("bank", 90), r("bco", 90), r("instituicao", 85), r("inst financeira", 85),
       r("portador", 80),
+      // Relatório de factoring/FIDC: a coluna diz para qual delas o título foi (ASSET, ABR…).
+      r("factoring", 85), r("fomento", 85), r("fidc", 85), r("securitizadora", 85),
     ],
   },
   // ── Nomes: pontuam menos que os atributos ───────────────────────────────────

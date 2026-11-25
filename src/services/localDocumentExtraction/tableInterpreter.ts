@@ -156,7 +156,12 @@ function mapearPorTitulo(cabecalho: string[], perfis: PerfilColuna[]): Partial<R
 
 /** Coluna para um campo sem título reconhecido, pelo conteúdo. */
 function inferirColuna(f: Campo, livres: number[], cabecalho: string[], perfis: PerfilColuna[]): number | null {
-  const aptas = livres.filter((c) => !(cabecalho[c] && headerExcludes(cabecalho[c], f)) && perfis[c].preenchimento >= 0.3);
+  // Coluna cujo título nomeia outro campo não vira este pelo conteúdo: "Nosso
+  // Número" (12 dígitos) passava por telefone e o WhatsApp iria para um número qualquer.
+  const tituloDeOutro = (c: number) =>
+    Boolean(cabecalho[c]) && CAMPOS.some((g) => g !== f && pontuarTitulo(cabecalho[c], g) >= 85);
+  const aptas = livres.filter((c) =>
+    !(cabecalho[c] && headerExcludes(cabecalho[c], f)) && !tituloDeOutro(c) && perfis[c].preenchimento >= 0.3);
   const melhor = (cands: number[], nota: (c: number) => number) =>
     cands.length ? cands.reduce((a, b) => (nota(b) > nota(a) ? b : a)) : null;
 

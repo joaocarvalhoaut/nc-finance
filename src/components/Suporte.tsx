@@ -183,7 +183,7 @@ const PERGUNTAS: Pergunta[] = [
   {
     tema: "Importação",
     pergunta: "O banco é detectado sozinho?",
-    resposta: "Quando dá: se o arquivo tiver uma coluna de banco, ela vale; senão, um banco no nome do arquivo (ex.: “BRADESCO_vencidos.pdf”) é usado para todos os registros. Sem nenhum dos dois, o campo fica em branco para você preencher.",
+    resposta: "Quando dá: se o arquivo tiver uma coluna de banco, ela vale; senão, um banco no nome do arquivo (ex.: “BRADESCO_vencidos.pdf”) é usado para todos os registros (com dois bancos no nome, como “VENCIDOS ASSET + ABR”, nenhum é usado, porque não dá para saber de qual é cada título). Coluna “Factoring” também conta como banco. Sem nenhum dos dois, o campo fica em branco para você preencher.",
   },
   {
     tema: "Importação",

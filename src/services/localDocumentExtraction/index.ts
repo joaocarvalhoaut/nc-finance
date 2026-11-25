@@ -32,18 +32,14 @@ import { ensureNinthDigit } from "../../../supabase/functions/_shared/brPhone.ts
  * Tenta extrair o nome do banco a partir do nome do arquivo.
  * Ex: "VENCIDOS_ABR_maio.pdf" → "ABR"
  *     "BRADESCO vencidos 2026.pdf" → "BRADESCO"
- * Retorna string vazia se não encontrar.
+ *     "VENCIDOS ASSET + ABR.xlsx" → ["ASSET", "ABR"] (dois: nenhum vale para todos)
+ * Retorna lista vazia se não encontrar.
  */
-function extractBankFromFilename(filename: string): string {
+function banksFromFilename(filename: string): string[] {
   const stem = filename.replace(/\.[^.]+$/, ""); // remove extensão
-  // Tokeniza por espaço, underscore, hífen, ponto
-  const tokens = stem.split(/[\s_\-\.]+/).map((t) => t.toUpperCase().replace(/[^A-ZÁÉÍÓÚÂÊÎÔÛÃÕÀÇ]/gi, ""));
-  for (const token of tokens) {
-    if (token.length >= 2 && BANK_INSTITUTION_KEYWORDS.has(token)) {
-      return token;
-    }
-  }
-  return "";
+  // Tokeniza por espaço, underscore, hífen, ponto, "+"
+  const tokens = stem.split(/[\s_\-\.+]+/).map((t) => t.toUpperCase().replace(/[^A-ZÁÉÍÓÚÂÊÎÔÛÃÕÀÇ]/gi, ""));
+  return [...new Set(tokens.filter((t) => t.length >= 2 && BANK_INSTITUTION_KEYWORDS.has(t)))];
 }
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -257,10 +253,15 @@ function extrair(ctx: Contexto): LocalExtractionResult {
     }
   }
 
-  // Banco pelo nome do arquivo (prioridade para registros sem banco).
-  const bankFromFilename = ctx.nomeArquivo ? extractBankFromFilename(ctx.nomeArquivo) : "";
+  // Banco pelo nome do arquivo (prioridade para registros sem banco). Com dois
+  // ou mais no nome ("VENCIDOS ASSET + ABR"), não dá para saber qual é de cada
+  // título: nenhum é aplicado, e vale só a coluna de banco, se houver.
+  const bancosNoNome = ctx.nomeArquivo ? banksFromFilename(ctx.nomeArquivo) : [];
+  const bankFromFilename = bancosNoNome.length === 1 ? bancosNoNome[0] : "";
   if (bankFromFilename) {
     warnings.push(`Banco detectado no nome do arquivo: "${bankFromFilename}" — será usado como padrão para todos os registros sem banco definido.`);
+  } else if (bancosNoNome.length > 1 && candidates.some((c) => !c.bank)) {
+    warnings.push(`O nome do arquivo cita ${bancosNoNome.join(" e ")}: sem coluna de banco, não dá para saber de qual é cada título. Confira o banco na revisão.`);
   }
 
   const conversionResults = candidates

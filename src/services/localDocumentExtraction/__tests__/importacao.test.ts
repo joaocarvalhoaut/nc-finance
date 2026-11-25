@@ -249,6 +249,27 @@ section("Títulos com R$ e banco abreviado");
   eq([...new Set(bco.candidates.map((c) => c.bank))], ["SICOOB"], "\"Bco.\" é o banco");
 }
 
+section("Relatório de factoring (banco por linha, valor aberto, nosso número)");
+{
+  const rel = [
+    ["Factoring", "Vencimento", "Sacado", "Documento", "Nosso Número", "Valor Aberto", "Encargos", "Valor Devido"],
+    ["ASSET", "04/10/2026", "CLIENTE TESTE A LTDA", "DP 101/1", "000012345778", "1912", "79,67", "1991,67"],
+    ["ABR", "06/10/2026", "CLIENTE TESTE B LTDA", "DP 102/1", "000012344817", "2086,52", "79,98", "2166,50"],
+    ["ABR", "08/10/2026", "CLIENTE TESTE C LTDA", "DP 103/1", "000012345022", "646,66", "22,63", "669,29"],
+  ];
+  const f = interpretarTabela(rel);
+  eq(f.candidates.map((c) => c.bank), ["ASSET", "ABR", "ABR"], "coluna \"Factoring\" é o banco de cada título");
+  eq(f.candidates.map((c) => c.value), [1912, 2086.52, 646.66], "\"Valor Aberto\" vence \"Valor Devido\" (encargos o app calcula)");
+  eq(f.candidates.map((c) => c.phone ?? ""), ["", "", ""], "\"Nosso Número\" nunca vira telefone");
+
+  // Dois bancos no nome e sem coluna de banco: nenhum é chutado.
+  const semColuna = rel.map((r) => r.slice(1)).map((r) => r.join(";")).join("\n");
+  const dois = extrairDeTexto(semColuna, "VENCIDOS ASSET + ABR 29_10_2026.xlsx");
+  eq([...new Set(dois.records.map((r) => r.bank))], [""], "nome com dois bancos: banco fica para conferir");
+  const um = extrairDeTexto(semColuna, "VENCIDOS_ASSET_29_10_2026.xlsx");
+  eq([...new Set(um.records.map((r) => r.bank))], ["ASSET"], "nome com um banco: vale para todos");
+}
+
 console.log(`\n${"═".repeat(62)}`);
 console.log(`  Tests: ${passed + failed}  ✓ passed: ${passed}  ✗ failed: ${failed}`);
 console.log(`${"═".repeat(62)}\n`);
